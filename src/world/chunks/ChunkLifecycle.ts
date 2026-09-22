@@ -27,13 +27,13 @@ export interface ChunkSaveRevisionSnapshot {
 
 const LIFECYCLE_TRANSITIONS: Readonly<
   Record<ChunkLifecycleState, readonly ChunkLifecycleState[]>
-> = Object.freeze({
+> = {
   UNLOADED: Object.freeze(['MATERIALIZING']),
   MATERIALIZING: Object.freeze(['ACTIVE', 'FAILED']),
   ACTIVE: Object.freeze(['EVICTING']),
   EVICTING: Object.freeze(['UNLOADED', 'ACTIVE']),
   FAILED: Object.freeze(['MATERIALIZING', 'UNLOADED']),
-});
+};
 
 function requireRevision(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
