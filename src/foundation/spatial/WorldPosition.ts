@@ -1,3 +1,5 @@
+export const WORLD_PIXELS_PER_UNIT = 32;
+
 export interface WorldPosition {
   readonly x: number;
   readonly y: number;
