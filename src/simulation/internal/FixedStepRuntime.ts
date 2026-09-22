@@ -12,7 +12,11 @@ import {
   type PlayerInput,
 } from '../api/PlayerInput';
 import type { SimulationRuntime } from '../api/SimulationRuntime';
-import type { SimulationSnapshot } from '../api/SimulationSnapshot';
+import type { PlayerPersistenceState } from '../api/PlayerPersistenceState';
+import type {
+  FacingDirection,
+  SimulationSnapshot,
+} from '../api/SimulationSnapshot';
 import { PlayerMovementSystem } from './PlayerMovementSystem';
 
 function copyInput(input: PlayerInput): PlayerInput {
@@ -32,8 +36,13 @@ export class FixedStepRuntime implements SimulationRuntime {
   public constructor(
     worldQuery: WorldCollisionQuery,
     initialPlayerPosition: WorldPosition,
+    initialPlayerFacing: FacingDirection | null = null,
   ) {
-    this.movement = new PlayerMovementSystem(worldQuery, initialPlayerPosition);
+    this.movement = new PlayerMovementSystem(
+      worldQuery,
+      initialPlayerPosition,
+      initialPlayerFacing,
+    );
   }
 
   public submitInput(playerId: PlayerId, input: PlayerInput): void {
@@ -60,6 +69,19 @@ export class FixedStepRuntime implements SimulationRuntime {
     return Object.freeze({
       tick: this.tick,
       player: this.movement.getSnapshot(),
+    });
+  }
+
+  public getPlayerPersistenceState(): Readonly<PlayerPersistenceState> | null {
+    const snapshot = this.movement.getSnapshot();
+
+    if (snapshot.facing === null) {
+      return null;
+    }
+
+    return Object.freeze({
+      position: snapshot.position,
+      facing: snapshot.facing,
     });
   }
 }

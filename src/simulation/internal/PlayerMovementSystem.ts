@@ -67,8 +67,10 @@ export class PlayerMovementSystem {
   public constructor(
     private readonly worldQuery: WorldCollisionQuery,
     initialPosition: WorldPosition,
+    initialFacing: FacingDirection | null = null,
   ) {
     this.position = createWorldPosition(initialPosition.x, initialPosition.y);
+    this.facing = initialFacing;
   }
 
   public step(input: PlayerInput, dtSeconds: number): void {

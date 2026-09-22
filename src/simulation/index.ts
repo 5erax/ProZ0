@@ -1,5 +1,6 @@
 import type { WorldPosition } from '../foundation';
 import type { WorldCollisionQuery } from '../world';
+import type { FacingDirection } from './api/SimulationSnapshot';
 import { FixedStepRuntime } from './internal/FixedStepRuntime';
 
 export {
@@ -8,6 +9,7 @@ export {
 } from './api/PlayerInput';
 
 export type { AuthorityRuntime } from './api/AuthorityRuntime';
+export type { PlayerPersistenceState } from './api/PlayerPersistenceState';
 export type { SimulationRuntime } from './api/SimulationRuntime';
 export type {
   FacingDirection,
@@ -30,10 +32,15 @@ export {
 export interface SimulationRuntimeOptions {
   readonly worldQuery: WorldCollisionQuery;
   readonly initialPlayerPosition: WorldPosition;
+  readonly initialPlayerFacing?: FacingDirection | null;
 }
 
 export function createSimulationRuntime(
   options: SimulationRuntimeOptions,
 ): FixedStepRuntime {
-  return new FixedStepRuntime(options.worldQuery, options.initialPlayerPosition);
+  return new FixedStepRuntime(
+    options.worldQuery,
+    options.initialPlayerPosition,
+    options.initialPlayerFacing ?? null,
+  );
 }
