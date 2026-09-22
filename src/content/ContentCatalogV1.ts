@@ -1,5 +1,6 @@
 import {
   canonicalJsonStringify,
+  compareCanonicalStrings,
   sha256HexUtf8,
   type JsonValue,
 } from './CanonicalJson';
@@ -23,23 +24,25 @@ function compareId(
   left: { readonly id: string },
   right: { readonly id: string },
 ): number {
-  return left.id.localeCompare(right.id);
+  return compareCanonicalStrings(left.id, right.id);
 }
 
 function compareItemQuantity(
   left: ItemQuantitySpecV1,
   right: ItemQuantitySpecV1,
 ): number {
-  return left.itemId.localeCompare(right.itemId);
+  return compareCanonicalStrings(left.itemId, right.itemId);
 }
 
 function canonicalizeSkillRequirements(
   requirements: readonly SkillRequirementV1[],
 ): readonly SkillRequirementV1[] {
   return [...requirements].sort((left, right) =>
-    left.type.localeCompare(right.type)
-    || canonicalJsonStringify(left as unknown as JsonValue)
-      .localeCompare(canonicalJsonStringify(right as unknown as JsonValue)),
+    compareCanonicalStrings(left.type, right.type)
+    || compareCanonicalStrings(
+      canonicalJsonStringify(left as unknown as JsonValue),
+      canonicalJsonStringify(right as unknown as JsonValue),
+    ),
   );
 }
 
@@ -52,7 +55,7 @@ function canonicalizeProfessionObjective(
       return {
         ...objective,
         structureIds: [...objective.structureIds].sort((left, right) =>
-          left.localeCompare(right),
+          compareCanonicalStrings(left, right),
         ),
       };
     default:
@@ -68,7 +71,7 @@ function canonicalizeDefinition(
       return {
         ...definition,
         capabilities: [...definition.capabilities].sort((left, right) =>
-          left.localeCompare(right),
+          compareCanonicalStrings(left, right),
         ),
         ...(
           definition.useProfile === undefined
@@ -97,7 +100,7 @@ function canonicalizeDefinition(
       return {
         ...definition,
         roles: [...definition.roles].sort((left, right) =>
-          left.localeCompare(right),
+          compareCanonicalStrings(left, right),
         ),
         ...(definition.container === undefined
           ? {}
@@ -120,7 +123,7 @@ function canonicalizeDefinition(
       return {
         ...definition,
         mitigationItemIds: [...definition.mitigationItemIds].sort(
-          (left, right) => left.localeCompare(right),
+          (left, right) => compareCanonicalStrings(left, right),
         ),
       };
 
@@ -128,7 +131,7 @@ function canonicalizeDefinition(
       return {
         ...definition,
         hazardIds: [...definition.hazardIds].sort((left, right) =>
-          left.localeCompare(right),
+          compareCanonicalStrings(left, right),
         ),
         firstSessionStartWindowActiveMinutes: [
           definition.firstSessionStartWindowActiveMinutes[0],
