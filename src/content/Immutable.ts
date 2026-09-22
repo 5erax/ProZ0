@@ -12,7 +12,7 @@ export function isPlainObject(
 }
 
 export function isJsonCompatible(value: unknown): value is JsonValue {
-  const seen = new Set<object>();
+  const activePath = new Set<object>();
 
   function visit(candidate: unknown): boolean {
     if (
@@ -31,20 +31,23 @@ export function isJsonCompatible(value: unknown): value is JsonValue {
       return false;
     }
 
-    if (seen.has(candidate)) {
+    if (activePath.has(candidate)) {
       return false;
     }
-    seen.add(candidate);
+    activePath.add(candidate);
+
+    let valid: boolean;
 
     if (Array.isArray(candidate)) {
-      return candidate.every((entry) => visit(entry));
+      valid = candidate.every((entry) => visit(entry));
+    } else if (!isPlainObject(candidate)) {
+      valid = false;
+    } else {
+      valid = Object.values(candidate).every((entry) => visit(entry));
     }
 
-    if (!isPlainObject(candidate)) {
-      return false;
-    }
-
-    return Object.values(candidate).every((entry) => visit(entry));
+    activePath.delete(candidate);
+    return valid;
   }
 
   return visit(value);
