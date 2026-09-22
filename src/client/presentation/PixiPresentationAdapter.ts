@@ -50,6 +50,7 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
 
   private readonly camera = new CameraPresenter();
   private lastRenderTimeMs: number | null = null;
+  private presentationFrame = 0;
 
   private constructor(
     private readonly app: Application,
@@ -189,6 +190,10 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
       obstacle.graphics.zIndex = obstacle.anchorY * 1000;
     }
 
+    this.app.renderer.render(this.app.stage);
+
+    this.presentationFrame += 1;
+    this.canvas.dataset.presentationFrame = String(this.presentationFrame);
     this.canvas.dataset.tick = String(Number(snapshot.tick));
     this.canvas.dataset.interpolationAlpha = alpha.toFixed(4);
     this.canvas.dataset.playerX = snapshot.player.position.x.toFixed(6);
@@ -201,8 +206,6 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
     this.canvas.dataset.cameraY = camera.y.toFixed(6);
     this.canvas.dataset.cameraRasterX = String(camera.rasterX);
     this.canvas.dataset.cameraRasterY = String(camera.rasterY);
-
-    this.app.renderer.render(this.app.stage);
   }
 
   public destroy(): void {
