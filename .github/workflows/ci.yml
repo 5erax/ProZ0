@@ -38,3 +38,12 @@ jobs:
         run: npm run test:browser
       - name: E2E smoke
         run: npm run test:e2e
+
+      - name: Upload P0-BUG-001 responsiveness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-bug-001-responsiveness-${{ github.sha }}
+          path: test-results/p0-bug-001/*.json
+          if-no-files-found: ignore
+          retention-days: 30
