@@ -1,3 +1,4 @@
+import type { WorldCollisionQuery } from '../api/WorldCollisionQuery';
 import { createStaticSolidAabb, type StaticSolidAabb } from '../collision/Aabb';
 import { StaticCollisionWorld } from '../internal/StaticCollisionWorld';
 
@@ -7,6 +8,6 @@ export const PHASE0_MOVEMENT_DEMO_SOLIDS: readonly StaticSolidAabb[] = Object.fr
   createStaticSolidAabb('west-pillar', -2.5, -1.25, -1.75, -0.5),
 ]);
 
-export function createPhase0MovementDemoWorld(): StaticCollisionWorld {
+export function createPhase0MovementDemoWorld(): WorldCollisionQuery {
   return new StaticCollisionWorld(PHASE0_MOVEMENT_DEMO_SOLIDS);
 }
