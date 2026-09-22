@@ -54,6 +54,18 @@ function toneForMode(mode: VisualQaMode): GroundTone {
   return mode === 'light' ? 'light' : 'dark';
 }
 
+function createPresentationOptions(
+  groundTone: GroundTone,
+  displayScale: number | undefined,
+  tallDepthVisual?: TallDepthVisual,
+): Omit<PixiPresentationOptions, 'solids'> {
+  return Object.freeze({
+    groundTone,
+    ...(displayScale === undefined ? {} : { displayScale }),
+    ...(tallDepthVisual === undefined ? {} : { tallDepthVisual }),
+  });
+}
+
 export function resolveVisualQaFixture(search: string): VisualQaFixture {
   const params = new URLSearchParams(search);
   const mode = parseMode(params.get('qaVisual'));
@@ -63,11 +75,11 @@ export function resolveVisualQaFixture(search: string): VisualQaFixture {
     return Object.freeze({
       mode,
       initialPlayerPosition: createWorldPosition(0, -0.75),
-      presentation: Object.freeze({
-        groundTone: 'dark',
+      presentation: createPresentationOptions(
+        'dark',
         displayScale,
-        tallDepthVisual: DEPTH_TEST_OBJECT,
-      }),
+        DEPTH_TEST_OBJECT,
+      ),
     });
   }
 
@@ -75,19 +87,16 @@ export function resolveVisualQaFixture(search: string): VisualQaFixture {
     return Object.freeze({
       mode,
       initialPlayerPosition: createWorldPosition(-1.25, 0),
-      presentation: Object.freeze({
-        groundTone: 'dark',
-        displayScale,
-      }),
+      presentation: createPresentationOptions('dark', displayScale),
     });
   }
 
   return Object.freeze({
     mode,
     initialPlayerPosition: createWorldPosition(0, 0),
-    presentation: Object.freeze({
-      groundTone: toneForMode(mode),
+    presentation: createPresentationOptions(
+      toneForMode(mode),
       displayScale,
-    }),
+    ),
   });
 }
