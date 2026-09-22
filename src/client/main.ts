@@ -1,6 +1,16 @@
-import type { PlayerId } from '../foundation';
-import { NEUTRAL_PLAYER_INPUT } from '../simulation';
+import {
+  createWorldPosition,
+  type PlayerId,
+} from '../foundation';
+import {
+  createPhase0MovementDemoWorld,
+  PHASE0_MOVEMENT_DEMO_SOLIDS,
+} from '../world';
 import { KeyboardInputAdapter } from './input/KeyboardInputAdapter';
+import {
+  isMovementInputCode,
+  mapMovementInput,
+} from './input/MovementInputMapper';
 import { createPixiPresentationAdapter } from './presentation';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
@@ -14,9 +24,17 @@ export interface RuntimeHandle {
 export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
   root.dataset.runtimeStatus = 'booting';
 
-  const authority = new LocalAuthorityHost();
-  const input = new KeyboardInputAdapter(() => NEUTRAL_PLAYER_INPUT);
-  const presentation = await createPixiPresentationAdapter(root);
+  const authority = new LocalAuthorityHost({
+    worldQuery: createPhase0MovementDemoWorld(),
+    initialPlayerPosition: createWorldPosition(0, 0),
+  });
+  const input = new KeyboardInputAdapter(
+    mapMovementInput,
+    isMovementInputCode,
+  );
+  const presentation = await createPixiPresentationAdapter(root, {
+    solids: PHASE0_MOVEMENT_DEMO_SOLIDS,
+  });
 
   authority.start();
   input.start();
