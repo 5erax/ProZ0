@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 
 const SAMPLE_COUNT = 40;
 const THRESHOLD_MS = 50;
+const PHASE_OFFSETS_MS = Object.freeze([0, 2, 4, 6, 8, 10, 12, 14]);
 const EVIDENCE_PATH = resolve(
   process.cwd(),
   'test-results/p0-bug-001/movement-responsiveness.json',
@@ -15,6 +16,7 @@ interface Sample {
   readonly observedFrame: number;
   readonly beforeX: number;
   readonly afterX: number;
+  readonly phaseOffsetMs: number;
 }
 
 interface MetricSummary {
@@ -71,13 +73,20 @@ async function measureStart(
   page: Page,
   code: 'KeyA' | 'KeyD',
   direction: -1 | 1,
+  phaseOffsetMs: number,
 ): Promise<Sample> {
   return page.evaluate(
-    async ({ keyCode, sign }) => {
+    async ({ keyCode, sign, phaseOffset }) => {
       const canvas = document.querySelector<HTMLCanvasElement>('#proz0-canvas');
       if (canvas === null) {
         throw new Error('Missing ProZ0 canvas.');
       }
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, phaseOffset);
+        });
+      });
 
       const beforeX = Number(canvas.dataset.playerX);
       const startFrame = Number(canvas.dataset.presentationFrame ?? '0');
@@ -95,6 +104,7 @@ async function measureStart(
         observedFrame: number;
         beforeX: number;
         afterX: number;
+        phaseOffsetMs: number;
       }>((resolve, reject) => {
         const deadline = startedAt + 250;
 
@@ -109,6 +119,7 @@ async function measureStart(
               observedFrame: Number(canvas.dataset.presentationFrame ?? '0'),
               beforeX,
               afterX,
+              phaseOffsetMs: phaseOffset,
             });
             return;
           }
@@ -124,16 +135,17 @@ async function measureStart(
         requestAnimationFrame(check);
       });
     },
-    { keyCode: code, sign: direction },
+    { keyCode: code, sign: direction, phaseOffset: phaseOffsetMs },
   );
 }
 
 async function measureStop(
   page: Page,
   code: 'KeyA' | 'KeyD',
+  phaseOffsetMs: number,
 ): Promise<Sample> {
   return page.evaluate(
-    async (keyCode) => {
+    async ({ keyCode, phaseOffset }) => {
       const canvas = document.querySelector<HTMLCanvasElement>('#proz0-canvas');
       if (canvas === null) {
         throw new Error('Missing ProZ0 canvas.');
@@ -181,7 +193,7 @@ async function measureStop(
         requestAnimationFrame(check);
       });
     },
-    code,
+    { keyCode: code, phaseOffset: phaseOffsetMs },
   );
 }
 
@@ -216,9 +228,10 @@ async function measureDirectionChange(
   toCode: 'KeyA' | 'KeyD',
   expectedFacing: 'E' | 'W',
   direction: -1 | 1,
+  phaseOffsetMs: number,
 ): Promise<Sample> {
   return page.evaluate(
-    async ({ fromKey, toKey, facing, sign }) => {
+    async ({ fromKey, toKey, facing, sign, phaseOffset }) => {
       const canvas = document.querySelector<HTMLCanvasElement>('#proz0-canvas');
       if (canvas === null) {
         throw new Error('Missing ProZ0 canvas.');
@@ -284,6 +297,7 @@ async function measureDirectionChange(
       toKey: toCode,
       facing: expectedFacing,
       sign: direction,
+      phaseOffset: phaseOffsetMs,
     },
   );
 }
@@ -320,11 +334,12 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
     const oppositeCode = startsRight ? 'KeyA' : 'KeyD';
     const oppositeDirection = startsRight ? -1 : 1;
     const oppositeFacing = startsRight ? 'W' : 'E';
+    const phaseOffsetMs = PHASE_OFFSETS_MS[index % PHASE_OFFSETS_MS.length]!;
 
     startSamples.push(
-      await measureStart(page, primaryCode, primaryDirection),
+      await measureStart(page, primaryCode, primaryDirection, phaseOffsetMs),
     );
-    stopSamples.push(await measureStop(page, primaryCode));
+    stopSamples.push(await measureStop(page, primaryCode, phaseOffsetMs));
 
     await prepareMoving(page, primaryCode, primaryFacing);
     directionSamples.push(
@@ -334,6 +349,7 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
         oppositeCode,
         oppositeFacing,
         oppositeDirection,
+        phaseOffsetMs,
       ),
     );
 
@@ -364,6 +380,7 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
     thresholdMs: THRESHOLD_MS,
     percentileMethod: 'nearest-rank ceil(0.95 * N)',
     sampleCountPerMetric: SAMPLE_COUNT,
+    phaseOffsetsMs: PHASE_OFFSETS_MS,
     measurementBoundary:
       'browser KeyboardEvent dispatch -> post-Pixi-render canvas presentation diagnostics observed on requestAnimationFrame',
     baseline: {
@@ -374,7 +391,8 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
       internalRaster: { width: 640, height: 360 },
       displayScale: 2,
     },
-    commit: process.env.GITHUB_SHA ?? 'local-worktree',
+    testedHead: process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
+    workflowCommit: process.env.GITHUB_SHA ?? 'local-worktree',
     generatedAt: new Date().toISOString(),
     metrics,
     rawSamples: {
@@ -383,6 +401,18 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
       directionChange: directionSamples,
     },
   };
+
+  console.log(
+    '[P0-BUG-001]',
+    JSON.stringify({
+      sampleCountPerMetric: SAMPLE_COUNT,
+      phaseOffsetsMs: PHASE_OFFSETS_MS,
+      movementStartP95Ms: metrics.movementStart.p95Ms,
+      movementStopP95Ms: metrics.movementStop.p95Ms,
+      directionChangeP95Ms: metrics.directionChange.p95Ms,
+      thresholdMs: THRESHOLD_MS,
+    }),
+  );
 
   mkdirSync(dirname(EVIDENCE_PATH), { recursive: true });
   writeFileSync(EVIDENCE_PATH, JSON.stringify(report, null, 2) + '\n', 'utf8');
