@@ -37,7 +37,8 @@ function canonicalizeSkillRequirements(
   requirements: readonly SkillRequirementV1[],
 ): readonly SkillRequirementV1[] {
   return [...requirements].sort((left, right) =>
-    canonicalJsonStringify(left as unknown as JsonValue)
+    left.type.localeCompare(right.type)
+    || canonicalJsonStringify(left as unknown as JsonValue)
       .localeCompare(canonicalJsonStringify(right as unknown as JsonValue)),
   );
 }
