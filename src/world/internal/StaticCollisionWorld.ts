@@ -126,7 +126,7 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
 
     return Object.freeze({
       allowedDelta,
-      blocked: hitSolidId !== undefined,
+      blocked: allowedDelta !== desiredDelta,
       ...(hitSolidId === undefined ? {} : { hitSolidId }),
     });
   }
@@ -181,7 +181,7 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
 
     return Object.freeze({
       allowedDelta,
-      blocked: hitSolidId !== undefined,
+      blocked: allowedDelta !== desiredDelta,
       ...(hitSolidId === undefined ? {} : { hitSolidId }),
     });
   }
