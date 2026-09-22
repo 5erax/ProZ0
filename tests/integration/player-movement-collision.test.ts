@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SIMULATION_STEP_SECONDS,
   createSimulationStep,
   createWorldPosition,
   toSimulationTick,
 } from '../../src/foundation';
 import {
+  CameraPresenter,
+} from '../../src/client/presentation/CameraPresenter';
+import {
+  projectPlayerPresentation,
+  type PlayerPresentationFrame,
+} from '../../src/client/presentation/PlayerPresentation';
+import {
+  FixedStepHost,
+  type FrameScheduler,
+} from '../../src/client/runtime/FixedStepHost';
+import {
   createSimulationRuntime,
   INV_SQRT_2,
+  PLAYER_COLLISION_FOOTPRINT,
   PLAYER_MOVEMENT_CONFIG,
   type PlayerInput,
 } from '../../src/simulation';
@@ -44,6 +57,8 @@ const DOWN_RIGHT: PlayerInput = Object.freeze({
   moveRight: true,
 });
 
+const TECH008_MAX_EPSILON_WU = 1 / 32768;
+
 function createRuntime(
   solids: readonly StaticSolidAabb[],
   x = 0,
@@ -64,6 +79,42 @@ function runTicks(
   for (let tick = startTick; tick < startTick + count; tick += 1) {
     runtime.submitInput('test-player', input);
     runtime.step(createSimulationStep(toSimulationTick(tick)));
+  }
+}
+
+class DeterministicFrameScheduler implements FrameScheduler {
+  private nowMs = 0;
+  private frameId = 0;
+  private pending:
+    | { readonly id: number; readonly callback: (timeMs: number) => void }
+    | null = null;
+
+  public now(): number {
+    return this.nowMs;
+  }
+
+  public requestFrame(callback: (timeMs: number) => void): number {
+    this.frameId += 1;
+    this.pending = { id: this.frameId, callback };
+    return this.frameId;
+  }
+
+  public cancelFrame(frameId: number): void {
+    if (this.pending?.id === frameId) {
+      this.pending = null;
+    }
+  }
+
+  public advanceBy(deltaMs: number): void {
+    const pending = this.pending;
+
+    if (pending === null) {
+      throw new Error('No scheduled render frame is pending.');
+    }
+
+    this.pending = null;
+    this.nowMs += deltaMs;
+    pending.callback(this.nowMs);
   }
 }
 
@@ -138,6 +189,22 @@ describe('P0-TECH-008 movement/collision fixtures', () => {
       .toBeLessThanOrEqual(-0.1875);
   });
 
+  it('keeps a sub-epsilon-below-20px gap blocked', () => {
+    const gap = PLAYER_COLLISION_FOOTPRINT.width - TECH008_MAX_EPSILON_WU / 2;
+    const halfGap = gap / 2;
+    const solids = [
+      createStaticSolidAabb('left', -1, 0, -halfGap, 3),
+      createStaticSolidAabb('right', halfGap, 0, 1, 3),
+    ];
+    const runtime = createRuntime(solids, 0, -0.5);
+
+    runTicks(runtime, DOWN, 30);
+
+    expect(runtime.getSnapshot().player.position.y)
+      .toBeLessThanOrEqual(-PLAYER_COLLISION_FOOTPRINT.halfDepth);
+    expect(runtime.getSnapshot().player.collision.blockedY).toBe(true);
+  });
+
   it('T6 traverses an exactly 20 px aligned corridor', () => {
     const halfGap = 0.625 / 2;
     const solids = [
@@ -194,41 +261,134 @@ describe('P0-TECH-008 movement/collision fixtures', () => {
     expect(first.getSnapshot().player).toEqual(second.getSnapshot().player);
   });
 
-  it('T10 keeps collision state independent from presentation frame metadata', () => {
-    const wall = createStaticSolidAabb('wall', 2, -2, 2.5, 2);
-    const smallVisualFrame = Object.freeze({ width: 16, height: 24 });
-    const largeVisualFrame = Object.freeze({ width: 64, height: 96 });
+  it('always clamps to the nearest physical boundary even inside epsilon distance', () => {
+    const nearBoundary = PLAYER_COLLISION_FOOTPRINT.halfWidth + 0.02;
+    const fartherBoundary = nearBoundary + TECH008_MAX_EPSILON_WU / 2;
+    const near = createStaticSolidAabb(
+      'z-near',
+      nearBoundary,
+      -1,
+      nearBoundary + 0.25,
+      1,
+    );
+    const farther = createStaticSolidAabb(
+      'a-farther',
+      fartherBoundary,
+      -1,
+      fartherBoundary + 0.25,
+      1,
+    );
+    const runtime = createRuntime([near, farther]);
 
+    runTicks(runtime, RIGHT, 1);
+
+    const player = runtime.getSnapshot().player;
+    expect(player.position.x).toBeCloseTo(0.02, 14);
+    expect(player.collision.hitSolidX).toBe('z-near');
+    expect(player.collision.blockedX).toBe(true);
+  });
+
+  it('T10 varies the production presentation frame seam without changing collision', () => {
+    const wall = createStaticSolidAabb('wall', 2, -2, 2.5, 2);
     const first = createRuntime([wall], 1.5, 0);
     const second = createRuntime([wall], 1.5, 0);
-
-    void smallVisualFrame;
-    void largeVisualFrame;
 
     runTicks(first, RIGHT, 20);
     runTicks(second, RIGHT, 20);
 
-    expect(first.getSnapshot().player).toEqual(second.getSnapshot().player);
+    const firstPlayer = first.getSnapshot().player;
+    const secondPlayer = second.getSnapshot().player;
+    expect(firstPlayer).toEqual(secondPlayer);
+
+    const camera = new CameraPresenter();
+    camera.snapTo(firstPlayer.position);
+    const cameraPosition = camera.getPosition();
+
+    const smallFrame: PlayerPresentationFrame = Object.freeze({
+      widthPx: 16,
+      heightPx: 24,
+      bodyWidthPx: 12,
+      bodyHeightPx: 22,
+    });
+    const largeFrame: PlayerPresentationFrame = Object.freeze({
+      widthPx: 64,
+      heightPx: 96,
+      bodyWidthPx: 48,
+      bodyHeightPx: 88,
+    });
+
+    const smallProjection = projectPlayerPresentation(
+      firstPlayer,
+      cameraPosition,
+      smallFrame,
+    );
+    const largeProjection = projectPlayerPresentation(
+      secondPlayer,
+      cameraPosition,
+      largeFrame,
+    );
+
+    expect(smallProjection.anchorX).toBe(largeProjection.anchorX);
+    expect(smallProjection.anchorY).toBe(largeProjection.anchorY);
+    expect(smallProjection.frameRight - smallProjection.frameLeft).toBe(16);
+    expect(largeProjection.frameRight - largeProjection.frameLeft).toBe(64);
+    expect(firstPlayer.position.x).toBe(1.6875);
+    expect(firstPlayer.collision.blockedX).toBe(true);
   });
 
-  it('T11 produces the same authoritative state across different presentation read cadences', () => {
-    const runtimeA = createRuntime([]);
-    const runtimeB = createRuntime([]);
+  it('T11 keeps authoritative state identical across real host render cadences', () => {
+    function runWithCadence(
+      simulationStepsPerRender: number,
+      renderFrames: number,
+    ) {
+      const runtime = createRuntime([]);
+      const scheduler = new DeterministicFrameScheduler();
+      const camera = new CameraPresenter();
+      let presentationRenderCount = 0;
 
-    for (let tick = 1; tick <= 120; tick += 1) {
-      runtimeA.submitInput('test-player', UP_RIGHT);
-      runtimeA.step(createSimulationStep(toSimulationTick(tick)));
-      runtimeA.getSnapshot();
+      const host = new FixedStepHost({
+        onStep: (step) => {
+          runtime.submitInput('test-player', UP_RIGHT);
+          runtime.step(step);
+        },
+        onRender: () => {
+          const snapshot = runtime.getSnapshot();
+          camera.update(
+            snapshot.player.position,
+            simulationStepsPerRender * SIMULATION_STEP_SECONDS,
+          );
+          projectPlayerPresentation(
+            snapshot.player,
+            camera.getPosition(),
+          );
+          presentationRenderCount += 1;
+        },
+      }, scheduler);
 
-      runtimeB.submitInput('test-player', UP_RIGHT);
-      runtimeB.step(createSimulationStep(toSimulationTick(tick)));
+      host.start();
 
-      if (tick % 4 === 0) {
-        runtimeB.getSnapshot();
+      for (let frame = 0; frame < renderFrames; frame += 1) {
+        scheduler.advanceBy(
+          simulationStepsPerRender * SIMULATION_STEP_SECONDS * 1000,
+        );
       }
+
+      host.stop();
+
+      return {
+        snapshot: runtime.getSnapshot(),
+        presentationRenderCount,
+      };
     }
 
-    expect(runtimeA.getSnapshot()).toEqual(runtimeB.getSnapshot());
+    const sixtyFps = runWithCadence(1, 12);
+    const twentyFps = runWithCadence(3, 4);
+
+    expect(sixtyFps.presentationRenderCount).toBe(12);
+    expect(twentyFps.presentationRenderCount).toBe(4);
+    expect(Number(sixtyFps.snapshot.tick)).toBe(12);
+    expect(Number(twentyFps.snapshot.tick)).toBe(12);
+    expect(sixtyFps.snapshot).toEqual(twentyFps.snapshot);
   });
 });
 
