@@ -34,14 +34,18 @@ async function openFixture(
 }
 
 async function canvasSizing(page: Page): Promise<CanvasSizing> {
-  return page.locator('#proz0-canvas').evaluate((canvas) => ({
-    internalWidth: canvas.width,
-    internalHeight: canvas.height,
+  return page.locator('#proz0-canvas').evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+
+    return {
+      internalWidth: canvas.width,
+      internalHeight: canvas.height,
     cssWidth: Number.parseInt(canvas.style.width, 10),
     cssHeight: Number.parseInt(canvas.style.height, 10),
     displayScale: canvas.dataset.displayScale,
-    imageRendering: canvas.style.imageRendering,
-  }));
+      imageRendering: canvas.style.imageRendering,
+    };
+  });
 }
 
 async function captureCanvas(page: Page, fileName: string): Promise<void> {
