@@ -30,6 +30,7 @@ const BROWSER_FRAME_SCHEDULER: FrameScheduler = Object.freeze({
 });
 
 const SUSPENSION_THRESHOLD_MS = 250;
+const HOST_ACCUMULATOR_EPSILON_SECONDS = 1e-12;
 
 export class FixedStepHost {
   private animationFrameId: number | null = null;
@@ -84,10 +85,16 @@ export class FixedStepHost {
 
     this.accumulatorSeconds += elapsedMs / 1000;
 
-    while (this.accumulatorSeconds >= SIMULATION_STEP_SECONDS) {
+    while (
+      this.accumulatorSeconds + HOST_ACCUMULATOR_EPSILON_SECONDS
+      >= SIMULATION_STEP_SECONDS
+    ) {
       this.tick = toSimulationTick(Number(this.tick) + 1);
       this.callbacks.onStep(createSimulationStep(this.tick));
-      this.accumulatorSeconds -= SIMULATION_STEP_SECONDS;
+      this.accumulatorSeconds = Math.max(
+        0,
+        this.accumulatorSeconds - SIMULATION_STEP_SECONDS,
+      );
     }
 
     const alpha = this.accumulatorSeconds / SIMULATION_STEP_SECONDS;
