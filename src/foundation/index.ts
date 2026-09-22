@@ -13,7 +13,13 @@ export {
   type RngState,
 } from './random/DeterministicRng';
 
-export type { SeedDerivation, SeedDerivationInput } from './random/SeedDerivation';
+export {
+  SEED_DERIVATION_VERSION,
+  StableSeedDerivation,
+  deriveSeedState,
+  type SeedDerivation,
+  type SeedDerivationInput,
+} from './random/SeedDerivation';
 
 export {
   WORLD_PIXELS_PER_UNIT,
