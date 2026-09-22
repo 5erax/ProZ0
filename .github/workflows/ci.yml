@@ -37,6 +37,8 @@ jobs:
       - name: Browser tests
         run: npm run test:browser
       - name: E2E smoke
+        env:
+          P0_TEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run test:e2e
 
       - name: Upload P0-BUG-001 responsiveness evidence
