@@ -1,3 +1,5 @@
+import { compareCanonicalStrings } from './CanonicalJson';
+
 export type ContentValidationFailureCodeV1 =
   | 'INVALID_FORMAT'
   | 'UNSUPPORTED_SCHEMA_VERSION'
@@ -24,7 +26,7 @@ function compareOptional(
   left: string | undefined,
   right: string | undefined,
 ): number {
-  return (left ?? '').localeCompare(right ?? '');
+  return compareCanonicalStrings(left ?? '', right ?? '');
 }
 
 export function sortContentValidationErrors(
@@ -34,8 +36,8 @@ export function sortContentValidationErrors(
     [...errors].sort((left, right) =>
       compareOptional(left.definitionId, right.definitionId)
       || compareOptional(left.path, right.path)
-      || left.code.localeCompare(right.code)
-      || left.message.localeCompare(right.message),
+      || compareCanonicalStrings(left.code, right.code)
+      || compareCanonicalStrings(left.message, right.message),
     ),
   );
 }
