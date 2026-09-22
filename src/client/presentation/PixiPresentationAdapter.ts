@@ -3,14 +3,19 @@ import { WORLD_PIXELS_PER_UNIT } from '../../foundation';
 import type { FacingDirection, SimulationSnapshot } from '../../simulation';
 import type { StaticSolidAabb } from '../../world';
 import { CameraPresenter } from './CameraPresenter';
+import {
+  DEFAULT_PLAYER_PRESENTATION_FRAME,
+  projectPlayerPresentation,
+  validatePlayerPresentationFrame,
+  type PlayerPresentationFrame,
+} from './PlayerPresentation';
 
 const INTERNAL_WIDTH = 640;
 const INTERNAL_HEIGHT = 360;
-const PLAYER_FRAME_WIDTH_PX = 32;
-const PLAYER_FRAME_HEIGHT_PX = 48;
 
 export interface PixiPresentationOptions {
   readonly solids: readonly StaticSolidAabb[];
+  readonly playerFrame?: PlayerPresentationFrame;
 }
 
 export interface PixiPresentationAdapter {
@@ -52,6 +57,7 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
     private readonly player: Graphics,
     private readonly facingMarker: Graphics,
     private readonly obstacles: readonly ObstacleVisual[],
+    private readonly playerFrame: PlayerPresentationFrame,
     private readonly targetWindow: Window,
   ) {
     this.canvas = canvas;
@@ -62,6 +68,9 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
     root: HTMLElement,
     options: PixiPresentationOptions,
   ): Promise<PixiPresentationAdapterImpl> {
+    const playerFrame = options.playerFrame ?? DEFAULT_PLAYER_PRESENTATION_FRAME;
+    validatePlayerPresentationFrame(playerFrame);
+
     const app = new Application();
 
     await app.init({
@@ -103,7 +112,12 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
     });
 
     const player = new Graphics()
-      .rect(-12, -44, 24, 44)
+      .rect(
+        -playerFrame.bodyWidthPx / 2,
+        -playerFrame.bodyHeightPx,
+        playerFrame.bodyWidthPx,
+        playerFrame.bodyHeightPx,
+      )
       .fill(0xe6f2ff);
     player.zIndex = 0;
     app.stage.addChild(player);
@@ -123,10 +137,11 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
       player,
       facingMarker,
       obstacles,
+      playerFrame,
       targetWindow,
     );
 
-    app.canvas.dataset.playerFrame = `${PLAYER_FRAME_WIDTH_PX}x${PLAYER_FRAME_HEIGHT_PX}`;
+    app.canvas.dataset.playerFrame = `${playerFrame.widthPx}x${playerFrame.heightPx}`;
     adapter.applyIntegerScale();
     app.renderer.render(app.stage);
 
@@ -142,19 +157,19 @@ class PixiPresentationAdapterImpl implements PixiPresentationAdapter {
 
     this.camera.update(snapshot.player.position, deltaSeconds);
     const camera = this.camera.getPosition();
-
-    const playerRasterX = Math.round(
-      snapshot.player.position.x * WORLD_PIXELS_PER_UNIT,
-    );
-    const playerRasterY = Math.round(
-      snapshot.player.position.y * WORLD_PIXELS_PER_UNIT,
+    const playerProjection = projectPlayerPresentation(
+      snapshot.player,
+      camera,
+      this.playerFrame,
+      INTERNAL_WIDTH,
+      INTERNAL_HEIGHT,
     );
 
     this.player.position.set(
-      playerRasterX - camera.rasterX + INTERNAL_WIDTH / 2,
-      playerRasterY - camera.rasterY + INTERNAL_HEIGHT / 2,
+      playerProjection.anchorX,
+      playerProjection.anchorY,
     );
-    this.player.zIndex = snapshot.player.position.y * 1000;
+    this.player.zIndex = playerProjection.zIndex;
 
     const facing = facingOffset(snapshot.player.facing);
     this.facingMarker.position.set(
