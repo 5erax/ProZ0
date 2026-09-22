@@ -93,7 +93,7 @@ async function closeAndDelete(
   await deleteIndexedDbSaveDatabase(databaseName);
 }
 
-describe.sequential('IndexedDbSaveRepository Phase 0 browser persistence', () => {
+describe('IndexedDbSaveRepository Phase 0 browser persistence', () => {
   it('round-trips and reloads the same validated world after repository reopen', async () => {
     const databaseName = 'proz0-test-save-roundtrip';
     const first = new IndexedDbSaveRepository({ databaseName });
