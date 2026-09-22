@@ -12,3 +12,11 @@ export {
   type CameraPresentationPosition,
   type CameraPresenterConfig,
 } from './CameraPresenter';
+
+export {
+  DEFAULT_PLAYER_PRESENTATION_FRAME,
+  projectPlayerPresentation,
+  validatePlayerPresentationFrame,
+  type PlayerPresentationFrame,
+  type PlayerPresentationProjection,
+} from './PlayerPresentation';
