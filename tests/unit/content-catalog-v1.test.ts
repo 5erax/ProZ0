@@ -108,10 +108,8 @@ describe('ContentCatalogV1', () => {
       packId: 'proz0-phase1-vertical-slice',
       packVersion: 1,
     });
-    expect(catalog.compatibility.canonicalFingerprint).toMatch(/^[0-9a-f]{64}$/);
-    console.info(
-      'PHASE1_CANONICAL_FINGERPRINT',
-      catalog.compatibility.canonicalFingerprint,
+    expect(catalog.compatibility.canonicalFingerprint).toBe(
+      '3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c',
     );
 
     const water = catalog.getAs('item:clean-water', 'item');
