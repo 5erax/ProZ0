@@ -637,7 +637,7 @@ BROKEN:
 ## 10.2 Condition loss sources
 
 - Stone Field Tool: 2 per successful hard-resource gather.
-- Basic Spear: 1 per successful committed attack.
+- Basic Spear: 1 condition point per successful hit on a valid hostile target. A whiff/miss does not reduce condition.
 - Thermal Wrap: no passive use decay in Phase 1; it may receive approved death durability penalty from P1-DES-003.
 - Death durability penalty is defined in P1-DES-003.
 
