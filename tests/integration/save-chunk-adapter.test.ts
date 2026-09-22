@@ -35,9 +35,11 @@ class MemorySaveRepository implements SaveRepository {
   }
 
   public async loadPlayer(
-    _worldId: string,
-    _playerId: string,
+    worldId: string,
+    playerId: string,
   ): Promise<SaveResult<PlayerRecordV1>> {
+    void worldId;
+    void playerId;
     return saveFailure('NOT_FOUND', 'player not found');
   }
 
@@ -51,8 +53,9 @@ class MemorySaveRepository implements SaveRepository {
   }
 
   public async loadWorld(
-    _worldId: string,
+    worldId: string,
   ): Promise<SaveResult<PortableSaveBundleV1>> {
+    void worldId;
     return saveFailure('NOT_FOUND', 'not used by this integration fixture');
   }
 
@@ -82,14 +85,16 @@ class MemorySaveRepository implements SaveRepository {
   }
 
   public async exportWorld(
-    _worldId: string,
+    worldId: string,
   ): Promise<SaveResult<PortableSaveBundleV1>> {
+    void worldId;
     return saveFailure('NOT_FOUND', 'not used by this integration fixture');
   }
 
   public async importWorld(
-    _bundle: unknown,
+    bundle: unknown,
   ): Promise<SaveResult<{ readonly worldId: string }>> {
+    void bundle;
     return saveFailure('STORAGE_FAILURE', 'not used by this integration fixture');
   }
 }
