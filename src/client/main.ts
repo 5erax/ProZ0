@@ -1,5 +1,4 @@
 import {
-  createWorldPosition,
   type PlayerId,
 } from '../foundation';
 import {
@@ -12,6 +11,7 @@ import {
   mapMovementInput,
 } from './input/MovementInputMapper';
 import { createPixiPresentationAdapter } from './presentation';
+import { resolveVisualQaFixture } from './qa/VisualQaFixture';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
 
@@ -24,9 +24,12 @@ export interface RuntimeHandle {
 export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
   root.dataset.runtimeStatus = 'booting';
 
+  const visualQaFixture = resolveVisualQaFixture(window.location.search);
+  root.dataset.visualQaMode = visualQaFixture.mode;
+
   const authority = new LocalAuthorityHost({
     worldQuery: createPhase0MovementDemoWorld(),
-    initialPlayerPosition: createWorldPosition(0, 0),
+    initialPlayerPosition: visualQaFixture.initialPlayerPosition,
   });
   const input = new KeyboardInputAdapter(
     mapMovementInput,
@@ -34,6 +37,7 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
   );
   const presentation = await createPixiPresentationAdapter(root, {
     solids: PHASE0_MOVEMENT_DEMO_SOLIDS,
+    ...visualQaFixture.presentation,
   });
 
   authority.start();
