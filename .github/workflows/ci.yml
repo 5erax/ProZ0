@@ -49,3 +49,12 @@ jobs:
           path: test-results/p0-bug-001/*.json
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload P0-BUG-002 visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-bug-002-visual-evidence-${{ github.sha }}
+          path: test-results/p0-bug-002/
+          if-no-files-found: ignore
+          retention-days: 30
