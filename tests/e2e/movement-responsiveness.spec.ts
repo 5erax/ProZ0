@@ -151,6 +151,12 @@ async function measureStop(
         throw new Error('Missing ProZ0 canvas.');
       }
 
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, phaseOffset);
+        });
+      });
+
       const beforeX = Number(canvas.dataset.playerX);
       const startFrame = Number(canvas.dataset.presentationFrame ?? '0');
       const startedAt = performance.now();
@@ -167,6 +173,7 @@ async function measureStop(
         observedFrame: number;
         beforeX: number;
         afterX: number;
+        phaseOffsetMs: number;
       }>((resolve, reject) => {
         const deadline = startedAt + 250;
 
@@ -178,6 +185,7 @@ async function measureStop(
               observedFrame: Number(canvas.dataset.presentationFrame ?? '0'),
               beforeX,
               afterX: Number(canvas.dataset.playerX),
+              phaseOffsetMs: phaseOffset,
             });
             return;
           }
@@ -237,6 +245,12 @@ async function measureDirectionChange(
         throw new Error('Missing ProZ0 canvas.');
       }
 
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, phaseOffset);
+        });
+      });
+
       const beforeX = Number(canvas.dataset.playerX);
       const startFrame = Number(canvas.dataset.presentationFrame ?? '0');
       const startedAt = performance.now();
@@ -258,6 +272,7 @@ async function measureDirectionChange(
         observedFrame: number;
         beforeX: number;
         afterX: number;
+        phaseOffsetMs: number;
       }>((resolve, reject) => {
         const deadline = startedAt + 250;
 
@@ -277,6 +292,7 @@ async function measureDirectionChange(
               observedFrame: Number(canvas.dataset.presentationFrame ?? '0'),
               beforeX,
               afterX,
+              phaseOffsetMs: phaseOffset,
             });
             return;
           }
