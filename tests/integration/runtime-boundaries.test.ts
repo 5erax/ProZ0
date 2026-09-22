@@ -13,8 +13,10 @@ describe('simulation public boundary', () => {
     runtime.submitInput('test-player', NEUTRAL_PLAYER_INPUT);
     runtime.step(createSimulationStep(toSimulationTick(1)));
 
-    expect(Number(runtime.getSnapshot().tick)).toBe(1);
-    expect(runtime.getSnapshot().runtimeMode).toBe('local-authority');
+    const snapshot = runtime.getSnapshot();
+
+    expect(Number(snapshot.tick)).toBe(1);
+    expect(Object.keys(snapshot)).toEqual(['tick']);
     expect(SIMULATION_STEP_SECONDS).toBe(1 / 60);
   });
 
