@@ -4,20 +4,41 @@ import {
   type PlayerId,
   type SimulationStep,
   type SimulationTick,
+  type WorldPosition,
 } from '../../foundation';
-import type { PlayerInput } from '../api/PlayerInput';
+import type { WorldCollisionQuery } from '../../world';
+import {
+  NEUTRAL_PLAYER_INPUT,
+  type PlayerInput,
+} from '../api/PlayerInput';
 import type { SimulationRuntime } from '../api/SimulationRuntime';
 import type { SimulationSnapshot } from '../api/SimulationSnapshot';
+import { PlayerMovementSystem } from './PlayerMovementSystem';
+
+function copyInput(input: PlayerInput): PlayerInput {
+  return Object.freeze({
+    moveUp: input.moveUp,
+    moveDown: input.moveDown,
+    moveLeft: input.moveLeft,
+    moveRight: input.moveRight,
+  });
+}
 
 export class FixedStepRuntime implements SimulationRuntime {
   private tick: SimulationTick = toSimulationTick(0);
+  private currentInput: PlayerInput = NEUTRAL_PLAYER_INPUT;
+  private readonly movement: PlayerMovementSystem;
+
+  public constructor(
+    worldQuery: WorldCollisionQuery,
+    initialPlayerPosition: WorldPosition,
+  ) {
+    this.movement = new PlayerMovementSystem(worldQuery, initialPlayerPosition);
+  }
 
   public submitInput(playerId: PlayerId, input: PlayerInput): void {
     void playerId;
-    void input;
-
-    // P0-ENG-001 establishes the logical input boundary only.
-    // Gameplay consumption belongs to an authorized gameplay task.
+    this.currentInput = copyInput(input);
   }
 
   public step(step: SimulationStep): void {
@@ -31,12 +52,14 @@ export class FixedStepRuntime implements SimulationRuntime {
       throw new Error('SimulationRuntime only accepts the approved fixed 60 Hz step.');
     }
 
+    this.movement.step(this.currentInput, step.dtSeconds);
     this.tick = step.tick;
   }
 
   public getSnapshot(): Readonly<SimulationSnapshot> {
     return Object.freeze({
       tick: this.tick,
+      player: this.movement.getSnapshot(),
     });
   }
 }

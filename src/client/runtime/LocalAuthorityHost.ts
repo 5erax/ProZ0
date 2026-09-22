@@ -3,12 +3,17 @@ import {
   createSimulationRuntime,
   type AuthorityRuntime,
   type PlayerInput,
+  type SimulationRuntimeOptions,
   type SimulationSnapshot,
 } from '../../simulation';
 
 export class LocalAuthorityHost {
-  private readonly runtime: AuthorityRuntime = createSimulationRuntime();
+  private readonly runtime: AuthorityRuntime;
   private active = false;
+
+  public constructor(options: SimulationRuntimeOptions) {
+    this.runtime = createSimulationRuntime(options);
+  }
 
   public start(): void {
     this.active = true;

@@ -1,12 +1,16 @@
 import type { PlayerInput } from '../../simulation';
 
 export type KeyboardInputMapper = (pressedCodes: ReadonlySet<string>) => PlayerInput;
+export type KeyboardCodeOwnership = (code: string) => boolean;
 
 export class KeyboardInputAdapter {
   private readonly pressedCodes = new Set<string>();
   private target: Window | null = null;
 
-  public constructor(private readonly mapper: KeyboardInputMapper) {}
+  public constructor(
+    private readonly mapper: KeyboardInputMapper,
+    private readonly ownsCode: KeyboardCodeOwnership = () => false,
+  ) {}
 
   public start(target: Window = window): void {
     if (this.target !== null) {
@@ -40,10 +44,18 @@ export class KeyboardInputAdapter {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (this.ownsCode(event.code)) {
+      event.preventDefault();
+    }
+
     this.pressedCodes.add(event.code);
   };
 
   private readonly onKeyUp = (event: KeyboardEvent): void => {
+    if (this.ownsCode(event.code)) {
+      event.preventDefault();
+    }
+
     this.pressedCodes.delete(event.code);
   };
 

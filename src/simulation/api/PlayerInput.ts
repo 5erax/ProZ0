@@ -1,9 +1,13 @@
 export interface PlayerInput {
-  readonly moveX: -1 | 0 | 1;
-  readonly moveY: -1 | 0 | 1;
+  readonly moveUp: boolean;
+  readonly moveDown: boolean;
+  readonly moveLeft: boolean;
+  readonly moveRight: boolean;
 }
 
 export const NEUTRAL_PLAYER_INPUT: PlayerInput = Object.freeze({
-  moveX: 0,
-  moveY: 0,
+  moveUp: false,
+  moveDown: false,
+  moveLeft: false,
+  moveRight: false,
 });
