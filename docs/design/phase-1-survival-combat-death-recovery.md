@@ -365,16 +365,15 @@ Defaults:
 - stamina cost = 15
 - damage = 25
 - cooldown = 0.65 s
-- successful committed attack costs 1 Spear condition whether or not the target ultimately dies.
 
-Targeting:
-- only hostile actor(s) inside attack arc/range can be hit;
-- Phase 1 spear attack damages the nearest valid hostile target in the arc;
+Commit rule:
+- if weapon/stamina/cooldown preconditions are valid, pressing Attack commits the attack and immediately spends 15 Stamina and starts cooldown;
+- at attack resolution, the nearest valid hostile target inside arc/range takes 25 damage;
+- only a successful hit reduces Spear condition by 1;
+- a whiff/miss spends Stamina and cooldown but causes no damage and no condition loss;
 - one attack does not cleave multiple targets.
 
-If no valid target is in range:
-- attack may still animate/present but causes no damage;
-- stamina and condition are spent only when the attack command is validly committed. Final technical command semantics are ADR scope.
+This is the complete player-facing rule; Technical Design owns command/tick implementation but may not reinterpret hit/miss resource costs.
 
 For player readability, implementation must avoid a state where the UI shows a confirmed hit but authority reports no valid target without feedback.
 
