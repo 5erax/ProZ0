@@ -109,6 +109,10 @@ describe('ContentCatalogV1', () => {
       packVersion: 1,
     });
     expect(catalog.compatibility.canonicalFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    console.info(
+      'PHASE1_CANONICAL_FINGERPRINT',
+      catalog.compatibility.canonicalFingerprint,
+    );
 
     const water = catalog.getAs('item:clean-water', 'item');
     expect(water.displayName).toBe('Clean Water');
@@ -270,6 +274,232 @@ describe('ContentCatalogV1', () => {
       () => createContentCatalogV1(invalid),
       'INVALID_FORMAT',
     );
+  });
+
+
+  it.each([
+    [
+      'newer schemaVersion',
+      { ...PHASE1_CONTENT_PACK, schemaVersion: 2 },
+      'UNSUPPORTED_SCHEMA_VERSION',
+    ],
+    [
+      'invalid packVersion',
+      { ...PHASE1_CONTENT_PACK, packVersion: 2 },
+      'INVALID_PACK_VERSION',
+    ],
+  ])('rejects %s', (_name, invalidPack, code) => {
+    expectValidationCode(
+      () => createContentCatalogV1(invalidPack),
+      code,
+    );
+  });
+
+  it('rejects malformed ContentId syntax', () => {
+    const definitions = PHASE1_CONTENT_PACK.definitions.map((definition) =>
+      definition.id === 'item:plant-fiber'
+        ? { ...definition, id: 'Item:Plant Fiber' }
+        : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions,
+      }),
+      'INVALID_CONTENT_ID',
+    );
+  });
+
+  it('rejects ContentId kind-prefix mismatch', () => {
+    const definitions = PHASE1_CONTENT_PACK.definitions.map((definition) =>
+      definition.id === 'item:plant-fiber'
+        ? { ...definition, id: 'recipe:plant-fiber' }
+        : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions,
+      }),
+      'ID_KIND_MISMATCH',
+    );
+  });
+
+  it('rejects non-finite numeric content values', () => {
+    const definitions = PHASE1_CONTENT_PACK.definitions.map((definition) =>
+      definition.id === 'item:plant-fiber' && definition.kind === 'item'
+        ? { ...definition, unitWeightKg: Number.POSITIVE_INFINITY }
+        : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions,
+      }),
+      'INVALID_FORMAT',
+    );
+  });
+
+  it('rejects unknown fields and unknown discriminated profile types', () => {
+    const definitionsWithUnknownField = PHASE1_CONTENT_PACK.definitions.map(
+      (definition) =>
+        definition.id === 'item:plant-fiber'
+          ? { ...definition, rendererAssetKey: 'forbidden-domain-field' }
+          : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions: definitionsWithUnknownField,
+      }),
+      'INVALID_DEFINITION',
+    );
+
+    const definitionsWithUnknownType = PHASE1_CONTENT_PACK.definitions.map(
+      (definition) =>
+        definition.id === 'item:clean-water' && definition.kind === 'item'
+          ? {
+              ...definition,
+              useProfile: {
+                type: 'teleport-player',
+                amount: 25,
+                channelSeconds: 1,
+              },
+            }
+          : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions: definitionsWithUnknownType,
+      }),
+      'INVALID_VALUE',
+    );
+  });
+
+  it('rejects a construction-kit / structure source-kit mismatch', () => {
+    const definitions = PHASE1_CONTENT_PACK.definitions.map((definition) =>
+      definition.id === 'structure:workbench'
+      && definition.kind === 'structure'
+        ? { ...definition, sourceKitItemId: 'item:habitat-kit' }
+        : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions,
+      }),
+      'INVALID_CROSS_REFERENCE',
+    );
+  });
+
+  it('rejects invalid profession skill and quest references', () => {
+    const missingSkill = PHASE1_CONTENT_PACK.definitions.map((definition) =>
+      definition.id === 'profession-quest:chart-the-unknown'
+      && definition.kind === 'profession-quest'
+        ? { ...definition, requiredSkillId: 'skill:missing-fieldcraft' }
+        : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions: missingSkill,
+      }),
+      'MISSING_REFERENCE',
+    );
+
+    const wrongProfessionKind = PHASE1_CONTENT_PACK.definitions.map(
+      (definition) =>
+        definition.id === 'profession-quest:chart-the-unknown'
+        && definition.kind === 'profession-quest'
+          ? { ...definition, rewardProfessionId: 'item:clean-water' }
+          : definition,
+    );
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions: wrongProfessionKind,
+      }),
+      'WRONG_REFERENCE_KIND',
+    );
+
+    const missingQuestObjectiveReference =
+      PHASE1_CONTENT_PACK.definitions.map((definition) => {
+        if (
+          definition.id !== 'profession-quest:chart-the-unknown'
+          || definition.kind !== 'profession-quest'
+        ) {
+          return definition;
+        }
+
+        return {
+          ...definition,
+          objectives: definition.objectives.map((objective) =>
+            objective.type === 'locate-ruin'
+              ? { ...objective, ruinId: 'ruin:missing-ruin' }
+              : objective,
+          ),
+        };
+      });
+
+    expectValidationCode(
+      () => createContentCatalogV1({
+        ...PHASE1_CONTENT_PACK,
+        definitions: missingQuestObjectiveReference,
+      }),
+      'MISSING_REFERENCE',
+    );
+  });
+
+  it('isolates finalized catalog data from later source-object mutation', () => {
+    const source = JSON.parse(JSON.stringify(PHASE1_CONTENT_PACK)) as {
+      definitions: Array<Record<string, unknown>>;
+      [key: string]: unknown;
+    };
+    const catalog = createContentCatalogV1(source);
+    const originalFingerprint = catalog.compatibility.canonicalFingerprint;
+
+    const sourceWater = source.definitions.find(
+      (definition) => definition.id === 'item:clean-water',
+    );
+    expect(sourceWater).toBeDefined();
+
+    sourceWater!.displayName = 'Mutated Water';
+    sourceWater!.unitWeightKg = 999;
+
+    expect(catalog.getAs('item:clean-water', 'item').displayName).toBe(
+      'Clean Water',
+    );
+    expect(catalog.getAs('item:clean-water', 'item').unitWeightKg).toBe(0.5);
+    expect(catalog.compatibility.canonicalFingerprint).toBe(
+      originalFingerprint,
+    );
+  });
+
+  it('round-trips compatibility identity as renderer-free JSON data', () => {
+    const compatibility = createPhase1ContentCatalog().compatibility;
+    const serialized = JSON.stringify(compatibility);
+    const roundTripped = JSON.parse(serialized) as unknown;
+
+    expect(roundTripped).toEqual(compatibility);
+    expect(Object.keys(compatibility).sort()).toEqual([
+      'canonicalFingerprint',
+      'formatId',
+      'packId',
+      'packVersion',
+      'schemaVersion',
+    ]);
+    expect(Object.values(compatibility).every((value) =>
+      ['string', 'number'].includes(typeof value),
+    )).toBe(true);
   });
 
   it('fails typed lookup for missing and wrong-kind content', () => {
