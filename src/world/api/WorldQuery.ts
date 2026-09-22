@@ -10,7 +10,8 @@ export interface WorldQuery extends WorldCollisionQuery {
 
 export const WORLD_QUERY_BOUNDARY: WorldQuery = Object.freeze({
   boundary: 'world-query',
-  sweepAabbAxis(_request: AxisSweepRequest): AxisSweepResult {
+  sweepAabbAxis(request: AxisSweepRequest): AxisSweepResult {
+    void request;
     throw new Error('No authoritative collision geometry is attached to this WorldQuery.');
   },
 });
