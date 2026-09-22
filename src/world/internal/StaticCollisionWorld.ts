@@ -17,8 +17,7 @@ function intervalsOverlapInterior(
   bMin: number,
   bMax: number,
 ): boolean {
-  return aMin < bMax - COLLISION_EPSILON_WU
-    && aMax > bMin + COLLISION_EPSILON_WU;
+  return aMin < bMax && aMax > bMin;
 }
 
 function assertFinitePosition(position: WorldPosition): void {
@@ -36,15 +35,15 @@ function chooseHit(
   const currentDistance = Math.abs(currentDelta);
   const candidateDistance = Math.abs(candidateDelta);
 
-  if (candidateDistance < currentDistance - COLLISION_EPSILON_WU) {
+  if (candidateDistance < currentDistance) {
     return { allowedDelta: candidateDelta, hitSolidId: candidateHitId };
   }
 
   if (
-    Math.abs(candidateDistance - currentDistance) <= COLLISION_EPSILON_WU
+    candidateDistance === currentDistance
     && (currentHitId === undefined || candidateHitId < currentHitId)
   ) {
-    return { allowedDelta: candidateDelta, hitSolidId: candidateHitId };
+    return { allowedDelta: currentDelta, hitSolidId: candidateHitId };
   }
 
   return {
@@ -96,10 +95,10 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
         throw new Error(`Player footprint starts penetrating solid ${solid.id}.`);
       }
 
-      if (desiredDelta > 0 && maxX <= solid.minX + COLLISION_EPSILON_WU) {
-        const candidate = Math.max(0, solid.minX - maxX);
+      if (desiredDelta > 0 && maxX <= solid.minX) {
+        const candidate = solid.minX - maxX;
 
-        if (candidate <= desiredDelta + COLLISION_EPSILON_WU) {
+        if (candidate <= desiredDelta) {
           const selected = chooseHit(
             allowedDelta,
             candidate,
@@ -109,13 +108,10 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           allowedDelta = selected.allowedDelta;
           hitSolidId = selected.hitSolidId;
         }
-      } else if (
-        desiredDelta < 0
-        && minX >= solid.maxX - COLLISION_EPSILON_WU
-      ) {
-        const candidate = Math.min(0, solid.maxX - minX);
+      } else if (desiredDelta < 0 && minX >= solid.maxX) {
+        const candidate = solid.maxX - minX;
 
-        if (candidate >= desiredDelta - COLLISION_EPSILON_WU) {
+        if (candidate >= desiredDelta) {
           const selected = chooseHit(
             allowedDelta,
             candidate,
@@ -130,7 +126,7 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
 
     return Object.freeze({
       allowedDelta,
-      blocked: Math.abs(allowedDelta - desiredDelta) > COLLISION_EPSILON_WU,
+      blocked: hitSolidId !== undefined,
       ...(hitSolidId === undefined ? {} : { hitSolidId }),
     });
   }
@@ -154,10 +150,10 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
         throw new Error(`Player footprint starts penetrating solid ${solid.id}.`);
       }
 
-      if (desiredDelta > 0 && maxY <= solid.minY + COLLISION_EPSILON_WU) {
-        const candidate = Math.max(0, solid.minY - maxY);
+      if (desiredDelta > 0 && maxY <= solid.minY) {
+        const candidate = solid.minY - maxY;
 
-        if (candidate <= desiredDelta + COLLISION_EPSILON_WU) {
+        if (candidate <= desiredDelta) {
           const selected = chooseHit(
             allowedDelta,
             candidate,
@@ -167,13 +163,10 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           allowedDelta = selected.allowedDelta;
           hitSolidId = selected.hitSolidId;
         }
-      } else if (
-        desiredDelta < 0
-        && minY >= solid.maxY - COLLISION_EPSILON_WU
-      ) {
-        const candidate = Math.min(0, solid.maxY - minY);
+      } else if (desiredDelta < 0 && minY >= solid.maxY) {
+        const candidate = solid.maxY - minY;
 
-        if (candidate >= desiredDelta - COLLISION_EPSILON_WU) {
+        if (candidate >= desiredDelta) {
           const selected = chooseHit(
             allowedDelta,
             candidate,
@@ -188,7 +181,7 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
 
     return Object.freeze({
       allowedDelta,
-      blocked: Math.abs(allowedDelta - desiredDelta) > COLLISION_EPSILON_WU,
+      blocked: hitSolidId !== undefined,
       ...(hitSolidId === undefined ? {} : { hitSolidId }),
     });
   }
