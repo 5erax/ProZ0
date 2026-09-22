@@ -179,7 +179,8 @@ test('P0-BUG-002 retains Phase 0 visual QA evidence', async ({ page }) => {
   const manifest = {
     schemaVersion: 1,
     task: 'P0-BUG-002',
-    commit: process.env.GITHUB_SHA ?? 'local-worktree',
+    testedHead: process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
+    workflowCommit: process.env.GITHUB_SHA ?? 'local-worktree',
     generatedAt: new Date().toISOString(),
     referenceRaster: { width: 640, height: 360 },
     deviceScaleFactor: 1,

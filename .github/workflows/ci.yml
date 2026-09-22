@@ -37,7 +37,18 @@ jobs:
       - name: Browser tests
         run: npm run test:browser
       - name: E2E smoke
+        env:
+          P0_TEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run test:e2e
+
+      - name: Upload P0-BUG-001 responsiveness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p0-bug-001-responsiveness-${{ github.sha }}
+          path: test-results/p0-bug-001/*.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload P0-BUG-002 visual QA evidence
         if: always()
