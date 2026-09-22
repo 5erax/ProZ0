@@ -1,3 +1,5 @@
+import type { WorldPosition } from '../foundation';
+import type { WorldCollisionQuery } from '../world';
 import { FixedStepRuntime } from './internal/FixedStepRuntime';
 
 export {
@@ -7,8 +9,31 @@ export {
 
 export type { AuthorityRuntime } from './api/AuthorityRuntime';
 export type { SimulationRuntime } from './api/SimulationRuntime';
-export type { SimulationSnapshot } from './api/SimulationSnapshot';
+export type {
+  FacingDirection,
+  LocomotionState,
+  MovementCollisionSnapshot,
+  PlayerMovementSnapshot,
+  SimulationSnapshot,
+} from './api/SimulationSnapshot';
 
-export function createSimulationRuntime(): FixedStepRuntime {
-  return new FixedStepRuntime();
+export {
+  PLAYER_COLLISION_FOOTPRINT,
+  type PlayerCollisionFootprint,
+} from './player/PlayerCollisionFootprint';
+
+export {
+  INV_SQRT_2,
+  PLAYER_MOVEMENT_CONFIG,
+} from './player/PlayerMovementConfig';
+
+export interface SimulationRuntimeOptions {
+  readonly worldQuery: WorldCollisionQuery;
+  readonly initialPlayerPosition: WorldPosition;
+}
+
+export function createSimulationRuntime(
+  options: SimulationRuntimeOptions,
+): FixedStepRuntime {
+  return new FixedStepRuntime(options.worldQuery, options.initialPlayerPosition);
 }
