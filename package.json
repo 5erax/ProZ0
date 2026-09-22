@@ -19,6 +19,7 @@
   },
   "dependencies": { "pixi.js": "8.21.0" },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
     "@vitest/browser": "5.0.1",
