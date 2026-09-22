@@ -1,0 +1,32 @@
+{
+  "name": "proz0",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test:unit": "vitest run tests/unit --config vitest.config.ts",
+    "test:integration": "vitest run tests/integration --config vitest.config.ts",
+    "test:determinism": "vitest run tests/determinism --config vitest.config.ts",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:e2e": "playwright test",
+    "ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:integration && npm run test:determinism && npm run build && npm run test:browser && npm run test:e2e"
+  },
+  "dependencies": { "pixi.js": "8.21.0" },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.6",
+    "@vitest/browser": "5.0.1",
+    "@vitest/browser-playwright": "5.0.1",
+    "eslint": "10.11.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}
