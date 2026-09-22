@@ -299,6 +299,55 @@ describe('Phase 1 vertical-slice content pack', () => {
     ]);
   });
 
+
+  it('locks all six approved structure kit/placeable/cap contracts', () => {
+    const structures = catalog.list('structure').map((structure) => [
+      structure.id,
+      structure.sourceKitItemId,
+      structure.placeableByPlayer,
+      structure.phase1WorldCap,
+    ]);
+
+    expect(structures).toEqual([
+      [
+        'structure:atmospheric-water-condenser',
+        'item:machine-kit',
+        true,
+        1,
+      ],
+      [
+        'structure:compact-power-unit',
+        'item:power-unit-kit',
+        true,
+        1,
+      ],
+      [
+        'structure:habitat-room',
+        'item:habitat-kit',
+        true,
+        1,
+      ],
+      [
+        'structure:landing-module',
+        null,
+        false,
+        1,
+      ],
+      [
+        'structure:storage-crate',
+        'item:storage-crate-kit',
+        true,
+        4,
+      ],
+      [
+        'structure:workbench',
+        'item:workbench-kit',
+        true,
+        1,
+      ],
+    ]);
+  });
+
   it('locks structure, machine, weather, hostile and ruin contracts', () => {
     const storage = catalog.getAs('structure:storage-crate', 'structure');
     expect(storage.phase1WorldCap).toBe(4);
