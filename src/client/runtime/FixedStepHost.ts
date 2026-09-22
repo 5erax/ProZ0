@@ -11,6 +11,24 @@ export interface FixedStepHostCallbacks {
   readonly onRender: (alpha: number) => void;
 }
 
+export interface FrameScheduler {
+  now(): number;
+  requestFrame(callback: (timeMs: number) => void): number;
+  cancelFrame(frameId: number): void;
+}
+
+const BROWSER_FRAME_SCHEDULER: FrameScheduler = Object.freeze({
+  now(): number {
+    return performance.now();
+  },
+  requestFrame(callback: (timeMs: number) => void): number {
+    return requestAnimationFrame(callback);
+  },
+  cancelFrame(frameId: number): void {
+    cancelAnimationFrame(frameId);
+  },
+});
+
 const SUSPENSION_THRESHOLD_MS = 250;
 
 export class FixedStepHost {
@@ -19,7 +37,10 @@ export class FixedStepHost {
   private accumulatorSeconds = 0;
   private tick: SimulationTick = toSimulationTick(0);
 
-  public constructor(private readonly callbacks: FixedStepHostCallbacks) {}
+  public constructor(
+    private readonly callbacks: FixedStepHostCallbacks,
+    private readonly scheduler: FrameScheduler = BROWSER_FRAME_SCHEDULER,
+  ) {}
 
   public start(): void {
     if (this.animationFrameId !== null) {
@@ -27,12 +48,12 @@ export class FixedStepHost {
     }
 
     this.resetTiming();
-    this.animationFrameId = requestAnimationFrame(this.onAnimationFrame);
+    this.animationFrameId = this.scheduler.requestFrame(this.onAnimationFrame);
   }
 
   public stop(): void {
     if (this.animationFrameId !== null) {
-      cancelAnimationFrame(this.animationFrameId);
+      this.scheduler.cancelFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
 
@@ -41,7 +62,7 @@ export class FixedStepHost {
   }
 
   public resetTiming(): void {
-    this.lastFrameTimeMs = performance.now();
+    this.lastFrameTimeMs = this.scheduler.now();
     this.accumulatorSeconds = 0;
   }
 
@@ -57,7 +78,7 @@ export class FixedStepHost {
     if (elapsedMs >= SUSPENSION_THRESHOLD_MS) {
       this.accumulatorSeconds = 0;
       this.callbacks.onRender(0);
-      this.animationFrameId = requestAnimationFrame(this.onAnimationFrame);
+      this.animationFrameId = this.scheduler.requestFrame(this.onAnimationFrame);
       return;
     }
 
@@ -71,6 +92,6 @@ export class FixedStepHost {
 
     const alpha = this.accumulatorSeconds / SIMULATION_STEP_SECONDS;
     this.callbacks.onRender(alpha);
-    this.animationFrameId = requestAnimationFrame(this.onAnimationFrame);
+    this.animationFrameId = this.scheduler.requestFrame(this.onAnimationFrame);
   };
 }
