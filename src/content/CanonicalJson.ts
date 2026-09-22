@@ -4,6 +4,19 @@ export type JsonValue =
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
 
+export function compareCanonicalStrings(
+  left: string,
+  right: string,
+): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+
 function isPlainJsonObject(
   value: unknown,
 ): value is { readonly [key: string]: JsonValue } {
@@ -40,7 +53,7 @@ export function canonicalJsonStringify(value: JsonValue): string {
   }
 
   const entries = Object.keys(value)
-    .sort((left, right) => left.localeCompare(right))
+    .sort(compareCanonicalStrings)
     .map((key) => {
       const entry = value[key];
       if (entry === undefined) {
