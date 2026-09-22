@@ -37,7 +37,6 @@ export class FixedStepRuntime implements SimulationRuntime {
   public getSnapshot(): Readonly<SimulationSnapshot> {
     return Object.freeze({
       tick: this.tick,
-      runtimeMode: 'local-authority',
     });
   }
 }
