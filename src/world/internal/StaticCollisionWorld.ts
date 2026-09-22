@@ -30,7 +30,6 @@ function assertFinitePosition(position: WorldPosition): void {
 function chooseHit(
   currentDelta: number,
   candidateDelta: number,
-  desiredDelta: number,
   currentHitId: string | undefined,
   candidateHitId: string,
 ): { allowedDelta: number; hitSolidId: string } {
@@ -104,7 +103,6 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           const selected = chooseHit(
             allowedDelta,
             candidate,
-            desiredDelta,
             hitSolidId,
             solid.id,
           );
@@ -121,7 +119,6 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           const selected = chooseHit(
             allowedDelta,
             candidate,
-            desiredDelta,
             hitSolidId,
             solid.id,
           );
@@ -164,7 +161,6 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           const selected = chooseHit(
             allowedDelta,
             candidate,
-            desiredDelta,
             hitSolidId,
             solid.id,
           );
@@ -181,7 +177,6 @@ export class StaticCollisionWorld implements WorldCollisionQuery {
           const selected = chooseHit(
             allowedDelta,
             candidate,
-            desiredDelta,
             hitSolidId,
             solid.id,
           );
