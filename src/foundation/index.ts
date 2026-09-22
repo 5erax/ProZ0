@@ -16,6 +16,7 @@ export {
 export type { SeedDerivation, SeedDerivationInput } from './random/SeedDerivation';
 
 export {
+  WORLD_PIXELS_PER_UNIT,
   createWorldPosition,
   createWorldVector,
   type WorldPosition,
