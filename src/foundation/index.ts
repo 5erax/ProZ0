@@ -15,4 +15,11 @@ export {
 
 export type { SeedDerivation, SeedDerivationInput } from './random/SeedDerivation';
 
+export {
+  createWorldPosition,
+  createWorldVector,
+  type WorldPosition,
+  type WorldVector,
+} from './spatial/WorldPosition';
+
 export type PlayerId = string;
