@@ -358,8 +358,11 @@ It intentionally avoids a fuel economy in Phase 1.
 Default:
 - `powerCapacity = 10 Power Units (PU)`
 
-While placed and enabled:
-- supplies 10 PU to eligible Phase 1 consumers.
+While placed:
+- the Power Unit is always ON in Phase 1;
+- it supplies 10 PU to eligible Phase 1 consumers.
+
+There is no player toggle for the Power Unit in Phase 1.
 
 No portable fuel item is consumed.
 
@@ -395,7 +398,7 @@ Technical Design may implement deterministic ordering but may not silently overd
 Power state does not simulate productive machine time while authority is offline.
 
 On reopen:
-- unit returns to its persisted enabled/placed state;
+- a placed Power Unit resumes its normal always-ON Phase 1 behavior;
 - machine progress is the persisted progress from last valid active-world state, subject to persistence rules.
 
 ---
@@ -651,7 +654,7 @@ Save/reopen must preserve:
 - world position;
 - orientation;
 - Habitat ↔ Landing connector state;
-- enabled/disabled Power Unit where relevant;
+- Power Unit placement/state needed to restore its always-ON supply;
 - machine enabled state;
 - machine production partial progress;
 - machine output contents;
