@@ -24,8 +24,9 @@ import {
 class AbortBeforeManifestRepository extends IndexedDbSaveRepository {
   protected override beforeManifestWrite(
     transaction: IDBTransaction,
-    _request: SaveCommitRequestV1,
+    request: SaveCommitRequestV1,
   ): void {
+    void request;
     transaction.abort();
   }
 }
