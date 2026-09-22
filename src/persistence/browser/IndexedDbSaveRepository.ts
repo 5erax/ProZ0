@@ -385,16 +385,20 @@ export class IndexedDbSaveRepository implements SaveRepository {
   }
 
   protected beforeManifestWrite(
-    _transaction: IDBTransaction,
-    _request: SaveCommitRequestV1,
+    transaction: IDBTransaction,
+    request: SaveCommitRequestV1,
   ): void {
+    void transaction;
+    void request;
     // Fault-injection seam for transactional adapter tests.
   }
 
   protected beforeImportManifestWrite(
-    _transaction: IDBTransaction,
-    _bundle: PortableSaveBundleV1,
+    transaction: IDBTransaction,
+    bundle: PortableSaveBundleV1,
   ): void {
+    void transaction;
+    void bundle;
     // Fault-injection seam for transactional adapter tests.
   }
 
