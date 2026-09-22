@@ -24,7 +24,7 @@ Metrics:
 
 ## Sampling and P95
 
-The test records 40 independent samples for each metric.
+The test records 40 independent samples for each metric. Samples are distributed across 8 offsets within the render-frame interval (0, 2, 4, 6, 8, 10, 12, and 14 ms; five samples per offset) so the result is not phase-locked to one favorable frame position.
 
 P95 uses nearest-rank:
 
@@ -44,7 +44,7 @@ Evidence is written to:
 
 `test-results/p0-bug-001/movement-responsiveness.json`
 
-The JSON contains raw samples, sample count, P95/min/max summaries, browser version, viewport, tested commit identifier, and the measurement boundary.
+The JSON contains raw samples, per-sample phase offset, sample count, P95/min/max summaries, browser version, viewport, explicit PR head SHA, workflow commit SHA, and the measurement boundary.
 
 ## CI retention
 
