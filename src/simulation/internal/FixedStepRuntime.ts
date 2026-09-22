@@ -12,7 +12,10 @@ import type { SimulationSnapshot } from '../api/SimulationSnapshot';
 export class FixedStepRuntime implements SimulationRuntime {
   private tick: SimulationTick = toSimulationTick(0);
 
-  public submitInput(_playerId: PlayerId, _input: PlayerInput): void {
+  public submitInput(playerId: PlayerId, input: PlayerInput): void {
+    void playerId;
+    void input;
+
     // P0-ENG-001 establishes the logical input boundary only.
     // Gameplay consumption belongs to an authorized gameplay task.
   }
