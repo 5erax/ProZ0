@@ -288,6 +288,38 @@ describe('P0-TECH-008 movement/collision fixtures', () => {
     expect(player.collision.blockedX).toBe(true);
   });
 
+  it('distinguishes exact endpoint contact from continued blocked input', () => {
+    const oneTickDelta = PLAYER_MOVEMENT_CONFIG.cardinalDeltaPerTick;
+    const wallMinX = PLAYER_COLLISION_FOOTPRINT.halfWidth + oneTickDelta;
+    const wall = createStaticSolidAabb(
+      'endpoint-wall',
+      wallMinX,
+      -1,
+      wallMinX + 0.25,
+      1,
+    );
+    const runtime = createRuntime([wall]);
+
+    runTicks(runtime, RIGHT, 1);
+
+    const endpointContact = runtime.getSnapshot().player;
+    expect(endpointContact.position.x).toBe(oneTickDelta);
+    expect(endpointContact.collision.hitSolidX).toBe('endpoint-wall');
+    expect(endpointContact.collision.blockedX).toBe(false);
+    expect(endpointContact.locomotionState).toBe('MOVING');
+    expect(endpointContact.resolvedVelocity.x)
+      .toBe(PLAYER_MOVEMENT_CONFIG.baseMoveSpeed);
+
+    runTicks(runtime, RIGHT, 1, 2);
+
+    const continuedContact = runtime.getSnapshot().player;
+    expect(continuedContact.position.x).toBe(oneTickDelta);
+    expect(continuedContact.collision.hitSolidX).toBe('endpoint-wall');
+    expect(continuedContact.collision.blockedX).toBe(true);
+    expect(continuedContact.locomotionState).toBe('COLLISION-CONSTRAINED');
+    expect(continuedContact.resolvedVelocity.x).toBe(0);
+  });
+
   it('T10 varies the production presentation frame seam without changing collision', () => {
     const wall = createStaticSolidAabb('wall', 2, -2, 2.5, 2);
     const first = createRuntime([wall], 1.5, 0);
