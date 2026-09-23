@@ -74,6 +74,10 @@ export type GatherStartResult =
       readonly requiredTicks: number;
     }
   | {
+      readonly status: 'resolved';
+      readonly result: ItemTransactionResult;
+    }
+  | {
       readonly status: 'rejected';
       readonly operationId: OperationId;
       readonly reason: TransactionRejectionReason;
