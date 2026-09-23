@@ -279,7 +279,7 @@ export class Phase1BuildingWorld {
         ...condenser,
       });
     }
-    this.validatePowerSnapshot();
+    this.validateReconstructedSnapshot();
   }
 
   public getBuildRevision(): number {
@@ -703,8 +703,8 @@ export class Phase1BuildingWorld {
   ): Readonly<CondenserRuntimeState> | 'STALE_REVISION' | 'SOURCE_MISSING' {
     const state = this.condensers.get(structureId);
     if (state === undefined) return 'SOURCE_MISSING';
-    if (state.revision !== expectedRevision) return 'STALE_REVISION';
     if (state.enabled === enabled) return freezeCondenser(state);
+    if (state.revision !== expectedRevision) return 'STALE_REVISION';
     state.enabled = enabled;
     state.revision += 1;
     if (enabled) {
@@ -944,7 +944,122 @@ export class Phase1BuildingWorld {
     }
   }
 
-  private validatePowerSnapshot(): void {
+  private validateReconstructedSnapshot(): void {
+    if (
+      !Number.isSafeInteger(this.buildRevision)
+      || this.buildRevision < 0
+      || !Number.isSafeInteger(this.powerRevision)
+      || this.powerRevision < 0
+    ) {
+      throw new Error('Building aggregate revision is corrupt.');
+    }
+
+    const landing = this.structures.get(
+      'structure-instance:landing-module',
+    );
+    if (
+      landing === undefined
+      || landing.definitionId !== 'structure:landing-module'
+      || landing.position.x !== 0
+      || landing.position.y !== 0
+      || landing.placedByPlayerId !== null
+      || landing.containerId !== null
+    ) {
+      throw new Error('Landing Module reconstruction is corrupt.');
+    }
+
+    for (const id of Object.keys(CAPS) as Phase1StructureDefinitionId[]) {
+      if (this.countDefinition(id) > CAPS[id]) {
+        throw new Error(`Structure cap exceeded for ${id}.`);
+      }
+    }
+
+    for (const structure of this.structures.values()) {
+      if (
+        !(structure.definitionId in PHASE1_STRUCTURE_PLACEMENT_PROFILES)
+        || !Number.isSafeInteger(structure.revision)
+        || structure.revision < 0
+        || ![0, 1, 2, 3].includes(structure.orientationQuarterTurns)
+      ) {
+        throw new Error('Structure reconstruction is corrupt.');
+      }
+
+      const requiresContainer =
+        structure.definitionId === 'structure:storage-crate'
+        || structure.definitionId
+          === 'structure:atmospheric-water-condenser';
+      if (requiresContainer !== (structure.containerId !== null)) {
+        throw new Error('Structure/container reference is corrupt.');
+      }
+    }
+
+    const structures = [...this.structures.values()];
+    for (let leftIndex = 0; leftIndex < structures.length; leftIndex += 1) {
+      const left = structures[leftIndex];
+      if (left === undefined) continue;
+      for (
+        let rightIndex = leftIndex + 1;
+        rightIndex < structures.length;
+        rightIndex += 1
+      ) {
+        const right = structures[rightIndex];
+        if (right === undefined) continue;
+        if (overlaps(
+          left.position,
+          PHASE1_STRUCTURE_PLACEMENT_PROFILES[left.definitionId],
+          left.orientationQuarterTurns,
+          right.position,
+          PHASE1_STRUCTURE_PLACEMENT_PROFILES[right.definitionId],
+          right.orientationQuarterTurns,
+        )) {
+          throw new Error('Reconstructed structures overlap.');
+        }
+      }
+    }
+
+    for (const connector of this.connectors.values()) {
+      if (!this.structures.has(connector.structureId)) {
+        throw new Error('Connector references missing structure.');
+      }
+      if (
+        connector.occupiedByConnectionId !== null
+        && !this.connections.has(connector.occupiedByConnectionId)
+      ) {
+        throw new Error('Connector references missing connection.');
+      }
+    }
+
+    for (const connection of this.connections.values()) {
+      const a = this.connectors.get(connection.a);
+      const b = this.connectors.get(connection.b);
+      if (
+        a === undefined
+        || b === undefined
+        || a.occupiedByConnectionId !== connection.connectionId
+        || b.occupiedByConnectionId !== connection.connectionId
+      ) {
+        throw new Error('Structure connection reconstruction is corrupt.');
+      }
+    }
+
+    for (const condenser of this.condensers.values()) {
+      const structure = this.structures.get(condenser.structureId);
+      if (
+        structure?.definitionId
+          !== 'structure:atmospheric-water-condenser'
+        || structure.containerId !== condenser.outputContainerId
+        || !Number.isSafeInteger(condenser.revision)
+        || condenser.revision < 0
+        || !Number.isSafeInteger(condenser.productionProgressTicks)
+        || condenser.productionProgressTicks < 0
+        || condenser.productionProgressTicks >= 5400
+        || !Number.isSafeInteger(condenser.completedCycleOrdinal)
+        || condenser.completedCycleOrdinal < 0
+      ) {
+        throw new Error('Condenser reconstruction is corrupt.');
+      }
+    }
+
     if (
       this.producerStructureId !== null
       && this.structures.get(this.producerStructureId)
@@ -952,9 +1067,32 @@ export class Phase1BuildingWorld {
     ) {
       throw new Error('Power producer reference is corrupt.');
     }
+
+    if (
+      this.grantedConsumerIds.length * PHASE1_CONDENSER_DEMAND_PU
+      > (this.producerStructureId === null
+        ? 0
+        : PHASE1_POWER_CAPACITY_PU)
+    ) {
+      throw new Error('Power grants exceed capacity.');
+    }
+
     for (const id of this.grantedConsumerIds) {
-      if (!this.condensers.has(id)) {
-        throw new Error('Power grant references missing condenser.');
+      const condenser = this.condensers.get(id);
+      const structure = this.structures.get(id);
+      const producer =
+        this.producerStructureId === null
+          ? undefined
+          : this.structures.get(this.producerStructureId);
+      if (
+        condenser === undefined
+        || !condenser.enabled
+        || structure === undefined
+        || producer === undefined
+        || squaredDistance(structure.position, producer.position)
+          > PHASE1_POWER_RADIUS_WU ** 2
+      ) {
+        throw new Error('Power grant reconstruction is corrupt.');
       }
     }
   }
