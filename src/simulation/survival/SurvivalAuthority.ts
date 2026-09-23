@@ -897,6 +897,7 @@ export class Phase1SurvivalAuthority {
     ) {
       throw new Error('Death transition requires canonical lethal event.');
     }
+    this.respawnReservations.delete(playerId);
     state.lifeState = {
       type: 'dead-pending-respawn',
       deathId,
