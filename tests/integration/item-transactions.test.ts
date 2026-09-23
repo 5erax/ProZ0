@@ -169,6 +169,38 @@ describe('Phase1 item transactions', () => {
     expect(runtime.exportLedgerSnapshot()).toEqual(before);
   });
 
+  it('does not allow another player to mutate a private player inventory', () => {
+    const world = new Phase1ItemTestWorld();
+    const runtime = authority(world, [
+      container(
+        'inventory:p1',
+        'player-inventory',
+        'p1',
+        [stack('fiber-a', 'item:plant-fiber', 5)],
+      ),
+      container('crate:a', 'storage-crate', null),
+    ]);
+
+    const before = runtime.exportLedgerSnapshot();
+    const result = runtime.execute({
+      type: 'transfer',
+      operationId: 'op:unauthorized-transfer',
+      playerId: 'p2',
+      sourceContainerId: 'inventory:p1',
+      sourceExpectedRevision: 0,
+      targetContainerId: 'crate:a',
+      targetExpectedRevision: 0,
+      sourceStackId: 'fiber-a',
+      quantity: 1,
+    });
+
+    expect(result).toMatchObject({
+      status: 'rejected',
+      reason: 'TARGET_UNAVAILABLE',
+    });
+    expect(runtime.exportLedgerSnapshot()).toEqual(before);
+  });
+
   it('rejects inbound player weight overflow atomically', () => {
     const world = new Phase1ItemTestWorld();
     const runtime = authority(world, [
@@ -249,6 +281,51 @@ describe('Phase1 item transactions', () => {
     expect(result).toMatchObject({
       status: 'rejected',
       reason: 'TARGET_CAPACITY_VOLUME',
+    });
+    expect(runtime.exportLedgerSnapshot()).toEqual(before);
+  });
+
+  it('split and merge failures preserve exact canonical pre-state', () => {
+    const world = new Phase1ItemTestWorld();
+    const runtime = authority(world, [
+      container(
+        'inventory:p1',
+        'player-inventory',
+        'p1',
+        [
+          stack('fiber-a', 'item:plant-fiber', 5),
+          stack('stone-a', 'item:stone', 2),
+        ],
+      ),
+    ]);
+
+    const before = runtime.exportLedgerSnapshot();
+
+    expect(runtime.execute({
+      type: 'split',
+      operationId: 'op:split-invalid',
+      playerId: 'p1',
+      containerId: 'inventory:p1',
+      expectedRevision: 0,
+      sourceStackId: 'fiber-a',
+      quantity: 5,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'INVALID_QUANTITY',
+    });
+    expect(runtime.exportLedgerSnapshot()).toEqual(before);
+
+    expect(runtime.execute({
+      type: 'merge',
+      operationId: 'op:merge-invalid',
+      playerId: 'p1',
+      containerId: 'inventory:p1',
+      expectedRevision: 0,
+      sourceStackId: 'fiber-a',
+      targetStackId: 'stone-a',
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'STACK_INCOMPATIBLE',
     });
     expect(runtime.exportLedgerSnapshot()).toEqual(before);
   });
