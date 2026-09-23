@@ -13,6 +13,18 @@ export {
 } from './api/WorldMutation';
 
 export type {
+  DropPlacementReservation,
+  ItemInteractionWorldPort,
+  ResourceEntityId,
+  ResourceNodeView,
+  StructureInstanceId,
+  WorkbenchView,
+  WorldDropId,
+  WorldDropView,
+  WorldRevisionResult,
+} from './api/ItemInteractionWorld';
+
+export type {
   AxisSweepRequest,
   AxisSweepResult,
   CollisionAxis,
