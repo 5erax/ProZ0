@@ -21,7 +21,6 @@ import {
   type ChunkRuntimeMeta,
 } from '../chunks/ChunkLifecycle';
 import {
-  CHUNK_SPAN_WORLD_UNITS,
   createChunkCoord,
   fromWorldPosition,
   sameChunkCoord,
@@ -124,7 +123,7 @@ function incrementRevision(value: number, label: string): number {
   return value + 1;
 }
 
-function sortedById<T extends { readonly entityId?: string }>(
+function sortedById<T>(
   values: readonly T[],
   getId: (value: T) => string,
 ): readonly T[] {
@@ -233,8 +232,8 @@ function validateResourceState(
     }
   } else {
     if (
-      !Number.isInteger(state.remainingGatherActions)
-      || state.remainingGatherActions === null
+      state.remainingGatherActions === null
+      || !Number.isInteger(state.remainingGatherActions)
       || state.remainingGatherActions < 0
       || state.remainingGatherActions > definition.maxGatherActions
     ) {
@@ -789,6 +788,9 @@ export class Phase1WorldStore {
     }
 
     const current = delta.resourceStates[index];
+    if (current === undefined) {
+      throw new Error('Resource runtime state index resolved no state.');
+    }
     if (current.revision !== expectedRevision) {
       throw new Error('Resource runtime revision is stale.');
     }
@@ -875,6 +877,9 @@ export class Phase1WorldStore {
     }
 
     const current = delta.ruinStates[index];
+    if (current === undefined) {
+      throw new Error('Ruin runtime state index resolved no state.');
+    }
     if (current.revision !== expectedRevision) {
       throw new Error('Ruin runtime revision is stale.');
     }
@@ -926,6 +931,9 @@ export class Phase1WorldStore {
       throw new Error('Ruin runtime state was not found.');
     }
     const current = delta.ruinStates[index];
+    if (current === undefined) {
+      throw new Error('Ruin runtime state index resolved no state.');
+    }
 
     if (current.revision !== expectedRevision) {
       throw new Error('Ruin runtime revision is stale.');
