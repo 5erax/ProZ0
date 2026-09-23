@@ -425,7 +425,6 @@ export class Phase1ItemAuthority {
         operationId: request.operationId,
         reason: 'SOURCE_MISSING',
       });
-      this.processedDeathMoves.set(request.deathId, { signature, result });
       return result;
     }
     if (inventory.revision !== request.expectedInventoryRevision) {
@@ -435,7 +434,6 @@ export class Phase1ItemAuthority {
         operationId: request.operationId,
         reason: 'STALE_REVISION',
       });
-      this.processedDeathMoves.set(request.deathId, { signature, result });
       return result;
     }
 
