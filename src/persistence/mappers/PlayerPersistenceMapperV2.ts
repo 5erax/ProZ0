@@ -94,7 +94,6 @@ export function playerRecordV2ToSurvivalState(
 ): PlayerSurvivalState {
   return Object.freeze({
     playerId: record.playerId,
-    revision: record.survival.revision,
     tick: authorityTick,
     ...record.survival,
     lifeState: Object.freeze({ ...record.lifeState }),
