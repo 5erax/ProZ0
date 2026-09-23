@@ -13,6 +13,12 @@ export interface DeathCachePlacementReservation {
   readonly position: WorldPosition;
 }
 
+export interface RespawnPlacementReservation {
+  readonly token: string;
+  readonly playerId: PlayerId;
+  readonly position: WorldPosition;
+}
+
 export interface DeathCacheWorldView {
   readonly entityId: DeathCacheEntityId;
   readonly deathId: string;
@@ -45,8 +51,24 @@ export interface PredatorWorldView {
 
 export interface SurvivalWorldPort {
   getPlayerPosition(playerId: PlayerId): WorldPosition;
-  getRespawnAnchor(playerId: PlayerId): WorldPosition;
-  commitPlayerRespawnPosition(playerId: PlayerId, position: WorldPosition): void;
+
+  /**
+   * Validates and reserves the canonical base respawn position without
+   * publishing player position or life-state changes. Returns null when the
+   * anchor cannot be safely committed.
+   */
+  reservePlayerRespawn(
+    playerId: PlayerId,
+  ): Readonly<RespawnPlacementReservation> | null;
+
+  /**
+   * After a valid respawn reservation is returned, finalization must be
+   * deterministic and non-throwing and must perform no new validation.
+   */
+  commitReservedPlayerRespawn(
+    reservation: Readonly<RespawnPlacementReservation>,
+  ): void;
+
   getEnvironmentExposure(playerId: PlayerId): Readonly<EnvironmentExposureView>;
 
   reserveDeathCachePlacement(request: {
