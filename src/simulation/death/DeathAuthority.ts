@@ -4,7 +4,7 @@ import type {
   Phase1ItemAuthority,
   TransferItemCommand,
 } from '../items';
-import type { Phase1SurvivalAuthority, SurvivalDamageSource } from '../survival';
+import type { Phase1SurvivalAuthority } from '../survival';
 import type {
   DeathXpPenaltyPort,
   DeathXpPenaltyReservation,
@@ -13,7 +13,6 @@ import type {
 export interface DeathTransitionInput {
   readonly deathId: string;
   readonly playerId: PlayerId;
-  readonly deathCause: SurvivalDamageSource;
   readonly deathPosition: WorldPosition;
   readonly deathTick: number;
   readonly inventoryContainerId: string;
@@ -35,9 +34,10 @@ export interface DeathAuthoritySnapshot {
 }
 
 export interface RespawnResult {
-  readonly status: 'waiting' | 'respawned';
+  readonly status: 'waiting' | 'rejected' | 'respawned';
   readonly playerId: PlayerId;
   readonly position: WorldPosition | null;
+  readonly reason?: 'RESPAWN_UNAVAILABLE';
 }
 
 export class Phase1DeathAuthority {
@@ -51,7 +51,11 @@ export class Phase1DeathAuthority {
     snapshot?: DeathAuthoritySnapshot,
   ) {
     for (const result of snapshot?.processed ?? []) {
-      if (result.deathId.length === 0 || this.processed.has(result.deathId)) {
+      if (
+        result.status !== 'committed'
+        || result.deathId.length === 0
+        || this.processed.has(result.deathId)
+      ) {
         throw new Error('Invalid DeathAuthority snapshot.');
       }
       this.processed.set(result.deathId, Object.freeze({ ...result }));
@@ -73,15 +77,25 @@ export class Phase1DeathAuthority {
     if (prior !== undefined) {
       return Object.freeze({ ...prior, status: 'duplicate' });
     }
+
     const state = this.survival.getPlayerState(input.playerId);
+    const lethalEvent = this.survival.getCanonicalLethalDamage(
+      input.playerId,
+      input.deathTick,
+    );
     if (
       state.lifeState.type !== 'alive'
       || state.healthMilli !== 0
       || state.tick !== input.deathTick
+      || lethalEvent === null
     ) {
-      return this.cache(input.deathId, {
-        status:'rejected', deathId:input.deathId,
-        cacheEntityId:null,cacheContainerId:null,xpLoss:0,reason:'NOT_LETHAL',
+      return Object.freeze({
+        status: 'rejected',
+        deathId: input.deathId,
+        cacheEntityId: null,
+        cacheContainerId: null,
+        xpLoss: 0,
+        reason: 'NOT_LETHAL',
       });
     }
 
@@ -92,13 +106,19 @@ export class Phase1DeathAuthority {
         playerId: input.playerId,
       });
     } catch {
-      return this.cache(input.deathId, {
-        status:'rejected',deathId:input.deathId,
-        cacheEntityId:null,cacheContainerId:null,xpLoss:0,reason:'ITEM_TRANSACTION_REJECTED',
+      return Object.freeze({
+        status: 'rejected',
+        deathId: input.deathId,
+        cacheEntityId: null,
+        cacheContainerId: null,
+        xpLoss: 0,
+        reason: 'ITEM_TRANSACTION_REJECTED',
       });
     }
 
-    const inventory = this.items.getContainerView(input.inventoryContainerId);
+    const inventory = this.items.getContainerView(
+      input.inventoryContainerId,
+    );
     const placement = inventory.stacks.length === 0
       ? null
       : this.world.reserveDeathCachePlacement({
@@ -117,10 +137,13 @@ export class Phase1DeathAuthority {
     });
     if (itemResult.status !== 'committed') {
       this.xp.releaseDeathXpPenalty(xpReservation);
-      return this.cache(input.deathId, {
-        status:'rejected',deathId:input.deathId,
-        cacheEntityId:null,cacheContainerId:null,xpLoss:0,
-        reason:'ITEM_TRANSACTION_REJECTED',
+      return Object.freeze({
+        status: 'rejected',
+        deathId: input.deathId,
+        cacheEntityId: null,
+        cacheContainerId: null,
+        xpLoss: 0,
+        reason: 'ITEM_TRANSACTION_REJECTED',
       });
     }
 
@@ -141,18 +164,20 @@ export class Phase1DeathAuthority {
     this.survival.markDead(
       input.playerId,
       input.deathId,
-      input.deathCause,
+      lethalEvent,
       cacheEntityId,
       input.deathTick,
     );
 
-    return this.cache(input.deathId, {
-      status:'committed',
-      deathId:input.deathId,
+    const committed: DeathTransitionResult = Object.freeze({
+      status: 'committed',
+      deathId: input.deathId,
       cacheEntityId,
-      cacheContainerId:itemResult.cacheContainerId,
-      xpLoss:xpReservation.xpLoss,
+      cacheContainerId: itemResult.cacheContainerId,
+      xpLoss: xpReservation.xpLoss,
     });
+    this.processed.set(input.deathId, committed);
+    return committed;
   }
 
   public processRespawn(playerId: PlayerId, tick: number): RespawnResult {
@@ -161,12 +186,31 @@ export class Phase1DeathAuthority {
       before.lifeState.type !== 'dead-pending-respawn'
       || tick < before.lifeState.respawnAtTick
     ) {
-      return Object.freeze({ status:'waiting', playerId, position:null });
+      return Object.freeze({ status: 'waiting', playerId, position: null });
     }
-    const anchor = this.world.getRespawnAnchor(playerId);
-    this.survival.processRespawn(playerId, tick);
-    this.world.commitPlayerRespawnPosition(playerId, anchor);
-    return Object.freeze({ status:'respawned', playerId, position:anchor });
+
+    const worldReservation = this.world.reservePlayerRespawn(playerId);
+    if (worldReservation === null) {
+      return Object.freeze({
+        status: 'rejected',
+        playerId,
+        position: null,
+        reason: 'RESPAWN_UNAVAILABLE',
+      });
+    }
+
+    const survivalReservation = this.survival.reserveRespawn(playerId, tick);
+    if (survivalReservation === null) {
+      return Object.freeze({ status: 'waiting', playerId, position: null });
+    }
+
+    this.world.commitReservedPlayerRespawn(worldReservation);
+    this.survival.commitReservedRespawn(survivalReservation);
+    return Object.freeze({
+      status: 'respawned',
+      playerId,
+      position: worldReservation.position,
+    });
   }
 
   public recoverFromDeathCache(command: TransferItemCommand) {
@@ -184,7 +228,4 @@ export class Phase1DeathAuthority {
     return result;
   }
 
-  private cache(id:string,result:DeathTransitionResult):DeathTransitionResult {
-    const frozen=Object.freeze(result); this.processed.set(id,frozen); return frozen;
-  }
 }
