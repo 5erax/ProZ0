@@ -6,6 +6,9 @@ export {
 export {
   NOOP_GATHER_COST_PORT,
   type GatherCostPort,
+  type GatherCostReservation,
+  type GatherCostReservationRequest,
+  type GatherCostReservationResult,
 } from './GatherCostPort';
 
 export {
