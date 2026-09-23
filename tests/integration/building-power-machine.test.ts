@@ -834,6 +834,39 @@ describe('Dismantle and reconstruction', () => {
     ).toHaveLength(1);
   });
 
+  it('fails reconstruction on corrupt power references before publish', () => {
+    const ctx = setup([
+      stack('power-kit', 'item:power-unit-kit'),
+    ]);
+    placeFree(ctx, {
+      operationId: 'place:power-corrupt',
+      definitionId: 'structure:compact-power-unit',
+      kitStackId: 'power-kit',
+      inventoryRevision: 0,
+      buildRevision: 0,
+      x: 3,
+      y: 0,
+    });
+
+    const snapshot = ctx.buildings.exportSnapshot();
+    const corruptSnapshot = {
+      foothold: {
+        ...snapshot.foothold,
+        power: {
+          ...snapshot.foothold.power,
+          producerStructureId: 'structure-instance:missing',
+        },
+      },
+    };
+
+    expect(
+      () => new Phase1BuildingWorld(
+        new Phase1BuildingTestSpatial(),
+        corruptSnapshot,
+      ),
+    ).toThrow(/Power producer reference is corrupt/);
+  });
+
   it('round-trips foothold + machine progress + item output without offline production', () => {
     const ctx = setup([
       stack('power-kit', 'item:power-unit-kit'),
