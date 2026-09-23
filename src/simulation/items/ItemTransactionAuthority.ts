@@ -24,6 +24,7 @@ import {
 } from './ItemLedger';
 import type {
   BeginGatherRequest,
+  ConsumeItemCommand,
   CraftItemCommand,
   DropItemCommand,
   ItemCommand,
@@ -32,8 +33,13 @@ import type {
   RepairItemCommand,
   SplitStackCommand,
   TransferItemCommand,
+  WearItemCommand,
   WorkbenchAccessRef,
 } from './ItemCommands';
+import type {
+  CommitDeathCacheItemsRequest,
+  DeathCacheItemCommitResult,
+} from './DeathItemTransaction';
 import type {
   GatherStartResult,
   GatherTickResult,
@@ -144,6 +150,27 @@ function itemCommandSignature(command: ItemCommand): string {
         command.worldDropId,
         command.expectedWorldDropRevision,
         command.expectedDropContainerRevision,
+      ]);
+
+    case 'wear':
+      return JSON.stringify([
+        command.type,
+        command.operationId,
+        command.playerId,
+        command.inventoryContainerId,
+        command.expectedInventoryRevision,
+        command.targetStackId,
+        command.conditionLoss,
+      ]);
+
+    case 'consume':
+      return JSON.stringify([
+        command.type,
+        command.operationId,
+        command.playerId,
+        command.inventoryContainerId,
+        command.expectedInventoryRevision,
+        command.sourceStackId,
       ]);
 
     case 'craft':
@@ -312,6 +339,11 @@ export class Phase1ItemAuthority {
   private readonly gatherCost: GatherCostPort;
   private readonly events: ItemAuthorityEventSink;
   private readonly processedOperations = new Map<OperationId, CachedOperation>();
+  private readonly processedDeathMoves =
+    new Map<string, {
+      readonly signature: string;
+      readonly result: DeathCacheItemCommitResult;
+    }>();
   private readonly pendingAuthorityEvents: ItemAuthorityEvent[] = [];
   private readonly activeGathersByPlayer = new Map<PlayerId, ActiveGatherChannel>();
   private readonly activeGatherOperationSignatures = new Map<OperationId, string>();
@@ -354,6 +386,143 @@ export class Phase1ItemAuthority {
     }
 
     return delivered;
+  }
+
+  public commitDeathCacheItems(
+    request: CommitDeathCacheItemsRequest,
+  ): DeathCacheItemCommitResult {
+    const signature = JSON.stringify([
+      request.deathId,
+      request.operationId,
+      request.playerId,
+      request.inventoryContainerId,
+      request.expectedInventoryRevision,
+      [...request.equippedStackIds].sort(compareStrings),
+    ]);
+    const cached = this.processedDeathMoves.get(request.deathId);
+    if (cached !== undefined) {
+      if (cached.signature === signature) {
+        return cached.result;
+      }
+      return Object.freeze({
+        status: 'rejected',
+        deathId: request.deathId,
+        operationId: request.operationId,
+        reason: 'OPERATION_ID_CONFLICT',
+      });
+    }
+
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(request.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== request.playerId
+    ) {
+      const result: DeathCacheItemCommitResult = Object.freeze({
+        status: 'rejected',
+        deathId: request.deathId,
+        operationId: request.operationId,
+        reason: 'SOURCE_MISSING',
+      });
+      return result;
+    }
+    if (inventory.revision !== request.expectedInventoryRevision) {
+      const result: DeathCacheItemCommitResult = Object.freeze({
+        status: 'rejected',
+        deathId: request.deathId,
+        operationId: request.operationId,
+        reason: 'STALE_REVISION',
+      });
+      return result;
+    }
+
+    const equipped = new Set(request.equippedStackIds);
+    const moved = inventory.stacks
+      .map((stack) => ({ ...stack }))
+      .sort((left, right) => compareStrings(left.stackId, right.stackId));
+    const penalized: ItemStackId[] = [];
+
+    for (const stack of moved) {
+      if (!equipped.has(stack.stackId) || stack.condition === null) {
+        continue;
+      }
+      const definition = getItemDefinition(
+        this.options.catalog,
+        stack.itemDefinitionId,
+      );
+      if (definition?.conditionMax === null || definition === null) {
+        continue;
+      }
+      stack.condition = Math.max(0, stack.condition - 10);
+      penalized.push(stack.stackId);
+    }
+
+    const cacheContainerId =
+      moved.length === 0 ? null : `death-cache:${request.deathId}`;
+
+    if (cacheContainerId !== null) {
+      const createFailure = draft.createContainer({
+        containerId: cacheContainerId,
+        kind: 'death-cache',
+        ownerPlayerId: null,
+        revision: 0,
+        stacks: [],
+      });
+      if (createFailure !== null) {
+        const result: DeathCacheItemCommitResult = Object.freeze({
+          status: 'rejected',
+          deathId: request.deathId,
+          operationId: request.operationId,
+          reason: 'OPERATION_ID_CONFLICT',
+        });
+        return result;
+      }
+    }
+
+    for (const stack of moved) {
+      const removal = draft.removeQuantity(
+        request.inventoryContainerId,
+        stack.stackId,
+        stack.quantity,
+      );
+      if (typeof removal === 'string') {
+        throw new Error('Validated death inventory removal failed.');
+      }
+      if (cacheContainerId !== null) {
+        const insertion = draft.insert({
+          containerId: cacheContainerId,
+          itemDefinitionId: stack.itemDefinitionId,
+          quantity: stack.quantity,
+          condition: stack.condition,
+          operationId: request.operationId,
+          generatedOrdinal: 0,
+          preserveStackId: stack.stackId,
+        });
+        if (typeof insertion === 'string') {
+          throw new Error('Validated death cache insertion failed.');
+        }
+      }
+    }
+
+    const inventoryRevision =
+      moved.length === 0
+        ? inventory.revision
+        : draft.incrementRevision(request.inventoryContainerId);
+    this.ledger.publish(draft);
+
+    const result: DeathCacheItemCommitResult = Object.freeze({
+      status: 'committed',
+      deathId: request.deathId,
+      operationId: request.operationId,
+      inventoryRevision,
+      cacheContainerId,
+      cacheRevision: cacheContainerId === null ? null : 0,
+      movedStackIds: Object.freeze(moved.map((stack) => stack.stackId)),
+      penalizedStackIds: Object.freeze([...penalized].sort(compareStrings)),
+    });
+    this.processedDeathMoves.set(request.deathId, { signature, result });
+    return result;
   }
 
   public execute(command: ItemCommand): ItemTransactionResult {
@@ -547,6 +716,10 @@ export class Phase1ItemAuthority {
         return this.executeDrop(command);
       case 'pickup':
         return this.executePickup(command);
+      case 'wear':
+        return this.executeWear(command);
+      case 'consume':
+        return this.executeConsume(command);
       case 'craft':
         return this.executeCraft(command);
       case 'repair':
@@ -617,6 +790,9 @@ export class Phase1ItemAuthority {
       && target.kind === 'storage-crate'
     ) || (
       source.kind === 'storage-crate'
+      && target.kind === 'player-inventory'
+    ) || (
+      source.kind === 'death-cache'
       && target.kind === 'player-inventory'
     );
     if (!pairValid) {
@@ -1056,6 +1232,102 @@ export class Phase1ItemAuthority {
       ],
       createdIds(mutations),
       removedIdsStillAbsent(draft.getStackIds(), mutations),
+    );
+  }
+
+  private executeWear(command: WearItemCommand): ItemTransactionResult {
+    if (!Number.isSafeInteger(command.conditionLoss) || command.conditionLoss <= 0) {
+      return rejected(command.operationId, 'INVALID_QUANTITY');
+    }
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(command.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== command.playerId
+    ) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+    if (inventory.revision !== command.expectedInventoryRevision) {
+      return rejected(command.operationId, 'STALE_REVISION');
+    }
+    const stack = draft.requireStack(
+      command.inventoryContainerId,
+      command.targetStackId,
+    );
+    if (stack === null || stack.condition === null) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+    const failure = draft.setCondition(
+      command.inventoryContainerId,
+      command.targetStackId,
+      Math.max(0, stack.condition - command.conditionLoss),
+    );
+    if (failure !== null) {
+      return rejected(command.operationId, failure);
+    }
+    const revision = draft.incrementRevision(command.inventoryContainerId);
+    this.ledger.publish(draft);
+    return committed(
+      command.operationId,
+      [{ containerId: command.inventoryContainerId, revision }],
+      [],
+      [],
+      [],
+    );
+  }
+
+  private executeConsume(command: ConsumeItemCommand): ItemTransactionResult {
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(command.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== command.playerId
+    ) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+    if (inventory.revision !== command.expectedInventoryRevision) {
+      return rejected(command.operationId, 'STALE_REVISION');
+    }
+
+    const source = draft.requireStack(
+      command.inventoryContainerId,
+      command.sourceStackId,
+    );
+    if (source === null) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+
+    const definition = getItemDefinition(
+      this.options.catalog,
+      source.itemDefinitionId,
+    );
+    if (
+      definition === null
+      || !definition.capabilities.includes('consumable')
+    ) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+
+    const removal = draft.removeQuantity(
+      command.inventoryContainerId,
+      command.sourceStackId,
+      1,
+    );
+    if (typeof removal === 'string') {
+      return rejected(command.operationId, removal);
+    }
+
+    const revision = draft.incrementRevision(command.inventoryContainerId);
+    this.ledger.publish(draft);
+
+    return committed(
+      command.operationId,
+      [{ containerId: command.inventoryContainerId, revision }],
+      [],
+      createdIds([removal]),
+      removedIdsStillAbsent(draft.getStackIds(), [removal]),
     );
   }
 

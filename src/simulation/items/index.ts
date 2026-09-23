@@ -30,6 +30,7 @@ export {
 
 export type {
   BeginGatherRequest,
+  ConsumeItemCommand,
   CraftItemCommand,
   DropItemCommand,
   ItemCommand,
@@ -38,8 +39,14 @@ export type {
   RepairItemCommand,
   SplitStackCommand,
   TransferItemCommand,
+  WearItemCommand,
   WorkbenchAccessRef,
 } from './ItemCommands';
+
+export type {
+  CommitDeathCacheItemsRequest,
+  DeathCacheItemCommitResult,
+} from './DeathItemTransaction';
 
 export type {
   GatherStartResult,

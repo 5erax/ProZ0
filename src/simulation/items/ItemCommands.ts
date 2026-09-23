@@ -63,6 +63,25 @@ export interface PickupItemCommand {
   readonly expectedDropContainerRevision: number;
 }
 
+export interface WearItemCommand {
+  readonly type: 'wear';
+  readonly operationId: OperationId;
+  readonly playerId: PlayerId;
+  readonly inventoryContainerId: ContainerId;
+  readonly expectedInventoryRevision: number;
+  readonly targetStackId: ItemStackId;
+  readonly conditionLoss: number;
+}
+
+export interface ConsumeItemCommand {
+  readonly type: 'consume';
+  readonly operationId: OperationId;
+  readonly playerId: PlayerId;
+  readonly inventoryContainerId: ContainerId;
+  readonly expectedInventoryRevision: number;
+  readonly sourceStackId: ItemStackId;
+}
+
 export interface WorkbenchAccessRef {
   readonly structureInstanceId: StructureInstanceId;
   readonly expectedRevision: number;
@@ -104,5 +123,7 @@ export type ItemCommand =
   | MergeStacksCommand
   | DropItemCommand
   | PickupItemCommand
+  | WearItemCommand
+  | ConsumeItemCommand
   | CraftItemCommand
   | RepairItemCommand;
