@@ -35,6 +35,11 @@ export interface WorldRevisionResult {
 }
 
 export interface ItemInteractionWorldPort {
+  isContainerAccessible(
+    playerId: PlayerId,
+    containerId: string,
+  ): boolean;
+
   getResource(resourceEntityId: ResourceEntityId): Readonly<ResourceNodeView> | null;
   isResourceInInteractionRange(
     playerId: PlayerId,
