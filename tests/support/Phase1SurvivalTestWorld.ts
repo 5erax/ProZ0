@@ -52,7 +52,8 @@ export class Phase1SurvivalTestWorld
     return this.playerPositions.get(playerId) ?? createWorldPosition(0, 0);
   }
 
-  public getRespawnAnchor(_playerId: PlayerId): WorldPosition {
+  public getRespawnAnchor(playerId: PlayerId): WorldPosition {
+    void playerId;
     return createWorldPosition(0, 0);
   }
 
@@ -63,7 +64,8 @@ export class Phase1SurvivalTestWorld
     this.playerPositions.set(playerId, position);
   }
 
-  public getEnvironmentExposure(_playerId: PlayerId) {
+  public getEnvironmentExposure(playerId: PlayerId) {
+    void playerId;
     return Object.freeze({
       thermalTarget: this.thermalTarget,
       sheltered: this.sheltered,
