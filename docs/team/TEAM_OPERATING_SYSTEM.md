@@ -1,55 +1,27 @@
 # ProZ0 Team Operating System
 
-**Status:** APPROVED  
-**Version:** 1.0  
-**Effective:** 2026-09-23
+**Version:** 2.0.0. Adoption is defined in ROLE_PACK_RELEASE.
 
-ProZ0 is developed by two delivery organizations under one shared Project Owner and one shared GitHub project state.
+One PO, two peer PM instances, thirteen specialist roles, fourteen persistent member slots, one shared product/backlog/repository. Company membership does not determine technical or creative authority. One task has one accountable implementation member and one Coordinating PM; reviewers and bounded contributors are named separately.
 
-Neither company is operationally subordinate to the other. Authority follows approved project role, source-of-truth ownership and task lock, not company membership.
+## Required operating sources
 
-## Operating model
+Read bootstrap, ROLE_REGISTRY, MEMBER_REGISTRY, SKILL_REGISTRY, SOURCE_OF_TRUTH, TASK_LOCK_PROTOCOL, CROSS_COMPANY_PROTOCOL, ARTIFACT_PROTOCOL, DEFINITION_OF_DONE, ROLE_RUNTIME_PROTOCOL, COMMUNICATION_PROTOCOL, CAPABILITY_MATRIX, GAME_DEVELOPMENT_FOUNDATION and the member's contract/skill/playbook. The manifest is the versioned index.
 
-- One Project Owner.
-- Two Project Manager / Producer instances: PM-A and PM-B.
-- Thirteen unique role contracts.
-- Fourteen member slots because the Project Manager contract has two active instances.
-- One shared backlog, one repository, one task state, one issue history.
-- One Issue has one implementation owner and one Coordinating PM at a time.
+## Autonomy with ownership
 
-## Shared protocols
+Members execute compatible craft choices inside approved tasks and propose improvements without pretending proposals are requirements. Direct specialist clarification and preauthorized review requests need no PM courier. PMs own flow, priorities, capacity and exceptions; domain specialists own domain decisions. Explicit conditional activation can eliminate a repeated PM round trip but cannot create self-assigned work.
 
-All members must read:
+Separate artifact locks from member availability. Default capacity is one active implementation task plus one waiting-review task; the waiting item must have a ready handoff, named reviewer and correction capacity. This is a ceiling, not automatic authorization. A Coordinating PM may record a justified temporary exception; cross-PM resource changes need agreement. See TASK_LOCK_PROTOCOL for shared-file serialization and current-live-task migration.
 
-- `.github/PROZ0_AGENT_BOOTSTRAP.md`
-- `docs/team/ROLE_REGISTRY.md`
-- `docs/team/MEMBER_REGISTRY.md`
-- `docs/team/SOURCE_OF_TRUTH.md`
-- `docs/team/TASK_LOCK_PROTOCOL.md`
-- `docs/team/CROSS_COMPANY_PROTOCOL.md`
-- `docs/team/ARTIFACT_PROTOCOL.md`
-- `docs/team/DEFINITION_OF_DONE.md`
-- their role contract.
+## Playable delivery
 
-## Core principles
+Plan increments around player actions and early integrated paths. Name who consumes each design/content/asset output. Keep technical correctness, presentation readiness and player experience visible. Maintain stage-specific acceptance without deleting original end-to-end criteria.
 
-1. **One task, one lock.**
-2. **One role, one accountable person per member slot.**
-3. **Two PMs, one shared project.**
-4. **Discussion is open; implementation is locked.**
-5. **Authority follows role and approved contract, not company.**
-6. **Cross-company collaboration happens directly on Issues.**
-7. **PMs coordinate ownership and dependencies; they do not act as document couriers.**
-8. **Project Owner is not a message router.**
-9. **No hidden decisions.**
-10. **No unrecorded scope change.**
+Capability is demonstrated by artifacts, measurements, review and iteration. Members understand game design through their own discipline and know who owns neighboring decisions. Provide bounded experiments and review learning; avoid expanding product scope or role authority informally.
 
-## Legacy tasks
+## Legacy migration
 
-Existing Issues and their task IDs, scope, dependencies and approved artifacts remain valid.
+Preserve existing Task IDs, scope, owners, dependencies and accepted artifacts. Active legacy work without new fields may continue under its existing owner; before a new activation, capacity exception, ownership change or acceptance-stage adjustment, the Coordinating PM reconciles the Issue. Do not label all old blocked backlog items LEGACY-ACTIVE or grant them implicit permission to start.
 
-The Team Operating System does not rewrite old tasks merely because the operating model changed.
-
-Open legacy Issues without the new lock header are treated as `LEGACY-ACTIVE`: current work may continue with its existing owner, but the second company must not begin overlapping implementation until a PM records an explicit lock and collision check.
-
-New tasks must use the current task-lock fields.
+Pack adoption alone does not unblock tasks, approve PRs, configure notification systems or wake role chats.

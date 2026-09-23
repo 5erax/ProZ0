@@ -58,4 +58,6 @@ This repository is the product/design foundation for ProZ0. The MVP target is a 
 
 ## Working principles
 
+Team members use the versioned [role contracts and specialist skills](docs/team/ROLE_REGISTRY.md). See [chat activation and reload](docs/team/ROLE_CHAT_BOOTSTRAP_TEMPLATE.md) for individual member prompts, and [release/adoption rules](docs/team/ROLE_PACK_RELEASE.md) before applying a candidate pack.
+
 Keep the world readable, the preparation meaningful, the consequences recoverable, and the player's choices visible in the colony. Prefer data-driven systems so new biomes, professions, machines, and events can be added without rewriting the simulation.

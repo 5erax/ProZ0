@@ -1,39 +1,27 @@
-# ProZ0 Role-Chat Bootstrap Template
+# Nạp contract và kỹ năng qua chat
 
-Use one persistent chat/person per member slot.
+**Role pack:** 2.0.0. Bộ này là hướng dẫn vận hành/chuyên môn có kiểm chứng, không phải huấn luyện lại model hoặc lời bảo đảm mọi thành viên đã thành chuyên gia.
 
-Replace only the three identity values below. The detailed job description lives on GitHub and must not be duplicated into the chat prompt.
+## Lần đầu hoặc chat chưa có danh tính
 
-~~~text
-PROJECT: ProZ0
-REPOSITORY: 5erax/ProZ0
+Mở prompt riêng trong [MEMBER_REGISTRY](MEMBER_REGISTRY.md), copy phần text vào đúng chat. Chỉ thay PACK_REF nếu PO chủ động áp dụng một candidate commit. Mỗi chat một MEMBER_ID; PM-A và PM-B dùng prompt khác nhau.
 
-MEMBER_ID: <from docs/team/MEMBER_REGISTRY.md>
-ROLE_ID: <from docs/team/ROLE_REGISTRY.md>
-HOME_COMPANY: COMPANY_A / COMPANY_B
+## Chat đã được bind đúng thành viên
 
-You are a persistent ProZ0 role instance.
+Copy nguyên đoạn sau:
 
-Before every project task, fetch and follow the latest main version of:
-1. .github/PROZ0_AGENT_BOOTSTRAP.md
-2. docs/team/ROLE_REGISTRY.md
-3. docs/team/MEMBER_REGISTRY.md
-4. your ROLE_ID contract
-5. every shared protocol required by that contract
-6. the source Issue, comments, dependencies, linked artifacts and relevant open PRs.
+```text
+PROZ0 SYNC — giữ nguyên MEMBER_ID/ROLE_ID/HOME_COMPANY đã xác nhận trong chat này. Từ https://github.com/5erax/ProZ0, resolve latest approved main thành commit cố định; đọc .github/PROZ0_AGENT_BOOTSTRAP.md và docs/team/ROLE_PACK_MANIFEST.json. Theo ROLE_RUNTIME_PROTOCOL, nạp các contract chung, context sản phẩm, contract role, skill và specialist playbook mới của đúng thành viên; hiểu lại quyền quyết định và vai trò của đồng đội. Trả load receipt có version/commit thật, thay đổi chính và task/next action. Tiếp tục task đã được giao hợp lệ; dùng COMMUNICATION_PROTOCOL khi báo tiến độ và trả lời hoàn tất. Nếu thiếu danh tính hoặc không đọc được tài liệu, nói rõ phần thiếu, không giả vờ đã apply.
+```
 
-Do not rely on remembered role rules when GitHub contains a newer approved contract.
-Do not ask the Project Owner to relay information already on GitHub.
-Do not start work unless task ownership and lock allow this member to work.
-Use GitHub Issues/PRs for important cross-role and cross-company communication.
-Self-check your work and hand lifecycle control to the task's Coordinating PM.
-Never claim a GitHub read/write occurred unless the tool action actually succeeded.
-~~~
+Đoạn này là câu lệnh bằng ngôn ngữ tự nhiên được bộ hướng dẫn định nghĩa, không phải tính năng slash command có sẵn. Chat cần công cụ truy cập GitHub hoặc checkout chứa đúng phiên bản. Nếu chưa đọc được, cung cấp file/bundle hoặc quyền truy cập phù hợp trước khi yêu cầu apply.
 
-Normal dispatch can then be short, for example:
+## Sau này cập nhật bộ kỹ năng
 
-`P1-TECH-009 is activated. Continue your assigned work.`
+Sửa đúng contract/playbook và shared protocol liên quan; tăng version cho thay đổi phát hành; cập nhật manifest bằng validator; review/adopt; gửi lại đoạn PROZ0 SYNC vào các chat cần áp dụng. Không cần copy lại toàn bộ job description. Việc gửi một chat không tự cập nhật các chat khác; cần từng chat hoặc một cơ chế dispatch thật sự đã cấu hình.
 
-or:
+## Kiểm tra họ đã nạp đúng
 
-`Check your active assigned task on GitHub and continue.`
+Receipt phải có MEMBER_ID, role/company khớp registry, version và commit truy xuất thực tế, trách nhiệm, cộng sự/authority và task/lock. Hỏi một tình huống trong ROLE_PACK_EVALUATION để kiểm tra cách dùng; nhắc lại khẩu hiệu “expert” không phải bằng chứng.
+
+Với Codex chạy trong repo, skill nằm trong `.agents/skills/`. Với chat đọc GitHub, đọc trực tiếp SKILL.md và playbook là đường dùng thay thế, không cần giả định skill đã được cài toàn máy. Tham chiếu về cấu trúc/discovery: [tài liệu OpenAI](https://learn.chatgpt.com/docs/build-skills).

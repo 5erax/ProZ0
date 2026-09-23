@@ -1,54 +1,41 @@
-# ProZ0 Shared Definition of Done
+# Definition of Done and handoff
 
-**Version:** 1.0
+**Version:** 2.0.0. Role-specific evidence adds to these requirements.
 
-Role-specific DoD adds to, and does not replace, this shared DoD.
+## Separate progress stages
 
-A task is not complete until all applicable items pass:
+- IMPLEMENTATION_COMPLETE: the owner completed the authorized deliverable and self-checks.
+- REVIEW_PENDING / QA_PENDING: external gates remain; this is not itself an implementation failure.
+- ACCEPTED / DONE: the authorized acceptance owner verified all criteria for the Issue's declared acceptance stage and mapped remaining end-to-end criteria to their real downstream task.
+- PARTIAL / BLOCKED: unfinished scope and reason are explicit.
 
-- Source Issue and current comments were read.
-- Current role contract and shared protocols were read.
-- Task ownership/lock matched the executing member.
-- Upstream dependencies were verified rather than assumed.
-- No unresolved material task collision remains.
-- Work stayed inside approved scope and role authority.
-- Acceptance Criteria were self-checked.
-- Required tests/reviews/validation were performed.
-- Required artifact/code/evidence was persisted to GitHub.
-- Source Issue/PR was updated.
-- Open questions and known limitations were recorded.
-- Downstream consumers can locate the result without Project Owner relaying it.
-- A Handoff Manifest was posted.
-- Lifecycle control returned to the Coordinating PM.
-- `PROJECT OWNER ACTION: NONE` or `REQUIRED` was stated.
+## Common completion evidence
 
-## Universal Handoff Manifest
+Identity, approved pack and task ownership were verified; relevant sources/dependencies were read; no unresolved material collision; scope and authority respected; criteria self-checked; applicable tests/reviews performed; artifacts and known limits persisted where available/authorized; consumer and required next role identified; PM-accountable lifecycle record updated. If persistence/tooling is unavailable, return PERSISTENCE_REQUIRED and copy-ready evidence, never a fake GitHub action.
 
-~~~text
-HANDOFF MANIFEST
+Do not require a final integrated test to pass before authorizing the task that implements its dependency. Do not silently remove that test either: stage reconciliation requires an explicit source-Issue record by PM and the relevant domain owner.
 
-TASK:
-ROLE:
-MEMBER_ID:
-HOME_COMPANY:
-STATUS: COMPLETE / PARTIAL / BLOCKED
-SOURCE_ISSUE:
-COORDINATING_PM:
-ARTIFACT_TYPE:
-ARTIFACT_LOCATION:
-GITHUB_STATE: PERSISTED / PERSISTENCE REQUIRED / NOT APPLICABLE
-DEFINITION_OF_DONE: PASS / FAIL
-ACCEPTANCE_CRITERIA: PASS / PARTIAL / FAIL
-UPSTREAM_DEPENDENCIES_VERIFIED: YES / NO
-COLLISION_CHECK: PASS / ISSUE FOUND
-TESTS_OR_VALIDATION:
-BLOCKERS:
-OPEN_QUESTIONS:
-DECISION_NEEDED:
-RECOMMENDED_NEXT_ACTION:
-RECOMMENDED_NEXT_ROLE:
-HANDOFF_TO: COORDINATING PM
-PROJECT_OWNER_ACTION: NONE / REQUIRED
-~~~
+## Standard handoff
 
-If Project Owner action is required, include the exact decision, why it belongs to PO authority, options and trade-offs.
+```text
+TASK / SOURCE_ISSUE:
+MEMBER_ID / ROLE_ID / HOME_COMPANY:
+PACK_VERSION / PACK_COMMIT:
+COORDINATING_PM / LOCK_REVISION:
+STAGE: IMPLEMENTATION_COMPLETE / REVIEW_PENDING / QA_PENDING / ACCEPTED / PARTIAL / BLOCKED
+ARTIFACT_LINK / EXACT_HEAD_OR_BUILD:
+PLAYER_OR_DELIVERY_RESULT:
+AC_SELF_CHECK: <criterion results, not-run and reason>
+VALIDATION: <actually executed checks and evidence>
+REQUIRED_EXTERNAL_GATES: <reviewer, pending/verdict, version>
+DEPENDENCIES_AND_COLLISION_CHECK:
+LIMITS / BLOCKERS:
+DOWNSTREAM_CONSUMER / INTEGRATION_OWNER:
+NEXT_ACTION / NEXT_MEMBER / DISPATCH_STATE:
+GITHUB_STATE: PERSISTED / PERSISTENCE_REQUIRED / NOT_APPLICABLE
+PROJECT_OWNER_ACTION: NONE / REQUIRED — <specific decision>
+```
+
+For a low-risk documentation clarification use compact handoff: task/member, exact artifact, result, checks, limits and next owner. Link the existing ownership and source records instead of duplicating all fields. Changes to authority, canonical gameplay, schema, save/network behavior or release policy use the standard handoff.
+
+The user-facing reply follows COMMUNICATION_PROTOCOL and stays concise. Full source code in comments is unnecessary when an exact PR/commit is accessible. Tests are proportional to impact and project-required gates; no “test passed” claim without execution/inspection evidence.

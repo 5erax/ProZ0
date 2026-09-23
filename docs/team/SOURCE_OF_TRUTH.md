@@ -1,47 +1,23 @@
-# ProZ0 Source of Truth
+# Source of Truth
 
-**Version:** 1.0
+**Version:** 2.0.0.
 
-ProZ0 separates product truth from operational truth so that workflow contracts cannot accidentally rewrite game design, and design documents cannot silently rewrite team authority.
+## Product precedence
 
-## Product / game truth precedence
+Latest explicit PO product decision → approved Product/Feature Brief → approved Game Design Specification → approved narrative canon within narrative authority → approved Technical Design/ADR for implementation structure → approved Issue → repository documentation → current implementation → discussion/draft/assumption.
 
-1. Latest explicit Project Owner product decision.
-2. Approved Product / Feature Brief.
-3. Approved Game Design Specification.
-4. Approved Narrative / World canon for narrative facts within its authority.
-5. Approved Technical Design / ADR for implementation structure.
-6. Approved GitHub Issue.
-7. Repository documentation.
-8. Existing implementation.
-9. Discussion, draft or assumption.
+These are domain-scoped sources, not permission for one domain to overrule another. A design spec does not authorize arbitrary architecture changes, and an ADR does not redefine mechanics. Code proves current behavior, not automatic requirement approval.
 
-Code is evidence of current behavior, not automatically a requirement.
+## Operating precedence
 
-## Operational truth precedence
+Explicit PO governance decision → approved bootstrap → approved Team Operating System/shared protocols → role contract → explicit source-Issue lock/delegation → recorded PM coordination → skill craft guidance → discussion/assumption.
 
-1. Latest explicit Project Owner governance decision.
-2. `.github/PROZ0_AGENT_BOOTSTRAP.md`.
-3. Current approved Team Operating System and shared protocols.
-4. Current role contract.
-5. Explicit task ownership / lock recorded on the source Issue.
-6. Recorded PM-to-PM coordination decision.
-7. Discussion or assumption.
+Role skills teach methods and evidence; they cannot override contracts or an explicit user instruction. The role-pack release/adoption state and resolved commit determine which version is effective. A branch labelled 2.0.0 is not automatically approved.
 
-## Classification
+## Evidence classification
 
-Important information must be distinguished as:
+Use CONFIRMED, ASSUMPTION, OPEN_QUESTION, CONSTRAINT and DECISION_NEEDED. Creative work may further distinguish DESIGN_OPINION, PROPOSAL, EXPERIMENT_RESULT and APPROVED_DESIGN. Only confirmed approved sources become requirements. Do not canonize a hypothesis by repeating it in data or assets.
 
-- `CONFIRMED`
-- `ASSUMPTION`
-- `OPEN QUESTION`
-- `CONSTRAINT`
-- `DECISION NEEDED`
+## Conflicts
 
-Only confirmed information may be treated as an approved requirement.
-
-## Conflict behavior
-
-Do not silently reconcile conflicting sources.
-
-Record the conflict, identify the two sources, stop the affected decision, and route it to the role that owns the disputed authority. Escalate to the Project Owner only when the conflict is within Project Owner authority or the responsible authorities cannot resolve it.
+Record both sources/versions, affected behavior and decision owner; stop only the affected decision/mutation and continue independent authorized work. Do not silently reconcile material conflicts. PM resolves lifecycle/ownership; the domain owner resolves their domain; PO handles unresolved product/governance authority. Reconcile stale Issue body versus a newer authorized comment before a contested transition.
