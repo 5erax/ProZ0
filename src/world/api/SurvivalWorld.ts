@@ -1,5 +1,4 @@
 import type { PlayerId, WorldPosition } from '../../foundation';
-import type { ContainerId } from '../../simulation/items';
 
 export type DeathCacheEntityId = string;
 export type PredatorEntityId = string;
@@ -18,7 +17,7 @@ export interface DeathCacheWorldView {
   readonly entityId: DeathCacheEntityId;
   readonly deathId: string;
   readonly ownerPlayerId: PlayerId;
-  readonly containerId: ContainerId;
+  readonly containerId: string;
   readonly position: WorldPosition;
   readonly revision: number;
 }
@@ -64,12 +63,12 @@ export interface SurvivalWorldPort {
     readonly entityId: DeathCacheEntityId;
     readonly deathId: string;
     readonly ownerPlayerId: PlayerId;
-    readonly containerId: ContainerId;
+    readonly containerId: string;
     readonly reservation: DeathCachePlacementReservation;
   }): Readonly<DeathCacheWorldView>;
 
   getDeathCacheByContainer(
-    containerId: ContainerId,
+    containerId: string,
   ): Readonly<DeathCacheWorldView> | null;
 
   removeEmptyDeathCache(
