@@ -74,15 +74,16 @@ export class HostedClientConnection {
   private sessionEpoch: string | null = null;
   private connectionId: string | null = null;
   private playerId: string | null = null;
-  private resumeCredential: string | null =
-    this.options.hello.resumeCredential ?? null;
+  private resumeCredential: string | null;
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
   private durableSaveRevision: number | null = null;
   private rttMs: number | null = null;
   private sessionClosingStatus: 'SUCCESS' | 'SAVE_FAILED' | null = null;
 
-  public constructor(private readonly options: HostedClientConnectionOptions) {}
+  public constructor(private readonly options: HostedClientConnectionOptions) {
+    this.resumeCredential = options.hello.resumeCredential ?? null;
+  }
 
   public start(): void {
     if (this.state !== 'DISCONNECTED') {
