@@ -275,7 +275,6 @@ DeathId is persisted so reload/rejoin cannot re-run death side effects as a new 
 interface PlayerProgressionSaveV2 {
   readonly revision: number;
   readonly totalXp: number;
-  readonly level: number;
 
   readonly completedMilestoneRuleIds: readonly string[];
   readonly repeatRuleCounts: readonly {
@@ -299,7 +298,8 @@ Rules:
 
 - milestone/repeat rule IDs must exist in the compatible progression content definition;
 - quest objective ordinals are valid only under the exact saved content fingerprint;
-- `level` must match the threshold implied by `totalXp`;
+- player level is **not persisted**; it is reconstructed from `totalXp` plus the exact compatible progression threshold table;
+- reconstructed level must be validated before player authority is published;
 - skills/professions/quests must reference the approved Phase 1 content kinds;
 - first-time milestone flags, repeat counters, completed quest objectives and profession unlocks survive death/rejoin/reopen;
 - death XP loss changes XP according to P1-DES-006 but never clears milestone/skill/profession state.
@@ -528,7 +528,6 @@ interface FootholdRecordV2 {
   readonly powerNetwork: {
     readonly revision: number;
     readonly producerStructureId: StructureId | null;
-    readonly capacityPu: number;
     readonly grantedConsumerIds: readonly StructureId[];
   };
 }
@@ -537,6 +536,8 @@ interface FootholdRecordV2 {
 Connection edges are canonically sorted by their normalized pair of ConnectorIds.
 
 Power grants are persisted because they are canonical authority state; load still revalidates eligibility under exact compatible structure/content state.
+
+`capacityPu` is **not persisted**. When `producerStructureId` is non-null, capacity is reconstructed from that producer's exact compatible content definition before grants are validated/published. A missing/incompatible producer definition fails load before authority publication.
 
 No generic electrical graph is introduced.
 
@@ -576,9 +577,17 @@ interface CondenserSaveV2 {
   readonly enabled: boolean;
   readonly productionProgressTicks: number;
   readonly completedCycleOrdinal: number;
-  readonly outputContainerId: ContainerId;
 }
 ```
+
+The Condenser's canonical output-container reference is stored **once**, at `StructureRecordV2.outputContainerId`. `CondenserSaveV2` does not duplicate that ContainerId.
+
+Load validation for a Condenser structure requires:
+- `StructureRecordV2.outputContainerId` is non-null;
+- it resolves to exactly one `ContainerRecordV2`;
+- that container has `kind = 'machine-output'`;
+- that container's `ownerStructureId` equals the same `StructureRecordV2.structureId`.
+Any mismatch is corruption and fails before authority publication.
 
 Current displayed machine state (DISABLED/UNPOWERED/RUNNING/OUTPUT FULL) is derived and is not independently persisted.
 
@@ -801,7 +810,11 @@ Set:
 - contentCompatibility = the exact validated Phase 1 content compatibility identity provided by the migrating runtime;
 - environment.activeTick = 0;
 - environment.cycleStartLocalMinute = 540 (approved new-world 09:00);
-- environment.weatherEvents = [].
+- environment.weatherEvents = the **single canonical first-session Cold Rain event** reconstructed with the accepted P1-TECH-004 deterministic contract from the V1 `worldSeed`, recorded RNG algorithm version, recorded seed-derivation version, exact validated Phase 1 content compatibility identity, and the dedicated `weather:cold-rain:first-session` namespace.
+
+Migration must use the same golden-locked Cold Rain mapping/event-identity algorithm as the accepted Phase 1 runtime. It must not invent an empty weather list, reroll on reopen, use wall-clock time, or derive a client-specific event.
+
+If the migrating runtime cannot construct and validate that exact canonical Cold Rain state under the recorded deterministic identities and exact content compatibility identity, V1 -> V2 migration **fails before publishing any V2 authority state**. The original V1 records remain unchanged.
 
 This does not claim that the V1 world-generation version is compatible with the Phase 1 generator.
 
@@ -1090,14 +1103,22 @@ P1 persistence implementation is not accepted without tests covering:
 7. V1 player position/facing preserved;
 8. Phase 1 new fields use exact approved defaults;
 9. deterministic empty player inventory ID/container produced once;
-10. V1 source records remain unchanged on migration failure;
-11. generation incompatibility after schema migration fails explicitly rather than regenerating.
+10. migrated environment contains exactly the canonical deterministic Phase 1 Cold Rain event and validates under the accepted environment contract;
+11. reopening the migrated save reconstructs the same persisted Cold Rain identity/ticks without reroll;
+12. inability to construct/validate the canonical Cold Rain state fails migration before V2 authority publication and leaves V1 source records unchanged;
+13. generation incompatibility after schema migration fails explicitly rather than regenerating.
+
+### Derived-state reconstruction / cross-reference corruption
+14. player level is absent from durable V2 state and reconstructs from `totalXp` + exact compatible progression thresholds;
+15. power capacity is absent from durable V2 state and reconstructs from the compatible producer definition;
+16. Condenser output container is referenced only by `StructureRecordV2.outputContainerId`;
+17. missing output container, wrong container kind, or owner StructureId mismatch rejects load before authority publication.
 
 ### Atomicity
-12. multi-record save failure preserves previous complete durable revision;
-13. death snapshot cannot publish duplicated inventory/cache state;
-14. stale expected worldRevision writes nothing;
-15. successful save advances worldRevision exactly once.
+18. multi-record save failure preserves previous complete durable revision;
+19. death snapshot cannot publish duplicated inventory/cache state;
+20. stale expected worldRevision writes nothing;
+21. successful save advances worldRevision exactly once.
 
 ### World delta
 16. explored fog survives save/reopen;
