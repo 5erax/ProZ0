@@ -298,6 +298,41 @@ export class Phase1BuildingWorld {
     return condenser === undefined ? null : freezeCondenser(condenser);
   }
 
+  public matchesCommittedPlacement(
+    structureId: StructureId,
+    placement: PlacementIntent,
+  ): boolean {
+    const structure = this.structures.get(structureId);
+    if (structure === undefined) return false;
+
+    if (placement.mode === 'free') {
+      return (
+        structure.position.x === placement.anchor.x
+        && structure.position.y === placement.anchor.y
+        && structure.orientationQuarterTurns
+          === placement.orientationQuarterTurns
+      );
+    }
+
+    const connector = this.connectors.get(
+      `connector:${structureId}:habitat`,
+    );
+    if (
+      connector === undefined
+      || connector.occupiedByConnectionId === null
+    ) {
+      return false;
+    }
+    const connection = this.connections.get(
+      connector.occupiedByConnectionId,
+    );
+    if (connection === undefined) return false;
+    return (
+      connection.a === placement.targetConnectorId
+      || connection.b === placement.targetConnectorId
+    );
+  }
+
   public getPowerNetwork(): Readonly<PowerNetworkState> {
     return Object.freeze({
       revision: this.powerRevision,
