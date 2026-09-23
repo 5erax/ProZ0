@@ -19,6 +19,8 @@ export type {
   SimulationSnapshot,
 } from './api/SimulationSnapshot';
 
+export * from './items';
+
 export {
   PLAYER_COLLISION_FOOTPRINT,
   type PlayerCollisionFootprint,
