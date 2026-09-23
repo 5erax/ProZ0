@@ -18,5 +18,7 @@ export {
   type PlayerSurvivalView,
   type SurvivalAuthoritySnapshot,
   type SurvivalDamageSource,
+  type SurvivalRespawnReservation,
+  type SurvivalStaminaReservation,
   type SurvivalTickContext,
 } from './SurvivalTypes';
