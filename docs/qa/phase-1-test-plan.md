@@ -479,18 +479,774 @@ Default evidence layer: **Architecture/static boundary + integration/review**
 | `TECH1-018` | `P1QA-TECH001-018` | Architecture/static boundary + integration/review | No implementation authorized by this artifact |
 
 
-## 9. Mandatory specialist test suites
 
-The specialized P1-TECH-002..009 ADRs define additional executable test strategies and quality gates. They are appended in the next artifact update and are mandatory for P1-QA-002 where the corresponding implementation exists.
+## 11. Source acceptance traceability — Specialized Technical ADRs
 
-## 10. Current completeness checkpoint
+Every technical acceptance/self-check statement below is mapped. Statements such as “implementation authorization: NO” and “blocking open question: NONE” are treated as **REVIEW/scope checks**, not runtime behavior.
 
-- Gameplay P1-DES-001..006: mapped one-to-one.
-- Art/UI P1-ART-001..002: mapped one-to-one.
-- P1-TECH-001 architecture self-check: mapped one-to-one.
-- P1-TECH-002..009: pending append in this same branch/file before handoff.
-- No QA-authored gameplay rule introduced.
-- No implementation performed.
-- Collision check: PASS for `docs/qa/phase-1-test-plan.md`.
+**Mapped in this section: 129 source statements.**
+
+### P1-TECH-002 — Issue #38
+
+Source: `docs/adr/ADR-P1-TECH-002-content-schema-registry.md`  
+Mapped statements: **17**  
+Default evidence layer: **Unit/schema + determinism/golden + compatibility**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Content definitions read-only/data-driven and separate from runtime state | `P1QA-TECH002-001` | Unit/schema + determinism/golden + compatibility |
+| Stable IDs defined | `P1QA-TECH002-002` | Unit/schema + determinism/golden + compatibility |
+| Pack/schema version identity defined | `P1QA-TECH002-003` | Unit/schema + determinism/golden + compatibility |
+| Canonical fingerprint defined | `P1QA-TECH002-004` | Unit/schema + determinism/golden + compatibility |
+| Validation/failure behavior defined | `P1QA-TECH002-005` | Unit/schema + determinism/golden + compatibility |
+| Cross-reference integrity enforceable | `P1QA-TECH002-006` | Unit/schema + determinism/golden + compatibility |
+| Deterministic/load-order-independent registry behavior defined | `P1QA-TECH002-007` | Unit/schema + determinism/golden + compatibility |
+| Renderer-specific data excluded from domain authority | `P1QA-TECH002-008` | Unit/schema + determinism/golden + compatibility |
+| Exact Phase 1 item/recipe/resource/structure/machine/hazard/weather/hostile/ruin/progression contracts identified | `P1QA-TECH002-009` | Unit/schema + determinism/golden + compatibility |
+| Atmospheric Water Condenser approved values preserved | `P1QA-TECH002-010` | Unit/schema + determinism/golden + compatibility |
+| Explorer/Engineer prototype content preserved with no class lock | `P1QA-TECH002-011` | Unit/schema + determinism/golden + compatibility |
+| Schema bounded to Phase 1 | `P1QA-TECH002-012` | Unit/schema + determinism/golden + compatibility |
+| Save/network compatibility seams identified | `P1QA-TECH002-013` | Unit/schema + determinism/golden + compatibility |
+| Specialized ADR responsibilities not collapsed into content layer | `P1QA-TECH002-014` | Unit/schema + determinism/golden + compatibility |
+| No gameplay values invented/rebalanced | `P1QA-TECH002-015` | Unit/schema + determinism/golden + compatibility |
+| No implementation authorized | `P1QA-TECH002-016` | Unit/schema + determinism/golden + compatibility |
+| Blocking open question | `P1QA-TECH002-017` | Unit/schema + determinism/golden + compatibility |
+
+### P1-TECH-003 — Issue #39
+
+Source: `docs/adr/ADR-P1-TECH-003-item-container-transaction-authority.md`  
+Mapped statements: **14**  
+Default evidence layer: **Integration + concurrency + determinism + persistence/network seam**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| No client can authoritatively create/duplicate items | `P1QA-TECH003-001` | Integration + concurrency + determinism + persistence/network seam |
+| Canonical item/stack/container identity defined | `P1QA-TECH003-002` | Integration + concurrency + determinism + persistence/network seam |
+| Atomic pickup/drop/transfer/split/merge defined | `P1QA-TECH003-003` | Integration + concurrency + determinism + persistence/network seam |
+| Gather cross-owner transaction defined | `P1QA-TECH003-004` | Integration + concurrency + determinism + persistence/network seam |
+| Craft/repair transaction defined | `P1QA-TECH003-005` | Integration + concurrency + determinism + persistence/network seam |
+| Condition mutation defined | `P1QA-TECH003-006` | Integration + concurrency + determinism + persistence/network seam |
+| Revisions/idempotency/stale conflict behavior explicit | `P1QA-TECH003-007` | Integration + concurrency + determinism + persistence/network seam |
+| Persistence seam explicit/non-authoritative | `P1QA-TECH003-008` | Integration + concurrency + determinism + persistence/network seam |
+| Replication seam explicit | `P1QA-TECH003-009` | Integration + concurrency + determinism + persistence/network seam |
+| Anti-duplication invariants explicit | `P1QA-TECH003-010` | Integration + concurrency + determinism + persistence/network seam |
+| Deterministic selection/order explicit | `P1QA-TECH003-011` | Integration + concurrency + determinism + persistence/network seam |
+| Gameplay values preserved from approved Design/Content ADR | `P1QA-TECH003-012` | Integration + concurrency + determinism + persistence/network seam |
+| Implementation authorization | `P1QA-TECH003-013` | Integration + concurrency + determinism + persistence/network seam |
+| Blocking open question | `P1QA-TECH003-014` | Integration + concurrency + determinism + persistence/network seam |
+
+### P1-TECH-004 — Issue #40
+
+Source: `docs/adr/ADR-P1-TECH-004-world-content-fog-delta.md`  
+Mapped statements: **13**  
+Default evidence layer: **Determinism/golden + world lifecycle + hosted fog + persistence**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Generated base vs mutable delta ownership explicit | `P1QA-TECH004-001` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Fog/discovery canonical identity/persistence/replication explicit | `P1QA-TECH004-002` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Deterministic/order-independent placement explicit | `P1QA-TECH004-003` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Corrupt delta cannot silently regenerate over mutations | `P1QA-TECH004-004` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Chunk streaming remains world-owned | `P1QA-TECH004-005` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Resource depletion/regeneration authority explicit | `P1QA-TECH004-006` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Ruin/one-time reward authority explicit | `P1QA-TECH004-007` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Day/night/weather active-time authority explicit | `P1QA-TECH004-008` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Revision/dirty/save semantics preserve Phase 0 contract | `P1QA-TECH004-009` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Client/presentation cannot mutate canonical world knowledge | `P1QA-TECH004-010` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| No gameplay values redefined | `P1QA-TECH004-011` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Implementation authorized | `P1QA-TECH004-012` | Determinism/golden + world lifecycle + hosted fog + persistence |
+| Blocking open question | `P1QA-TECH004-013` | Determinism/golden + world lifecycle + hosted fog + persistence |
+
+### P1-TECH-005 — Issue #41
+
+Source: `docs/adr/ADR-P1-TECH-005-survival-combat-death-authority.md`  
+Mapped statements: **15**  
+Default evidence layer: **Fixed-step integration + idempotency/concurrency + persistence/reconnect**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Client cannot authoritatively decide damage/death/drop/recovery | `P1QA-TECH005-001` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Health/Food/Water/Stamina/Temperature owner explicit | `P1QA-TECH005-002` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Fixed-step/rate determinism explicit | `P1QA-TECH005-003` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Damage/event contract explicit | `P1QA-TECH005-004` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Death transition idempotent | `P1QA-TECH005-005` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Death Cache item duplication prevented | `P1QA-TECH005-006` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Respawn transition explicit | `P1QA-TECH005-007` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| XP/durability loss transaction explicit | `P1QA-TECH005-008` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Recovery/co-op contention explicit | `P1QA-TECH005-009` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Persistence/reconnect seams explicit | `P1QA-TECH005-010` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Revision/idempotency identities explicit | `P1QA-TECH005-011` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Replay/golden requirements explicit | `P1QA-TECH005-012` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Approved gameplay values preserved | `P1QA-TECH005-013` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Implementation authorization | `P1QA-TECH005-014` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+| Blocking open question | `P1QA-TECH005-015` | Fixed-step integration + idempotency/concurrency + persistence/reconnect |
+
+### P1-TECH-006 — Issue #42
+
+Source: `docs/adr/ADR-P1-TECH-006-building-power-machine-authority.md`  
+Mapped statements: **19**  
+Default evidence layer: **Integration + deterministic tick + concurrency + persistence/rejoin**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Stable structure/machine identities | `P1QA-TECH006-001` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Host-authoritative deterministic placement | `P1QA-TECH006-002` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| World/collision validation explicit | `P1QA-TECH006-003` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Kit consumption + placement atomic | `P1QA-TECH006-004` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Co-op competing placement behavior explicit | `P1QA-TECH006-005` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Habitat connector/connectivity bounded | `P1QA-TECH006-006` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Shelter thermal target 50 / no free healing preserved | `P1QA-TECH006-007` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| 10 PU Power Unit contract preserved | `P1QA-TECH006-008` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| 5 PU Condenser contract preserved | `P1QA-TECH006-009` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| 1 Clean Water / 90 active powered seconds preserved | `P1QA-TECH006-010` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Buffer 4 / no offline production / no hidden wear preserved | `P1QA-TECH006-011` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Machine output item authority uses #39 seam | `P1QA-TECH006-012` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Power/machine persistence/rejoin contract explicit | `P1QA-TECH006-013` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Dismantle exact one-Kit recovery atomic | `P1QA-TECH006-014` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Structure/machine state revisions explicit | `P1QA-TECH006-015` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| No client-authoritative structure/power/output state | `P1QA-TECH006-016` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Phase 1 scope bounded | `P1QA-TECH006-017` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Implementation authorization | `P1QA-TECH006-018` | Integration + deterministic tick + concurrency + persistence/rejoin |
+| Blocking open question | `P1QA-TECH006-019` | Integration + deterministic tick + concurrency + persistence/rejoin |
+
+### P1-TECH-007 — Issue #43
+
+Source: `docs/adr/ADR-P1-TECH-007-hosted-coop-protocol.md`  
+Mapped statements: **22**  
+Default evidence layer: **Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Critical game state remains host/server authoritative | `P1QA-TECH007-001` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Solo and hosted use same domain runtime/rules | `P1QA-TECH007-002` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Host/session lifecycle explicit | `P1QA-TECH007-003` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Join/leave/rejoin explicit | `P1QA-TECH007-004` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Durable PlayerId vs ephemeral ConnectionId explicit | `P1QA-TECH007-005` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Compatibility/version handshake explicit | `P1QA-TECH007-006` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Content canonical fingerprint used | `P1QA-TECH007-007` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Continuous movement input authority explicit | `P1QA-TECH007-008` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Snapshot/event/revision model explicit | `P1QA-TECH007-009` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Duplicate/out-of-order/stale behavior explicit | `P1QA-TECH007-010` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Item/container/world/fog/building/machine/death revisions consumed | `P1QA-TECH007-011` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Shared discovery replication explicit | `P1QA-TECH007-012` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Concurrent shared mutation behavior explicit | `P1QA-TECH007-013` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Disconnect during item/build/death/save defined | `P1QA-TECH007-014` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Live commit vs durable save distinction explicit | `P1QA-TECH007-015` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Session-end failure feedback explicit | `P1QA-TECH007-016` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Transport separated from authority logic | `P1QA-TECH007-017` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| 2–4 operational path implementable | `P1QA-TECH007-018` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| No structural four-player ceiling / future 10 path preserved | `P1QA-TECH007-019` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Production matchmaking/fleet/host migration excluded | `P1QA-TECH007-020` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Implementation authorization | `P1QA-TECH007-021` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+| Blocking open question | `P1QA-TECH007-022` | Hosted-2/Hosted-4 + protocol + contention + disconnect/rejoin + desync |
+
+### P1-TECH-008 — Issue #44
+
+Source: `docs/adr/ADR-P1-TECH-008-save-schema-v2.md`  
+Mapped statements: **14**  
+Default evidence layer: **Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| Every new persisted field has authoritative owner/reconstruction purpose | `P1QA-TECH008-001` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Inventory/equipment/progression/respawn state explicit | `P1QA-TECH008-002` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Fog/shared discovery and world delta explicit | `P1QA-TECH008-003` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Structures/containers/machine/power explicit | `P1QA-TECH008-004` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Death Cache/drop state explicit | `P1QA-TECH008-005` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Canonical environment/weather state explicit | `P1QA-TECH008-006` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Save schema V2 and V1->V2 migration explicit | `P1QA-TECH008-007` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Migration does not silently perform generation upgrade | `P1QA-TECH008-008` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Corruption cannot silently destroy/regenerate canonical Phase 1 mutation | `P1QA-TECH008-009` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Export/import validated and atomic | `P1QA-TECH008-010` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Hosted persistence ownership/checkpoint coordination explicit | `P1QA-TECH008-011` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Stale-write/revision behavior explicit | `P1QA-TECH008-012` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| Presentation/transient network state excluded | `P1QA-TECH008-013` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+| ADR persisted | `P1QA-TECH008-014` | Schema/migration + real Chromium IndexedDB + atomicity/corruption + hosted durability |
+
+### P1-TECH-009 — Issue #45
+
+Source: `docs/adr/ADR-P1-TECH-009-performance-observability-ci.md`  
+Mapped statements: **15**  
+Default evidence layer: **PERF + CI/evidence + exact-main + architecture review**
+
+| Source statement | QA tracking ID | Evidence layer |
+|---|---|---|
+| quantitative gates measurable and tied to player-facing risk | `P1QA-TECH009-001` | PERF + CI/evidence + exact-main + architecture review |
+| CI can detect architecture/determinism/save/network regressions | `P1QA-TECH009-002` | PERF + CI/evidence + exact-main + architecture review |
+| evidence reproducible on exact candidate head | `P1QA-TECH009-003` | PERF + CI/evidence + exact-main + architecture review |
+| no production analytics infrastructure required | `P1QA-TECH009-004` | PERF + CI/evidence + exact-main + architecture review |
+| ADR + handoff persisted | `P1QA-TECH009-005` | PERF + CI/evidence + exact-main + architecture review |
+| architecture/ownership explicit | `P1QA-TECH009-006` | PERF + CI/evidence + exact-main + architecture review |
+| instrumentation cannot become authority | `P1QA-TECH009-007` | PERF + CI/evidence + exact-main + architecture review |
+| browser/runtime/network/save budgets explicit | `P1QA-TECH009-008` | PERF + CI/evidence + exact-main + architecture review |
+| failure/observability behavior explicit | `P1QA-TECH009-009` | PERF + CI/evidence + exact-main + architecture review |
+| downstream QA use explicit | `P1QA-TECH009-010` | PERF + CI/evidence + exact-main + architecture review |
+| exact-main policy explicit | `P1QA-TECH009-011` | PERF + CI/evidence + exact-main + architecture review |
+| future 10-player path not unnecessarily blocked | `P1QA-TECH009-012` | PERF + CI/evidence + exact-main + architecture review |
+| Phase 1 scope proportional | `P1QA-TECH009-013` | PERF + CI/evidence + exact-main + architecture review |
+| implementation authorized | `P1QA-TECH009-014` | PERF + CI/evidence + exact-main + architecture review |
+| blocking open question | `P1QA-TECH009-015` | PERF + CI/evidence + exact-main + architecture review |
+
+
+## 12. Mandatory content-registry evidence — P1-TECH-002
+
+Use source-controlled exact Phase 1 content pack fixtures.
+
+### P1QA-CREG schema / identity / validation
+1. valid Phase 1 pack validates;
+2. wrong format rejects;
+3. newer schema rejects;
+4. invalid pack version rejects;
+5. malformed ContentId rejects;
+6. kind-prefix mismatch rejects;
+7. non-finite numeric value rejects;
+8. unknown field/type violation rejects;
+9. duplicate ContentId rejects;
+10. missing reference rejects;
+11. wrong-kind reference rejects;
+12. construction-kit/structure mismatch rejects;
+13. invalid recipe reference rejects;
+14. invalid profession/skill/quest reference rejects.
+
+### P1QA-CREG immutability / determinism
+15. finalized definitions cannot mutate through public catalog;
+16. source-object mutation after validation cannot mutate catalog;
+17. no mutable Map/array authority is exposed;
+18. shuffled source definition order produces same canonical catalog/fingerprint;
+19. shuffled unordered recipe/reference lists produce same canonical representation;
+20. quest objective order remains significant;
+21. stable ID-sorted listing is identical across runs.
+
+### P1QA-CREG exact approved content / compatibility
+22. exact approved 18-item set and numeric values;
+23. exact 11 recipes;
+24. exact six resource definitions;
+25. exact structure caps/source kits;
+26. Compact Power Unit = 10 PU / 8-footprint static contract;
+27. Atmospheric Water Condenser = 5 PU / 1 Clean Water per 90 active powered seconds / buffer 4 / no offline production;
+28. canonical Cold Rain static schedule/effect values;
+29. Territorial Predator static profile;
+30. ruin reward exactly one Ancient Alloy Shard;
+31. progression thresholds/rewards/caps;
+32. Fieldcraft/Maintenance prerequisites;
+33. Explorer/Engineer quest references and non-exclusive profession flags;
+34. any canonical pack-content change changes canonical fingerprint;
+35. exact pack identity fixture retained;
+36. save/network compatibility DTO round-trip is renderer-free and serializable.
+
+## 13. Mandatory item/container transaction evidence — P1-TECH-003
+
+### Identity/invariants
+- unique stack/container identities;
+- duplicate persisted identity fails explicitly;
+- condition-bearing stack quantity >1 fails where prohibited.
+
+### Atomicity/failure
+- target failure during transfer leaves source/target unchanged;
+- failed world-drop placement leaves inventory unchanged;
+- pickup capacity failure leaves world drop unchanged;
+- craft output overflow leaves inputs unchanged;
+- invalid/full-condition repair leaves Repair Patch unchanged.
+
+### Concurrency/idempotency
+- two players race same drop -> exactly one successful acquisition;
+- two players race same shared-container quantity -> one valid commit;
+- stale expected revision rejects;
+- repeated identical OperationId returns/replays one logical outcome without double apply;
+- same OperationId with different payload rejects.
+
+### Gathering/crafting/repair
+- canceled gather mutates no resource/output/tool condition;
+- fixed yields exact;
+- capacity precheck exact;
+- successful hard gather applies exact tool wear once;
+- craft consumes inputs iff output commits;
+- repair consumes Repair Patch iff condition increases.
+
+### Determinism/persistence/network
+- same initial ledger + ordered commands -> exact canonical final state;
+- merge/selection order independent of insertion order where source defines unordered data;
+- export/import round-trip;
+- invalid content reference fails;
+- reconnect retry cannot duplicate committed item.
+
+## 14. Mandatory world/fog/delta evidence — P1-TECH-004
+
+1. same seed/generation/content identity/chunk -> same GeneratedBase;
+2. chunk A->B generation equals B->A;
+3. exact golden chunk fixture includes resource/ruin/hostile placement;
+4. source content order does not alter generation;
+5. generated entity IDs stable;
+6. resource mutation survives unload/reload via PersistedDelta;
+7. corrupt delta fails instead of clean regeneration;
+8. same resolved movement tape -> identical explored fog state;
+9. overlapping multiplayer reveal union is idempotent;
+10. concurrent ruin Inspect creates one discovery and one Shard authority event;
+11. Cold Rain schedule golden fixture stable;
+12. reopen does not reroll weather;
+13. active-world timers do not advance through offline wall-clock gaps;
+14. canonical predator-dead mutation survives unload/reload when persistence scope requires it.
+
+Additional QA:
+- no fog-induced locomotion grid lock;
+- stale world aggregate cannot overwrite newer revision;
+- shared fog/discovery state received correctly on join/rejoin;
+- renderer/map culling never becomes chunk/fog authority.
+
+## 15. Mandatory survival/combat/death/recovery evidence — P1-TECH-005
+
+### Survival/fixed-step
+- exact Water/Food drain after source-defined fixed ticks;
+- render-FPS variation -> same authoritative states;
+- offline wall-clock gap -> no survival progression;
+- HEAVY/OVERLOADED stamina/movement consequences exact;
+- stamina regen delay exact;
+- Thermal Wrap broken/non-broken rate exact;
+- shelter/night/Cold Rain thermal targets exact.
+
+### Combat/damage
+- Spear commit spends approved stamina/cooldown on whiff;
+- Spear condition decreases only on successful hit;
+- nearest-target deterministic tie-break;
+- predator 0.55 s windup can be escaped according to approved geometry/rules;
+- duplicate AttackId/DamageId does not double hit;
+- leash/disengage exact authoritative behavior.
+
+### Death
+- simultaneous lethal sources -> one DeathId;
+- death penalty applies exactly once;
+- equipped condition -10 exactly once;
+- portable items exist either on player or in Death Cache, never both;
+- empty inventory follows approved cache rule;
+- invalid death position uses deterministic fallback;
+- later deaths preserve older non-empty caches.
+
+### Recovery/concurrency/reconnect
+- owner/teammate race same quantity -> one successful transfer;
+- stale revision rejects;
+- empty-cache removal and marker cleanup coherent;
+- save/reopen preserves survival/cache/condition/XP result;
+- corrupt persisted canonical state fails explicitly;
+- reconnect during dead state cannot recreate cache;
+- repeated recovery OperationId cannot duplicate item;
+- same input/environment tape -> same canonical checkpoint.
+
+## 16. Mandatory building/power/machine evidence — P1-TECH-006
+
+### Placement
+- valid placement consumes exactly one correct Kit and creates exactly one structure;
+- invalid terrain/overlap/fog/build-zone/cap consumes no Kit;
+- competing placements -> one commit and one stale/conflict loser;
+- duplicate OperationId cannot duplicate placement;
+- sprite/visual size cannot change collision footprint;
+- free placement remains continuous world-space, not terrain-tile snapped;
+- four logical rotations deterministic.
+
+### Habitat/connector
+- valid Landing Module connector snap exact/replayable;
+- occupied/invalid connector fails;
+- required door/access clearance enforced;
+- shelter thermal query = 50;
+- shelter does not mutate Health/Food/Water.
+
+### Power
+- Compact Power Unit = 10 PU;
+- radius = approved 8 footprint widths / current 5 WU contract;
+- Condenser demand = 5 PU;
+- no overdraw;
+- power removal -> UNPOWERED with partial progress preserved;
+- existing valid grants retained before new requests as defined by ADR.
+
+### Condenser
+- 5,399 RUNNING ticks -> no output;
+- 5,400th RUNNING tick -> exactly one Clean Water;
+- duplicate cycle processing -> no duplicate;
+- output count 4 pauses;
+- collection resumes from preserved partial progress;
+- disabled/unpowered/full ticks do not advance;
+- offline wall clock does not advance;
+- save/load preserves exact progress/cycle/output.
+
+### Dismantle/persistence
+- success returns exactly one matching Kit;
+- non-empty crate/full machine output/player-in-Habitat blocks where source contract requires;
+- failed dismantle returns no Kit;
+- interaction/dismantle contention remains coherent;
+- Power Unit dismantle pauses machine without deleting canonical machine state;
+- exact persistence round-trip;
+- corrupt references fail;
+- reconnect/retry is idempotent.
+
+## 17. Mandatory hosted co-op protocol suite — P1-TECH-007
+
+### Handshake/session
+NET-001 compatible two-player join succeeds.  
+NET-002 four-player session succeeds.  
+NET-003 fifth player rejected when maxPlayers=4.  
+NET-004 protocol mismatch rejects.  
+NET-005 content fingerprint mismatch rejects.  
+NET-006 generation/RNG mismatch rejects.  
+NET-007 resumed connection reclaims same PlayerId.  
+NET-008 invalid ResumeCredential rejects.  
+NET-009 schema has no hard-coded four-slot ceiling; configured maxPlayers=10 is structurally valid.
+
+### Movement
+NET-010 client position payload cannot authoritatively move player.  
+NET-011 stale/duplicate movement inputSeq ignored.  
+NET-012 input lease expiry neutralizes movement.  
+NET-013 disconnect neutralizes movement.  
+NET-014 same movement tape remains authority-equivalent to solo rules.
+
+### Shared commands/contention
+NET-015 duplicate OperationId applies once.  
+NET-016 same OperationId/different payload rejects.  
+NET-017 stale container revision rejects.  
+NET-018 same drop race -> one commit.  
+NET-019 same container quantity race -> one commit.  
+NET-020 placement race -> one commit; loser keeps Kit.  
+NET-021 concurrent Condenser collection preserves exact item total.
+
+### World/fog replication
+NET-022 one-player reveal appears to teammate.  
+NET-023 ruin discovery replicates without teleporting teammate.  
+NET-024 resource/world revision survives rejoin baseline.  
+NET-025 stale aggregate update cannot overwrite newer client read model.  
+NET-026 tombstone prevents stale removed-entity resurrection.
+
+### Disconnect/rejoin
+NET-027 accepted command with lost response resolves to one final outcome.  
+NET-028 reconnect does not replay item/build mutation.  
+NET-029 disconnect during death does not duplicate Death Cache.  
+NET-030 reconnect receives current dead/respawn/cache state.  
+NET-031 disconnect during recovery does not duplicate transferred item.
+
+### Durability/session end
+NET-032 COMMITTED is distinguishable from durable checkpoint.  
+NET-033 graceful shutdown reports save success only after persistence success.  
+NET-034 save failure remains explicit.  
+NET-035 new SessionEpoch forces baseline resync and prevents old command auto-replay.
+
+### Desync/backpressure
+NET-036 server sequence gap triggers resync.  
+NET-037 duplicate aggregate revision is harmless.  
+NET-038 stale aggregate revision ignored.  
+NET-039 slow-client backpressure cannot stall authority simulation.  
+NET-040 RTT/desync diagnostics cannot alter gameplay result.
+
+## 18. Mandatory Save V2 / migration / recovery suite — P1-TECH-008
+
+QA IDs below are intentionally unique because the source ADR contains repeated numeric labels in different subsections.
+
+### Schema/validation
+SAVEV2-001 valid V2 bundle round-trip.  
+SAVEV2-002 newer schema rejects.  
+SAVEV2-003 wrong content fingerprint rejects.  
+SAVEV2-004 invalid ContentId kind/reference rejects.  
+SAVEV2-005 duplicate stable IDs reject.  
+SAVEV2-006 invalid numeric/revision/tick state rejects.
+
+### V1 -> V2 migration
+SAVEV2-007 V1 player position/facing preserved.  
+SAVEV2-008 new Phase 1 fields use exact approved defaults.  
+SAVEV2-009 deterministic empty player inventory/container identity produced once.  
+SAVEV2-010 migrated environment contains exactly canonical deterministic Cold Rain.  
+SAVEV2-011 reopen reconstructs same Cold Rain identity/ticks without reroll.  
+SAVEV2-012 invalid/unconstructable canonical Cold Rain fails migration before V2 authority publication and leaves V1 source unchanged.  
+SAVEV2-013 generation incompatibility after schema migration fails explicitly rather than regenerating.
+
+### Derived-state / cross-reference
+SAVEV2-014 durable player level is absent and reconstructs from totalXp + compatible progression thresholds.  
+SAVEV2-015 durable power capacity is absent and reconstructs from compatible producer definition.  
+SAVEV2-016 Condenser output container has one canonical ownership reference through StructureRecordV2.outputContainerId.  
+SAVEV2-017 missing/wrong-kind/wrong-owner output container rejects load before authority publication.
+
+### Atomicity/data loss
+SAVEV2-018 multi-record save failure preserves previous complete durable revision.  
+SAVEV2-019 death snapshot cannot publish duplicated player/cache inventory.  
+SAVEV2-020 stale expected worldRevision writes nothing.  
+SAVEV2-021 successful save advances worldRevision exactly once.
+
+### World delta
+SAVEV2-022 explored fog survives reopen.  
+SAVEV2-023 depleted/regenerating resource preserves exact revision/ready tick.  
+SAVEV2-024 ruin INVESTIGATED/reward state survives without duplicate Shard.  
+SAVEV2-025 predator dead state survives.  
+SAVEV2-026 corrupt persisted delta fails materialization, not clean regeneration.
+
+### Player canonical state
+SAVEV2-027 survival rate remainder/ticks round-trip.  
+SAVEV2-028 active dead-pending-respawn round-trips by canonical tick, not wall clock.  
+SAVEV2-029 equipment references round-trip and validate ownership.  
+SAVEV2-030 progression milestones/repeat counts/quest objectives/professions round-trip.  
+SAVEV2-031 death XP result does not reapply on reopen.
+
+### Building/machine
+SAVEV2-032 foothold/connectors/structure caps reconstruct.  
+SAVEV2-033 power grants validate/reconstruct.  
+SAVEV2-034 Condenser enabled/progress/cycle ordinal/output container round-trip.  
+SAVEV2-035 offline wall-clock does not advance Condenser.
+
+### Export/import + hosted durability
+SAVEV2-036 canonical export ordering.  
+SAVEV2-037 export -> import -> export equivalence.  
+SAVEV2-038 invalid import cannot overwrite valid world.  
+SAVEV2-039 checkpoint revision/tick matches committed world manifest.  
+SAVEV2-040 command result before checkpoint is not represented as durable.  
+SAVEV2-041 graceful shutdown SAVE_FAILED never reports persistence success.
+
+Real Chromium IndexedDB is required for browser-persistence behavior; pure memory adapters cannot be the only evidence.
+
+## 19. Performance, responsiveness, observability and exact-main gates — P1-TECH-009
+
+All blocking performance evidence must retain raw samples, percentile method, fixture identity and environment.
+
+### Authority tick
+Representative four-player authority fixture:
+- >=300 warmup ticks;
+- >=10,000 measured ticks;
+- P95 <= 8 ms;
+- P99 <= 12 ms;
+- max <= 33.34 ms;
+- no three consecutive ticks each >16.67 ms.
+
+### Browser application frame work
+After warmup, >=30 seconds steady fixture:
+- P95 <=12 ms;
+- P99 <=20 ms;
+- no application-controlled frame-work sample >50 ms.
+
+Inherited movement responsiveness remains blocking:
+- movement start P95 <=50 ms;
+- movement stop P95 <=50 ms;
+- direction-change P95 <=50 ms.
+
+rAF/frame interval distribution is retained as diagnostic unless a later approved supported-hardware/browser contract promotes it to a product gate.
+
+### Chunk/fog
+GeneratedBase over >=200 stable fixtures:
+- P95 <=20 ms/chunk;
+- P99 <=40 ms/chunk;
+- max <=100 ms/chunk.
+
+PersistedDelta validation/materialization:
+- P95 <=30 ms/chunk;
+- P99 <=50 ms/chunk;
+- max <=100 ms/chunk.
+
+Standard four-player fog mutation:
+- P95 <=2 ms/authority tick;
+- P99 <=4 ms/authority tick.
+
+No synchronous chunk work may hide cost by skipping authoritative ticks.
+
+### Save/load/import representative V2 fixture
+Fixture includes:
+- four players;
+- >=64 chunks;
+- fog/resources/ruin/predator mutations;
+- foothold/buildings/power/Condenser;
+- Storage Crates;
+- machine output;
+- >=2 Death Caches;
+- canonical Cold Rain.
+
+Hard gates:
+- authority snapshot capture P95 <=16 ms / max <=33.34 ms;
+- IndexedDB durable save P95 <=750 ms / max <=2 s;
+- load+validate+reconstruct P95 <=1.5 s / max <=4 s;
+- export P95 <=1.5 s / max <=4 s;
+- import P95 <=2.5 s / max <=6 s.
+
+### Hosted latency/desync
+PR/network change:
+- real-browser Hosted-2 smoke.
+
+Exact integrated-main:
+- real-browser Hosted-4 E2E.
+
+Controlled loopback:
+- two-client command P95 <=100 ms;
+- two-client motion age P95 <=100 ms;
+- four-client command/motion P95 <=150 ms.
+
+Synthetic 100 ms RTT:
+- command P95 <=350 ms;
+- motion age P95 <=300 ms.
+
+Desync:
+- AuthorityCheckpoint interval <=120 ticks / 2 seconds;
+- diagnostic digest uses approved canonical SHA-256 contract;
+- mismatch starts resync <=250 ms after detection on loopback;
+- coherent READY restored <=2 seconds for representative snapshot.
+
+Backpressure:
+- soft threshold >256 KiB or >64 messages for >1 s -> SLOW_CLIENT/resync-coalescing;
+- hard threshold >1 MiB, >256 messages, or oldest update >5 s -> RESYNC_REQUIRED/disconnect allowed;
+- authority continues for unaffected clients.
+
+Instrumentation is read-only/non-authoritative and must not change command ordering, deterministic state or gameplay behavior.
+
+## 20. Browser visual/readability evidence set
+
+Minimum PO-facing retained evidence should cover, on the exact candidate:
+- player on representative light and dark terrain;
+- terrain/water/resource/hazard/human structure/machine/ruin/actor category distinction;
+- gatherable versus decoration readability;
+- human foothold versus previous-civilization ruin distinction;
+- landing state versus connected first-habitat progression;
+- survival/logistics HUD;
+- inventory/container transfer;
+- craft/repair requirements and failure feedback;
+- build VALID/INVALID + blocking reason;
+- machine ACTIVE/INACTIVE/UNPOWERED and reason;
+- unexplored/explored fog + ruin UNKNOWN/LOCATED/INVESTIGATED;
+- day/night readability;
+- Cold Rain warning/active readability without obscuring critical state;
+- damage/death/Death Cache/recovery presentation;
+- Explorer/Engineer progression feedback;
+- 2–4 player identity using non-hue cues;
+- 1×/2×/3× integer crispness;
+- camera movement sequence proving no static-object resampling shimmer;
+- normal PO-facing route uses coherent production-light art/UI rather than raw engineering rectangles/debug labels for core categories.
+
+Critical state distinctions must not rely on color alone.
+
+## 21. 30–60 minute PO-facing playtest protocol
+
+Record exact candidate/deployment identity and use a fresh world.
+
+Observe without coaching beyond approved in-product guidance:
+1. Can player identify avatar, landing module and first useful action?
+2. Can player complete nearby gather/carry/return/use loop?
+3. Does capacity affect choices?
+4. Can player understand survival/logistics state without debug tooling?
+5. Can player craft/repair and build the first useful foothold?
+6. Can player understand invalid build/craft/use reasons?
+7. Does preparation observably change expedition capability?
+8. Does fog make exploration meaningful without grid-lock?
+9. Do night/Cold Rain affect decisions readably?
+10. Is hostile contact readable with a valid retreat/disengage path?
+11. Is the ruin visibly previous-civilization content?
+12. Does Inspect persist discovery and preserve one-time reward semantics?
+13. If death occurs, are consequence, respawn and recovery objective understandable?
+14. Can basic recovery capability be recreated if carried gear was lost?
+15. Does reopen continue the same world rather than resetting progress?
+16. Is early Level 3–4/profession progress visible under varied activity?
+17. Does the build look like a product-facing slice rather than an engineering test room?
+
+Record:
+- total active time;
+- milestone times;
+- confusion points;
+- observed facts separately from interpretations/recommendations;
+- any spec failure as a bug with reproduction evidence.
+
+The 30–60 minute value is the approved tuning target, not an automatic failure for every individual player outside the range.
+
+## 22. Hosted 2–4 player playtest protocol
+
+Required player-facing scenarios:
+- join compatible session;
+- divide gather/build/exploration work;
+- shared Storage/structure/machine outcomes;
+- one player reveals fog and teammates receive shared knowledge;
+- ruin discovery shared correctly;
+- same-drop/container/build contention;
+- teammate Death Cache recovery assistance;
+- disconnect/rejoin during ordinary play;
+- disconnect after command acceptance/before response;
+- disconnect during dead/recovery state;
+- slow-client/backpressure fixture;
+- save/session-end success and failure feedback.
+
+Record authority/client diagnostics without exposing secrets or ResumeCredential.
+
+## 23. Regression triggers
+
+Re-run affected suites after changes to:
+
+**Items/content:** content definitions/fingerprint, item ledger, container revisions, gather/craft/repair, death/build/machine item adapters.  
+**Survival/combat:** need rates, stamina, thermal/weather coupling, attack/damage IDs, predator state, death transition.  
+**World:** seed derivation, chunk generation, entity IDs, fog, ruin, resource deltas, environment schedule.  
+**Building/machine:** placement validation, collision footprint, connectors, power grants, machine progress/output, dismantle.  
+**Persistence:** schema, migration, validators, world/player/item/build/environment records, export/import, IndexedDB transaction logic.  
+**Network:** protocol/version/content handshake, ingress ordering, replication revisions, reconnect/resume, checkpoint/digest, backpressure.  
+**Presentation/UI:** Pixi mapping, HUD/panels, fog/weather overlays, co-op identity, scale/DPR/camera sampling.  
+**Architecture:** module ownership/import boundaries, public authority seams, persistence non-authority, renderer/network/browser leakage.
+
+## 24. Failure severity / release gate
+
+NOT READY for Product Review while any of these remain:
+- BLOCKER;
+- Critical data loss;
+- item/kit/reward/death-cache duplication;
+- broken or destructive save/migration/import;
+- authoritative desync that cannot recover under approved protocol;
+- core vertical-slice criterion failure;
+- exact-main evidence identity mismatch;
+- required Hosted-4 acceptance missing when networking is part of candidate.
+
+Major non-core defects are returned to Producer with evidence for milestone/product decision; QA does not silently waive them.
+
+## 25. Evidence package for P1-QA-002
+
+Permanent GitHub QA summary records:
+- exact candidate main SHA;
+- deployed build URL/identity when release task supplies it;
+- exact push CI run;
+- artifact IDs/digests;
+- source acceptance status;
+- bugs/known issues;
+- final PASS / PASS WITH KNOWN ISSUES / FAIL;
+- READY / NOT READY.
+
+Retained evidence bundle should include as applicable:
+- Phase1QualityEvidenceManifestV1;
+- production `dist/` and SHA-256 digest manifest;
+- raw performance samples;
+- deterministic/golden fixtures/results;
+- persistence/browser results;
+- Hosted-4 results and logs;
+- visual screenshots/sequences;
+- Playwright trace/screenshot/console/page-error/server excerpts on failure.
+
+## 26. Traceability completeness self-check
+
+Mapped source acceptance statements:
+- gameplay + art/UI + P1-TECH-001: **245**
+- P1-TECH-002..009: **129**
+- total: **374 / 374**
+
+Expected activated-task target: **374 / 374**.
+
+Mandatory specialized ADR test-strategy coverage is separately expanded in Sections 12–19 and does not disappear into the source-acceptance count.
+
+Critical authority/data-loss/desync risks have explicit tests:
+**PASS**
+
+Automation vs manual/playtest evidence identified:
+**PASS**
+
+No QA-authored gameplay rules introduced:
+**PASS**
+
+Artifact is under `docs/qa/`:
+**PASS**
+
+Blocking source ambiguity:
+**NONE FOUND**
+
+## 27. P1-QA-001 acceptance self-check
+
+1. 100% approved source acceptance statements mapped: **PASS — 374/374**
+2. Critical authority/data-loss/desync risks have explicit tests: **PASS**
+3. No QA-authored gameplay rules introduced: **PASS**
+4. Automation vs manual/playtest evidence identified: **PASS**
+5. Artifact under `docs/qa/`: **PASS**
+6. Handoff manifest: **PENDING GitHub PR/CI verification and final Issue handoff comment**
+
+## 28. Handoff state
+
+Artifact content is complete for QA self-review. Lifecycle remains with A-QA-01 until branch/PR scope, CI and final persisted handoff are verified.
 
 PROJECT OWNER ACTION: NONE
