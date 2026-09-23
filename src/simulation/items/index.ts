@@ -39,6 +39,7 @@ export type {
   RepairItemCommand,
   SplitStackCommand,
   TransferItemCommand,
+  WearItemCommand,
   WorkbenchAccessRef,
 } from './ItemCommands';
 
