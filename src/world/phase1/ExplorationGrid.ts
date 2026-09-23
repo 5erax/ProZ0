@@ -129,7 +129,7 @@ export function revealExplorationCircle(
       }
 
       const { wordIndex, mask } = bitForCell(cellX, cellY);
-      const before = words[wordIndex] >>> 0;
+      const before = (words[wordIndex] ?? 0) >>> 0;
       const after = (before | mask) >>> 0;
 
       if (after !== before) {
@@ -179,5 +179,5 @@ export function isExplorationCellKnown(
 
   const validated = validateExplorationFragment(coord, fragment);
   const { wordIndex, mask } = bitForCell(cellX, cellY);
-  return ((validated.words[wordIndex] >>> 0) & mask) !== 0;
+  return (((validated.words[wordIndex] ?? 0) >>> 0) & mask) !== 0;
 }
