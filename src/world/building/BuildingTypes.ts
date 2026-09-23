@@ -159,6 +159,12 @@ export interface BuildingSpatialQuery {
     orientationQuarterTurns: QuarterTurn,
   ): boolean;
 
+  hasNonBuildableSurface(
+    position: WorldPosition,
+    profile: StructurePlacementProfile,
+    orientationQuarterTurns: QuarterTurn,
+  ): boolean;
+
   hasBlockingWorldCollision(
     position: WorldPosition,
     profile: StructurePlacementProfile,
