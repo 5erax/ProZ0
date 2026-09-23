@@ -1,4 +1,4 @@
-export type ContentId = string;
+import type { ContentId } from './SchemaV1';
 
 export interface ContentDefinition {
   readonly id: ContentId;
