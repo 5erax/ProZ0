@@ -5,10 +5,11 @@ import type {
   GatherCostReservationResult,
 } from '../items';
 import type { Phase1SurvivalAuthority } from './SurvivalAuthority';
+import type { SurvivalStaminaReservation } from './SurvivalTypes';
 
 interface ReservationState {
   readonly reservation: GatherCostReservation;
-  readonly staminaCost: number;
+  readonly staminaReservation: SurvivalStaminaReservation;
   committed: boolean;
   released: boolean;
 }
@@ -45,7 +46,12 @@ export class SurvivalGatherCostPort implements GatherCostPort {
     }
 
     const staminaCost = this.costFor(request.resourceDefinitionId);
-    if (!this.survival.canSpendStamina(request.playerId, staminaCost)) {
+    const staminaReservation = this.survival.reserveStaminaSpend(
+      `gather-stamina:${request.operationId}`,
+      request.playerId,
+      staminaCost,
+    );
+    if (staminaReservation === null) {
       return Object.freeze({
         status: 'rejected',
         reason: 'INSUFFICIENT_STAMINA',
@@ -60,7 +66,7 @@ export class SurvivalGatherCostPort implements GatherCostPort {
     });
     this.reservations.set(request.operationId, {
       reservation,
-      staminaCost,
+      staminaReservation,
       committed: false,
       released: false,
     });
@@ -70,25 +76,18 @@ export class SurvivalGatherCostPort implements GatherCostPort {
   public commitReservedGatherCost(
     reservation: Readonly<GatherCostReservation>,
   ): void {
-    const state = this.requireReservation(reservation);
-    if (state.committed) return;
-    if (state.released) {
-      throw new Error('Released gather cost reservation cannot commit.');
-    }
-    const tick = this.survival.getPlayerState(reservation.playerId).tick;
-    this.survival.commitStaminaSpend(
-      reservation.playerId,
-      state.staminaCost,
-      tick,
-    );
+    const state = this.findReservation(reservation);
+    if (state === null || state.committed || state.released) return;
+    this.survival.commitReservedStaminaSpend(state.staminaReservation);
     state.committed = true;
   }
 
   public releaseGatherCostReservation(
     reservation: Readonly<GatherCostReservation>,
   ): void {
-    const state = this.requireReservation(reservation);
-    if (state.committed) return;
+    const state = this.findReservation(reservation);
+    if (state === null || state.committed || state.released) return;
+    this.survival.releaseStaminaReservation(state.staminaReservation);
     state.released = true;
   }
 
@@ -97,15 +96,15 @@ export class SurvivalGatherCostPort implements GatherCostPort {
     return resource.requiredToolItemId === null ? 2 : 5;
   }
 
-  private requireReservation(
+  private findReservation(
     reservation: Readonly<GatherCostReservation>,
-  ): ReservationState {
+  ): ReservationState | null {
     const state = this.reservations.get(reservation.operationId);
     if (
       state === undefined
       || state.reservation.reservationId !== reservation.reservationId
     ) {
-      throw new Error('Unknown gather cost reservation.');
+      return null;
     }
     return state;
   }
