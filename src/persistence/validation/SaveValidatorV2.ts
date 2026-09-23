@@ -8,7 +8,10 @@ import {
   explorationRegionId,
   validateExplorationFragment,
 } from '../../world/phase1/ExplorationGrid';
-import { validatePhase1EnvironmentState } from '../../world/phase1/Phase1Environment';
+import {
+  createPhase1EnvironmentState,
+  validatePhase1EnvironmentState,
+} from '../../world/phase1/Phase1Environment';
 import { decodeExplorationWordsV2 } from '../migrations/V1ToV2Migration';
 import {
   saveFailure,
@@ -208,6 +211,29 @@ export function validateWorldManifestV2(
     const environment = validatePhase1EnvironmentState(record.environment, policy.catalog);
     if (environment.activeTick !== record.authorityTick) {
       return saveFailure('CORRUPT_RECORD', 'Environment activeTick must equal the coherent authorityTick.');
+    }
+    const canonicalEnvironment = createPhase1EnvironmentState(
+      record.worldSeed,
+      policy.catalog,
+    );
+    const canonicalWeather = canonicalEnvironment.weatherEvents[0];
+    const persistedWeather = environment.weatherEvents[0];
+    if (
+      environment.cycleStartLocalMinute
+        !== canonicalEnvironment.cycleStartLocalMinute
+      || canonicalWeather === undefined
+      || persistedWeather === undefined
+      || persistedWeather.weatherEventId !== canonicalWeather.weatherEventId
+      || persistedWeather.weatherDefinitionId
+        !== canonicalWeather.weatherDefinitionId
+      || persistedWeather.startTick !== canonicalWeather.startTick
+      || persistedWeather.warningStartTick !== canonicalWeather.warningStartTick
+      || persistedWeather.endTick !== canonicalWeather.endTick
+    ) {
+      return saveFailure(
+        'CORRUPT_RECORD',
+        'Persisted environment does not match the canonical deterministic Cold Rain schedule.',
+      );
     }
   } catch (error) {
     return saveFailure('CORRUPT_RECORD', `Invalid persisted environment: ${error instanceof Error ? error.message : String(error)}`);
@@ -795,6 +821,12 @@ function globalCrossReferences(
   >();
   const chunkStructures = new Set<string>();
   for (const chunk of bundle.chunks) {
+    if (chunk.generationVersion !== bundle.world.generationVersion) {
+      return saveFailure(
+        'UNSUPPORTED_GENERATION_VERSION',
+        'Chunk generation version does not match its world manifest.',
+      );
+    }
     for (const id of chunk.structureIds) chunkStructures.add(id);
     for (const entity of chunk.createdEntities) {
       if (worldEntities.has(entity.entityId)) {
