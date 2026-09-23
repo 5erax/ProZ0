@@ -1,6 +1,6 @@
 import {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
 } from '../schema/SaveSchema';
 import type { PortableSaveBundleV1 } from '../schema/v1/PortableSaveBundleV1';
 
@@ -25,7 +25,7 @@ export function canonicalizePortableSaveBundle(
 
   return Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'portable-bundle',
     world: bundle.world,
     players: Object.freeze(players),
