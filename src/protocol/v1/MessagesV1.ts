@@ -56,7 +56,7 @@ export interface ContentCompatibilityIdentityV1Wire {
   readonly formatId: string;
   readonly schemaVersion: number;
   readonly packId: string;
-  readonly packVersion: string;
+  readonly packVersion: number;
   readonly canonicalFingerprint: string;
 }
 
