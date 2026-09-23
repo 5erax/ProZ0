@@ -51,6 +51,14 @@ function objectValue(
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function onlyKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  const allowedSet = new Set(allowed);
+  return Object.keys(value).every((key) => allowedSet.has(key));
+}
+
 function nonEmpty(value: unknown, maxLength = 256): value is string {
   return typeof value === 'string'
     && value.length > 0
@@ -103,8 +111,18 @@ export function parseClientEnvelopeV1(
     return failure('INVALID_MESSAGE', 'Wire message is not valid JSON.');
   }
 
-  if (!objectValue(input)) {
-    return failure('INVALID_MESSAGE', 'Client envelope must be an object.');
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, [
+      'protocolVersion',
+      'messageType',
+      'clientMessageSeq',
+      'sessionId',
+      'connectionId',
+      'payload',
+    ])
+  ) {
+    return failure('INVALID_MESSAGE', 'Client envelope must contain only protocol fields.');
   }
   if (input.protocolVersion !== HOSTED_PROTOCOL_VERSION) {
     return failure('PROTOCOL_MISMATCH', 'Hosted protocol version mismatch.');
@@ -136,8 +154,17 @@ export function parseClientEnvelopeV1(
 export function validateClientHelloV1(
   input: unknown,
 ): ProtocolValidationResult<ClientHelloV1> {
-  if (!objectValue(input)) {
-    return failure('INVALID_MESSAGE', 'ClientHello must be an object.');
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, [
+      'protocolVersion',
+      'clientBuild',
+      'contentCompatibility',
+      'worldCompatibility',
+      'resumeCredential',
+    ])
+  ) {
+    return failure('INVALID_MESSAGE', 'ClientHello contains unknown fields.');
   }
   if (input.protocolVersion !== HOSTED_PROTOCOL_VERSION) {
     return failure('PROTOCOL_MISMATCH', 'Hosted protocol version mismatch.');
@@ -147,12 +174,24 @@ export function validateClientHelloV1(
   const world = input.worldCompatibility;
   if (
     !objectValue(content)
+    || !onlyKeys(content, [
+      'formatId',
+      'schemaVersion',
+      'packId',
+      'packVersion',
+      'canonicalFingerprint',
+    ])
     || !nonEmpty(content.formatId)
     || !nonNegativeSafeInteger(content.schemaVersion)
     || !nonEmpty(content.packId)
     || !nonNegativeSafeInteger(content.packVersion)
     || !nonEmpty(content.canonicalFingerprint, 512)
     || !objectValue(world)
+    || !onlyKeys(world, [
+      'worldGenerationVersion',
+      'rngAlgorithmVersion',
+      'seedDerivationVersion',
+    ])
     || !nonNegativeSafeInteger(world.worldGenerationVersion)
     || !nonEmpty(world.rngAlgorithmVersion)
     || !nonEmpty(world.seedDerivationVersion)
@@ -176,6 +215,7 @@ export function validateMovementInputV1(
 ): ProtocolValidationResult<MovementInputV1> {
   if (
     !objectValue(input)
+    || !onlyKeys(input, ['inputSeq', 'up', 'down', 'left', 'right'])
     || !nonNegativeSafeInteger(input.inputSeq)
     || typeof input.up !== 'boolean'
     || typeof input.down !== 'boolean'
@@ -193,6 +233,12 @@ export function validateGameplayCommandEnvelopeV1(
 ): ProtocolValidationResult<GameplayCommandEnvelopeV1> {
   if (
     !objectValue(input)
+    || !onlyKeys(input, [
+      'operationId',
+      'commandType',
+      'expectedRevisions',
+      'payload',
+    ])
     || !nonEmpty(input.operationId, 256)
     || !nonEmpty(input.commandType, 128)
     || !Array.isArray(input.expectedRevisions)
@@ -205,6 +251,11 @@ export function validateGameplayCommandEnvelopeV1(
   for (const revision of input.expectedRevisions) {
     if (
       !objectValue(revision)
+      || !onlyKeys(revision, [
+        'aggregateType',
+        'aggregateId',
+        'revision',
+      ])
       || !nonEmpty(revision.aggregateType, 128)
       || !nonEmpty(revision.aggregateId, 256)
       || !nonNegativeSafeInteger(revision.revision)
@@ -222,7 +273,11 @@ export function validateGameplayCommandEnvelopeV1(
 export function validateBaselineAppliedV1(
   input: unknown,
 ): ProtocolValidationResult<{ readonly snapshotId: string }> {
-  if (!objectValue(input) || !nonEmpty(input.snapshotId)) {
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, ['snapshotId'])
+    || !nonEmpty(input.snapshotId)
+  ) {
     return failure('INVALID_MESSAGE', 'BaselineApplied is invalid.');
   }
   return success(Object.freeze({ snapshotId: input.snapshotId }));
@@ -231,7 +286,11 @@ export function validateBaselineAppliedV1(
 export function validateOperationStatusQueryV1(
   input: unknown,
 ): ProtocolValidationResult<{ readonly operationId: string }> {
-  if (!objectValue(input) || !nonEmpty(input.operationId, 256)) {
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, ['operationId'])
+    || !nonEmpty(input.operationId, 256)
+  ) {
     return failure('INVALID_MESSAGE', 'OperationStatusQuery is invalid.');
   }
   return success(Object.freeze({ operationId: input.operationId }));
@@ -245,6 +304,7 @@ export function validatePingV1(
 }> {
   if (
     !objectValue(input)
+    || !onlyKeys(input, ['pingId', 'clientSentAtMs'])
     || !nonEmpty(input.pingId, 128)
     || !finite(input.clientSentAtMs)
   ) {
