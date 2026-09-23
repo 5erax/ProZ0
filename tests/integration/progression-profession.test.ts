@@ -531,3 +531,286 @@ describe('Progression authoritative item-event seam', () => {
     expect(progressionAuthority.getPlayerView('p1').totalXp).toBe(8);
   });
 });
+
+
+describe('P1-ENG-005 technical review corrections', () => {
+  it('binds an ignored Engineer event so replay cannot advance a later objective', () => {
+    const authority = progression(Object.freeze({
+      players: Object.freeze([emptyPlayerSnapshot(225, 3)]),
+    }));
+
+    apply(authority, {
+      type: 'repair-completed',
+      eventId: 'correction:repair',
+      playerId: 'p1',
+      conditionBefore: 25,
+      conditionAfter: 50,
+    });
+
+    const earlyInteraction: ProgressionGameplayEvent = {
+      type: 'powered-machine-interacted',
+      eventId: 'correction:engineer:early',
+      playerId: 'p1',
+      machineId: 'machine:atmospheric-water-condenser',
+      powered: true,
+    };
+    expect(authority.applyEvent(earlyInteraction)).toMatchObject({
+      status: 'ignored',
+      xpAwarded: 0,
+    });
+
+    apply(authority, {
+      type: 'structures-present',
+      eventId: 'correction:engineer:structures',
+      playerId: 'p1',
+      structureIds: [
+        'structure:compact-power-unit',
+        'structure:atmospheric-water-condenser',
+      ],
+    });
+    expect(
+      authority.getPlayerView('p1').quests.find(
+        (quest) => quest.questId
+          === 'profession-quest:bring-water-online',
+      ),
+    ).toMatchObject({
+      status: 'in-progress',
+      completedObjectives: 1,
+    });
+
+    expect(authority.applyEvent(earlyInteraction)).toMatchObject({
+      status: 'duplicate',
+      xpAwarded: 0,
+    });
+    expect(
+      authority.getPlayerView('p1').quests.find(
+        (quest) => quest.questId
+          === 'profession-quest:bring-water-online',
+      )?.completedObjectives,
+    ).toBe(1);
+
+    expect(authority.applyEvent({
+      ...earlyInteraction,
+      powered: false,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+
+    const reopened = progression(authority.exportSnapshot());
+    expect(reopened.applyEvent(earlyInteraction)).toMatchObject({
+      status: 'duplicate',
+      xpAwarded: 0,
+    });
+    expect(
+      reopened.getPlayerView('p1').quests.find(
+        (quest) => quest.questId
+          === 'profession-quest:bring-water-online',
+      )?.completedObjectives,
+    ).toBe(1);
+    expect(reopened.applyEvent({
+      ...earlyInteraction,
+      powered: false,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+  });
+
+  it('binds capped event identity and preserves conflict behavior after reopen', () => {
+    const authority = progression();
+    apply(authority, {
+      type: 'gather-completed',
+      eventId: 'correction:gather:first',
+      playerId: 'p1',
+      resourceId: 'resource:fiber-plant',
+    });
+    for (let index = 0; index < 20; index += 1) {
+      apply(authority, {
+        type: 'gather-completed',
+        eventId: 'correction:gather:repeat:' + index,
+        playerId: 'p1',
+        resourceId: 'resource:fiber-plant',
+      });
+    }
+
+    const capped: ProgressionGameplayEvent = {
+      type: 'gather-completed',
+      eventId: 'correction:gather:capped',
+      playerId: 'p1',
+      resourceId: 'resource:fiber-plant',
+    };
+    expect(authority.applyEvent(capped)).toMatchObject({
+      status: 'ignored',
+      xpAwarded: 0,
+    });
+    expect(authority.applyEvent({
+      ...capped,
+      resourceId: 'resource:food-plant',
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+
+    const reopened = progression(authority.exportSnapshot());
+    expect(reopened.applyEvent(capped)).toMatchObject({
+      status: 'duplicate',
+      xpAwarded: 0,
+    });
+    expect(reopened.applyEvent({
+      ...capped,
+      resourceId: 'resource:food-plant',
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+  });
+
+  it('rejects ineligible quest progress during reconstruction', () => {
+    const base = emptyPlayerSnapshot(225, 3);
+    const engineerProgress = base.questStates.map((quest) =>
+      quest.questId === 'profession-quest:bring-water-online'
+        ? Object.freeze({
+            ...quest,
+            completedObjectives: 1,
+          })
+        : quest,
+    );
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...base,
+          questStates: Object.freeze(engineerProgress),
+        }),
+      ]),
+    }))).toThrow(/quest eligibility state is corrupt/);
+
+    const explorerProgress = base.questStates.map((quest) =>
+      quest.questId === 'profession-quest:chart-the-unknown'
+        ? Object.freeze({
+            ...quest,
+            completedObjectives: 1,
+          })
+        : quest,
+    );
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...base,
+          questStates: Object.freeze(explorerProgress),
+        }),
+      ]),
+    }))).toThrow(/quest eligibility state is corrupt/);
+  });
+
+  it('rejects Explorer progress without matching persistent ruin milestones', () => {
+    const eligible = progression(Object.freeze({
+      players: Object.freeze([emptyPlayerSnapshot(225, 3)]),
+    }));
+    apply(eligible, {
+      type: 'expedition-band-entered',
+      eventId: 'correction:explorer:expedition',
+      playerId: 'p1',
+    });
+    const eligibleSnapshot = eligible.exportSnapshot();
+    const eligiblePlayer = eligibleSnapshot.players[0];
+    if (eligiblePlayer === undefined) {
+      throw new Error('Expected eligible Explorer snapshot.');
+    }
+
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...eligiblePlayer,
+          questStates: Object.freeze(
+            eligiblePlayer.questStates.map((quest) =>
+              quest.questId === 'profession-quest:chart-the-unknown'
+                ? Object.freeze({
+                    ...quest,
+                    completedObjectives: 1,
+                  })
+                : quest,
+            ),
+          ),
+        }),
+      ]),
+    }))).toThrow(/Explorer quest milestone state is corrupt/);
+
+    apply(eligible, {
+      type: 'ruin-located',
+      eventId: 'correction:explorer:locate',
+      playerId: 'p1',
+      ruinId: 'ruin:previous-civilization-ruin',
+    });
+    const locatedSnapshot = eligible.exportSnapshot();
+    const locatedPlayer = locatedSnapshot.players[0];
+    if (locatedPlayer === undefined) {
+      throw new Error('Expected located Explorer snapshot.');
+    }
+
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...locatedPlayer,
+          questStates: Object.freeze(
+            locatedPlayer.questStates.map((quest) =>
+              quest.questId === 'profession-quest:chart-the-unknown'
+                ? Object.freeze({
+                    ...quest,
+                    completedObjectives: 2,
+                  })
+                : quest,
+            ),
+          ),
+        }),
+      ]),
+    }))).toThrow(/Explorer quest milestone state is corrupt/);
+  });
+
+  it('rejects mismatched structured event receipts before publication', () => {
+    const authority = progression();
+    apply(authority, {
+      type: 'gather-completed',
+      eventId: 'correction:receipt:gather',
+      playerId: 'p1',
+      resourceId: 'resource:fiber-plant',
+    });
+    const snapshot = authority.exportSnapshot();
+    const player = snapshot.players[0];
+    const receipt = player?.eventReceipts[0];
+    if (player === undefined || receipt === undefined) {
+      throw new Error('Expected progression receipt snapshot.');
+    }
+
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...player,
+          eventReceipts: Object.freeze([
+            Object.freeze({
+              ...receipt,
+              eventId: 'correction:receipt:mismatched',
+            }),
+          ]),
+        }),
+      ]),
+    }))).toThrow(/event receipt state is corrupt/);
+
+    expect(() => progression(Object.freeze({
+      players: Object.freeze([
+        Object.freeze({
+          ...player,
+          eventReceipts: Object.freeze([
+            Object.freeze({
+              eventId: receipt.eventId,
+              event: Object.freeze({
+                ...receipt.event,
+                playerId: 'p2',
+              }),
+            }),
+          ]),
+        }),
+      ]),
+    }))).toThrow(/event receipt state is corrupt/);
+  });
+});

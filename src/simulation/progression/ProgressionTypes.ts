@@ -109,7 +109,7 @@ export interface ProgressionQuestSnapshot {
 
 export interface ProgressionEventReceipt {
   readonly eventId: string;
-  readonly signature: string;
+  readonly event: Readonly<ProgressionGameplayEvent>;
 }
 
 export interface PlayerProgressionSnapshot {

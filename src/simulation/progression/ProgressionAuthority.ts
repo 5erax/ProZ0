@@ -63,7 +63,7 @@ interface MutablePlayerProgression {
   skillIds: Set<ProgressionSkillId>;
   questStates: Map<ProgressionQuestId, MutableQuestState>;
   professionIds: Set<ProgressionProfessionId>;
-  eventReceipts: Map<string, string>;
+  eventReceipts: Map<string, Readonly<ProgressionGameplayEvent>>;
 }
 
 interface PendingDeathPenalty {
@@ -179,6 +179,20 @@ function eventSignature(event: ProgressionGameplayEvent): string {
   }
 }
 
+function cloneProgressionEvent(
+  event: Readonly<ProgressionGameplayEvent>,
+): Readonly<ProgressionGameplayEvent> {
+  if (event.type === 'structures-present') {
+    return Object.freeze({
+      ...event,
+      structureIds: Object.freeze(
+        [...event.structureIds].sort(compareStrings),
+      ),
+    });
+  }
+  return Object.freeze({ ...event });
+}
+
 export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
   private readonly progression: Readonly<ProgressionDefinitionV1>;
   private readonly quests = new Map<
@@ -243,9 +257,9 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
 
     const state = this.getOrCreatePlayer(event.playerId);
     const signature = eventSignature(event);
-    const previousSignature = state.eventReceipts.get(event.eventId);
-    if (previousSignature !== undefined) {
-      if (previousSignature !== signature) {
+    const previousEvent = state.eventReceipts.get(event.eventId);
+    if (previousEvent !== undefined) {
+      if (eventSignature(previousEvent) !== signature) {
         return Object.freeze({
           status: 'rejected',
           eventId: event.eventId,
@@ -275,13 +289,8 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
 
     const mutationAfter = this.progressionMutationFingerprint(state);
     const changed = mutationAfter !== mutationBefore;
-    if (changed) {
-      if (state.eventReceipts.size >= MAX_EVENT_RECEIPTS) {
-        throw new Error('Phase 1 progression event receipt bound exceeded.');
-      }
-      state.eventReceipts.set(event.eventId, signature);
-      state.revision = revisionBefore + 1;
-    }
+    this.bindEventReceipt(state, event);
+    state.revision = revisionBefore + 1;
 
     const unlockedSkillIds = sortedStrings(
       [...state.skillIds].filter((id) => !skillsBefore.has(id)),
@@ -740,6 +749,22 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
     return created;
   }
 
+  private bindEventReceipt(
+    state: MutablePlayerProgression,
+    event: Readonly<ProgressionGameplayEvent>,
+  ): void {
+    if (state.eventReceipts.size >= MAX_EVENT_RECEIPTS) {
+      const oldestEventId = state.eventReceipts.keys().next().value;
+      if (oldestEventId !== undefined) {
+        state.eventReceipts.delete(oldestEventId);
+      }
+    }
+    state.eventReceipts.set(
+      event.eventId,
+      cloneProgressionEvent(event),
+    );
+  }
+
   private progressionMutationFingerprint(
     state: MutablePlayerProgression,
   ): string {
@@ -817,9 +842,10 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
     });
     const eventReceipts: ProgressionEventReceipt[] = [
       ...state.eventReceipts.entries(),
-    ]
-      .sort((left, right) => compareStrings(left[0], right[0]))
-      .map(([eventId, signature]) => Object.freeze({ eventId, signature }));
+    ].map(([eventId, event]) => Object.freeze({
+      eventId,
+      event: cloneProgressionEvent(event),
+    }));
 
     return Object.freeze({
       playerId: state.playerId,
@@ -846,12 +872,16 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
       }
       questStates.set(quest.questId, { ...quest });
     }
-    const eventReceipts = new Map<string, string>();
+    const eventReceipts =
+      new Map<string, Readonly<ProgressionGameplayEvent>>();
     for (const receipt of snapshot.eventReceipts) {
       if (eventReceipts.has(receipt.eventId)) {
         throw new Error('Duplicate progression event receipt.');
       }
-      eventReceipts.set(receipt.eventId, receipt.signature);
+      eventReceipts.set(
+        receipt.eventId,
+        cloneProgressionEvent(receipt.event),
+      );
     }
     return {
       playerId: snapshot.playerId,
@@ -904,14 +934,28 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
       }
     }
 
-    if (
-      state.eventReceipts.size > MAX_EVENT_RECEIPTS
-      || [...state.eventReceipts].some(
-        ([eventId, signature]) =>
-          eventId.length === 0 || signature.length === 0,
-      )
-    ) {
+    if (state.eventReceipts.size > MAX_EVENT_RECEIPTS) {
       throw new Error('Progression event receipt state is corrupt.');
+    }
+    for (const [eventId, event] of state.eventReceipts) {
+      if (
+        eventId.length === 0
+        || event.eventId !== eventId
+        || event.playerId !== state.playerId
+        || !this.isValidEvent(event)
+      ) {
+        throw new Error('Progression event receipt state is corrupt.');
+      }
+      if (
+        event.type === 'structures-present'
+        && event.structureIds.some(
+          (id, index) =>
+            index > 0
+            && compareStrings(event.structureIds[index - 1] ?? '', id) >= 0,
+        )
+      ) {
+        throw new Error('Progression event receipt state is corrupt.');
+      }
     }
 
     if (
@@ -961,6 +1005,31 @@ export class Phase1ProgressionAuthority implements DeathXpPenaltyPort {
       || state.professionIds.has(ENGINEER_PROFESSION) !== engineer.completed
     ) {
       throw new Error('Progression profession state is corrupt.');
+    }
+
+    for (const questId of QUEST_IDS) {
+      const progress = state.questStates.get(questId);
+      const definition = this.requireQuest(questId);
+      if (
+        progress !== undefined
+        && (progress.completedObjectives > 0 || progress.completed)
+        && !this.isQuestEligible(state, definition)
+      ) {
+        throw new Error('Progression quest eligibility state is corrupt.');
+      }
+    }
+
+    const hasRuinLocate = state.milestoneRuleIds.has(
+      'first-ruin-locate:previous-civilization-ruin',
+    );
+    const hasRuinInspect = state.milestoneRuleIds.has(
+      'first-ruin-inspect:previous-civilization-ruin',
+    );
+    if (
+      explorer.completedObjectives >= 1 && !hasRuinLocate
+      || explorer.completedObjectives >= 2 && !hasRuinInspect
+    ) {
+      throw new Error('Explorer quest milestone state is corrupt.');
     }
   }
 
