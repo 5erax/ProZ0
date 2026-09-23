@@ -208,6 +208,7 @@ export class Phase1BuildingWorld {
   private readonly connectors = new Map<ConnectorId, ConnectorState>();
   private readonly connections = new Map<string, StructureConnection>();
   private readonly pendingPlacements = new Map<string, PendingPlacement>();
+  private readonly requestedConsumers = new Set<StructureId>();
   private buildRevision = 0;
   private powerRevision = 0;
   private producerStructureId: StructureId | null = null;
@@ -243,6 +244,9 @@ export class Phase1BuildingWorld {
     this.grantedConsumerIds = [
       ...snapshot.foothold.power.grantedConsumerIds,
     ].sort(compareStrings);
+    for (const id of this.grantedConsumerIds) {
+      this.requestedConsumers.add(id);
+    }
     for (const structure of snapshot.foothold.structures) {
       if (this.structures.has(structure.structureId)) {
         throw new Error('Duplicate structure identity in snapshot.');
@@ -559,6 +563,7 @@ export class Phase1BuildingWorld {
         completedCycleOrdinal: 0,
         outputContainerId: state.containerId,
       });
+      this.requestedConsumers.add(state.structureId);
     }
 
     this.buildRevision += 1;
@@ -626,6 +631,7 @@ export class Phase1BuildingWorld {
     if (structure === undefined) return;
     this.structures.delete(structure.structureId);
     this.condensers.delete(structure.structureId);
+    this.requestedConsumers.delete(structure.structureId);
 
     for (const [id, connector] of this.connectors) {
       if (connector.structureId !== structure.structureId) continue;
@@ -666,12 +672,52 @@ export class Phase1BuildingWorld {
     if (state.enabled === enabled) return freezeCondenser(state);
     state.enabled = enabled;
     state.revision += 1;
+    if (enabled) {
+      this.requestedConsumers.add(structureId);
+    } else {
+      this.requestedConsumers.delete(structureId);
+    }
     this.recalculatePower();
     return freezeCondenser(state);
   }
 
   public isCondenserPowered(structureId: StructureId): boolean {
     return this.grantedConsumerIds.includes(structureId);
+  }
+
+  public setCondenserPowerRequest(
+    structureId: StructureId,
+    requested: boolean,
+  ): void {
+    const condenser = this.condensers.get(structureId);
+    if (condenser === undefined) {
+      throw new Error('Unknown condenser.');
+    }
+    const shouldRequest = requested && condenser.enabled;
+    const had = this.requestedConsumers.has(structureId);
+    if (shouldRequest === had) return;
+    if (shouldRequest) {
+      this.requestedConsumers.add(structureId);
+    } else {
+      this.requestedConsumers.delete(structureId);
+    }
+    this.recalculatePower();
+  }
+
+  public getStructureByContainerId(
+    containerId: string,
+  ): Readonly<StructureRuntimeState> | null {
+    const structure = [...this.structures.values()].find(
+      (candidate) => candidate.containerId === containerId,
+    );
+    return structure === undefined ? null : freezeStructure(structure);
+  }
+
+  public isStructureAccessible(
+    playerId: PlayerId,
+    structureId: StructureId,
+  ): boolean {
+    return this.spatial.isPlayerInInteractionRange(playerId, structureId);
   }
 
   public commitCondenserCycle(
@@ -813,6 +859,7 @@ export class Phase1BuildingWorld {
         && condenser !== undefined
         && structure !== undefined
         && condenser.enabled
+        && this.requestedConsumers.has(id)
         && squaredDistance(
           structure.position,
           producer.position,
@@ -823,7 +870,11 @@ export class Phase1BuildingWorld {
     let used = stillValid.length * PHASE1_CONDENSER_DEMAND_PU;
     const candidates = [...this.condensers.values()]
       .filter((state) => !stillValid.includes(state.structureId))
-      .filter((state) => state.enabled)
+      .filter(
+        (state) =>
+          state.enabled
+          && this.requestedConsumers.has(state.structureId),
+      )
       .sort((a,b)=>compareStrings(a.structureId,b.structureId));
 
     const next = [...stillValid];
