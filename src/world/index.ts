@@ -99,3 +99,5 @@ export function createStaticCollisionWorld(
 ): WorldCollisionQuery {
   return new StaticCollisionWorld(solids);
 }
+
+export * from './building';
