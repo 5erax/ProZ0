@@ -99,3 +99,14 @@ export function createStaticCollisionWorld(
 ): WorldCollisionQuery {
   return new StaticCollisionWorld(solids);
 }
+
+export type {
+  DeathCacheEntityId,
+  DeathCachePlacementReservation,
+  DeathCacheWorldView,
+  EnvironmentExposureView,
+  PredatorCombatState,
+  PredatorEntityId,
+  PredatorWorldView,
+  SurvivalWorldPort,
+} from './api/SurvivalWorld';
