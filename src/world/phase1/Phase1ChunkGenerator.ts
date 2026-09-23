@@ -37,6 +37,9 @@ import type {
 } from './Phase1WorldTypes';
 
 export const PHASE1_WORLD_GENERATION_VERSION = 2 as const;
+// The Phase 1 generator-version identity is intentionally the same version.
+// Any intentional change to deterministic generated base/entity identity must
+// increment PHASE1_WORLD_GENERATION_VERSION.
 export const PHASE1_CHUNK_GENERATION_NAMESPACE =
   'phase1-world-chunk-generation' as const;
 export const PHASE1_GENERATED_ENTITY_ID_NAMESPACE =
@@ -191,26 +194,45 @@ function seedForChunk(
   });
 }
 
-function generatedEntityId(
-  worldSeed: string,
-  kind: string,
-  definitionId: ContentId,
-  coord: ChunkCoord,
-  ordinal: string,
+export interface Phase1GeneratedEntityIdInput {
+  readonly worldSeed: string;
+  readonly contentCompatibility: ContentCompatibilityIdentityV1;
+  readonly kind: string;
+  readonly definitionId: ContentId;
+  readonly coord: ChunkCoord;
+  readonly ordinal: string;
+}
+
+export function derivePhase1GeneratedEntityId(
+  input: Phase1GeneratedEntityIdInput,
 ): string {
+  if (input.worldSeed.length === 0) {
+    throw new RangeError('World seed must not be empty.');
+  }
+  if (input.ordinal.length === 0) {
+    throw new RangeError('Generated entity ordinal/candidate key must not be empty.');
+  }
+
+  const coord = createChunkCoord(input.coord.x, input.coord.y);
+  const [encodedX, encodedY] = encodeChunkCoordForSeed(coord);
   const state = deriveSeedState({
-    worldSeed,
+    worldSeed: input.worldSeed,
     namespace: PHASE1_GENERATED_ENTITY_ID_NAMESPACE,
     stableIdentifiers: Object.freeze([
       `generation:${PHASE1_WORLD_GENERATION_VERSION}`,
-      kind,
-      definitionId,
-      `coord:${coord.x}:${coord.y}`,
-      ordinal,
+      `rng:${RNG_ALGORITHM_VERSION}`,
+      `seed-derivation:${SEED_DERIVATION_VERSION}`,
+      `content-fingerprint:${input.contentCompatibility.canonicalFingerprint}`,
+      `generator-namespace:${PHASE1_CHUNK_GENERATION_NAMESPACE}`,
+      `chunk-x:${encodedX}`,
+      `chunk-y:${encodedY}`,
+      `kind:${input.kind}`,
+      `content-id:${input.definitionId}`,
+      `ordinal:${input.ordinal}`,
     ]),
   });
 
-  return `generated:${kind}:${state
+  return `generated:${input.kind}:${state
     .map((value) => value.toString(16).padStart(8, '0'))
     .join('')}`;
 }
@@ -329,13 +351,14 @@ function expeditionResourceEntities(
 
     entities.push(Object.freeze({
       type: 'resource',
-      entityId: generatedEntityId(
+      entityId: derivePhase1GeneratedEntityId({
         worldSeed,
-        'resource',
-        definitionId,
+        contentCompatibility: catalog.compatibility,
+        kind: 'resource',
+        definitionId: definitionId,
         coord,
-        `expedition:${ordinal}`,
-      ),
+        ordinal: `expedition:${ordinal}`,
+      }),
       definitionId,
       position,
     }));
@@ -359,13 +382,14 @@ function generateEntities(
     catalog.getAs(anchor.definitionId, 'resource');
     entities.push(Object.freeze({
       type: 'resource',
-      entityId: generatedEntityId(
+      entityId: derivePhase1GeneratedEntityId({
         worldSeed,
-        'resource',
-        anchor.definitionId,
+        contentCompatibility: catalog.compatibility,
+        kind: 'resource',
+        definitionId: anchor.definitionId,
         coord,
-        `local:${ordinal}`,
-      ),
+        ordinal: `local:${ordinal}`,
+      }),
       definitionId: anchor.definitionId,
       position: anchor.position,
     }));
@@ -377,13 +401,14 @@ function generateEntities(
     catalog.getAs('entity:passive-wildlife', 'entity');
     entities.push(Object.freeze({
       type: 'passive-wildlife',
-      entityId: generatedEntityId(
+      entityId: derivePhase1GeneratedEntityId({
         worldSeed,
-        'passive-wildlife',
-        'entity:passive-wildlife',
+        contentCompatibility: catalog.compatibility,
+        kind: 'passive-wildlife',
+        definitionId: 'entity:passive-wildlife',
         coord,
-        'local:0',
-      ),
+        ordinal: 'local:0',
+      }),
       definitionId: 'entity:passive-wildlife',
       position: LOCAL_WILDLIFE_POSITION,
     }));
@@ -413,13 +438,14 @@ function generateEntities(
       );
       entities.push(Object.freeze({
         type: 'passive-wildlife',
-        entityId: generatedEntityId(
-          worldSeed,
-          'passive-wildlife',
-          'entity:passive-wildlife',
-          coord,
-          'expedition:0',
-        ),
+        entityId: derivePhase1GeneratedEntityId({
+        worldSeed,
+        contentCompatibility: catalog.compatibility,
+        kind: 'passive-wildlife',
+        definitionId: 'entity:passive-wildlife',
+        coord,
+        ordinal: 'expedition:0',
+      }),
         definitionId: 'entity:passive-wildlife',
         position,
       }));
@@ -432,13 +458,14 @@ function generateEntities(
     catalog.getAs('hostile:territorial-predator', 'hostile');
     entities.push(Object.freeze({
       type: 'hostile',
-      entityId: generatedEntityId(
+      entityId: derivePhase1GeneratedEntityId({
         worldSeed,
-        'hostile',
-        'hostile:territorial-predator',
+        contentCompatibility: catalog.compatibility,
+        kind: 'hostile',
+        definitionId: 'hostile:territorial-predator',
         coord,
-        'phase1:0',
-      ),
+        ordinal: 'phase1:0',
+      }),
       definitionId: 'hostile:territorial-predator',
       position: landmarks.predatorPosition,
     }));
@@ -448,13 +475,14 @@ function generateEntities(
     catalog.getAs('ruin:previous-civilization-ruin', 'ruin');
     entities.push(Object.freeze({
       type: 'ruin',
-      entityId: generatedEntityId(
+      entityId: derivePhase1GeneratedEntityId({
         worldSeed,
-        'ruin',
-        'ruin:previous-civilization-ruin',
+        contentCompatibility: catalog.compatibility,
+        kind: 'ruin',
+        definitionId: 'ruin:previous-civilization-ruin',
         coord,
-        'phase1:0',
-      ),
+        ordinal: 'phase1:0',
+      }),
       definitionId: 'ruin:previous-civilization-ruin',
       position: landmarks.ruinPosition,
     }));
