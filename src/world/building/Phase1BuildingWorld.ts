@@ -800,6 +800,9 @@ export class Phase1BuildingWorld {
     if (!this.spatial.isBuildableGround(
       position, profile, orientation,
     )) return 'INVALID_TERRAIN';
+    if (this.spatial.hasNonBuildableSurface(
+      position, profile, orientation,
+    )) return 'NON_BUILDABLE_SURFACE';
     if (this.spatial.hasBlockingWorldCollision(
       position, profile, orientation,
     )) return 'OBSTRUCTED';
