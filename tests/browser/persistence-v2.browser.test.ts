@@ -223,4 +223,57 @@ describe('IndexedDbSaveRepositoryV2 browser persistence', () => {
       await cleanup(databaseName, [normal, failingSave, failingImport]);
     }
   });
+
+  it('exports, imports, and reexports a validated V2 world equivalently while invalid import preserves the prior target', async () => {
+    const sourceName = 'proz0-test-save-v2-export-source';
+    const targetName = 'proz0-test-save-v2-export-target';
+    const source = new IndexedDbSaveRepositoryV2(options(sourceName));
+    const target = new IndexedDbSaveRepositoryV2(options(targetName));
+
+    try {
+      const initial = migratedBundle();
+      expect(await source.commit({
+        world: initial.world,
+        players: initial.players,
+        containers: initial.containers,
+        chunks: initial.chunks,
+        footholds: initial.footholds,
+        structures: initial.structures,
+        expectedPreviousWorldRevision: null,
+      })).toMatchObject({ ok: true });
+
+      const exported = await source.exportWorld('world-alpha');
+      expect(exported.ok).toBe(true);
+      if (!exported.ok) throw new Error(exported.message);
+
+      expect(await target.importWorld(exported.value)).toEqual({
+        ok: true,
+        value: { worldId: 'world-alpha' },
+      });
+      const targetBeforeInvalid = await target.exportWorld('world-alpha');
+      expect(targetBeforeInvalid).toEqual(exported);
+
+      const invalid = {
+        ...exported.value,
+        world: {
+          ...exported.value.world,
+          contentCompatibility: {
+            ...exported.value.world.contentCompatibility,
+            canonicalFingerprint: 'tampered-fingerprint',
+          },
+        },
+      };
+      expect(await target.importWorld(invalid)).toMatchObject({
+        ok: false,
+        code: 'CONTENT_FINGERPRINT_MISMATCH',
+      });
+      expect(await target.exportWorld('world-alpha')).toEqual(
+        targetBeforeInvalid,
+      );
+    } finally {
+      await cleanup(sourceName, [source]);
+      await cleanup(targetName, [target]);
+    }
+  });
+
 });
