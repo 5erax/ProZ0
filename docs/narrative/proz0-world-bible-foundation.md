@@ -1675,7 +1675,7 @@ The World Bible can function without deciding:
 
 # 17. ACCEPTANCE CRITERIA SELF-CHECK
 
-- Expected artifact path exists after persistence: **PENDING PERSISTENCE STEP**
+- Expected artifact path exists after persistence: **PASS**
 - Required minimum structure present: **PASS**
 - Humanity foundation coherent with Source of Truth: **PASS**
 - Planet foundation coherent with PO survey direction: **PASS**
@@ -1693,7 +1693,7 @@ The World Bible can function without deciding:
 - No gameplay/runtime/world-gen/architecture/art/audio implementation introduced: **PASS**
 - No Company A ownership/scope modified: **PASS**
 - Downstream implications recorded without activation: **PASS**
-- Universal Handoff Manifest: **PENDING COMPLETION COMMENT**
+- Universal Handoff Manifest: **POSTED AS REQUIRED IN SOURCE ISSUE COMPLETION STEP**
 - PO creative review routing after PM-B verification: **DEFINED**
 - Blocking OPEN QUESTION for execution: **NONE**
 
