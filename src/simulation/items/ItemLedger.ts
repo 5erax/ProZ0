@@ -29,6 +29,7 @@ interface MutableItemStackState {
 interface MutableContainerState {
   containerId: ContainerId;
   kind: ContainerState['kind'];
+  ownerPlayerId: ContainerState['ownerPlayerId'];
   revision: number;
   stacks: MutableItemStackState[];
 }
@@ -77,6 +78,7 @@ function freezeContainer(
   return Object.freeze({
     containerId: container.containerId,
     kind: container.kind,
+    ownerPlayerId: container.ownerPlayerId,
     revision: container.revision,
     stacks: Object.freeze(
       [...container.stacks]
@@ -92,6 +94,7 @@ function cloneContainer(
   return {
     containerId: container.containerId,
     kind: container.kind,
+    ownerPlayerId: container.ownerPlayerId,
     revision: container.revision,
     stacks: container.stacks.map((stack) => ({ ...stack })),
   };
@@ -420,6 +423,24 @@ function validateInitialSnapshot(
     if (!Number.isSafeInteger(container.revision) || container.revision < 0) {
       throw new Error(
         `Invalid revision for container ${container.containerId}.`,
+      );
+    }
+
+    if (
+      container.kind === 'player-inventory'
+      && (container.ownerPlayerId === null || container.ownerPlayerId.length === 0)
+    ) {
+      throw new Error(
+        `Player inventory ${container.containerId} requires ownerPlayerId.`,
+      );
+    }
+
+    if (
+      container.kind !== 'player-inventory'
+      && container.ownerPlayerId !== null
+    ) {
+      throw new Error(
+        `Non-player container ${container.containerId} cannot own a player.`,
       );
     }
 
