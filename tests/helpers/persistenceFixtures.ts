@@ -4,7 +4,7 @@ import {
 } from '../../src/foundation';
 import {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
   type ChunkRecordV1,
   type PlayerFacingV1,
   type PlayerRecordV1,
@@ -21,7 +21,7 @@ export function makeWorldManifest(
 ): WorldManifestV1 {
   return Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'world-manifest',
     worldId: 'world-alpha',
     worldRevision: 0,
@@ -42,7 +42,7 @@ export function makePlayerRecord(
 
   return Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'player',
     worldId: 'world-alpha',
     playerId: 'player-1',
@@ -58,7 +58,7 @@ export function makeChunkRecord(
 ): ChunkRecordV1 {
   return Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'chunk',
     worldId: 'world-alpha',
     coord: createChunkCoord(-7, 11),
@@ -74,7 +74,7 @@ export function makePortableBundle(
 ): PortableSaveBundleV1 {
   return Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'portable-bundle',
     world: makeWorldManifest(),
     players: Object.freeze([makePlayerRecord()]),
