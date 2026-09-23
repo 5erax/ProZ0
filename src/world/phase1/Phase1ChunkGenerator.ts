@@ -307,6 +307,9 @@ function expeditionResourceEntities(
       EXPEDITION_RESOURCE_IDS[
         rng.nextUint32() % EXPEDITION_RESOURCE_IDS.length
       ];
+    if (definitionId === undefined) {
+      throw new Error('Expedition resource table unexpectedly resolved no definition.');
+    }
     catalog.getAs(definitionId, 'resource');
 
     let localX = 4 + (rng.nextUint32() % 24000) / 1000;
