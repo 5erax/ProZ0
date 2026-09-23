@@ -33,6 +33,7 @@ import type {
   RepairItemCommand,
   SplitStackCommand,
   TransferItemCommand,
+  WearItemCommand,
   WorkbenchAccessRef,
 } from './ItemCommands';
 import type {
@@ -149,6 +150,17 @@ function itemCommandSignature(command: ItemCommand): string {
         command.worldDropId,
         command.expectedWorldDropRevision,
         command.expectedDropContainerRevision,
+      ]);
+
+    case 'wear':
+      return JSON.stringify([
+        command.type,
+        command.operationId,
+        command.playerId,
+        command.inventoryContainerId,
+        command.expectedInventoryRevision,
+        command.targetStackId,
+        command.conditionLoss,
       ]);
 
     case 'consume':
@@ -707,6 +719,8 @@ export class Phase1ItemAuthority {
         return this.executeDrop(command);
       case 'pickup':
         return this.executePickup(command);
+      case 'wear':
+        return this.executeWear(command);
       case 'consume':
         return this.executeConsume(command);
       case 'craft':
@@ -1221,6 +1235,48 @@ export class Phase1ItemAuthority {
       ],
       createdIds(mutations),
       removedIdsStillAbsent(draft.getStackIds(), mutations),
+    );
+  }
+
+  private executeWear(command: WearItemCommand): ItemTransactionResult {
+    if (!Number.isSafeInteger(command.conditionLoss) || command.conditionLoss <= 0) {
+      return rejected(command.operationId, 'INVALID_QUANTITY');
+    }
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(command.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== command.playerId
+    ) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+    if (inventory.revision !== command.expectedInventoryRevision) {
+      return rejected(command.operationId, 'STALE_REVISION');
+    }
+    const stack = draft.requireStack(
+      command.inventoryContainerId,
+      command.targetStackId,
+    );
+    if (stack === null || stack.condition === null) {
+      return rejected(command.operationId, 'SOURCE_MISSING');
+    }
+    const failure = draft.setCondition(
+      command.inventoryContainerId,
+      command.targetStackId,
+      Math.max(0, stack.condition - command.conditionLoss),
+    );
+    if (failure !== null) {
+      return rejected(command.operationId, failure);
+    }
+    const revision = draft.incrementRevision(command.inventoryContainerId);
+    this.ledger.publish(draft);
+    return committed(
+      command.operationId,
+      [{ containerId: command.inventoryContainerId, revision }],
+      [],
+      [],
+      [],
     );
   }
 
