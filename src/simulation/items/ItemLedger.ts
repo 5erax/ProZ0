@@ -46,7 +46,6 @@ export interface InsertRequest {
   readonly operationId: OperationId;
   readonly generatedOrdinal: number;
   readonly preserveStackId?: ItemStackId;
-  readonly validateInboundFrom?: Readonly<ContainerState>;
 }
 
 export interface InsertResult extends LedgerMutationResult {
@@ -218,7 +217,7 @@ export class ItemLedgerDraft {
 
     const currentUsage = computeContainerUsage(
       this.catalog,
-      request.validateInboundFrom?.stacks ?? freezeContainer(container).stacks,
+      container.stacks,
     );
 
     const projectedStacks = container.stacks.map((stack) => ({ ...stack }));
@@ -279,13 +278,11 @@ export class ItemLedgerDraft {
       this.catalog,
       projectedStacks,
     );
-    const capacityFailure = request.validateInboundFrom === undefined
-      ? validateContainerAbsoluteCapacity(container.kind, projectedUsage)
-      : validateInboundCapacityTransition(
-          container.kind,
-          currentUsage,
-          projectedUsage,
-        );
+    const capacityFailure = validateInboundCapacityTransition(
+      container.kind,
+      currentUsage,
+      projectedUsage,
+    );
 
     if (capacityFailure !== null) {
       return capacityFailure;
