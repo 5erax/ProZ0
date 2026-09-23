@@ -6,6 +6,7 @@ import {
 import {
   PHASE1_WORLD_GENERATION_VERSION,
   Phase1ChunkGenerator,
+  derivePhase1GeneratedEntityId,
   getPhase1WorldLandmarks,
 } from '../../src/world/phase1/Phase1ChunkGenerator';
 import {
@@ -39,13 +40,13 @@ describe('Phase 1 world deterministic generation', () => {
       2049803912,
     ]);
     expect(generated.baseGenerationFingerprint).toBe(
-      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:38e0afc9',
+      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:398f82f1',
     );
     expect(generated.entities).toEqual([
       {
         type: 'resource',
         entityId:
-          'generated:resource:b7d898043d5b047598d39c5d4e5cc8cc',
+          'generated:resource:d049d66d3bfea471ac0521571b5c7186',
         definitionId: 'resource:fiber-plant',
         position: { x: 18, y: 10 },
       },
@@ -80,14 +81,54 @@ describe('Phase 1 world deterministic generation', () => {
       751075795,
     ]);
     expect(generated.baseGenerationFingerprint).toBe(
-      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:9149283a',
+      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:2d265028',
     );
     expect(generated.entities).toContainEqual({
       type: 'ruin',
-      entityId: 'generated:ruin:d91239a36ee4e1fb38480ba9f59020cd',
+      entityId: 'generated:ruin:3b53940f17bff6c5577120c0b62f3dda',
       definitionId: 'ruin:previous-civilization-ruin',
       position: { x: -392, y: 0 },
     });
+  });
+
+
+  it('binds generated entity identity to content compatibility and not request order', () => {
+    const baseInput = {
+      worldSeed: 'entity-id-contract',
+      contentCompatibility: catalog.compatibility,
+      kind: 'resource',
+      definitionId: 'resource:fiber-plant' as const,
+      coord: createChunkCoord(-7, 11),
+      ordinal: 'candidate:3',
+    };
+
+    const first = derivePhase1GeneratedEntityId(baseInput);
+    const other = derivePhase1GeneratedEntityId({
+      ...baseInput,
+      coord: createChunkCoord(4, -2),
+      ordinal: 'candidate:9',
+    });
+
+    const reverseOther = derivePhase1GeneratedEntityId({
+      ...baseInput,
+      coord: createChunkCoord(4, -2),
+      ordinal: 'candidate:9',
+    });
+    const reverseFirst = derivePhase1GeneratedEntityId(baseInput);
+
+    expect(reverseFirst).toBe(first);
+    expect(reverseOther).toBe(other);
+
+    expect(
+      derivePhase1GeneratedEntityId({
+        ...baseInput,
+        contentCompatibility: {
+          ...catalog.compatibility,
+          canonicalFingerprint:
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      }),
+    ).not.toBe(first);
   });
 
   it('is independent from chunk request order', () => {
