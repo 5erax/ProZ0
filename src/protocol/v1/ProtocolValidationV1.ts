@@ -150,7 +150,7 @@ export function validateClientHelloV1(
     || !nonEmpty(content.formatId)
     || !nonNegativeSafeInteger(content.schemaVersion)
     || !nonEmpty(content.packId)
-    || !nonEmpty(content.packVersion)
+    || !nonNegativeSafeInteger(content.packVersion)
     || !nonEmpty(content.canonicalFingerprint, 512)
     || !objectValue(world)
     || !nonNegativeSafeInteger(world.worldGenerationVersion)
