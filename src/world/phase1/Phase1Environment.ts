@@ -2,7 +2,6 @@ import type { ContentCatalogV1 } from '../../content';
 import {
   DeterministicRng,
   SIMULATION_HZ,
-  createWorldPosition,
   deriveSeedState,
 } from '../../foundation';
 import type {
@@ -110,6 +109,9 @@ export function validatePhase1EnvironmentState(
 
   const definition = catalog.getAs('weather:cold-rain', 'weather');
   const event = state.weatherEvents[0];
+  if (event === undefined) {
+    throw new Error('Phase 1 requires exactly one canonical Cold Rain event.');
+  }
 
   if (event.weatherDefinitionId !== definition.id) {
     throw new Error('Environment weather event references the wrong definition.');
@@ -150,7 +152,14 @@ export function validatePhase1EnvironmentState(
     activeTick: state.activeTick,
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze([
-      Object.freeze({ ...event }),
+      Object.freeze({
+        weatherEventId: event.weatherEventId,
+        weatherDefinitionId: event.weatherDefinitionId,
+        revision: event.revision,
+        startTick: event.startTick,
+        warningStartTick: event.warningStartTick,
+        endTick: event.endTick,
+      }),
     ]),
   });
 }
@@ -196,6 +205,9 @@ export function coldRainStatus(
   state: Phase1EnvironmentState,
 ): Phase1ColdRainStatus {
   const event = state.weatherEvents[0];
+  if (event === undefined) {
+    throw new Error('Phase 1 environment is missing its Cold Rain event.');
+  }
 
   if (state.activeTick < event.warningStartTick) return 'future';
   if (state.activeTick < event.startTick) return 'warning';
@@ -222,7 +234,3 @@ export function getPhase1EnvironmentView(
     coldRainStatus: coldRainStatus(validated),
   });
 }
-
-// Keep this module platform-neutral; this export only prevents accidental
-// introduction of renderer-driven environment positioning.
-export const PHASE1_ENVIRONMENT_ORIGIN = createWorldPosition(0, 0);
