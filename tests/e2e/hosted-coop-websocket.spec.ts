@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import type { Socket } from 'node:net';
+import type { Duplex } from 'node:stream';
 import { expect, test, type Page } from '@playwright/test';
 import { createPhase1ContentCatalog } from '../../src/content';
 import {
@@ -38,7 +38,7 @@ class UpgradeSocketPeer implements ServerWebSocketLike {
     Array<(data?: unknown) => void>
   >();
 
-  public constructor(private readonly socket: Socket) {
+  public constructor(private readonly socket: Duplex) {
     socket.on('data', (chunk: Buffer) => this.consume(chunk));
     socket.on('close', () => this.emit('close'));
     socket.on('error', () => this.emit('error'));
