@@ -20,7 +20,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/content/**', '**/world/**', '**/simulation/**', '**/persistence/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
+          group: ['**/content/**', '**/world/**', '**/simulation/**', '**/persistence/**', '**/protocol/**', '**/server/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
           message: 'foundation must remain platform-neutral and dependency-free.',
         },
       ]),
@@ -31,7 +31,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/world/**', '**/simulation/**', '**/persistence/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
+          group: ['**/world/**', '**/simulation/**', '**/persistence/**', '**/protocol/**', '**/server/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
           message: 'content may depend only on foundation.',
         },
       ]),
@@ -42,7 +42,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/simulation/**', '**/persistence/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
+          group: ['**/simulation/**', '**/persistence/**', '**/protocol/**', '**/server/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
           message: 'world cannot depend on higher runtime or presentation modules.',
         },
         {
@@ -57,7 +57,7 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/persistence/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
+          group: ['**/persistence/**', '**/protocol/**', '**/server/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
           message: 'simulation cannot depend on persistence adapters or presentation.',
         },
         {
@@ -72,12 +72,57 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/client/**', 'pixi.js', 'pixi.js/**'],
-          message: 'persistence must remain independent from presentation.',
+          group: ['**/protocol/**', '**/server/**', '**/client/**', 'pixi.js', 'pixi.js/**'],
+          message: 'persistence must remain independent from protocol/server/presentation.',
         },
         {
           group: ['**/simulation/internal/**', '**/world/internal/**', '**/content/internal/**'],
           message: 'persistence must use public domain contracts.',
+        },
+      ]),
+    },
+  },
+  {
+    files: ['src/protocol/**/*.ts'],
+    rules: {
+      'no-restricted-imports': restricted([
+        {
+          group: [
+            '**/foundation/**',
+            '**/content/**',
+            '**/world/**',
+            '**/simulation/**',
+            '**/persistence/**',
+            '**/server/**',
+            '**/client/**',
+            'pixi.js',
+            'pixi.js/**',
+          ],
+          message: 'protocol must remain transport-neutral DTO/schema code with no domain/server/client imports.',
+        },
+      ]),
+    },
+  },
+  {
+    files: ['src/server/**/*.ts'],
+    rules: {
+      'no-restricted-imports': restricted([
+        {
+          group: [
+            '**/client/**',
+            'pixi.js',
+            'pixi.js/**',
+          ],
+          message: 'server authority must remain headless and independent from client/presentation.',
+        },
+        {
+          group: [
+            '**/simulation/internal/**',
+            '**/world/internal/**',
+            '**/content/internal/**',
+            '**/persistence/internal/**',
+          ],
+          message: 'server must compose public authority/persistence surfaces only.',
         },
       ]),
     },
@@ -92,8 +137,8 @@ export default tseslint.config(
           message: 'Only src/client/presentation may import PixiJS.',
         },
         {
-          group: ['**/simulation/internal/**', '**/world/internal/**', '**/content/internal/**', '**/persistence/internal/**'],
-          message: 'client composition must use public module surfaces.',
+          group: ['**/server/**', '**/simulation/internal/**', '**/world/internal/**', '**/content/internal/**', '**/persistence/internal/**'],
+          message: 'client composition must not import server and must use public module surfaces.',
         },
       ]),
     },
@@ -103,8 +148,8 @@ export default tseslint.config(
     rules: {
       'no-restricted-imports': restricted([
         {
-          group: ['**/simulation/internal/**', '**/world/internal/**', '**/content/internal/**', '**/persistence/internal/**'],
-          message: 'presentation must consume public read models/contracts only.',
+          group: ['**/server/**', '**/simulation/internal/**', '**/world/internal/**', '**/content/internal/**', '**/persistence/internal/**'],
+          message: 'presentation must not import server and must consume public read models/contracts only.',
         },
       ]),
     },
