@@ -11,7 +11,7 @@ import {
 } from '../../world';
 import {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
 } from '../schema/SaveSchema';
 import type { ChunkRecordV1 } from '../schema/v1/ChunkRecordV1';
 import type { WorldManifestV1 } from '../schema/v1/WorldManifestV1';
@@ -132,7 +132,7 @@ implements ChunkPersistencePort {
 
     const chunk: ChunkRecordV1 = Object.freeze({
       formatId: SAVE_FORMAT_ID,
-      schemaVersion: SAVE_SCHEMA_VERSION,
+      schemaVersion: SAVE_SCHEMA_VERSION_V1,
       recordKind: 'chunk',
       worldId: this.worldId,
       coord,

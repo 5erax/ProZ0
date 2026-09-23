@@ -16,7 +16,7 @@ import {
 } from '../repository/SaveRepository';
 import {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
 } from '../schema/SaveSchema';
 import type { ChunkRecordV1 } from '../schema/v1/ChunkRecordV1';
 import type {
@@ -124,17 +124,17 @@ function validateCommonRecord(
     );
   }
 
-  if (input.schemaVersion > SAVE_SCHEMA_VERSION) {
+  if (input.schemaVersion > SAVE_SCHEMA_VERSION_V1) {
     return saveFailure(
       'UNSUPPORTED_NEWER_SCHEMA',
-      `Save schema version ${input.schemaVersion} is newer than supported version ${SAVE_SCHEMA_VERSION}.`,
+      `Save schema version ${input.schemaVersion} is newer than supported version ${SAVE_SCHEMA_VERSION_V1}.`,
     );
   }
 
-  if (input.schemaVersion < SAVE_SCHEMA_VERSION) {
+  if (input.schemaVersion < SAVE_SCHEMA_VERSION_V1) {
     return saveFailure(
       'MIGRATION_FAILED',
-      `Save schema version ${input.schemaVersion} requires migration before V${SAVE_SCHEMA_VERSION} validation.`,
+      `Save schema version ${input.schemaVersion} requires migration before V${SAVE_SCHEMA_VERSION_V1} validation.`,
     );
   }
 
@@ -239,7 +239,7 @@ export function validateWorldManifestV1(
 
   return saveSuccess(Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'world-manifest',
     worldId: record.worldId,
     worldRevision: record.worldRevision,
@@ -315,7 +315,7 @@ export function validatePlayerRecordV1(
 
   return saveSuccess(Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'player',
     worldId: record.worldId,
     playerId: record.playerId,
@@ -405,7 +405,7 @@ export function validateChunkRecordV1(
 
   return saveSuccess(Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'chunk',
     worldId: record.worldId,
     coord,
@@ -515,7 +515,7 @@ export function validatePortableSaveBundleV1(
 
   return saveSuccess(Object.freeze({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'portable-bundle',
     world: world.value,
     players: collections.value.players,

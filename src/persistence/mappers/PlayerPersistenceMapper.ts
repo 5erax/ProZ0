@@ -11,7 +11,7 @@ import {
 } from '../repository/SaveRepository';
 import {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
 } from '../schema/SaveSchema';
 import type { PlayerRecordV1 } from '../schema/v1/PlayerRecordV1';
 import {
@@ -37,7 +37,7 @@ export function createPlayerRecordV1(
 
   return validatePlayerRecordV1({
     formatId: SAVE_FORMAT_ID,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: SAVE_SCHEMA_VERSION_V1,
     recordKind: 'player',
     worldId: input.worldId,
     playerId: input.playerId,
