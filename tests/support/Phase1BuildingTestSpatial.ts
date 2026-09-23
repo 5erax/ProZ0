@@ -8,6 +8,7 @@ import type {
 export class Phase1BuildingTestSpatial implements BuildingSpatialQuery {
   public explored = true;
   public buildable = true;
+  public nonBuildableSurface = false;
   public blocking = false;
   public protectedRuin = false;
   public deathCacheObstruction = false;
@@ -36,6 +37,17 @@ export class Phase1BuildingTestSpatial implements BuildingSpatialQuery {
     void profile;
     void orientationQuarterTurns;
     return this.buildable;
+  }
+
+  public hasNonBuildableSurface(
+    position: WorldPosition,
+    profile: StructurePlacementProfile,
+    orientationQuarterTurns: QuarterTurn,
+  ): boolean {
+    void position;
+    void profile;
+    void orientationQuarterTurns;
+    return this.nonBuildableSurface;
   }
 
   public hasBlockingWorldCollision(
