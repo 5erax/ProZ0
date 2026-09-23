@@ -106,7 +106,7 @@ describe('Save V2 schema, migration, and fail-closed validation', () => {
 
     expect(migrated).toMatchObject({
       ok: false,
-      code: 'MIGRATION_FAILED',
+      code: 'UNSUPPORTED_RNG_VERSION',
     });
   });
 
