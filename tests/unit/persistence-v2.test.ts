@@ -178,6 +178,7 @@ describe('Save V2 schema, migration, and fail-closed validation', () => {
       position: { x: 3, y: 2 },
       orientationQuarterTurns: 0,
       placedByPlayerId: 'player-1',
+      placementOperationFingerprint: 'placement:condenser',
       outputContainerId: 'container:condenser:output',
       machine: {
         enabled: true,
@@ -194,6 +195,107 @@ describe('Save V2 schema, migration, and fail-closed validation', () => {
       ok: false,
       code: 'CORRUPT_RECORD',
     });
+  });
+
+  it('rejects Save V2 progression states that #52 reconstruction would reject', () => {
+    const catalog = createPhase1ContentCatalog();
+    const policy = createPhase1SaveV2Compatibility(
+      catalog,
+      [PHASE0_WORLD_GENERATION_VERSION],
+    );
+    const migrated = migratePortableSaveBundleV1ToV2(
+      makePortableBundle(),
+      migrationOptions(),
+    );
+    if (!migrated.ok) throw new Error(migrated.message);
+    const player = migrated.value.players[0];
+    if (player === undefined) throw new Error('Expected migrated player.');
+
+    const validateProgression = (
+      progression: typeof player.progression,
+    ) => validatePortableSaveBundleV2({
+      ...migrated.value,
+      players: [{ ...player, progression }],
+    }, policy);
+
+    const quests = player.progression.professionQuests;
+    const explorer = quests.find(
+      (quest) =>
+        quest.questDefinitionId === 'profession-quest:chart-the-unknown',
+    );
+    const engineer = quests.find(
+      (quest) =>
+        quest.questDefinitionId === 'profession-quest:bring-water-online',
+    );
+    if (explorer === undefined || engineer === undefined) {
+      throw new Error('Expected canonical migrated quest records.');
+    }
+
+    expect(validateProgression({
+      ...player.progression,
+      professionQuests: [{
+        ...explorer,
+        completedObjectiveOrdinals: [1],
+      }, engineer],
+    })).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
+
+    expect(validateProgression({
+      ...player.progression,
+      professionQuests: [{
+        ...explorer,
+        completedObjectiveOrdinals: [0],
+      }, engineer],
+    })).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
+
+    expect(validateProgression({
+      ...player.progression,
+      totalXp: 225,
+      completedMilestoneRuleIds: ['first-expedition-band-entry'],
+      unlockedSkillIds: [],
+    })).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
+
+    const eligibleBase = {
+      ...player.progression,
+      totalXp: 225,
+      completedMilestoneRuleIds: ['first-expedition-band-entry'],
+      unlockedSkillIds: ['skill:fieldcraft-basics'],
+    } as const;
+    expect(validateProgression({
+      ...eligibleBase,
+      professionQuests: [{
+        ...explorer,
+        completedObjectiveOrdinals: [0],
+      }, engineer],
+    })).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
+
+    expect(validateProgression({
+      ...player.progression,
+      unlockedProfessionIds: ['profession:explorer-prototype'],
+    })).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
+
+    const completedExplorer = {
+      ...eligibleBase,
+      completedMilestoneRuleIds: [
+        'first-expedition-band-entry',
+        'first-ruin-locate:previous-civilization-ruin',
+        'first-ruin-inspect:previous-civilization-ruin',
+      ],
+      professionQuests: [{
+        ...explorer,
+        completedObjectiveOrdinals: [0, 1, 2],
+        completed: true,
+      }, engineer],
+      unlockedProfessionIds: [],
+    } as const;
+    expect(validateProgression(completedExplorer)).toMatchObject({
+      ok: false,
+      code: 'CORRUPT_RECORD',
+    });
+
+    expect(validateProgression({
+      ...completedExplorer,
+      unlockedProfessionIds: ['profession:explorer-prototype'],
+    })).toMatchObject({ ok: true });
   });
 
   it('derives player level and durability checkpoint instead of persisting derived authority', () => {
