@@ -10,9 +10,12 @@ import type { ItemInteractionWorldPort } from '../../world';
 import {
   NOOP_GATHER_COST_PORT,
   type GatherCostPort,
+  type GatherCostReservation,
+  type GatherCostReservationResult,
 } from './GatherCostPort';
 import {
   NOOP_ITEM_AUTHORITY_EVENT_SINK,
+  type ItemAuthorityEvent,
   type ItemAuthorityEventSink,
 } from './ItemAuthorityEvents';
 import {
@@ -309,6 +312,7 @@ export class Phase1ItemAuthority {
   private readonly gatherCost: GatherCostPort;
   private readonly events: ItemAuthorityEventSink;
   private readonly processedOperations = new Map<OperationId, CachedOperation>();
+  private readonly pendingAuthorityEvents: ItemAuthorityEvent[] = [];
   private readonly activeGathersByPlayer = new Map<PlayerId, ActiveGatherChannel>();
   private readonly activeGatherOperationSignatures = new Map<OperationId, string>();
 
@@ -326,10 +330,37 @@ export class Phase1ItemAuthority {
     return this.ledger.exportSnapshot();
   }
 
+  public getPendingAuthorityEvents(): readonly Readonly<ItemAuthorityEvent>[] {
+    return Object.freeze([...this.pendingAuthorityEvents]);
+  }
+
+  public flushPendingAuthorityEvents(): number {
+    let delivered = 0;
+
+    while (this.pendingAuthorityEvents.length > 0) {
+      const event = this.pendingAuthorityEvents[0];
+      if (event === undefined) {
+        break;
+      }
+
+      try {
+        this.events.emit(event);
+      } catch {
+        break;
+      }
+
+      this.pendingAuthorityEvents.shift();
+      delivered += 1;
+    }
+
+    return delivered;
+  }
+
   public execute(command: ItemCommand): ItemTransactionResult {
     const signature = itemCommandSignature(command);
     const cached = this.resolveCachedOperation(command.operationId, signature);
     if (cached !== null) {
+      this.flushPendingAuthorityEvents();
       return cached;
     }
 
@@ -345,6 +376,7 @@ export class Phase1ItemAuthority {
       signature,
       result,
     });
+    this.flushPendingAuthorityEvents();
     return result;
   }
 
@@ -354,6 +386,7 @@ export class Phase1ItemAuthority {
 
     if (cached !== undefined) {
       if (cached.signature === signature) {
+        this.flushPendingAuthorityEvents();
         return Object.freeze({
           status: 'resolved',
           result: cached.result,
@@ -486,6 +519,7 @@ export class Phase1ItemAuthority {
 
     const result = this.completeGather(channel);
     this.clearGather(channel);
+    this.flushPendingAuthorityEvents();
     return Object.freeze({
       status: 'resolved',
       result,
@@ -1095,20 +1129,22 @@ export class Phase1ItemAuthority {
     const revision = draft.incrementRevision(command.inventoryContainerId);
     this.ledger.publish(draft);
 
-    this.events.emit(Object.freeze({
-      type: 'craft-completed',
-      operationId: command.operationId,
-      playerId: command.playerId,
-      recipeId: recipe.id,
-    }));
-
-    return committed(
+    const result = committed(
       command.operationId,
       [{ containerId: command.inventoryContainerId, revision }],
       [],
       createdIds(mutations),
       removedIdsStillAbsent(draft.getStackIds(), mutations),
     );
+
+    this.recordAuthorityEvent(Object.freeze({
+      type: 'craft-completed',
+      operationId: command.operationId,
+      playerId: command.playerId,
+      recipeId: recipe.id,
+    }));
+
+    return result;
   }
 
   private executeRepair(command: RepairItemCommand): ItemTransactionResult {
@@ -1179,7 +1215,15 @@ export class Phase1ItemAuthority {
     const revision = draft.incrementRevision(command.inventoryContainerId);
     this.ledger.publish(draft);
 
-    this.events.emit(Object.freeze({
+    const result = committed(
+      command.operationId,
+      [{ containerId: command.inventoryContainerId, revision }],
+      [],
+      createdIds(consumed),
+      removedIdsStillAbsent(draft.getStackIds(), consumed),
+    );
+
+    this.recordAuthorityEvent(Object.freeze({
       type: 'repair-completed',
       operationId: command.operationId,
       playerId: command.playerId,
@@ -1188,13 +1232,7 @@ export class Phase1ItemAuthority {
       conditionAfter,
     }));
 
-    return committed(
-      command.operationId,
-      [{ containerId: command.inventoryContainerId, revision }],
-      [],
-      createdIds(consumed),
-      removedIdsStillAbsent(draft.getStackIds(), consumed),
-    );
+    return result;
   }
 
   private validateWorkbench(
@@ -1336,7 +1374,7 @@ export class Phase1ItemAuthority {
     }
 
     if (
-      !this.gatherCost.canCompleteGather(
+      !this.gatherCost.canStartGather(
         request.playerId,
         definition.id,
       )
@@ -1472,18 +1510,6 @@ export class Phase1ItemAuthority {
       );
     }
 
-    if (
-      !this.gatherCost.canCompleteGather(
-        request.playerId,
-        channel.resourceDefinition.id,
-      )
-    ) {
-      return this.cacheGatherResult(
-        channel,
-        rejected(request.operationId, 'INSUFFICIENT_STAMINA'),
-      );
-    }
-
     const draft = this.ledger.createDraft();
     const outputItem = getItemDefinition(
       this.options.catalog,
@@ -1547,21 +1573,27 @@ export class Phase1ItemAuthority {
       }
     }
 
+    const costReservation = this.reserveGatherCost(channel);
+    if (typeof costReservation === 'string') {
+      return this.cacheGatherResult(
+        channel,
+        rejected(request.operationId, costReservation),
+      );
+    }
+
     const worldResult = this.options.world.commitGather(
       request.resourceEntityId,
       request.expectedResourceRevision,
     );
     if (worldResult === null) {
+      this.gatherCost.releaseGatherCostReservation(costReservation);
       return this.cacheGatherResult(
         channel,
         rejected(request.operationId, 'STALE_REVISION'),
       );
     }
 
-    this.gatherCost.commitGatherCost(
-      request.playerId,
-      channel.resourceDefinition.id,
-    );
+    this.gatherCost.commitReservedGatherCost(costReservation);
 
     const revision = draft.incrementRevision(request.inventoryContainerId);
     this.ledger.publish(draft);
@@ -1580,7 +1612,8 @@ export class Phase1ItemAuthority {
       [],
     );
 
-    this.events.emit(Object.freeze({
+    this.cacheGatherResult(channel, result);
+    this.recordAuthorityEvent(Object.freeze({
       type: 'gather-completed',
       operationId: request.operationId,
       playerId: request.playerId,
@@ -1588,7 +1621,33 @@ export class Phase1ItemAuthority {
       resourceDefinitionId: channel.resourceDefinition.id,
     }));
 
-    return this.cacheGatherResult(channel, result);
+    return result;
+  }
+
+  private recordAuthorityEvent(event: Readonly<ItemAuthorityEvent>): void {
+    this.pendingAuthorityEvents.push(event);
+  }
+
+  private reserveGatherCost(
+    channel: ActiveGatherChannel,
+  ): Readonly<GatherCostReservation> | TransactionRejectionReason {
+    let reservationResult: GatherCostReservationResult;
+
+    try {
+      reservationResult = this.gatherCost.reserveGatherCost({
+        operationId: channel.request.operationId,
+        playerId: channel.request.playerId,
+        resourceDefinitionId: channel.resourceDefinition.id,
+      });
+    } catch {
+      return 'GATHER_COST_RESERVATION_FAILED';
+    }
+
+    if (reservationResult.status === 'rejected') {
+      return reservationResult.reason;
+    }
+
+    return reservationResult.reservation;
   }
 
   private cacheGatherResult(
