@@ -72,7 +72,7 @@ export interface PlayerSurvivalView {
 export interface SurvivalAuthoritySnapshot {
   readonly players: readonly PlayerSurvivalState[];
   readonly appliedDamageIds: readonly string[];
-  readonly lethalDamageEvents: readonly DamageEvent[];
+  readonly lethalDamageEvents?: readonly DamageEvent[];
 }
 
 export interface SurvivalStaminaReservation {
