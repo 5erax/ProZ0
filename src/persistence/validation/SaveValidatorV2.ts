@@ -54,17 +54,25 @@ function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isJsonCompatible(value: unknown, seen = new Set<object>()): boolean {
+function isJsonCompatible(value: unknown, path = new Set<object>()): boolean {
   if (value === null) return true;
   if (typeof value === 'string' || typeof value === 'boolean') return true;
   if (typeof value === 'number') return Number.isFinite(value);
   if (typeof value !== 'object') return false;
-  if (seen.has(value as object)) return false;
-  seen.add(value as object);
-  if (Array.isArray(value)) return value.every((entry) => isJsonCompatible(entry, seen));
-  const prototype = Object.getPrototypeOf(value);
-  if (prototype !== Object.prototype && prototype !== null) return false;
-  return Object.values(value as JsonObject).every((entry) => isJsonCompatible(entry, seen));
+  if (path.has(value as object)) return false;
+
+  path.add(value as object);
+  let valid: boolean;
+  if (Array.isArray(value)) {
+    valid = value.every((entry) => isJsonCompatible(entry, path));
+  } else {
+    const prototype = Object.getPrototypeOf(value);
+    valid = (prototype === Object.prototype || prototype === null)
+      && Object.values(value as JsonObject)
+        .every((entry) => isJsonCompatible(entry, path));
+  }
+  path.delete(value as object);
+  return valid;
 }
 
 function nonEmpty(value: unknown): value is string {
