@@ -1,11 +1,11 @@
 import type {
   SAVE_FORMAT_ID,
-  SAVE_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION_V1,
 } from '../SaveSchema';
 
 export interface WorldManifestV1 {
   readonly formatId: typeof SAVE_FORMAT_ID;
-  readonly schemaVersion: typeof SAVE_SCHEMA_VERSION;
+  readonly schemaVersion: typeof SAVE_SCHEMA_VERSION_V1;
   readonly recordKind: 'world-manifest';
 
   readonly worldId: string;
