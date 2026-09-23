@@ -288,18 +288,29 @@ function validateProgression(
   if (!isObject(progression)
     || 'level' in progression
     || !nonNegativeInt(progression.revision)
-    || !nonNegativeInt(progression.totalXp)) {
+    || !nonNegativeInt(progression.totalXp)
+    || !Array.isArray(progression.completedMilestoneRuleIds)
+    || !Array.isArray(progression.repeatRuleCounts)
+    || !Array.isArray(progression.unlockedSkillIds)
+    || !Array.isArray(progression.professionQuests)
+    || !Array.isArray(progression.unlockedProfessionIds)) {
     return saveFailure(
       'CORRUPT_RECORD',
       'Player progression state is invalid or persists derived level.',
     );
   }
+
   const definition = policy.catalog.getAs(
     'progression:phase1-early-progression',
     'progression',
   );
-  const milestoneIds = new Set(definition.milestoneRules.map((rule) => rule.id));
-  const repeatById = new Map(definition.repeatRules.map((rule) => [rule.id, rule]));
+  const milestoneIds = new Set(
+    definition.milestoneRules.map((rule) => rule.id),
+  );
+  const repeatById = new Map(
+    definition.repeatRules.map((rule) => [rule.id, rule]),
+  );
+
   const seenMilestones = new Set<string>();
   for (const id of progression.completedMilestoneRuleIds) {
     if (!nonEmpty(id) || !milestoneIds.has(id) || seenMilestones.has(id)) {
@@ -310,8 +321,15 @@ function validateProgression(
     }
     seenMilestones.add(id);
   }
+
   const seenRepeats = new Set<string>();
   for (const entry of progression.repeatRuleCounts) {
+    if (!isObject(entry) || !nonEmpty(entry.ruleId)) {
+      return saveFailure(
+        'CORRUPT_RECORD',
+        'Progression repeat counter must be a structured rule/count pair.',
+      );
+    }
     const rule = repeatById.get(entry.ruleId);
     if (rule === undefined
       || seenRepeats.has(entry.ruleId)
@@ -324,23 +342,68 @@ function validateProgression(
     }
     seenRepeats.add(entry.ruleId);
   }
+
+  const allowedSkills = new Set([
+    'skill:fieldcraft-basics',
+    'skill:maintenance-basics',
+  ]);
   const seenSkills = new Set<string>();
   for (const id of progression.unlockedSkillIds) {
-    if (seenSkills.has(id)) {
-      return saveFailure('CORRUPT_RECORD', `Duplicate unlocked skill ${id}.`);
+    if (!nonEmpty(id)
+      || seenSkills.has(id)
+      || !allowedSkills.has(id)) {
+      return saveFailure(
+        'CORRUPT_RECORD',
+        `Invalid or duplicate unlocked skill ${String(id)}.`,
+      );
     }
     const failure = requireContent(policy.catalog, id, 'skill');
     if (failure !== null) return failure;
     seenSkills.add(id);
   }
-  const seenQuests = new Set<string>();
+
+  const level = reconstructPlayerLevelV2(
+    progression.totalXp,
+    policy.catalog,
+  );
+  const expectedFieldcraft = level >= 2
+    && seenMilestones.has('first-expedition-band-entry');
+  const expectedMaintenance = level >= 2
+    && seenMilestones.has('first-condition-repair');
+  if (
+    seenSkills.has('skill:fieldcraft-basics') !== expectedFieldcraft
+    || seenSkills.has('skill:maintenance-basics') !== expectedMaintenance
+  ) {
+    return saveFailure(
+      'CORRUPT_RECORD',
+      'Progression prerequisite skill state disagrees with canonical level/milestone derivation.',
+    );
+  }
+
+  const allowedQuests = new Set([
+    'profession-quest:chart-the-unknown',
+    'profession-quest:bring-water-online',
+  ]);
+  const questProgress = new Map<
+    string,
+    { readonly completedObjectives: number; readonly completed: boolean }
+  >();
+
   for (const quest of progression.professionQuests) {
-    if (seenQuests.has(quest.questDefinitionId)) {
+    if (!isObject(quest)
+      || !nonEmpty(quest.questDefinitionId)
+      || !allowedQuests.has(quest.questDefinitionId)
+      || questProgress.has(quest.questDefinitionId)
+      || !Array.isArray(quest.completedObjectiveOrdinals)
+      || typeof quest.completed !== 'boolean') {
       return saveFailure(
         'CORRUPT_RECORD',
-        `Duplicate quest ${quest.questDefinitionId}.`,
+        `Invalid or duplicate profession quest ${String(
+          isObject(quest) ? quest.questDefinitionId : quest,
+        )}.`,
       );
     }
+
     let questDefinition;
     try {
       questDefinition = policy.catalog.getAs(
@@ -353,36 +416,122 @@ function validateProgression(
         `Invalid profession quest ${quest.questDefinitionId}.`,
       );
     }
-    const ordinals = new Set<number>();
-    for (const ordinal of quest.completedObjectiveOrdinals) {
-      if (!nonNegativeInt(ordinal)
+
+    for (
+      let index = 0;
+      index < quest.completedObjectiveOrdinals.length;
+      index += 1
+    ) {
+      const ordinal = quest.completedObjectiveOrdinals[index];
+      if (
+        !nonNegativeInt(ordinal)
         || ordinal >= questDefinition.objectives.length
-        || ordinals.has(ordinal)) {
+        || ordinal !== index
+      ) {
         return saveFailure(
-          'CROSS_REFERENCE_FAILURE',
-          `Invalid quest objective ordinal for ${quest.questDefinitionId}.`,
+          'CORRUPT_RECORD',
+          `Quest ${quest.questDefinitionId} objective ordinals must be the exact ordered prefix starting at zero.`,
         );
       }
-      ordinals.add(ordinal);
     }
-    if (quest.completed !== (ordinals.size === questDefinition.objectives.length)) {
+
+    const completedObjectives = quest.completedObjectiveOrdinals.length;
+    if (
+      quest.completed
+        !== (completedObjectives === questDefinition.objectives.length)
+    ) {
       return saveFailure(
         'CORRUPT_RECORD',
         `Quest completion state disagrees with objectives for ${quest.questDefinitionId}.`,
       );
     }
-    seenQuests.add(quest.questDefinitionId);
+
+    if (
+      (completedObjectives > 0 || quest.completed)
+      && (
+        level < questDefinition.minimumLevel
+        || !seenSkills.has(questDefinition.requiredSkillId)
+      )
+    ) {
+      return saveFailure(
+        'CORRUPT_RECORD',
+        `Quest progress is ineligible for ${quest.questDefinitionId}.`,
+      );
+    }
+
+    questProgress.set(quest.questDefinitionId, {
+      completedObjectives,
+      completed: quest.completed,
+    });
   }
+
+  if (questProgress.size !== allowedQuests.size) {
+    return saveFailure(
+      'CORRUPT_RECORD',
+      'Progression quest state set is incomplete.',
+    );
+  }
+
+  const explorer = questProgress.get(
+    'profession-quest:chart-the-unknown',
+  );
+  const engineer = questProgress.get(
+    'profession-quest:bring-water-online',
+  );
+  if (explorer === undefined || engineer === undefined) {
+    return saveFailure(
+      'CORRUPT_RECORD',
+      'Progression quest state set is incomplete.',
+    );
+  }
+
+  const hasRuinLocate = seenMilestones.has(
+    'first-ruin-locate:previous-civilization-ruin',
+  );
+  const hasRuinInspect = seenMilestones.has(
+    'first-ruin-inspect:previous-civilization-ruin',
+  );
+  if (
+    (explorer.completedObjectives >= 1 && !hasRuinLocate)
+    || (explorer.completedObjectives >= 2 && !hasRuinInspect)
+  ) {
+    return saveFailure(
+      'CORRUPT_RECORD',
+      'Explorer quest progress disagrees with persistent ruin milestones.',
+    );
+  }
+
+  const allowedProfessions = new Set([
+    'profession:explorer-prototype',
+    'profession:engineer-prototype',
+  ]);
   const seenProfessions = new Set<string>();
   for (const id of progression.unlockedProfessionIds) {
-    if (seenProfessions.has(id)) {
-      return saveFailure('CORRUPT_RECORD', `Duplicate unlocked profession ${id}.`);
+    if (!nonEmpty(id)
+      || seenProfessions.has(id)
+      || !allowedProfessions.has(id)) {
+      return saveFailure(
+        'CORRUPT_RECORD',
+        `Invalid or duplicate unlocked profession ${String(id)}.`,
+      );
     }
     const failure = requireContent(policy.catalog, id, 'profession');
     if (failure !== null) return failure;
     seenProfessions.add(id);
   }
-  reconstructPlayerLevelV2(progression.totalXp, policy.catalog);
+
+  if (
+    seenProfessions.has('profession:explorer-prototype')
+      !== explorer.completed
+    || seenProfessions.has('profession:engineer-prototype')
+      !== engineer.completed
+  ) {
+    return saveFailure(
+      'CORRUPT_RECORD',
+      'Progression profession state disagrees with completed quest state.',
+    );
+  }
+
   return null;
 }
 
@@ -731,7 +880,10 @@ export function validateStructureRecordV2(
     || (record.placedByPlayerId !== null
       && !nonEmpty(record.placedByPlayerId))
     || (record.outputContainerId !== null
-      && !nonEmpty(record.outputContainerId))) {
+      && !nonEmpty(record.outputContainerId))
+    || (record.structureDefinitionId === 'structure:landing-module'
+      ? record.placementOperationFingerprint !== null
+      : !nonEmpty(record.placementOperationFingerprint))) {
     return saveFailure(
       'CORRUPT_RECORD',
       'Structure record scalar fields are invalid.',
