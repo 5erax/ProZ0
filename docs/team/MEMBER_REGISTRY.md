@@ -23,7 +23,7 @@ This registry defines persistent member identities for role-runtime bootstrappin
 
 | MEMBER_ID | ROLE_ID | Instance | Identity binding |
 |---|---|---|---|
-| B-PM-01 | PROJECT_MANAGER | PM-B | Partner-company representative designated by Project Owner; bind to confirmed GitHub username before assignment |
+| B-PM-01 | PROJECT_MANAGER | PM-B | `@trisnef2293` — confirmed repository collaborator, write permission |
 | B-NWD-01 | NARRATIVE_WORLD_DIRECTOR | Primary | Partner staffing slot |
 | B-WLD-01 | WORLD_LEVEL_DESIGNER | Primary | Partner staffing slot |
 | B-TD-01 | TECHNICAL_DESIGNER | Primary | Partner staffing slot |
@@ -37,7 +37,7 @@ The repository is public. Personal email addresses are not used as public member
 
 A member is bound to GitHub by confirmed GitHub username, not by guessed username, email local-part or display name.
 
-The Project Owner has designated an existing repository collaborator as the Company B representative. The GitHub username must be confirmed before it is written here or used for assignment.
+The Project Owner designated the Company B representative. Repository access was verified for GitHub username `@trisnef2293` with write permission. Personal email is intentionally not published in this public registry.
 
 ## One-person-per-slot rule
 
