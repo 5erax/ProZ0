@@ -274,7 +274,9 @@ export class ItemLedgerDraft {
         quantity: remaining,
         condition: request.condition,
       });
-      createdStackIds.push(stackId);
+      if (request.preserveStackId === undefined) {
+        createdStackIds.push(stackId);
+      }
     }
 
     const projectedUsage = computeContainerUsage(
