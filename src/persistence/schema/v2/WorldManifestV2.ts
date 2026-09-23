@@ -1,11 +1,11 @@
-import type { ContentCompatibilityIdentityV1, ContentId } from '../../../content';
+import type { ContentCompatibilityIdentityV1 } from '../../../content';
 import type { SAVE_FORMAT_ID, SAVE_SCHEMA_VERSION_V2 } from '../SaveSchema';
 
 export type SaveContentCompatibilityV2 = ContentCompatibilityIdentityV1;
 
 export interface WeatherEventSaveV2 {
   readonly weatherEventId: string;
-  readonly weatherDefinitionId: ContentId;
+  readonly weatherDefinitionId: 'weather:cold-rain';
   readonly revision: number;
   readonly startTick: number;
   readonly warningStartTick: number;
