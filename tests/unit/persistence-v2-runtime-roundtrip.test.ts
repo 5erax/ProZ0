@@ -86,7 +86,9 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
       level: 3,
       milestoneRuleIds: Object.freeze([
         'first-gather:fiber-plant',
+        'first-expedition-band-entry',
         'first-ruin-locate:previous-civilization-ruin',
+        'first-ruin-inspect:previous-civilization-ruin',
       ]),
       repeatCounts: Object.freeze({ gather: 2, craft: 1, repair: 0 }),
       skillIds: Object.freeze(['skill:fieldcraft-basics'] as const),
@@ -95,6 +97,11 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
           questId: 'profession-quest:chart-the-unknown' as const,
           completedObjectives: 3,
           completed: true,
+        }),
+        Object.freeze({
+          questId: 'profession-quest:bring-water-online' as const,
+          completedObjectives: 0,
+          completed: false,
         }),
       ]),
       professionIds: Object.freeze(['profession:explorer-prototype'] as const),
@@ -279,6 +286,14 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
     );
     expect(condenser?.outputContainerId).toBe('container:condenser:output');
     expect(condenser?.machine).not.toHaveProperty('outputContainerId');
+    expect(condenser?.placementOperationFingerprint).toBe(
+      'place:condenser',
+    );
+    expect(
+      persisted.structures.find(
+        (entry) => entry.structureId === 'structure-instance:power',
+      )?.placementOperationFingerprint,
+    ).toBe('place:power');
 
     const output: ContainerRecordV2 = Object.freeze({
       formatId: SAVE_FORMAT_ID,
@@ -306,6 +321,11 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
       completedCycleOrdinal: 2,
       outputContainerId: 'container:condenser:output',
     });
+    expect(
+      restored.foothold.structures.find(
+        (entry) => entry.structureId === 'structure-instance:condenser',
+      )?.placementOperationFingerprint,
+    ).toBe('place:condenser');
     const reconstructed = new Phase1BuildingWorld(
       new Phase1BuildingTestSpatial(),
       restored,
