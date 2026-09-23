@@ -96,7 +96,8 @@ export class IndexedDbSaveRepository implements SaveRepository {
     this.databaseName =
       options.databaseName ?? DEFAULT_INDEXED_DB_SAVE_DATABASE;
     this.indexedDbFactory = factory;
-    this.migrations = options.migrations ?? new SaveMigrationRegistry();
+    this.migrations = options.migrations
+      ?? new SaveMigrationRegistry(SAVE_SCHEMA_VERSION_V1);
     this.compatibility = options.compatibility ?? PHASE0_SAVE_COMPATIBILITY;
   }
 
