@@ -13,6 +13,7 @@ import type {
 export interface TransferItemCommand {
   readonly type: 'transfer';
   readonly operationId: OperationId;
+  readonly playerId: PlayerId;
   readonly sourceContainerId: ContainerId;
   readonly sourceExpectedRevision: number;
   readonly targetContainerId: ContainerId;
@@ -24,6 +25,7 @@ export interface TransferItemCommand {
 export interface SplitStackCommand {
   readonly type: 'split';
   readonly operationId: OperationId;
+  readonly playerId: PlayerId;
   readonly containerId: ContainerId;
   readonly expectedRevision: number;
   readonly sourceStackId: ItemStackId;
@@ -33,6 +35,7 @@ export interface SplitStackCommand {
 export interface MergeStacksCommand {
   readonly type: 'merge';
   readonly operationId: OperationId;
+  readonly playerId: PlayerId;
   readonly containerId: ContainerId;
   readonly expectedRevision: number;
   readonly sourceStackId: ItemStackId;
