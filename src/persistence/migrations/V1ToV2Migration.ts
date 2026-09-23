@@ -185,7 +185,18 @@ export function migratePortableSaveBundleV1ToV2(
           completedMilestoneRuleIds: Object.freeze([]),
           repeatRuleCounts: Object.freeze([]),
           unlockedSkillIds: Object.freeze([]),
-          professionQuests: Object.freeze([]),
+          professionQuests: Object.freeze([
+            Object.freeze({
+              questDefinitionId: 'profession-quest:chart-the-unknown',
+              completedObjectiveOrdinals: Object.freeze([]),
+              completed: false,
+            }),
+            Object.freeze({
+              questDefinitionId: 'profession-quest:bring-water-online',
+              completedObjectiveOrdinals: Object.freeze([]),
+              completed: false,
+            }),
+          ]),
           unlockedProfessionIds: Object.freeze([]),
         }),
       });
