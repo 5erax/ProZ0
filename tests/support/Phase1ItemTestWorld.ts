@@ -111,9 +111,10 @@ export class Phase1ItemTestWorld implements ItemInteractionWorldPort {
   }
 
   public isContainerAccessible(
-    _playerId: PlayerId,
+    playerId: PlayerId,
     containerId: string,
   ): boolean {
+    void playerId;
     return !this.blockedContainers.has(containerId);
   }
 
@@ -125,9 +126,10 @@ export class Phase1ItemTestWorld implements ItemInteractionWorldPort {
   }
 
   public isResourceInInteractionRange(
-    _playerId: PlayerId,
+    playerId: PlayerId,
     resourceEntityId: ResourceEntityId,
   ): boolean {
+    void playerId;
     return !this.outOfRangeResources.has(resourceEntityId);
   }
 
@@ -164,15 +166,17 @@ export class Phase1ItemTestWorld implements ItemInteractionWorldPort {
   }
 
   public isWorldDropInInteractionRange(
-    _playerId: PlayerId,
+    playerId: PlayerId,
     worldDropId: WorldDropId,
   ): boolean {
+    void playerId;
     return !this.outOfRangeDrops.has(worldDropId);
   }
 
   public resolveDropPlacement(
-    _playerId: PlayerId,
+    playerId: PlayerId,
   ): Readonly<DropPlacementReservation> | null {
+    void playerId;
     return this.dropPlacementAvailable
       ? Object.freeze({ token: 'nearest-valid-reachable' })
       : null;
@@ -226,9 +230,10 @@ export class Phase1ItemTestWorld implements ItemInteractionWorldPort {
   }
 
   public isWorkbenchAccessible(
-    _playerId: PlayerId,
+    playerId: PlayerId,
     structureInstanceId: StructureInstanceId,
   ): boolean {
+    void playerId;
     return !this.inaccessibleWorkbenches.has(structureInstanceId);
   }
 }
