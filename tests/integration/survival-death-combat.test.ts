@@ -6,6 +6,7 @@ import {
   Phase1DeathAuthority,
   Phase1ItemAuthority,
   Phase1SurvivalAuthority,
+  SurvivalGatherCostPort,
   type ContainerState,
   type DeathXpPenaltyPort,
   type ItemLedgerSnapshot,
@@ -245,7 +246,6 @@ describe('Phase 1 death / respawn / recovery', () => {
     const input={
       deathId:'death:p1:reopen',
       playerId:'p1',
-      deathCause:'hostile-attack' as const,
       deathPosition:createWorldPosition(1,1),
       deathTick:0,
       inventoryContainerId:'inventory:p1',
@@ -311,8 +311,7 @@ describe('Phase 1 death / respawn / recovery', () => {
     });
 
     const input={
-      deathId:'death:p1:1',playerId:'p1',deathCause:'hostile-attack' as const,
-      deathPosition:createWorldPosition(5,7),deathTick:0,
+      deathId:'death:p1:1',playerId:'p1',deathPosition:createWorldPosition(5,7),deathTick:0,
       inventoryContainerId:'inventory:p1',expectedInventoryRevision:0,
       equippedStackIds:['spear'],
     };
@@ -348,5 +347,485 @@ describe('Phase 1 death / respawn / recovery', () => {
       sourceStackId:'spear',quantity:1,
     })).toMatchObject({status:'committed'});
     expect(world.getDeathCacheByContainer(cacheId)).toBeNull();
+  });
+});
+
+
+describe('P1-ENG-003 focused authority corrections', () => {
+  it('retries the same DeathId after stale inventory rejection and commits once', () => {
+    const { world, items, survival } = setup([{
+      stackId: 'spear',
+      itemDefinitionId: 'item:basic-spear',
+      quantity: 1,
+      condition: 100,
+    }]);
+    world.setPlayerPosition('p1', createWorldPosition(3, 4));
+
+    let xpCommits = 0;
+    let xpReleases = 0;
+    const xp: DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId: `xp:${request.deathId}`,
+          deathId: request.deathId,
+          playerId: request.playerId,
+          xpLoss: 5,
+        };
+      },
+      commitReservedDeathXpPenalty() {
+        xpCommits += 1;
+      },
+      releaseDeathXpPenalty() {
+        xpReleases += 1;
+      },
+    };
+    const death = new Phase1DeathAuthority(survival, items, world, xp);
+
+    survival.applyAuthorityDamage({
+      damageId: 'lethal:retry',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:retry',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+
+    const base = {
+      deathId: 'death:p1:retry',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(3, 4),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      equippedStackIds: ['spear'],
+    } as const;
+
+    expect(death.processDeath({
+      ...base,
+      expectedInventoryRevision: 99,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'ITEM_TRANSACTION_REJECTED',
+    });
+    expect(xpCommits).toBe(0);
+    expect(xpReleases).toBe(1);
+    expect(survival.getPlayerState('p1')).toMatchObject({
+      healthMilli: 0,
+      lifeState: { type: 'alive' },
+    });
+    expect(items.getContainerView('inventory:p1').stacks[0]?.condition)
+      .toBe(100);
+
+    const committed = death.processDeath({
+      ...base,
+      expectedInventoryRevision: 0,
+    });
+    expect(committed).toMatchObject({
+      status: 'committed',
+      deathId: 'death:p1:retry',
+    });
+    expect(xpCommits).toBe(1);
+    expect(
+      items.getContainerView('death-cache:death:p1:retry')
+        .stacks[0]?.condition,
+    ).toBe(90);
+
+    expect(death.processDeath({
+      ...base,
+      expectedInventoryRevision: 0,
+    })).toMatchObject({ status: 'duplicate' });
+    expect(xpCommits).toBe(1);
+    expect(
+      items.getContainerView('death-cache:death:p1:retry').stacks,
+    ).toHaveLength(1);
+  });
+
+  it('orders simultaneous lethal sources deterministically and commits one cause/cache', () => {
+    const { world, items, survival } = setup([{
+      stackId: 'fiber',
+      itemDefinitionId: 'item:plant-fiber',
+      quantity: 1,
+      condition: null,
+    }]);
+    const xp: DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId: `xp:${request.deathId}`,
+          deathId: request.deathId,
+          playerId: request.playerId,
+          xpLoss: 1,
+        };
+      },
+      commitReservedDeathXpPenalty() {},
+      releaseDeathXpPenalty() {},
+    };
+    const death = new Phase1DeathAuthority(survival, items, world, xp);
+
+    // Intentionally submit hostile first. Canonical ordering puts scheduled
+    // environmental damage before hostile damage for the same tick.
+    survival.applyAuthorityDamage({
+      damageId: 'attack:z',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:z',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+    survival.applyAuthorityDamage({
+      damageId: 'environment:dehydration',
+      sourceType: 'critical-dehydration',
+      sourceEntityId: null,
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+
+    expect(survival.getCanonicalLethalDamage('p1', 0)).toMatchObject({
+      damageId: 'environment:dehydration',
+      sourceType: 'critical-dehydration',
+    });
+
+    const result = death.processDeath({
+      deathId: 'death:p1:ordered',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(1, 1),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      equippedStackIds: [],
+    });
+    expect(result).toMatchObject({ status: 'committed' });
+    expect(survival.getPlayerState('p1').lifeState).toMatchObject({
+      type: 'dead-pending-respawn',
+      deathCause: 'critical-dehydration',
+    });
+
+    expect(survival.applyAuthorityDamage({
+      damageId: 'attack:later-same-tick',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:a',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    })).toMatchObject({ status: 'ignored-dead' });
+
+    expect(death.processDeath({
+      deathId: 'death:p1:ordered',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(1, 1),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      equippedStackIds: [],
+    })).toMatchObject({ status: 'duplicate' });
+    expect(
+      items.getContainerView('death-cache:death:p1:ordered').stacks,
+    ).toHaveLength(1);
+  });
+
+  it('stages gather stamina so finalization cannot be invalidated or throw', () => {
+    const ctx = setup();
+    const port = new SurvivalGatherCostPort(ctx.catalog, ctx.survival);
+
+    const reserved = port.reserveGatherCost({
+      operationId: 'gather:reserved',
+      playerId: 'p1',
+      resourceDefinitionId: 'resource:timber-source',
+    });
+    expect(reserved.status).toBe('reserved');
+    if (reserved.status !== 'reserved') {
+      throw new Error('Expected stamina reservation.');
+    }
+
+    // Five stamina is now reserved. Another canonical spend can consume only
+    // the unreserved 95, leaving the exact reserved amount protected.
+    expect(ctx.survival.canSpendStamina('p1', 96)).toBe(false);
+    ctx.survival.commitStaminaSpend('p1', 95, 0);
+    expect(ctx.survival.getPlayerView('p1').stamina).toBe(5);
+
+    expect(
+      () => port.commitReservedGatherCost(reserved.reservation),
+    ).not.toThrow();
+    expect(ctx.survival.getPlayerView('p1').stamina).toBe(0);
+
+    const releasedCtx = setup();
+    const releasedPort = new SurvivalGatherCostPort(
+      releasedCtx.catalog,
+      releasedCtx.survival,
+    );
+    const released = releasedPort.reserveGatherCost({
+      operationId: 'gather:released',
+      playerId: 'p1',
+      resourceDefinitionId: 'resource:timber-source',
+    });
+    if (released.status !== 'reserved') {
+      throw new Error('Expected releasable reservation.');
+    }
+    releasedPort.releaseGatherCostReservation(released.reservation);
+    expect(
+      () => releasedPort.commitReservedGatherCost(released.reservation),
+    ).not.toThrow();
+    expect(releasedCtx.survival.getPlayerView('p1').stamina).toBe(100);
+  });
+
+  it('does not publish alive state when respawn anchor reservation fails', () => {
+    const { world, items, survival } = setup();
+    world.setPlayerPosition('p1', createWorldPosition(8, 9));
+    const xp: DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId: `xp:${request.deathId}`,
+          deathId: request.deathId,
+          playerId: request.playerId,
+          xpLoss: 0,
+        };
+      },
+      commitReservedDeathXpPenalty() {},
+      releaseDeathXpPenalty() {},
+    };
+    const death = new Phase1DeathAuthority(survival, items, world, xp);
+
+    survival.applyAuthorityDamage({
+      damageId: 'lethal:respawn',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:respawn',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+    expect(death.processDeath({
+      deathId: 'death:p1:respawn',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(8, 9),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      equippedStackIds: [],
+    })).toMatchObject({ status: 'committed' });
+
+    world.respawnAvailable = false;
+    expect(death.processRespawn('p1', 300)).toMatchObject({
+      status: 'rejected',
+      reason: 'RESPAWN_UNAVAILABLE',
+    });
+    expect(survival.getPlayerState('p1').lifeState).toMatchObject({
+      type: 'dead-pending-respawn',
+    });
+    expect(world.getPlayerPosition('p1')).toEqual(
+      createWorldPosition(8, 9),
+    );
+
+    world.respawnAvailable = true;
+    expect(death.processRespawn('p1', 300)).toMatchObject({
+      status: 'respawned',
+      position: { x: 0, y: 0 },
+    });
+    expect(survival.getPlayerState('p1').lifeState).toEqual({
+      type: 'alive',
+    });
+    expect(world.getPlayerPosition('p1')).toEqual(
+      createWorldPosition(0, 0),
+    );
+  });
+
+  it('resolves owner/teammate contention for the final Death Cache quantity once', () => {
+    const catalog = createPhase1ContentCatalog();
+    const world = new Phase1SurvivalTestWorld();
+    const items = new Phase1ItemAuthority({
+      catalog,
+      world,
+      initialLedger: {
+        containers: [
+          {
+            containerId: 'inventory:p1',
+            kind: 'player-inventory',
+            ownerPlayerId: 'p1',
+            revision: 0,
+            stacks: [{
+              stackId: 'fiber',
+              itemDefinitionId: 'item:plant-fiber',
+              quantity: 1,
+              condition: null,
+            }],
+          },
+          {
+            containerId: 'inventory:p2',
+            kind: 'player-inventory',
+            ownerPlayerId: 'p2',
+            revision: 0,
+            stacks: [],
+          },
+        ],
+      },
+    });
+    const survival = new Phase1SurvivalAuthority({ catalog, items });
+    survival.registerPlayer('p1');
+    const xp: DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId: `xp:${request.deathId}`,
+          deathId: request.deathId,
+          playerId: request.playerId,
+          xpLoss: 0,
+        };
+      },
+      commitReservedDeathXpPenalty() {},
+      releaseDeathXpPenalty() {},
+    };
+    const death = new Phase1DeathAuthority(survival, items, world, xp);
+    survival.applyAuthorityDamage({
+      damageId: 'lethal:contention',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:contention',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+    const committed = death.processDeath({
+      deathId: 'death:p1:contention',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(1, 1),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      equippedStackIds: [],
+    });
+    if (
+      committed.status !== 'committed'
+      || committed.cacheContainerId === null
+    ) {
+      throw new Error('Expected non-empty Death Cache.');
+    }
+
+    const cacheId = committed.cacheContainerId;
+    expect(death.recoverFromDeathCache({
+      type: 'transfer',
+      operationId: 'recover:teammate',
+      playerId: 'p2',
+      sourceContainerId: cacheId,
+      sourceExpectedRevision: 0,
+      targetContainerId: 'inventory:p2',
+      targetExpectedRevision: 0,
+      sourceStackId: 'fiber',
+      quantity: 1,
+    })).toMatchObject({ status: 'committed' });
+
+    expect(death.recoverFromDeathCache({
+      type: 'transfer',
+      operationId: 'recover:owner-stale',
+      playerId: 'p1',
+      sourceContainerId: cacheId,
+      sourceExpectedRevision: 0,
+      targetContainerId: 'inventory:p1',
+      targetExpectedRevision: 1,
+      sourceStackId: 'fiber',
+      quantity: 1,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'STALE_REVISION',
+    });
+    expect(items.getContainerView('inventory:p2').stacks).toMatchObject([
+      { stackId: 'fiber', quantity: 1 },
+    ]);
+    expect(world.getDeathCacheByContainer(cacheId)).toBeNull();
+  });
+
+  it('preserves separate non-empty caches across multiple deaths', () => {
+    const { world, items, survival } = setup([
+      {
+        stackId: 'spear',
+        itemDefinitionId: 'item:basic-spear',
+        quantity: 1,
+        condition: 100,
+      },
+      {
+        stackId: 'fiber',
+        itemDefinitionId: 'item:plant-fiber',
+        quantity: 1,
+        condition: null,
+      },
+    ]);
+    const xp: DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId: `xp:${request.deathId}`,
+          deathId: request.deathId,
+          playerId: request.playerId,
+          xpLoss: 0,
+        };
+      },
+      commitReservedDeathXpPenalty() {},
+      releaseDeathXpPenalty() {},
+    };
+    const death = new Phase1DeathAuthority(survival, items, world, xp);
+
+    survival.applyAuthorityDamage({
+      damageId: 'lethal:first',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:first',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 0,
+    });
+    const first = death.processDeath({
+      deathId: 'death:p1:first',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(2, 2),
+      deathTick: 0,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      equippedStackIds: ['spear'],
+    });
+    if (first.status !== 'committed' || first.cacheContainerId === null) {
+      throw new Error('Expected first Death Cache.');
+    }
+
+    death.processRespawn('p1', 300);
+    expect(death.recoverFromDeathCache({
+      type: 'transfer',
+      operationId: 'recover:fiber-for-second-death',
+      playerId: 'p1',
+      sourceContainerId: first.cacheContainerId,
+      sourceExpectedRevision: 0,
+      targetContainerId: 'inventory:p1',
+      targetExpectedRevision: 1,
+      sourceStackId: 'fiber',
+      quantity: 1,
+    })).toMatchObject({ status: 'committed' });
+
+    survival.applyAuthorityDamage({
+      damageId: 'lethal:second',
+      sourceType: 'hostile-attack',
+      sourceEntityId: 'predator:second',
+      targetPlayerId: 'p1',
+      amount: 100,
+      tick: 300,
+    });
+    const second = death.processDeath({
+      deathId: 'death:p1:second',
+      playerId: 'p1',
+      deathPosition: createWorldPosition(4, 4),
+      deathTick: 300,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 2,
+      equippedStackIds: [],
+    });
+    if (second.status !== 'committed' || second.cacheContainerId === null) {
+      throw new Error('Expected second Death Cache.');
+    }
+
+    expect(
+      items.getContainerView(first.cacheContainerId).stacks,
+    ).toMatchObject([
+      { stackId: 'spear', condition: 90 },
+    ]);
+    expect(
+      items.getContainerView(second.cacheContainerId).stacks,
+    ).toMatchObject([
+      { stackId: 'fiber', quantity: 1 },
+    ]);
+    expect(world.getDeathCacheByContainer(first.cacheContainerId))
+      .not.toBeNull();
+    expect(world.getDeathCacheByContainer(second.cacheContainerId))
+      .not.toBeNull();
   });
 });
