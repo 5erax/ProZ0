@@ -14,7 +14,10 @@ import {
 import {
   createPhase1WorldStore,
 } from '../../src/world/phase1/Phase1WorldStore';
-import { MemoryPhase1WorldPersistence } from '../helpers/MemoryPhase1WorldPersistence';
+import {
+  DeferredPhase1WorldPersistence,
+  MemoryPhase1WorldPersistence,
+} from '../helpers/MemoryPhase1WorldPersistence';
 
 describe('Phase 1 world store', () => {
   it('persists shared radial fog across temporary chunk streaming and reload', async () => {
@@ -244,6 +247,107 @@ describe('Phase 1 world store', () => {
     );
     expect(second.getMeta(coord)?.lifecycle).toBe('FAILED');
     expect(second.query(coord)).toBeUndefined();
+  });
+
+
+  it('keeps a newer mutation DIRTY when an older immutable save completes after reacquire', async () => {
+    const persistence = new DeferredPhase1WorldPersistence();
+    const catalog = createPhase1ContentCatalog();
+    const store = createPhase1WorldStore({
+      worldSeed: 'p1-world-golden',
+      catalog,
+      persistence,
+    });
+    await store.initialize();
+
+    const coord = createChunkCoord(0, 0);
+    const initial = await store.requestActive(coord);
+    const fiber = initial.base.entities.find(
+      (entity) =>
+        entity.type === 'resource'
+        && entity.definitionId === 'resource:fiber-plant',
+    );
+    if (fiber === undefined || fiber.type !== 'resource') {
+      throw new Error('Fiber fixture missing.');
+    }
+
+    store.commitResourceGather(fiber.entityId, 0, 0);
+    persistence.deferChunkSave = true;
+
+    const oldSave = store.releaseInterest(coord);
+    expect(persistence.pendingChunkSnapshot?.revision).toBe(1);
+
+    await store.requestActive(coord);
+    store.commitResourceGather(fiber.entityId, 1, 0);
+
+    expect(store.getMeta(coord)).toMatchObject({
+      lifecycle: 'ACTIVE',
+      persistence: 'SAVING',
+      revision: 2,
+      persistedRevision: 0,
+    });
+
+    persistence.resolvePendingChunkSave();
+    await oldSave;
+
+    expect(store.getMeta(coord)).toMatchObject({
+      lifecycle: 'ACTIVE',
+      persistence: 'DIRTY',
+      revision: 2,
+      persistedRevision: 1,
+    });
+
+    persistence.deferChunkSave = false;
+    await store.releaseInterest(coord);
+
+    expect(store.getMeta(coord)).toMatchObject({
+      lifecycle: 'UNLOADED',
+      persistence: 'CLEAN',
+      revision: 2,
+      persistedRevision: 2,
+    });
+  });
+
+  it('keeps a failed save ACTIVE and DIRTY instead of finalizing eviction', async () => {
+    const persistence = new MemoryPhase1WorldPersistence();
+    const catalog = createPhase1ContentCatalog();
+    const store = createPhase1WorldStore({
+      worldSeed: 'p1-world-golden',
+      catalog,
+      persistence,
+    });
+    await store.initialize();
+
+    const coord = createChunkCoord(0, 0);
+    const view = await store.requestActive(coord);
+    const fiber = view.base.entities.find(
+      (entity) => entity.type === 'resource',
+    );
+    if (fiber === undefined || fiber.type !== 'resource') {
+      throw new Error('Resource fixture missing.');
+    }
+
+    store.commitResourceGather(fiber.entityId, 0, 0);
+    persistence.failChunkSave = true;
+
+    await expect(store.releaseInterest(coord)).rejects.toThrow(
+      /injected Phase 1 chunk save failure/,
+    );
+    expect(store.getMeta(coord)).toMatchObject({
+      lifecycle: 'ACTIVE',
+      persistence: 'DIRTY',
+      revision: 1,
+      persistedRevision: 0,
+    });
+
+    persistence.failChunkSave = false;
+    await store.retryEviction(coord);
+    expect(store.getMeta(coord)).toMatchObject({
+      lifecycle: 'UNLOADED',
+      persistence: 'CLEAN',
+      revision: 1,
+      persistedRevision: 1,
+    });
   });
 
   it('places local, expedition predator, and ruin landmarks inside approved travel bands', () => {
