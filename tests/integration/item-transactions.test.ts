@@ -206,6 +206,53 @@ describe('Phase1 item transactions', () => {
     expect(runtime.exportLedgerSnapshot()).toEqual(before);
   });
 
+  it('rejects inbound player volume overflow independently of weight', () => {
+    const world = new Phase1ItemTestWorld();
+    const runtime = authority(world, [
+      container(
+        'inventory:p1',
+        'player-inventory',
+        'p1',
+        [
+          stack('fiber-1', 'item:plant-fiber', 50),
+          stack('fiber-2', 'item:plant-fiber', 50),
+          stack('fiber-3', 'item:plant-fiber', 50),
+          stack('fiber-4', 'item:plant-fiber', 50),
+          stack('fiber-5', 'item:plant-fiber', 40),
+        ],
+      ),
+      container(
+        'crate:a',
+        'storage-crate',
+        null,
+        [stack('fiber-extra', 'item:plant-fiber', 1)],
+      ),
+    ]);
+
+    const before = runtime.exportLedgerSnapshot();
+    const view = runtime.getContainerView('inventory:p1');
+    expect(view.totalWeightKg).toBe(12);
+    expect(view.totalVolume).toBe(24);
+
+    const result = runtime.execute({
+      type: 'transfer',
+      operationId: 'op:volume-capacity',
+      playerId: 'p1',
+      sourceContainerId: 'crate:a',
+      sourceExpectedRevision: 0,
+      targetContainerId: 'inventory:p1',
+      targetExpectedRevision: 0,
+      sourceStackId: 'fiber-extra',
+      quantity: 1,
+    });
+
+    expect(result).toMatchObject({
+      status: 'rejected',
+      reason: 'TARGET_CAPACITY_VOLUME',
+    });
+    expect(runtime.exportLedgerSnapshot()).toEqual(before);
+  });
+
   it('split then merge conserves quantity and uses deterministic new stack identity', () => {
     const world = new Phase1ItemTestWorld();
     const runtime = authority(world, [
@@ -326,6 +373,63 @@ describe('Phase1 item transactions', () => {
     });
     expect(runtime.exportLedgerSnapshot()).toEqual(before);
     expect(world.getWorldDrop('generated-drop:op:drop-invalid')).toBeNull();
+  });
+
+  it('pickup capacity failure leaves the world drop available and inventory unchanged', () => {
+    const world = new Phase1ItemTestWorld();
+    const runtime = authority(world, [
+      container(
+        'inventory:p1',
+        'player-inventory',
+        'p1',
+        [stack('fiber-a', 'item:plant-fiber', 3)],
+      ),
+      container(
+        'inventory:p2',
+        'player-inventory',
+        'p2',
+        [stack('ore-full', 'item:metal-ore', 20)],
+      ),
+    ]);
+
+    expect(runtime.execute({
+      type: 'drop',
+      operationId: 'op:drop-for-full-player',
+      playerId: 'p1',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      sourceStackId: 'fiber-a',
+      quantity: 3,
+    })).toMatchObject({ status: 'committed' });
+
+    const dropId = 'generated-drop:op:drop-for-full-player';
+    const beforeInventory = runtime.getContainerView('inventory:p2');
+
+    const pickup = runtime.execute({
+      type: 'pickup',
+      operationId: 'op:pickup-full-player',
+      playerId: 'p2',
+      inventoryContainerId: 'inventory:p2',
+      expectedInventoryRevision: 0,
+      worldDropId: dropId,
+      expectedWorldDropRevision: 0,
+      expectedDropContainerRevision: 0,
+    });
+
+    expect(pickup).toMatchObject({
+      status: 'rejected',
+      reason: 'TARGET_CAPACITY_WEIGHT',
+    });
+    expect(runtime.getContainerView('inventory:p2')).toEqual(beforeInventory);
+    expect(world.getWorldDrop(dropId)).toMatchObject({
+      available: true,
+      revision: 0,
+    });
+    expect(
+      runtime.getContainerView(
+        'generated-container:op:drop-for-full-player:drop',
+      ).stacks,
+    ).toHaveLength(1);
   });
 
   it('world drop moves exact canonical stack once and first pickup wins', () => {
