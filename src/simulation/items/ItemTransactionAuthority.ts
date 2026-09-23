@@ -476,7 +476,6 @@ export class Phase1ItemAuthority {
           operationId: request.operationId,
           reason: 'OPERATION_ID_CONFLICT',
         });
-        this.processedDeathMoves.set(request.deathId, { signature, result });
         return result;
       }
     }
