@@ -171,6 +171,27 @@ describe('Phase 1 building placement', () => {
     expect(ctx.buildings.getBuildRevision()).toBe(0);
   });
 
+  it('distinguishes NON_BUILDABLE_SURFACE from generic terrain rejection', () => {
+    const ctx = setup([
+      stack('crate-kit', 'item:storage-crate-kit'),
+    ]);
+    ctx.spatial.nonBuildableSurface = true;
+
+    expect(placeFree(ctx, {
+      operationId: 'place:non-buildable',
+      definitionId: 'structure:storage-crate',
+      kitStackId: 'crate-kit',
+      inventoryRevision: 0,
+      buildRevision: 0,
+      x: 2.5,
+      y: 0,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'NON_BUILDABLE_SURFACE',
+    });
+    expect(ctx.items.getContainerView('inventory:p1').revision).toBe(0);
+  });
+
   it('same OperationId retries without duplicate structure or Kit consumption', () => {
     const ctx = setup([
       stack('crate-kit', 'item:storage-crate-kit'),
@@ -306,6 +327,62 @@ describe('Phase 1 building placement', () => {
           orientationQuarterTurns: placement.orientation,
         },
       });
+    });
+  });
+
+  it('reconstructs committed placement retry without consuming another Kit', () => {
+    const ctx = setup([
+      stack('crate-kit', 'item:storage-crate-kit'),
+    ]);
+    const command = {
+      operationId: 'place:reconnect',
+      actorPlayerId: 'p1',
+      structureDefinitionId: 'structure:storage-crate' as const,
+      sourceKitStackId: 'crate-kit',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      expectedBuildRevision: 0,
+      placement: {
+        mode: 'free' as const,
+        anchor: createWorldPosition(2.75, 0.25),
+        orientationQuarterTurns: 1 as const,
+      },
+    };
+    const first = ctx.building.place(command);
+    expect(first).toMatchObject({ status: 'committed' });
+
+    const worldSnapshot = ctx.buildings.exportSnapshot();
+    const itemSnapshot = ctx.items.exportLedgerSnapshot();
+    const spatial2 = new Phase1BuildingTestSpatial();
+    const buildings2 = new Phase1BuildingWorld(spatial2, worldSnapshot);
+    const base2 = new Phase1ItemTestWorld();
+    const adapter2 = new BuildingItemWorldAdapter(base2, buildings2);
+    const items2 = new Phase1ItemAuthority({
+      catalog: ctx.catalog,
+      world: adapter2,
+      initialLedger: itemSnapshot,
+    });
+    const building2 = new Phase1BuildingAuthority(
+      ctx.catalog,
+      items2,
+      buildings2,
+    );
+
+    const retry = building2.place(command);
+    expect(retry).toMatchObject({ status: 'committed' });
+    expect(items2.getContainerView('inventory:p1').revision).toBe(1);
+    expect(buildings2.exportSnapshot().foothold.structures).toHaveLength(2);
+
+    expect(building2.place({
+      ...command,
+      placement: {
+        mode: 'free',
+        anchor: createWorldPosition(4, 0),
+        orientationQuarterTurns: 1,
+      },
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
     });
   });
 
@@ -699,6 +776,62 @@ describe('Dismantle and reconstruction', () => {
     });
     expect(ctx.buildings.getStructure(placed.structure.structureId))
       .not.toBeNull();
+  });
+
+  it('reconstructs successful dismantle retry from stable returned Kit identity', () => {
+    const ctx = setup([
+      stack('workbench-kit', 'item:workbench-kit'),
+    ]);
+    const placed = placeFree(ctx, {
+      operationId: 'place:workbench-reconnect',
+      definitionId: 'structure:workbench',
+      kitStackId: 'workbench-kit',
+      inventoryRevision: 0,
+      buildRevision: 0,
+      x: 2.5,
+      y: 0,
+    });
+    if (placed.status !== 'committed') throw new Error('Expected Workbench.');
+
+    const command = {
+      operationId: 'dismantle:workbench-reconnect',
+      actorPlayerId: 'p1',
+      structureId: placed.structure.structureId,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 1,
+      expectedStructureRevision: 0,
+      expectedBuildRevision: 1,
+    };
+    expect(ctx.building.dismantle(command)).toMatchObject({
+      status: 'committed',
+    });
+
+    const spatial2 = new Phase1BuildingTestSpatial();
+    const buildings2 = new Phase1BuildingWorld(
+      spatial2,
+      ctx.buildings.exportSnapshot(),
+    );
+    const base2 = new Phase1ItemTestWorld();
+    const adapter2 = new BuildingItemWorldAdapter(base2, buildings2);
+    const items2 = new Phase1ItemAuthority({
+      catalog: ctx.catalog,
+      world: adapter2,
+      initialLedger: ctx.items.exportLedgerSnapshot(),
+    });
+    const building2 = new Phase1BuildingAuthority(
+      ctx.catalog,
+      items2,
+      buildings2,
+    );
+
+    expect(building2.dismantle(command)).toMatchObject({
+      status: 'committed',
+    });
+    expect(
+      items2.getContainerView('inventory:p1').stacks.filter(
+        (entry) => entry.itemDefinitionId === 'item:workbench-kit',
+      ),
+    ).toHaveLength(1);
   });
 
   it('round-trips foothold + machine progress + item output without offline production', () => {
