@@ -148,6 +148,35 @@ describe('Phase 1 combat authority', () => {
     expect(world.getPredator('predator:1')?.health).toBe(70);
   });
 
+  it('Basic Spear spends 15 stamina and loses condition only on authoritative hit', () => {
+    const { catalog, world, items, survival } = setup([{
+      stackId:'spear',
+      itemDefinitionId:'item:basic-spear',
+      quantity:1,
+      condition:100,
+    }]);
+    world.setPlayerPosition('p1', createWorldPosition(0,0));
+    world.addPredator({
+      entityId:'predator:1',
+      position:createWorldPosition(0.5,0),
+      encounterAnchor:createWorldPosition(0.5,0),
+      revision:0,health:75,state:'idle',targetPlayerId:null,
+      stateUntilTick:null,outsideLeashTicks:0,
+    });
+    const combat = new Phase1CombatAuthority(catalog,survival,items,world);
+    combat.setEquippedWeapon('p1','spear');
+
+    expect(combat.submitAttack({
+      attackId:'spear-hit',playerId:'p1',
+      inventoryContainerId:'inventory:p1',expectedInventoryRevision:0,
+      facingX:1,facingY:0,
+    },'predator:1')).toMatchObject({status:'hit',damage:25});
+
+    expect(survival.getPlayerView('p1').stamina).toBe(85);
+    expect(world.getPredator('predator:1')?.health).toBe(50);
+    expect(items.getContainerView('inventory:p1').stacks[0]?.condition).toBe(99);
+  });
+
   it('moving out during the 33-tick predator windup prevents damage', () => {
     const { catalog, world, items, survival } = setup();
     world.setPlayerPosition('p1', createWorldPosition(0,0));
@@ -160,11 +189,17 @@ describe('Phase 1 combat authority', () => {
     });
     const combat = new Phase1CombatAuthority(catalog,survival,items,world);
     combat.tickPredator('predator:1',['p1']);
+    expect(world.getPredator('predator:1')?.state).toBe('alert');
+    for(let tick=1;tick<=24;tick+=1) survival.stepPlayer('p1',tick,NORMAL);
+    combat.tickPredator('predator:1',['p1']);
+    expect(world.getPredator('predator:1')?.state).toBe('chase');
+    combat.tickPredator('predator:1',['p1']);
     expect(world.getPredator('predator:1')?.state).toBe('attack-windup');
-    for(let tick=1;tick<=33;tick+=1) survival.stepPlayer('p1',tick,NORMAL);
+    for(let tick=25;tick<=57;tick+=1) survival.stepPlayer('p1',tick,NORMAL);
     world.setPlayerPosition('p1', createWorldPosition(10,0));
     combat.tickPredator('predator:1',['p1']);
     expect(survival.getPlayerView('p1').health).toBe(100);
+    expect(world.getPredator('predator:1')?.state).toBe('recovery');
   });
 });
 
