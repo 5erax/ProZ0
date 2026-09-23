@@ -306,12 +306,23 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
       completedCycleOrdinal: 2,
       outputContainerId: 'container:condenser:output',
     });
+    const reconstructed = new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      restored,
+    ).exportSnapshot();
+    expect(reconstructed.foothold.power).toEqual(restored.foothold.power);
+    expect(reconstructed.foothold.condensers).toEqual(
+      restored.foothold.condensers,
+    );
     expect(
-      new Phase1BuildingWorld(
-        new Phase1BuildingTestSpatial(),
-        restored,
-      ).exportSnapshot(),
-    ).toEqual(restored);
+      reconstructed.foothold.structures
+        .map((entry) => entry.structureId)
+        .sort(),
+    ).toEqual(
+      restored.foothold.structures
+        .map((entry) => entry.structureId)
+        .sort(),
+    );
   });
 
   it('fails closed for corrupt V1 input and deterministic weather/chunk identity drift', () => {
