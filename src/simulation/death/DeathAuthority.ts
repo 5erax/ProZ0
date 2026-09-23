@@ -30,6 +30,10 @@ export interface DeathTransitionResult {
   readonly reason?: 'NOT_LETHAL' | 'ITEM_TRANSACTION_REJECTED';
 }
 
+export interface DeathAuthoritySnapshot {
+  readonly processed: readonly DeathTransitionResult[];
+}
+
 export interface RespawnResult {
   readonly status: 'waiting' | 'respawned';
   readonly playerId: PlayerId;
@@ -44,7 +48,25 @@ export class Phase1DeathAuthority {
     private readonly items: Phase1ItemAuthority,
     private readonly world: SurvivalWorldPort,
     private readonly xp: DeathXpPenaltyPort,
-  ) {}
+    snapshot?: DeathAuthoritySnapshot,
+  ) {
+    for (const result of snapshot?.processed ?? []) {
+      if (result.deathId.length === 0 || this.processed.has(result.deathId)) {
+        throw new Error('Invalid DeathAuthority snapshot.');
+      }
+      this.processed.set(result.deathId, Object.freeze({ ...result }));
+    }
+  }
+
+  public exportSnapshot(): DeathAuthoritySnapshot {
+    return Object.freeze({
+      processed: Object.freeze(
+        [...this.processed.values()]
+          .sort((a, b) => a.deathId.localeCompare(b.deathId))
+          .map((result) => Object.freeze({ ...result })),
+      ),
+    });
+  }
 
   public processDeath(input: DeathTransitionInput): DeathTransitionResult {
     const prior = this.processed.get(input.deathId);
