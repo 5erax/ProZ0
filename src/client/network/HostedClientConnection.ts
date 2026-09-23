@@ -101,8 +101,7 @@ export class HostedClientConnection {
     }
 
     if (
-      this.lastServerMessageSeq !== 0
-      && envelope.serverMessageSeq !== this.lastServerMessageSeq + 1
+      envelope.serverMessageSeq !== this.lastServerMessageSeq + 1
     ) {
       this.state = 'RESYNC_REQUIRED';
       return;
