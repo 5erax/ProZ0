@@ -9,7 +9,6 @@ import {
   type Phase1DeathAuthority,
   type Phase1ItemAuthority,
   type PlaceStructureCommand,
-  type RevisionedAggregateViewV1,
 } from '../../simulation';
 import type {
   GameplayCommandEnvelopeV1,
