@@ -262,7 +262,7 @@ describe('Phase1 gathering', () => {
     expect(world.getResource('resource-instance:ore')?.revision).toBe(0);
   });
 
-  it('honors the external stamina eligibility seam without spending on failure', () => {
+  it('honors the advisory gather-cost preflight without reserving or spending', () => {
     const world = new Phase1ItemTestWorld();
     world.addResource({
       resourceEntityId: 'resource-instance:fiber',
@@ -272,13 +272,24 @@ describe('Phase1 gathering', () => {
       depleted: false,
     });
 
+    let reservations = 0;
     let commits = 0;
     const gatherCost: GatherCostPort = {
-      canCompleteGather(): boolean {
+      canStartGather(): boolean {
         return false;
       },
-      commitGatherCost(): void {
+      reserveGatherCost() {
+        reservations += 1;
+        return {
+          status: 'rejected',
+          reason: 'INSUFFICIENT_STAMINA',
+        };
+      },
+      commitReservedGatherCost(): void {
         commits += 1;
+      },
+      releaseGatherCostReservation(): void {
+        // Nothing was reserved.
       },
     };
 
@@ -294,7 +305,251 @@ describe('Phase1 gathering', () => {
       status: 'rejected',
       reason: 'INSUFFICIENT_STAMINA',
     });
+    expect(reservations).toBe(0);
     expect(commits).toBe(0);
+  });
+
+  it.each([
+    'INSUFFICIENT_STAMINA',
+    'STALE_REVISION',
+  ] as const)(
+    'rejects %s cost reservation before any world/item/tool commit',
+    (reason) => {
+      const world = new Phase1ItemTestWorld();
+      world.addResource({
+        resourceEntityId: 'resource-instance:timber',
+        resourceDefinitionId: 'resource:timber-source',
+        revision: 0,
+        remainingActions: 5,
+        depleted: false,
+      });
+
+      let commits = 0;
+      let releases = 0;
+      const gatherCost: GatherCostPort = {
+        canStartGather(): boolean {
+          return true;
+        },
+        reserveGatherCost() {
+          return {
+            status: 'rejected',
+            reason,
+          };
+        },
+        commitReservedGatherCost(): void {
+          commits += 1;
+        },
+        releaseGatherCostReservation(): void {
+          releases += 1;
+        },
+      };
+
+      const authority = makeAuthority(
+        world,
+        inventory([
+          stack('tool-a', 'item:stone-field-tool', 1, 100),
+        ]),
+        { gatherCost },
+      );
+
+      expect(authority.beginGather({
+        operationId: `op:gather:reservation:${reason}`,
+        playerId: 'p1',
+        inventoryContainerId: 'inventory:p1',
+        expectedInventoryRevision: 0,
+        resourceEntityId: 'resource-instance:timber',
+        expectedResourceRevision: 0,
+        toolStackId: 'tool-a',
+      })).toMatchObject({
+        status: 'started',
+        requiredTicks: 60,
+      });
+
+      const resolved = tickUntilResolved(authority, 60);
+      expect(resolved).toMatchObject({
+        status: 'resolved',
+        result: {
+          status: 'rejected',
+          reason,
+        },
+      });
+
+      expect(itemQuantity(authority, 'item:timber')).toBe(0);
+      expect(
+        authority
+          .getContainerView('inventory:p1')
+          .stacks
+          .find((entry) => entry.stackId === 'tool-a')?.condition,
+      ).toBe(100);
+      expect(authority.getContainerView('inventory:p1').revision).toBe(0);
+      expect(world.getResource('resource-instance:timber')).toMatchObject({
+        revision: 0,
+        remainingActions: 5,
+        depleted: false,
+      });
+      expect(commits).toBe(0);
+      expect(releases).toBe(0);
+      expect(authority.tickGather('p1')).toEqual({ status: 'idle' });
+    },
+  );
+
+  it('releases a staged gather cost when the world CAS fails before commit', () => {
+    class StaleCommitWorld extends Phase1ItemTestWorld {
+      public override commitGather(): null {
+        return null;
+      }
+    }
+
+    const world = new StaleCommitWorld();
+    world.addResource({
+      resourceEntityId: 'resource-instance:timber',
+      resourceDefinitionId: 'resource:timber-source',
+      revision: 0,
+      remainingActions: 5,
+      depleted: false,
+    });
+
+    let commits = 0;
+    let releases = 0;
+    const gatherCost: GatherCostPort = {
+      canStartGather(): boolean {
+        return true;
+      },
+      reserveGatherCost(request) {
+        return {
+          status: 'reserved',
+          reservation: {
+            reservationId: 'reservation:stale-world',
+            operationId: request.operationId,
+            playerId: request.playerId,
+            resourceDefinitionId: request.resourceDefinitionId,
+          },
+        };
+      },
+      commitReservedGatherCost(): void {
+        commits += 1;
+      },
+      releaseGatherCostReservation(): void {
+        releases += 1;
+      },
+    };
+
+    const authority = makeAuthority(
+      world,
+      inventory([
+        stack('tool-a', 'item:stone-field-tool', 1, 100),
+      ]),
+      { gatherCost },
+    );
+
+    expect(authority.beginGather({
+      operationId: 'op:gather:world-cas-stale',
+      playerId: 'p1',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      resourceEntityId: 'resource-instance:timber',
+      expectedResourceRevision: 0,
+      toolStackId: 'tool-a',
+    })).toMatchObject({ status: 'started' });
+
+    expect(tickUntilResolved(authority, 60)).toMatchObject({
+      status: 'resolved',
+      result: {
+        status: 'rejected',
+        reason: 'STALE_REVISION',
+      },
+    });
+
+    expect(commits).toBe(0);
+    expect(releases).toBe(1);
+    expect(itemQuantity(authority, 'item:timber')).toBe(0);
+    expect(
+      authority
+        .getContainerView('inventory:p1')
+        .stacks
+        .find((entry) => entry.stackId === 'tool-a')?.condition,
+    ).toBe(100);
+    expect(world.getResource('resource-instance:timber')).toMatchObject({
+      revision: 0,
+      remainingActions: 5,
+    });
+  });
+
+  it('keeps committed gather result/event/idempotency safe when observer throws', () => {
+    const world = new Phase1ItemTestWorld();
+    world.addResource({
+      resourceEntityId: 'resource-instance:fiber',
+      resourceDefinitionId: 'resource:fiber-plant',
+      revision: 0,
+      remainingActions: 4,
+      depleted: false,
+    });
+
+    let shouldThrow = true;
+    const delivered: ItemAuthorityEvent[] = [];
+    const authority = makeAuthority(
+      world,
+      inventory([]),
+      {
+        events: {
+          emit(event): void {
+            if (shouldThrow) {
+              throw new Error('observer failed');
+            }
+            delivered.push(event);
+          },
+        },
+      },
+    );
+
+    const request = {
+      operationId: 'op:gather:throwing-observer',
+      playerId: 'p1',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      resourceEntityId: 'resource-instance:fiber',
+      expectedResourceRevision: 0,
+    } as const;
+
+    expect(authority.beginGather(request)).toMatchObject({
+      status: 'started',
+      requiredTicks: 36,
+    });
+
+    const first = tickUntilResolved(authority, 36);
+    expect(first).toMatchObject({
+      status: 'resolved',
+      result: { status: 'committed' },
+    });
+    expect(itemQuantity(authority, 'item:plant-fiber')).toBe(2);
+    expect(world.getResource('resource-instance:fiber')).toMatchObject({
+      revision: 1,
+      remainingActions: 3,
+    });
+    expect(authority.getPendingAuthorityEvents()).toHaveLength(1);
+    expect(authority.tickGather('p1')).toEqual({ status: 'idle' });
+
+    const retry = authority.beginGather(request);
+    expect(retry).toEqual({
+      status: 'resolved',
+      result: first.status === 'resolved' ? first.result : undefined,
+    });
+    expect(itemQuantity(authority, 'item:plant-fiber')).toBe(2);
+    expect(world.getResource('resource-instance:fiber')?.remainingActions).toBe(3);
+    expect(authority.getPendingAuthorityEvents()).toHaveLength(1);
+
+    shouldThrow = false;
+    expect(authority.flushPendingAuthorityEvents()).toBe(1);
+    expect(authority.getPendingAuthorityEvents()).toEqual([]);
+    expect(delivered).toEqual([
+      {
+        type: 'gather-completed',
+        operationId: 'op:gather:throwing-observer',
+        playerId: 'p1',
+        resourceEntityId: 'resource-instance:fiber',
+        resourceDefinitionId: 'resource:fiber-plant',
+      },
+    ]);
   });
 });
 
@@ -319,6 +574,59 @@ describe('Phase1 crafting and repair', () => {
     expect(itemQuantity(authority, 'item:plant-fiber')).toBe(0);
     expect(itemQuantity(authority, 'item:cordage')).toBe(1);
     expect(authority.getContainerView('inventory:p1').revision).toBe(1);
+  });
+
+  it('keeps committed craft result/idempotency safe when observer throws', () => {
+    const world = new Phase1ItemTestWorld();
+    let shouldThrow = true;
+    const delivered: ItemAuthorityEvent[] = [];
+    const authority = makeAuthority(
+      world,
+      inventory([stack('fiber-a', 'item:plant-fiber', 3)]),
+      {
+        events: {
+          emit(event): void {
+            if (shouldThrow) {
+              throw new Error('observer failed');
+            }
+            delivered.push(event);
+          },
+        },
+      },
+    );
+
+    const command = {
+      type: 'craft' as const,
+      operationId: 'op:craft:throwing-observer',
+      playerId: 'p1',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      recipeId: 'recipe:cordage',
+    };
+
+    const first = authority.execute(command);
+    expect(first).toMatchObject({ status: 'committed' });
+    expect(itemQuantity(authority, 'item:plant-fiber')).toBe(0);
+    expect(itemQuantity(authority, 'item:cordage')).toBe(1);
+    expect(authority.getPendingAuthorityEvents()).toHaveLength(1);
+
+    const retry = authority.execute(command);
+    expect(retry).toEqual(first);
+    expect(itemQuantity(authority, 'item:cordage')).toBe(1);
+    expect(authority.getContainerView('inventory:p1').revision).toBe(1);
+    expect(authority.getPendingAuthorityEvents()).toHaveLength(1);
+
+    shouldThrow = false;
+    expect(authority.flushPendingAuthorityEvents()).toBe(1);
+    expect(authority.getPendingAuthorityEvents()).toEqual([]);
+    expect(delivered).toEqual([
+      {
+        type: 'craft-completed',
+        operationId: 'op:craft:throwing-observer',
+        playerId: 'p1',
+        recipeId: 'recipe:cordage',
+      },
+    ]);
   });
 
   it('Tier 1 crafting requires a functional accessible Workbench', () => {
