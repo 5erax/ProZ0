@@ -6,6 +6,7 @@ import {
 import type {
   BuildingSpatialQuery,
   BuildingWorldSnapshot,
+  CommittedDismantleOperation,
   CondenserRuntimeState,
   ConnectorId,
   ConnectorState,
@@ -29,6 +30,7 @@ export const PHASE1_BUILD_ZONE_RADIUS_WU = 7.5;
 export const PHASE1_POWER_RADIUS_WU = 5;
 export const PHASE1_POWER_CAPACITY_PU = 10;
 export const PHASE1_CONDENSER_DEMAND_PU = 5;
+const MAX_RETAINED_DISMANTLES = 32;
 
 export const PHASE1_STRUCTURE_PLACEMENT_PROFILES:
   Readonly<Record<Phase1StructureDefinitionId, StructurePlacementProfile>> =
@@ -209,6 +211,7 @@ export class Phase1BuildingWorld {
   private readonly connections = new Map<string, StructureConnection>();
   private readonly pendingPlacements = new Map<string, PendingPlacement>();
   private readonly requestedConsumers = new Set<StructureId>();
+  private readonly recentDismantles: CommittedDismantleOperation[] = [];
   private buildRevision = 0;
   private powerRevision = 0;
   private producerStructureId: StructureId | null = null;
@@ -227,6 +230,7 @@ export class Phase1BuildingWorld {
         orientationQuarterTurns: 0,
         placedByPlayerId: null,
         containerId: null,
+        placementOperationFingerprint: null,
       });
       for (const connector of defaultLandingConnectors()) {
         this.connectors.set(connector.connectorId, connector);
@@ -266,6 +270,9 @@ export class Phase1BuildingWorld {
       this.connectors.set(connector.connectorId, freezeConnector(connector));
     }
     for (const connection of snapshot.foothold.connections) {
+      if (this.connections.has(connection.connectionId)) {
+        throw new Error('Duplicate connection identity in snapshot.');
+      }
       this.connections.set(
         connection.connectionId,
         freezeConnection(connection),
@@ -279,11 +286,23 @@ export class Phase1BuildingWorld {
         ...condenser,
       });
     }
+    for (const record of snapshot.foothold.recentDismantles ?? []) {
+      this.recentDismantles.push(Object.freeze({ ...record }));
+    }
     this.validateReconstructedSnapshot();
   }
 
   public getBuildRevision(): number {
     return this.buildRevision;
+  }
+
+  public getCommittedDismantle(
+    operationId: string,
+  ): Readonly<CommittedDismantleOperation> | null {
+    const record = this.recentDismantles.find(
+      (candidate) => candidate.operationId === operationId,
+    );
+    return record === undefined ? null : Object.freeze({ ...record });
   }
 
   public getStructure(structureId: StructureId):
@@ -371,6 +390,7 @@ export class Phase1BuildingWorld {
 
   public reservePlacement(request: {
     readonly operationId: string;
+    readonly commandFingerprint: string;
     readonly actorPlayerId: PlayerId;
     readonly definitionId: Exclude<
       Phase1StructureDefinitionId,
@@ -491,6 +511,7 @@ export class Phase1BuildingWorld {
 
     const reservation = Object.freeze({
       operationId: request.operationId,
+      commandFingerprint: request.commandFingerprint,
       actorPlayerId: request.actorPlayerId,
       footholdId: PHASE1_FOOTHOLD_ID,
       expectedBuildRevision: request.expectedBuildRevision,
@@ -543,6 +564,7 @@ export class Phase1BuildingWorld {
         reservation.orientationQuarterTurns,
       placedByPlayerId: reservation.actorPlayerId,
       containerId: reservation.containerId,
+      placementOperationFingerprint: reservation.commandFingerprint,
     };
     this.structures.set(state.structureId, state);
 
@@ -609,6 +631,7 @@ export class Phase1BuildingWorld {
 
   public reserveDismantle(request: {
     readonly operationId: string;
+    readonly commandFingerprint: string;
     readonly actorPlayerId: PlayerId;
     readonly structureId: StructureId;
     readonly expectedStructureRevision: number;
@@ -642,6 +665,7 @@ export class Phase1BuildingWorld {
 
     return Object.freeze({
       operationId: request.operationId,
+      commandFingerprint: request.commandFingerprint,
       actorPlayerId: request.actorPlayerId,
       footholdId: PHASE1_FOOTHOLD_ID,
       expectedBuildRevision: request.expectedBuildRevision,
@@ -693,6 +717,14 @@ export class Phase1BuildingWorld {
     }
 
     this.buildRevision += 1;
+    this.recentDismantles.push(Object.freeze({
+      operationId: reservation.operationId,
+      commandFingerprint: reservation.commandFingerprint,
+      structureId: reservation.structure.structureId,
+    }));
+    while (this.recentDismantles.length > MAX_RETAINED_DISMANTLES) {
+      this.recentDismantles.shift();
+    }
     this.recalculatePower();
   }
 
@@ -807,6 +839,9 @@ export class Phase1BuildingWorld {
         [...this.condensers.values()]
           .sort((a,b)=>compareStrings(a.structureId,b.structureId))
           .map(freezeCondenser),
+      ),
+      recentDismantles: Object.freeze(
+        this.recentDismantles.map((record) => Object.freeze({ ...record })),
       ),
     });
     return Object.freeze({ foothold });
@@ -991,6 +1026,14 @@ export class Phase1BuildingWorld {
       if (requiresContainer !== (structure.containerId !== null)) {
         throw new Error('Structure/container reference is corrupt.');
       }
+      if (
+        structure.definitionId === 'structure:landing-module'
+          ? structure.placementOperationFingerprint !== null
+          : typeof structure.placementOperationFingerprint !== 'string'
+            || structure.placementOperationFingerprint.length === 0
+      ) {
+        throw new Error('Structure operation fingerprint is corrupt.');
+      }
     }
 
     const structures = [...this.structures.values()];
@@ -1040,6 +1083,105 @@ export class Phase1BuildingWorld {
       ) {
         throw new Error('Structure connection reconstruction is corrupt.');
       }
+    }
+
+    const expectedLandingConnectors = defaultLandingConnectors();
+    const landingConnectors = [...this.connectors.values()].filter(
+      (connector) =>
+        connector.structureId === 'structure-instance:landing-module',
+    );
+    const habitats = [...this.structures.values()].filter(
+      (structure) => structure.definitionId === 'structure:habitat-room',
+    );
+    if (
+      landingConnectors.length !== expectedLandingConnectors.length
+      || this.connectors.size !== expectedLandingConnectors.length + habitats.length
+    ) {
+      throw new Error('Required connector topology is corrupt.');
+    }
+    for (const expected of expectedLandingConnectors) {
+      const actual = this.connectors.get(expected.connectorId);
+      if (
+        actual === undefined
+        || actual.structureId !== expected.structureId
+        || actual.localConnectorKey !== expected.localConnectorKey
+      ) {
+        throw new Error('Required Landing connector topology is corrupt.');
+      }
+    }
+
+    if (habitats.length === 0) {
+      if (
+        this.connections.size !== 0
+        || landingConnectors.some(
+          (connector) => connector.occupiedByConnectionId !== null,
+        )
+      ) {
+        throw new Error('Disconnected connector topology is corrupt.');
+      }
+    } else {
+      const habitat = habitats[0];
+      if (habitat === undefined) {
+        throw new Error('Habitat connector topology is corrupt.');
+      }
+      const habitatConnectorId =
+        `connector:${habitat.structureId}:habitat`;
+      const habitatConnector = this.connectors.get(habitatConnectorId);
+      if (
+        habitatConnector === undefined
+        || habitatConnector.structureId !== habitat.structureId
+        || habitatConnector.localConnectorKey !== 'habitat'
+        || habitatConnector.occupiedByConnectionId === null
+        || this.connections.size !== 1
+      ) {
+        throw new Error('Habitat connector topology is corrupt.');
+      }
+      const connection = this.connections.get(
+        habitatConnector.occupiedByConnectionId,
+      );
+      if (connection === undefined) {
+        throw new Error('Habitat connection is missing.');
+      }
+      const landingConnectorId =
+        connection.a === habitatConnectorId
+          ? connection.b
+          : connection.b === habitatConnectorId
+            ? connection.a
+            : null;
+      const landingConnector =
+        landingConnectorId === null
+          ? undefined
+          : this.connectors.get(landingConnectorId);
+      if (
+        landingConnector === undefined
+        || landingConnector.structureId
+          !== 'structure-instance:landing-module'
+        || landingConnector.occupiedByConnectionId
+          !== connection.connectionId
+        || habitatConnector.occupiedByConnectionId
+          !== connection.connectionId
+        || landingConnectors.filter(
+          (connector) => connector.occupiedByConnectionId !== null,
+        ).length !== 1
+      ) {
+        throw new Error('Landing-Habitat connector topology is corrupt.');
+      }
+    }
+
+    if (this.recentDismantles.length > MAX_RETAINED_DISMANTLES) {
+      throw new Error('Dismantle operation retention is corrupt.');
+    }
+    const dismantleIds = new Set<string>();
+    for (const record of this.recentDismantles) {
+      if (
+        record.operationId.length === 0
+        || record.commandFingerprint.length === 0
+        || record.structureId.length === 0
+        || dismantleIds.has(record.operationId)
+      ) {
+        throw new Error('Dismantle operation record is corrupt.');
+      }
+      dismantleIds.add(record.operationId);
     }
 
     for (const condenser of this.condensers.values()) {

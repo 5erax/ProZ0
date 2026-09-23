@@ -905,3 +905,234 @@ describe('Dismantle and reconstruction', () => {
     });
   });
 });
+
+
+describe('Technical review corrections', () => {
+  it('binds the full placement OperationId payload live and after reconstruction', () => {
+    const ctx = setup([
+      stack('crate-kit', 'item:storage-crate-kit'),
+    ]);
+    const command = {
+      operationId: 'place:fingerprint',
+      actorPlayerId: 'p1',
+      structureDefinitionId: 'structure:storage-crate' as const,
+      sourceKitStackId: 'crate-kit',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      expectedBuildRevision: 0,
+      placement: {
+        mode: 'free' as const,
+        anchor: createWorldPosition(2.5, 0),
+        orientationQuarterTurns: 0 as const,
+      },
+    };
+    expect(ctx.building.place(command)).toMatchObject({ status: 'committed' });
+    expect(ctx.building.place({
+      ...command,
+      sourceKitStackId: 'different-kit',
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+
+    const buildings2 = new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      ctx.buildings.exportSnapshot(),
+    );
+    const items2 = new Phase1ItemAuthority({
+      catalog: ctx.catalog,
+      world: new BuildingItemWorldAdapter(
+        new Phase1ItemTestWorld(),
+        buildings2,
+      ),
+      initialLedger: ctx.items.exportLedgerSnapshot(),
+    });
+    const building2 = new Phase1BuildingAuthority(
+      ctx.catalog,
+      items2,
+      buildings2,
+    );
+    expect(building2.place(command)).toMatchObject({ status: 'committed' });
+    expect(building2.place({
+      ...command,
+      expectedBuildRevision: 99,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+  });
+
+  it('binds dismantle OperationId to the original target live and after reconstruction', () => {
+    const ctx = setup([
+      stack('crate-kit-a', 'item:storage-crate-kit'),
+      stack('crate-kit-b', 'item:storage-crate-kit'),
+    ]);
+    const first = placeFree(ctx, {
+      operationId: 'place:dismantle-a',
+      definitionId: 'structure:storage-crate',
+      kitStackId: 'crate-kit-a',
+      inventoryRevision: 0,
+      buildRevision: 0,
+      x: 2.5,
+      y: 0,
+    });
+    const second = placeFree(ctx, {
+      operationId: 'place:dismantle-b',
+      definitionId: 'structure:storage-crate',
+      kitStackId: 'crate-kit-b',
+      inventoryRevision: 1,
+      buildRevision: 1,
+      x: -2.5,
+      y: 0,
+    });
+    if (first.status !== 'committed' || second.status !== 'committed') {
+      throw new Error('Expected two Storage Crates.');
+    }
+    const command = {
+      operationId: 'dismantle:bound-target',
+      actorPlayerId: 'p1',
+      structureId: first.structure.structureId,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 2,
+      expectedStructureRevision: 0,
+      expectedBuildRevision: 2,
+    };
+    expect(ctx.building.dismantle(command)).toMatchObject({
+      status: 'committed',
+    });
+    expect(ctx.building.dismantle({
+      ...command,
+      structureId: second.structure.structureId,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+
+    const buildings2 = new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      ctx.buildings.exportSnapshot(),
+    );
+    const items2 = new Phase1ItemAuthority({
+      catalog: ctx.catalog,
+      world: new BuildingItemWorldAdapter(
+        new Phase1ItemTestWorld(),
+        buildings2,
+      ),
+      initialLedger: ctx.items.exportLedgerSnapshot(),
+    });
+    const building2 = new Phase1BuildingAuthority(
+      ctx.catalog,
+      items2,
+      buildings2,
+    );
+    expect(building2.dismantle(command)).toMatchObject({
+      status: 'committed',
+      structureId: first.structure.structureId,
+    });
+    expect(building2.dismantle({
+      ...command,
+      structureId: second.structure.structureId,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+  });
+
+  it('fails closed on missing, disconnected, or mismatched connector topology', () => {
+    const base = setup([]);
+    const baseSnapshot = base.buildings.exportSnapshot();
+    expect(() => new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      {
+        foothold: {
+          ...baseSnapshot.foothold,
+          connectors: baseSnapshot.foothold.connectors.filter(
+            (connector) => connector.connectorId !== 'connector:landing:north',
+          ),
+        },
+      },
+    )).toThrow(/connector topology/i);
+
+    const habitat = setup([
+      stack('habitat-kit', 'item:habitat-kit'),
+    ]);
+    expect(habitat.building.place({
+      operationId: 'place:topology-habitat',
+      actorPlayerId: 'p1',
+      structureDefinitionId: 'structure:habitat-room',
+      sourceKitStackId: 'habitat-kit',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      expectedBuildRevision: 0,
+      placement: {
+        mode: 'connector',
+        targetConnectorId: 'connector:landing:east',
+        requestedOrientationQuarterTurns: 0,
+      },
+    })).toMatchObject({ status: 'committed' });
+    const snapshot = habitat.buildings.exportSnapshot();
+
+    expect(() => new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      {
+        foothold: {
+          ...snapshot.foothold,
+          connections: [],
+        },
+      },
+    )).toThrow(/connector|connection/i);
+
+    expect(() => new Phase1BuildingWorld(
+      new Phase1BuildingTestSpatial(),
+      {
+        foothold: {
+          ...snapshot.foothold,
+          connectors: snapshot.foothold.connectors.map((connector) =>
+            connector.structureId === 'structure-instance:place:topology-habitat'
+              ? { ...connector, occupiedByConnectionId: null }
+              : connector,
+          ),
+        },
+      },
+    )).toThrow(/connector|connection/i);
+  });
+
+  it('returns item-first placement failures when item and world state are invalid together', () => {
+    const missingKit = setup([
+      stack('crate-kit', 'item:storage-crate-kit'),
+    ]);
+    missingKit.spatial.explored = false;
+    expect(placeFree(missingKit, {
+      operationId: 'place:item-first-missing',
+      definitionId: 'structure:storage-crate',
+      kitStackId: 'missing-kit',
+      inventoryRevision: 0,
+      buildRevision: 99,
+      x: 2.5,
+      y: 0,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'KIT_UNAVAILABLE',
+    });
+
+    const staleInventory = setup([
+      stack('crate-kit', 'item:storage-crate-kit'),
+    ]);
+    staleInventory.spatial.explored = false;
+    expect(placeFree(staleInventory, {
+      operationId: 'place:item-first-stale',
+      definitionId: 'structure:storage-crate',
+      kitStackId: 'crate-kit',
+      inventoryRevision: 99,
+      buildRevision: 99,
+      x: 2.5,
+      y: 0,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'STALE_REVISION',
+    });
+    expect(staleInventory.buildings.getBuildRevision()).toBe(0);
+    expect(staleInventory.items.getContainerView('inventory:p1').revision)
+      .toBe(0);
+  });
+});

@@ -329,6 +329,26 @@ function removedIdsStillAbsent(
   return [...removed].sort(compareStrings);
 }
 
+function placementBuildingItemSignature(
+  request: PlacementItemCommitRequest,
+): string {
+  return JSON.stringify([
+    'placement-items',
+    request.operationId,
+    request.playerId,
+    request.inventoryContainerId,
+    request.expectedInventoryRevision,
+    request.sourceKitStackId,
+    request.expectedKitItemDefinitionId,
+    request.createContainer === null
+      ? null
+      : [
+          request.createContainer.containerId,
+          request.createContainer.kind,
+        ],
+  ]);
+}
+
 function createdIds(
   mutationResults: readonly LedgerMutationResult[],
 ): readonly ItemStackId[] {
@@ -537,24 +557,52 @@ export class Phase1ItemAuthority {
     return result;
   }
 
+  public validatePlacementItems(
+    request: PlacementItemCommitRequest,
+  ): BuildingItemRejectionReason | null {
+    const signature = placementBuildingItemSignature(request);
+    const cached = this.resolveBuildingOperation(request.operationId, signature);
+    if (cached !== null) {
+      return cached.status === 'rejected' ? cached.reason : null;
+    }
+
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(request.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== request.playerId
+    ) {
+      return 'SOURCE_MISSING';
+    }
+
+    const kit = draft.requireStack(
+      request.inventoryContainerId,
+      request.sourceKitStackId,
+    );
+    if (
+      kit === null
+      || kit.itemDefinitionId !== request.expectedKitItemDefinitionId
+      || kit.quantity < 1
+    ) {
+      return 'KIT_UNAVAILABLE';
+    }
+    if (inventory.revision !== request.expectedInventoryRevision) {
+      return 'STALE_REVISION';
+    }
+    if (
+      request.createContainer !== null
+      && draft.getContainer(request.createContainer.containerId) !== null
+    ) {
+      return 'OPERATION_ID_CONFLICT';
+    }
+    return null;
+  }
+
   public commitPlacementItems(
     request: PlacementItemCommitRequest,
   ): BuildingItemCommitResult {
-    const signature = JSON.stringify([
-      'placement-items',
-      request.operationId,
-      request.playerId,
-      request.inventoryContainerId,
-      request.expectedInventoryRevision,
-      request.sourceKitStackId,
-      request.expectedKitItemDefinitionId,
-      request.createContainer === null
-        ? null
-        : [
-            request.createContainer.containerId,
-            request.createContainer.kind,
-          ],
-    ]);
+    const signature = placementBuildingItemSignature(request);
     const cached = this.resolveBuildingOperation(request.operationId, signature);
     if (cached !== null) return cached;
 
@@ -571,13 +619,6 @@ export class Phase1ItemAuthority {
         'SOURCE_MISSING',
       );
     }
-    if (inventory.revision !== request.expectedInventoryRevision) {
-      return this.cacheBuildingRejected(
-        request.operationId,
-        signature,
-        'STALE_REVISION',
-      );
-    }
 
     const kit = draft.requireStack(
       request.inventoryContainerId,
@@ -592,6 +633,13 @@ export class Phase1ItemAuthority {
         request.operationId,
         signature,
         'KIT_UNAVAILABLE',
+      );
+    }
+    if (inventory.revision !== request.expectedInventoryRevision) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'STALE_REVISION',
       );
     }
 

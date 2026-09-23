@@ -47,6 +47,7 @@ export interface StructureRuntimeState {
   readonly orientationQuarterTurns: QuarterTurn;
   readonly placedByPlayerId: PlayerId | null;
   readonly containerId: string | null;
+  readonly placementOperationFingerprint: string | null;
 }
 
 export interface CondenserRuntimeState {
@@ -65,6 +66,12 @@ export interface PowerNetworkState {
   readonly grantedConsumerIds: readonly StructureId[];
 }
 
+export interface CommittedDismantleOperation {
+  readonly operationId: string;
+  readonly commandFingerprint: string;
+  readonly structureId: StructureId;
+}
+
 export interface FootholdBuildState {
   readonly footholdId: FootholdId;
   readonly buildRevision: number;
@@ -73,6 +80,7 @@ export interface FootholdBuildState {
   readonly connections: readonly StructureConnection[];
   readonly power: PowerNetworkState;
   readonly condensers: readonly CondenserRuntimeState[];
+  readonly recentDismantles: readonly CommittedDismantleOperation[];
 }
 
 export type PlacementRejectionReason =
@@ -118,6 +126,7 @@ export type PlacementIntent =
 
 export interface PlacementReservation {
   readonly operationId: string;
+  readonly commandFingerprint: string;
   readonly actorPlayerId: PlayerId;
   readonly footholdId: FootholdId;
   readonly expectedBuildRevision: number;
@@ -134,6 +143,7 @@ export interface PlacementReservation {
 
 export interface DismantleReservation {
   readonly operationId: string;
+  readonly commandFingerprint: string;
   readonly actorPlayerId: PlayerId;
   readonly footholdId: FootholdId;
   readonly expectedBuildRevision: number;

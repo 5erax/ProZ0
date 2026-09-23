@@ -79,6 +79,18 @@ interface Cached<T> {
 }
 
 function placeSignature(command: PlaceStructureCommand): string {
+  const placementFingerprint = command.placement.mode === 'free'
+    ? [
+        'free',
+        command.placement.anchor.x,
+        command.placement.anchor.y,
+        command.placement.orientationQuarterTurns,
+      ]
+    : [
+        'connector',
+        command.placement.targetConnectorId,
+        command.placement.requestedOrientationQuarterTurns,
+      ];
   return JSON.stringify([
     command.operationId,
     command.actorPlayerId,
@@ -87,7 +99,7 @@ function placeSignature(command: PlaceStructureCommand): string {
     command.inventoryContainerId,
     command.expectedInventoryRevision,
     command.expectedBuildRevision,
-    command.placement,
+    placementFingerprint,
   ]);
 }
 
@@ -120,14 +132,7 @@ export class Phase1BuildingAuthority {
     const structureId = `structure-instance:${command.operationId}`;
     const existingStructure = this.world.getStructure(structureId);
     if (existingStructure !== null) {
-      if (
-        existingStructure.definitionId !== command.structureDefinitionId
-        || existingStructure.placedByPlayerId !== command.actorPlayerId
-        || !this.world.matchesCommittedPlacement(
-          structureId,
-          command.placement,
-        )
-      ) {
+      if (existingStructure.placementOperationFingerprint !== signature) {
         return Object.freeze({
           status: 'rejected',
           operationId: command.operationId,
@@ -182,8 +187,47 @@ export class Phase1BuildingAuthority {
       });
     }
 
+    const expectedContainerId =
+      command.structureDefinitionId === 'structure:storage-crate'
+        ? `container:${structureId}:storage`
+        : command.structureDefinitionId
+            === 'structure:atmospheric-water-condenser'
+          ? `container:${structureId}:output`
+          : null;
+    const createContainer =
+      command.structureDefinitionId === 'structure:storage-crate'
+        ? {
+            containerId: expectedContainerId!,
+            kind: 'storage-crate' as const,
+          }
+        : command.structureDefinitionId
+            === 'structure:atmospheric-water-condenser'
+          ? {
+              containerId: expectedContainerId!,
+              kind: 'machine-output' as const,
+            }
+          : null;
+    const itemRequest = {
+      operationId: command.operationId,
+      playerId: command.actorPlayerId,
+      inventoryContainerId: command.inventoryContainerId,
+      expectedInventoryRevision: command.expectedInventoryRevision,
+      sourceKitStackId: command.sourceKitStackId,
+      expectedKitItemDefinitionId: definition.sourceKitItemId,
+      createContainer,
+    };
+    const itemFailure = this.items.validatePlacementItems(itemRequest);
+    if (itemFailure !== null) {
+      return this.cachePlace(command.operationId, signature, {
+        status: 'rejected',
+        operationId: command.operationId,
+        reason: itemFailure,
+      });
+    }
+
     const reservation = this.world.reservePlacement({
       operationId: command.operationId,
+      commandFingerprint: signature,
       actorPlayerId: command.actorPlayerId,
       definitionId: command.structureDefinitionId,
       expectedBuildRevision: command.expectedBuildRevision,
@@ -196,30 +240,11 @@ export class Phase1BuildingAuthority {
         reason: reservation,
       });
     }
+    if (reservation.containerId !== expectedContainerId) {
+      throw new Error('Reserved placement container identity drifted.');
+    }
 
-    const createContainer =
-      command.structureDefinitionId === 'structure:storage-crate'
-        ? {
-            containerId: reservation.containerId!,
-            kind: 'storage-crate' as const,
-          }
-        : command.structureDefinitionId
-            === 'structure:atmospheric-water-condenser'
-          ? {
-              containerId: reservation.containerId!,
-              kind: 'machine-output' as const,
-            }
-          : null;
-
-    const itemResult = this.items.commitPlacementItems({
-      operationId: command.operationId,
-      playerId: command.actorPlayerId,
-      inventoryContainerId: command.inventoryContainerId,
-      expectedInventoryRevision: command.expectedInventoryRevision,
-      sourceKitStackId: command.sourceKitStackId,
-      expectedKitItemDefinitionId: definition.sourceKitItemId,
-      createContainer,
-    });
+    const itemResult = this.items.commitPlacementItems(itemRequest);
     if (itemResult.status !== 'committed') {
       this.world.releasePlacementReservation(reservation);
       return this.cachePlace(command.operationId, signature, {
@@ -243,25 +268,25 @@ export class Phase1BuildingAuthority {
     command: DismantleStructureCommand,
   ): DismantleStructureResult {
     const signature = dismantleSignature(command);
-    if (this.world.getStructure(command.structureId) === null) {
+    const committed = this.world.getCommittedDismantle(command.operationId);
+    if (committed !== null) {
+      if (committed.commandFingerprint !== signature) {
+        return Object.freeze({
+          status: 'rejected',
+          operationId: command.operationId,
+          reason: 'OPERATION_ID_CONFLICT',
+        });
+      }
       const inventory = this.items.getContainerView(
         command.inventoryContainerId,
       );
-      const returnedStackId =
-        `generated-stack:${command.operationId}:0`;
-      if (
-        inventory.stacks.some(
-          (stack) => stack.stackId === returnedStackId,
-        )
-      ) {
-        return Object.freeze({
-          status: 'committed',
-          operationId: command.operationId,
-          structureId: command.structureId,
-          buildRevision: this.world.getBuildRevision(),
-          inventoryRevision: inventory.revision,
-        });
-      }
+      return Object.freeze({
+        status: 'committed',
+        operationId: command.operationId,
+        structureId: committed.structureId,
+        buildRevision: this.world.getBuildRevision(),
+        inventoryRevision: inventory.revision,
+      });
     }
 
     const cached = this.dismantles.get(command.operationId);
@@ -271,12 +296,13 @@ export class Phase1BuildingAuthority {
         : Object.freeze({
             status: 'rejected',
             operationId: command.operationId,
-            reason: 'WORLD_STATE_CHANGED',
+            reason: 'OPERATION_ID_CONFLICT',
           });
     }
 
     const reservation = this.world.reserveDismantle({
       operationId: command.operationId,
+      commandFingerprint: signature,
       actorPlayerId: command.actorPlayerId,
       structureId: command.structureId,
       expectedStructureRevision: command.expectedStructureRevision,
