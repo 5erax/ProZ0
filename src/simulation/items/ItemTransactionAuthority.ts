@@ -6,12 +6,7 @@ import {
   type RecipeDefinitionV1,
   type ResourceNodeDefinitionV1,
 } from '../../content';
-import type {
-  ItemInteractionWorldPort,
-  ResourceNodeView,
-  WorkbenchView,
-  WorldDropView,
-} from '../../world';
+import type { ItemInteractionWorldPort } from '../../world';
 import {
   NOOP_GATHER_COST_PORT,
   type GatherCostPort,
@@ -362,7 +357,7 @@ export class Phase1ItemAuthority {
         return Object.freeze({
           status: 'resolved',
           result: cached.result,
-        }) as GatherStartResult;
+        });
       }
       return Object.freeze({
         status: 'rejected',
@@ -710,27 +705,18 @@ export class Phase1ItemAuthority {
       return rejected(command.operationId, 'STACK_INCOMPATIBLE');
     }
 
-    const sourceCopy = { ...source };
-    const removal = draft.removeQuantity(
-      command.containerId,
-      command.sourceStackId,
-      command.quantity,
-    );
-    if (typeof removal === 'string') {
-      return rejected(command.operationId, removal);
+    const newStackId = createdStackId(command.operationId, 0);
+    if (draft.getStackIds().has(newStackId)) {
+      return rejected(command.operationId, 'OPERATION_ID_CONFLICT');
     }
 
-    const insertion = draft.insert({
-      containerId: command.containerId,
-      itemDefinitionId: sourceCopy.itemDefinitionId,
+    source.quantity -= command.quantity;
+    container.stacks.push({
+      stackId: newStackId,
+      itemDefinitionId: source.itemDefinitionId,
       quantity: command.quantity,
       condition: null,
-      operationId: command.operationId,
-      generatedOrdinal: 0,
     });
-    if (typeof insertion === 'string') {
-      return rejected(command.operationId, insertion);
-    }
 
     const revision = draft.incrementRevision(command.containerId);
     this.ledger.publish(draft);
@@ -739,8 +725,8 @@ export class Phase1ItemAuthority {
       command.operationId,
       [{ containerId: command.containerId, revision }],
       [],
-      createdIds([removal, insertion]),
-      removedIdsStillAbsent(draft.getStackIds(), [removal, insertion]),
+      [newStackId],
+      [],
     );
   }
 
@@ -1603,15 +1589,6 @@ export class Phase1ItemAuthority {
     }));
 
     return this.cacheGatherResult(channel, result);
-  }
-
-  private validateGatherResourceIdentity(
-    resource: Readonly<ResourceNodeView>,
-    expected: Readonly<ResourceNodeDefinitionV1>,
-  ): TransactionRejectionReason | null {
-    return resource.resourceDefinitionId === expected.id
-      ? null
-      : 'SOURCE_MISSING';
   }
 
   private cacheGatherResult(
