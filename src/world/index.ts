@@ -110,3 +110,12 @@ export type {
   PredatorWorldView,
   SurvivalWorldPort,
 } from './api/SurvivalWorld';
+
+export {
+  DEATH_CACHE_SEARCH_MAX_STEPS,
+  DEATH_CACHE_SEARCH_STEP_WORLD_UNITS,
+  DeathCacheWorldState,
+  resolveDeathCachePlacement,
+  type DeathCachePlacementResolver,
+  type DeathCacheWorldSnapshot,
+} from './phase1/DeathCacheWorldState';
