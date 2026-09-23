@@ -39,6 +39,7 @@ export function buildingSnapshotToRecordsV2(
       position: Object.freeze({ ...structure.position }),
       orientationQuarterTurns: structure.orientationQuarterTurns,
       placedByPlayerId: structure.placedByPlayerId,
+      placementOperationFingerprint: structure.placementOperationFingerprint,
       outputContainerId: condenser?.outputContainerId ?? null,
       machine: condenser === null ? null : Object.freeze({
         enabled: condenser.enabled,
@@ -96,7 +97,7 @@ export function recordsV2ToBuildingSnapshot(
       : record.structureDefinitionId === 'structure:storage-crate'
         ? linkedContainers.get(record.structureId) ?? null
         : null,
-    placementOperationFingerprint: null,
+    placementOperationFingerprint: record.placementOperationFingerprint,
   }));
 
   const connectorMap = new Map<string, ConnectorState>();
