@@ -1029,8 +1029,11 @@ export class Phase1BuildingWorld {
       if (
         structure.definitionId === 'structure:landing-module'
           ? structure.placementOperationFingerprint !== null
-          : typeof structure.placementOperationFingerprint !== 'string'
-            || structure.placementOperationFingerprint.length === 0
+          : structure.placementOperationFingerprint !== null
+            && (
+              typeof structure.placementOperationFingerprint !== 'string'
+              || structure.placementOperationFingerprint.length === 0
+            )
       ) {
         throw new Error('Structure operation fingerprint is corrupt.');
       }
