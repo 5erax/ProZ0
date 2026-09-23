@@ -98,7 +98,6 @@ function deterministicSequence(prefix: string): () => string {
 
 function hello(
   resumeCredential?: string,
-  mutate: Partial<ClientHelloV1> = {},
 ): ClientHelloV1 {
   const catalog = createPhase1ContentCatalog();
   return Object.freeze({
@@ -112,7 +111,6 @@ function hello(
       seedDerivationVersion: SEED_DERIVATION_VERSION,
     }),
     ...(resumeCredential === undefined ? {} : { resumeCredential }),
-    ...mutate,
   });
 }
 
