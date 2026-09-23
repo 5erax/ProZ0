@@ -47,6 +47,7 @@ export interface PredatorWorldView {
 export interface SurvivalWorldPort {
   getPlayerPosition(playerId: PlayerId): WorldPosition;
   getRespawnAnchor(playerId: PlayerId): WorldPosition;
+  commitPlayerRespawnPosition(playerId: PlayerId, position: WorldPosition): void;
   getEnvironmentExposure(playerId: PlayerId): Readonly<EnvironmentExposureView>;
 
   reserveDeathCachePlacement(request: {
