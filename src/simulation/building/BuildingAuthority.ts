@@ -117,6 +117,25 @@ export class Phase1BuildingAuthority {
 
   public place(command: PlaceStructureCommand): PlaceStructureResult {
     const signature = placeSignature(command);
+    const structureId = `structure-instance:${command.operationId}`;
+    const existingStructure = this.world.getStructure(structureId);
+    if (
+      existingStructure !== null
+      && existingStructure.definitionId === command.structureDefinitionId
+      && existingStructure.placedByPlayerId === command.actorPlayerId
+    ) {
+      const inventory = this.items.getContainerView(
+        command.inventoryContainerId,
+      );
+      return Object.freeze({
+        status: 'committed',
+        operationId: command.operationId,
+        structure: existingStructure,
+        buildRevision: this.world.getBuildRevision(),
+        inventoryRevision: inventory.revision,
+      });
+    }
+
     const cached = this.placements.get(command.operationId);
     if (cached !== undefined) {
       return cached.signature === signature
@@ -213,6 +232,27 @@ export class Phase1BuildingAuthority {
     command: DismantleStructureCommand,
   ): DismantleStructureResult {
     const signature = dismantleSignature(command);
+    if (this.world.getStructure(command.structureId) === null) {
+      const inventory = this.items.getContainerView(
+        command.inventoryContainerId,
+      );
+      const returnedStackId =
+        `generated-stack:${command.operationId}:0`;
+      if (
+        inventory.stacks.some(
+          (stack) => stack.stackId === returnedStackId,
+        )
+      ) {
+        return Object.freeze({
+          status: 'committed',
+          operationId: command.operationId,
+          structureId: command.structureId,
+          buildRevision: this.world.getBuildRevision(),
+          inventoryRevision: inventory.revision,
+        });
+      }
+    }
+
     const cached = this.dismantles.get(command.operationId);
     if (cached !== undefined) {
       return cached.signature === signature
