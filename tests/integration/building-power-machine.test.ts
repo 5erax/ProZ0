@@ -275,6 +275,40 @@ describe('Phase 1 building placement', () => {
   });
 });
 
+  it('preserves all four authoritative quarter-turn orientations', () => {
+    const ctx = setup([
+      stack('crate-0', 'item:storage-crate-kit'),
+      stack('crate-1', 'item:storage-crate-kit'),
+      stack('crate-2', 'item:storage-crate-kit'),
+      stack('crate-3', 'item:storage-crate-kit'),
+    ]);
+    const placements = [
+      { x: 2.5, y: 0, orientation: 0 as const },
+      { x: -2.5, y: 0, orientation: 1 as const },
+      { x: 0, y: 2.5, orientation: 2 as const },
+      { x: 0, y: -2.5, orientation: 3 as const },
+    ];
+
+    placements.forEach((placement, index) => {
+      const result = placeFree(ctx, {
+        operationId: `place:rotation:${index}`,
+        definitionId: 'structure:storage-crate',
+        kitStackId: `crate-${index}`,
+        inventoryRevision: index,
+        buildRevision: index,
+        x: placement.x,
+        y: placement.y,
+        orientation: placement.orientation,
+      });
+      expect(result).toMatchObject({
+        status: 'committed',
+        structure: {
+          orientationQuarterTurns: placement.orientation,
+        },
+      });
+    });
+  });
+
 describe('Storage and Workbench integration', () => {
   it('placed Storage Crate becomes the canonical shared item container', () => {
     const ctx = setup([
@@ -590,6 +624,79 @@ describe('Dismantle and reconstruction', () => {
       reason:'CONTAINER_NOT_EMPTY',
     });
     expect(ctx.items.exportLedgerSnapshot()).toEqual(before);
+    expect(ctx.buildings.getStructure(placed.structure.structureId))
+      .not.toBeNull();
+  });
+
+  it('successful dismantle returns exactly one original Kit', () => {
+    const ctx = setup([
+      stack('workbench-kit', 'item:workbench-kit'),
+    ]);
+    const placed = placeFree(ctx, {
+      operationId: 'place:workbench-refund',
+      definitionId: 'structure:workbench',
+      kitStackId: 'workbench-kit',
+      inventoryRevision: 0,
+      buildRevision: 0,
+      x: 2.5,
+      y: 0,
+    });
+    if (placed.status !== 'committed') throw new Error('Expected Workbench.');
+
+    expect(ctx.building.dismantle({
+      operationId: 'dismantle:workbench-refund',
+      actorPlayerId: 'p1',
+      structureId: placed.structure.structureId,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 1,
+      expectedStructureRevision: 0,
+      expectedBuildRevision: 1,
+    })).toMatchObject({ status: 'committed' });
+
+    const kits = ctx.items
+      .getContainerView('inventory:p1')
+      .stacks.filter(
+        (entry) => entry.itemDefinitionId === 'item:workbench-kit',
+      );
+    expect(kits).toHaveLength(1);
+    expect(kits[0]?.quantity).toBe(1);
+    expect(ctx.buildings.getStructure(placed.structure.structureId))
+      .toBeNull();
+  });
+
+  it('Habitat dismantle rejects while a player is inside', () => {
+    const ctx = setup([
+      stack('habitat-kit', 'item:habitat-kit'),
+    ]);
+    const placed = ctx.building.place({
+      operationId: 'place:habitat-inside',
+      actorPlayerId: 'p1',
+      structureDefinitionId: 'structure:habitat-room',
+      sourceKitStackId: 'habitat-kit',
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 0,
+      expectedBuildRevision: 0,
+      placement: {
+        mode: 'connector',
+        targetConnectorId: 'connector:landing:east',
+        requestedOrientationQuarterTurns: 0,
+      },
+    });
+    if (placed.status !== 'committed') throw new Error('Expected Habitat.');
+    ctx.spatial.playerInside = true;
+
+    expect(ctx.building.dismantle({
+      operationId: 'dismantle:habitat-inside',
+      actorPlayerId: 'p1',
+      structureId: placed.structure.structureId,
+      inventoryContainerId: 'inventory:p1',
+      expectedInventoryRevision: 1,
+      expectedStructureRevision: 0,
+      expectedBuildRevision: 1,
+    })).toMatchObject({
+      status: 'rejected',
+      reason: 'PLAYER_INSIDE',
+    });
     expect(ctx.buildings.getStructure(placed.structure.structureId))
       .not.toBeNull();
   });
