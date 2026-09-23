@@ -312,7 +312,7 @@ function expeditionResourceEntities(
     }
     catalog.getAs(definitionId, 'resource');
 
-    let localX = 4 + (rng.nextUint32() % 24000) / 1000;
+    const localX = 4 + (rng.nextUint32() % 24000) / 1000;
     let localY = 4 + (rng.nextUint32() % 24000) / 1000;
     let position = createWorldPosition(
       coord.x * CHUNK_SPAN_WORLD_UNITS + localX,
