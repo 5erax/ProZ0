@@ -4,6 +4,7 @@ import type {
   DeathCachePlacementReservation,
   DeathCacheWorldView,
   PredatorCombatState,
+  RespawnPlacementReservation,
   PredatorWorldView,
   SurvivalWorldPort,
 } from '../../src/world';
@@ -39,6 +40,7 @@ export class Phase1SurvivalTestWorld
   public thermalTarget = 50;
   public sheltered = false;
   public deathPlacementOffsetX = 0;
+  public respawnAvailable = true;
 
   public setPlayerPosition(playerId: PlayerId, position: WorldPosition): void {
     this.playerPositions.set(playerId, position);
@@ -52,16 +54,24 @@ export class Phase1SurvivalTestWorld
     return this.playerPositions.get(playerId) ?? createWorldPosition(0, 0);
   }
 
-  public getRespawnAnchor(playerId: PlayerId): WorldPosition {
-    void playerId;
-    return createWorldPosition(0, 0);
+  public reservePlayerRespawn(
+    playerId: PlayerId,
+  ): Readonly<RespawnPlacementReservation> | null {
+    if (!this.respawnAvailable) return null;
+    return Object.freeze({
+      token: `respawn:${playerId}`,
+      playerId,
+      position: createWorldPosition(0, 0),
+    });
   }
 
-  public commitPlayerRespawnPosition(
-    playerId: PlayerId,
-    position: WorldPosition,
+  public commitReservedPlayerRespawn(
+    reservation: Readonly<RespawnPlacementReservation>,
   ): void {
-    this.playerPositions.set(playerId, position);
+    this.playerPositions.set(
+      reservation.playerId,
+      reservation.position,
+    );
   }
 
   public getEnvironmentExposure(playerId: PlayerId) {
