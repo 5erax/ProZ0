@@ -119,7 +119,8 @@ function actorMismatch(payload: JsonValue, playerId: string): boolean {
   if (payload === null || Array.isArray(payload) || typeof payload !== 'object') {
     return false;
   }
-  const actor = payload.playerId;
+  const object = payload as { readonly [key: string]: JsonValue };
+  const actor = object.playerId;
   return actor !== undefined && actor !== playerId;
 }
 
