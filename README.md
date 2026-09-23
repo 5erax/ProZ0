@@ -32,6 +32,12 @@ Short activities take minutes; expeditions take 30–120 minutes; the long-term 
 - Offline time is resolved on world re-open: machines do not produce while offline, but require maintenance and may accumulate dust, wear, and state changes.
 - PvE combat is purposeful and moderate: wildlife, alien nests, environmental events, and expedition danger.
 
+## Developer setup
+
+For the current clean-checkout build/test path, start with [Phase 0 browser runtime workflow](docs/development/phase-0-runtime.md). It documents dependency installation, Playwright Chromium/system provisioning, aggregate verification, local development, and production preview.
+
+The repository-proven parity path is the Ubuntu/GitHub-Actions path. Non-Ubuntu host provisioning is not fully defined by the repository. For exact CI evidence, commit-to-run traceability, and known reproducibility limitations, see the [Phase 1 Build & CI Reproducibility Audit](docs/technical/phase-1-build-ci-reproducibility-audit.md).
+
 ## Documentation
 
 The design and implementation scope live in [`docs/`](docs/):
