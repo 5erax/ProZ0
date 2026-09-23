@@ -89,15 +89,15 @@ describe('Save V2 canonical runtime mapper round-trips', () => {
         'first-ruin-locate:previous-civilization-ruin',
       ]),
       repeatCounts: Object.freeze({ gather: 2, craft: 1, repair: 0 }),
-      skillIds: Object.freeze(['skill:fieldcraft-basics']),
+      skillIds: Object.freeze(['skill:fieldcraft-basics'] as const),
       questStates: Object.freeze([
         Object.freeze({
-          questId: 'profession-quest:chart-the-unknown',
+          questId: 'profession-quest:chart-the-unknown' as const,
           completedObjectives: 3,
           completed: true,
         }),
       ]),
-      professionIds: Object.freeze(['profession:explorer-prototype']),
+      professionIds: Object.freeze(['profession:explorer-prototype'] as const),
       eventReceipts: Object.freeze([]),
     });
 
