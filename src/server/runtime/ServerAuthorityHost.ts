@@ -171,10 +171,15 @@ export class ServerAuthorityHost {
   ): readonly HostedOutboundMessage[] {
     const parsed = parseClientEnvelopeV1(text);
     if (!parsed.ok) {
-      return this.singleUnauthenticatedError(
-        transportId,
-        parsed.reason,
-      );
+      return parsed.reason === 'PROTOCOL_MISMATCH'
+        ? this.singleUnauthenticatedRejection(
+            transportId,
+            'PROTOCOL_MISMATCH',
+          )
+        : this.singleUnauthenticatedError(
+            transportId,
+            parsed.reason,
+          );
     }
 
     const envelope = parsed.value;
