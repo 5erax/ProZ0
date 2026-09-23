@@ -42,6 +42,14 @@ export type {
 } from './ItemCommands';
 
 export type {
+  BuildingItemCommitResult,
+  BuildingItemRejectionReason,
+  DismantleItemCommitRequest,
+  MachineOutputCommitRequest,
+  PlacementItemCommitRequest,
+} from './BuildingItemTransaction';
+
+export type {
   GatherStartResult,
   GatherTickResult,
   ItemTransactionResult,
