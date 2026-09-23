@@ -120,3 +120,5 @@ export {
   type DeathCachePlacementResolver,
   type DeathCacheWorldSnapshot,
 } from './phase1/DeathCacheWorldState';
+
+export * from './building';

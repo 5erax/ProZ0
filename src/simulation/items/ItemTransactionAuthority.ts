@@ -41,6 +41,13 @@ import type {
   DeathCacheItemCommitResult,
 } from './DeathItemTransaction';
 import type {
+  BuildingItemCommitResult,
+  BuildingItemRejectionReason,
+  DismantleItemCommitRequest,
+  MachineOutputCommitRequest,
+  PlacementItemCommitRequest,
+} from './BuildingItemTransaction';
+import type {
   GatherStartResult,
   GatherTickResult,
   ItemTransactionResult,
@@ -344,6 +351,11 @@ export class Phase1ItemAuthority {
       readonly signature: string;
       readonly result: DeathCacheItemCommitResult;
     }>();
+  private readonly processedBuildingOperations =
+    new Map<OperationId, {
+      readonly signature: string;
+      readonly result: BuildingItemCommitResult;
+    }>();
   private readonly pendingAuthorityEvents: ItemAuthorityEvent[] = [];
   private readonly activeGathersByPlayer = new Map<PlayerId, ActiveGatherChannel>();
   private readonly activeGatherOperationSignatures = new Map<OperationId, string>();
@@ -522,6 +534,310 @@ export class Phase1ItemAuthority {
       penalizedStackIds: Object.freeze([...penalized].sort(compareStrings)),
     });
     this.processedDeathMoves.set(request.deathId, { signature, result });
+    return result;
+  }
+
+  public commitPlacementItems(
+    request: PlacementItemCommitRequest,
+  ): BuildingItemCommitResult {
+    const signature = JSON.stringify([
+      'placement-items',
+      request.operationId,
+      request.playerId,
+      request.inventoryContainerId,
+      request.expectedInventoryRevision,
+      request.sourceKitStackId,
+      request.expectedKitItemDefinitionId,
+      request.createContainer === null
+        ? null
+        : [
+            request.createContainer.containerId,
+            request.createContainer.kind,
+          ],
+    ]);
+    const cached = this.resolveBuildingOperation(request.operationId, signature);
+    if (cached !== null) return cached;
+
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(request.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== request.playerId
+    ) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'SOURCE_MISSING',
+      );
+    }
+    if (inventory.revision !== request.expectedInventoryRevision) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'STALE_REVISION',
+      );
+    }
+
+    const kit = draft.requireStack(
+      request.inventoryContainerId,
+      request.sourceKitStackId,
+    );
+    if (
+      kit === null
+      || kit.itemDefinitionId !== request.expectedKitItemDefinitionId
+      || kit.quantity < 1
+    ) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'KIT_UNAVAILABLE',
+      );
+    }
+
+    if (request.createContainer !== null) {
+      const containerFailure = draft.createContainer({
+        containerId: request.createContainer.containerId,
+        kind: request.createContainer.kind,
+        ownerPlayerId: null,
+        revision: 0,
+        stacks: [],
+      });
+      if (containerFailure !== null) {
+        return this.cacheBuildingRejected(
+          request.operationId,
+          signature,
+          'OPERATION_ID_CONFLICT',
+        );
+      }
+    }
+
+    const removal = draft.removeQuantity(
+      request.inventoryContainerId,
+      request.sourceKitStackId,
+      1,
+    );
+    if (typeof removal === 'string') {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'KIT_UNAVAILABLE',
+      );
+    }
+
+    const inventoryRevision = draft.incrementRevision(
+      request.inventoryContainerId,
+    );
+    this.ledger.publish(draft);
+
+    const result: BuildingItemCommitResult = Object.freeze({
+      status: 'committed',
+      operationId: request.operationId,
+      inventoryRevision,
+      containerId: request.createContainer?.containerId ?? null,
+      containerRevision: request.createContainer === null ? null : 0,
+      createdStackIds: Object.freeze([...removal.createdStackIds]),
+      removedStackIds: Object.freeze([...removal.removedStackIds]),
+    });
+    this.processedBuildingOperations.set(request.operationId, {
+      signature,
+      result,
+    });
+    return result;
+  }
+
+  public commitDismantleItems(
+    request: DismantleItemCommitRequest,
+  ): BuildingItemCommitResult {
+    const signature = JSON.stringify([
+      'dismantle-items',
+      request.operationId,
+      request.playerId,
+      request.inventoryContainerId,
+      request.expectedInventoryRevision,
+      request.returnedKitItemDefinitionId,
+      request.removeContainerId,
+    ]);
+    const cached = this.resolveBuildingOperation(request.operationId, signature);
+    if (cached !== null) return cached;
+
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(request.inventoryContainerId);
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== request.playerId
+    ) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'SOURCE_MISSING',
+      );
+    }
+    if (inventory.revision !== request.expectedInventoryRevision) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'STALE_REVISION',
+      );
+    }
+
+    if (request.removeContainerId !== null) {
+      const linked = draft.getContainer(request.removeContainerId);
+      if (linked === null) {
+        return this.cacheBuildingRejected(
+          request.operationId,
+          signature,
+          'SOURCE_MISSING',
+        );
+      }
+      if (linked.stacks.length !== 0) {
+        return this.cacheBuildingRejected(
+          request.operationId,
+          signature,
+          'CONTAINER_NOT_EMPTY',
+        );
+      }
+    }
+
+    const insertion = draft.insert({
+      containerId: request.inventoryContainerId,
+      itemDefinitionId: request.returnedKitItemDefinitionId,
+      quantity: 1,
+      condition: null,
+      operationId: request.operationId,
+      generatedOrdinal: 0,
+    });
+    if (typeof insertion === 'string') {
+      const mapped: BuildingItemRejectionReason =
+        insertion === 'TARGET_CAPACITY_WEIGHT'
+          || insertion === 'TARGET_CAPACITY_VOLUME'
+          ? insertion
+          : 'OPERATION_ID_CONFLICT';
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        mapped,
+      );
+    }
+
+    if (
+      request.removeContainerId !== null
+      && !draft.removeContainer(request.removeContainerId)
+    ) {
+      throw new Error('Validated linked building container disappeared.');
+    }
+
+    const inventoryRevision = draft.incrementRevision(
+      request.inventoryContainerId,
+    );
+    this.ledger.publish(draft);
+
+    const result: BuildingItemCommitResult = Object.freeze({
+      status: 'committed',
+      operationId: request.operationId,
+      inventoryRevision,
+      containerId: request.removeContainerId,
+      containerRevision: null,
+      createdStackIds: Object.freeze([...insertion.createdStackIds]),
+      removedStackIds: Object.freeze([...insertion.removedStackIds]),
+    });
+    this.processedBuildingOperations.set(request.operationId, {
+      signature,
+      result,
+    });
+    return result;
+  }
+
+  public commitMachineOutput(
+    request: MachineOutputCommitRequest,
+  ): BuildingItemCommitResult {
+    const signature = JSON.stringify([
+      'machine-output',
+      request.operationId,
+      request.outputContainerId,
+      request.expectedOutputRevision,
+      request.itemDefinitionId,
+    ]);
+    const cached = this.resolveBuildingOperation(request.operationId, signature);
+    if (cached !== null) return cached;
+
+    const draft = this.ledger.createDraft();
+    const output = draft.getContainer(request.outputContainerId);
+    if (output === null || output.kind !== 'machine-output') {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'SOURCE_MISSING',
+      );
+    }
+    if (output.revision !== request.expectedOutputRevision) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'STALE_REVISION',
+      );
+    }
+    if (
+      output.stacks.some(
+        (stack) => stack.itemDefinitionId !== request.itemDefinitionId,
+      )
+    ) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'OPERATION_ID_CONFLICT',
+      );
+    }
+
+    const currentCount = output.stacks.reduce(
+      (sum, stack) => sum + stack.quantity,
+      0,
+    );
+    if (currentCount >= 4) {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        'OUTPUT_FULL',
+      );
+    }
+
+    const insertion = draft.insert({
+      containerId: request.outputContainerId,
+      itemDefinitionId: request.itemDefinitionId,
+      quantity: 1,
+      condition: null,
+      operationId: request.operationId,
+      generatedOrdinal: 0,
+    });
+    if (typeof insertion === 'string') {
+      return this.cacheBuildingRejected(
+        request.operationId,
+        signature,
+        insertion === 'OPERATION_ID_CONFLICT'
+          ? 'OPERATION_ID_CONFLICT'
+          : 'OUTPUT_FULL',
+      );
+    }
+
+    const containerRevision = draft.incrementRevision(
+      request.outputContainerId,
+    );
+    this.ledger.publish(draft);
+
+    const result: BuildingItemCommitResult = Object.freeze({
+      status: 'committed',
+      operationId: request.operationId,
+      inventoryRevision: null,
+      containerId: request.outputContainerId,
+      containerRevision,
+      createdStackIds: Object.freeze([...insertion.createdStackIds]),
+      removedStackIds: Object.freeze([...insertion.removedStackIds]),
+    });
+    this.processedBuildingOperations.set(request.operationId, {
+      signature,
+      result,
+    });
     return result;
   }
 
@@ -793,6 +1109,9 @@ export class Phase1ItemAuthority {
       && target.kind === 'player-inventory'
     ) || (
       source.kind === 'death-cache'
+      && target.kind === 'player-inventory'
+    ) || (
+      source.kind === 'machine-output'
       && target.kind === 'player-inventory'
     );
     if (!pairValid) {
@@ -1928,6 +2247,37 @@ export class Phase1ItemAuthority {
   ): ItemTransactionResult {
     this.processedOperations.set(channel.request.operationId, {
       signature: channel.signature,
+      result,
+    });
+    return result;
+  }
+
+  private resolveBuildingOperation(
+    operationId: OperationId,
+    signature: string,
+  ): BuildingItemCommitResult | null {
+    const cached = this.processedBuildingOperations.get(operationId);
+    if (cached === undefined) return null;
+    if (cached.signature === signature) return cached.result;
+    return Object.freeze({
+      status: 'rejected',
+      operationId,
+      reason: 'OPERATION_ID_CONFLICT',
+    });
+  }
+
+  private cacheBuildingRejected(
+    operationId: OperationId,
+    signature: string,
+    reason: BuildingItemRejectionReason,
+  ): BuildingItemCommitResult {
+    const result: BuildingItemCommitResult = Object.freeze({
+      status: 'rejected',
+      operationId,
+      reason,
+    });
+    this.processedBuildingOperations.set(operationId, {
+      signature,
       result,
     });
     return result;
