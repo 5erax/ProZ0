@@ -204,6 +204,90 @@ describe('Phase 1 combat authority', () => {
 });
 
 describe('Phase 1 death / respawn / recovery', () => {
+  it('reconstructs committed DeathId result so reopen retry cannot reapply penalties', () => {
+    const catalog = createPhase1ContentCatalog();
+    const world = new Phase1SurvivalTestWorld();
+    const items = new Phase1ItemAuthority({
+      catalog,
+      world,
+      initialLedger: ledger([{
+        stackId:'spear',
+        itemDefinitionId:'item:basic-spear',
+        quantity:1,
+        condition:100,
+      }]),
+    });
+    const survival = new Phase1SurvivalAuthority({ catalog, items });
+    survival.registerPlayer('p1');
+
+    let xpCommits=0;
+    const xp:DeathXpPenaltyPort = {
+      reserveDeathXpPenalty(request) {
+        return {
+          reservationId:`xp:${request.deathId}`,
+          deathId:request.deathId,
+          playerId:request.playerId,
+          xpLoss:5,
+        };
+      },
+      commitReservedDeathXpPenalty(){xpCommits+=1;},
+      releaseDeathXpPenalty(){},
+    };
+    const death = new Phase1DeathAuthority(survival,items,world,xp);
+    survival.applyAuthorityDamage({
+      damageId:'lethal:reopen',
+      sourceType:'hostile-attack',
+      sourceEntityId:'predator:1',
+      targetPlayerId:'p1',
+      amount:100,
+      tick:0,
+    });
+    const input={
+      deathId:'death:p1:reopen',
+      playerId:'p1',
+      deathCause:'hostile-attack' as const,
+      deathPosition:createWorldPosition(1,1),
+      deathTick:0,
+      inventoryContainerId:'inventory:p1',
+      expectedInventoryRevision:0,
+      equippedStackIds:['spear'],
+    };
+    expect(death.processDeath(input)).toMatchObject({status:'committed'});
+    expect(xpCommits).toBe(1);
+
+    const itemSnapshot=items.exportLedgerSnapshot();
+    const survivalSnapshot=survival.exportSnapshot();
+    const deathSnapshot=death.exportSnapshot();
+
+    const restoredItems = new Phase1ItemAuthority({
+      catalog,
+      world,
+      initialLedger:itemSnapshot,
+    });
+    const restoredSurvival = new Phase1SurvivalAuthority({
+      catalog,
+      items:restoredItems,
+      snapshot:survivalSnapshot,
+    });
+    const restoredDeath = new Phase1DeathAuthority(
+      restoredSurvival,
+      restoredItems,
+      world,
+      xp,
+      deathSnapshot,
+    );
+
+    expect(restoredDeath.processDeath(input)).toMatchObject({
+      status:'duplicate',
+      deathId:'death:p1:reopen',
+    });
+    expect(xpCommits).toBe(1);
+    expect(
+      restoredItems.getContainerView('death-cache:death:p1:reopen')
+        .stacks[0]?.condition,
+    ).toBe(90);
+  });
+
   it('commits one DeathId/cache, durability penalty and staged XP exactly once', () => {
     const { world, items, survival } = setup([
       {stackId:'spear',itemDefinitionId:'item:basic-spear',quantity:1,condition:100},
