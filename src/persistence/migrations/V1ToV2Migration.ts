@@ -15,6 +15,7 @@ import {
 import { saveFailure, saveSuccess, type SaveResult } from '../repository/SaveRepository';
 import { SAVE_FORMAT_ID, SAVE_SCHEMA_VERSION_V2 } from '../schema/SaveSchema';
 import type { PortableSaveBundleV1 } from '../schema/v1/PortableSaveBundleV1';
+import { validatePortableSaveBundleV1 } from '../validation/SaveValidator';
 import type { ChunkRecordV2 } from '../schema/v2/ChunkRecordV2';
 import type { ContainerRecordV2 } from '../schema/v2/ContainerRecordV2';
 import type { PlayerRecordV2 } from '../schema/v2/PlayerRecordV2';
@@ -91,6 +92,12 @@ export function migratePortableSaveBundleV1ToV2(
   source: PortableSaveBundleV1,
   options: V1ToV2MigrationOptions,
 ): SaveResult<PortableSaveBundleV2> {
+  const validatedSource = validatePortableSaveBundleV1(source);
+  if (!validatedSource.ok) {
+    return validatedSource;
+  }
+  source = validatedSource.value;
+
   try {
     if (
       source.world.rngAlgorithmVersion !== RNG_ALGORITHM_VERSION
