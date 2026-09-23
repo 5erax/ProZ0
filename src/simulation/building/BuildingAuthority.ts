@@ -119,11 +119,22 @@ export class Phase1BuildingAuthority {
     const signature = placeSignature(command);
     const structureId = `structure-instance:${command.operationId}`;
     const existingStructure = this.world.getStructure(structureId);
-    if (
-      existingStructure !== null
-      && existingStructure.definitionId === command.structureDefinitionId
-      && existingStructure.placedByPlayerId === command.actorPlayerId
-    ) {
+    if (existingStructure !== null) {
+      if (
+        existingStructure.definitionId !== command.structureDefinitionId
+        || existingStructure.placedByPlayerId !== command.actorPlayerId
+        || !this.world.matchesCommittedPlacement(
+          structureId,
+          command.placement,
+        )
+      ) {
+        return Object.freeze({
+          status: 'rejected',
+          operationId: command.operationId,
+          reason: 'OPERATION_ID_CONFLICT',
+        });
+      }
+
       const inventory = this.items.getContainerView(
         command.inventoryContainerId,
       );
