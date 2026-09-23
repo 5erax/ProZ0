@@ -23,11 +23,25 @@ export interface DeathCacheWorldView {
   readonly revision: number;
 }
 
+export type PredatorCombatState =
+  | 'idle'
+  | 'alert'
+  | 'chase'
+  | 'attack-windup'
+  | 'recovery'
+  | 'return'
+  | 'dead';
+
 export interface PredatorWorldView {
   readonly entityId: PredatorEntityId;
   readonly position: WorldPosition;
   readonly encounterAnchor: WorldPosition;
   readonly revision: number;
+  readonly health: number;
+  readonly state: PredatorCombatState;
+  readonly targetPlayerId: PlayerId | null;
+  readonly stateUntilTick: number | null;
+  readonly outsideLeashTicks: number;
 }
 
 export interface SurvivalWorldPort {
@@ -63,4 +77,13 @@ export interface SurvivalWorldPort {
   ): boolean;
 
   getPredator(entityId: PredatorEntityId): Readonly<PredatorWorldView> | null;
+  commitPredatorRuntime(request: {
+    readonly entityId: PredatorEntityId;
+    readonly expectedRevision: number;
+    readonly health: number;
+    readonly state: PredatorCombatState;
+    readonly targetPlayerId: PlayerId | null;
+    readonly stateUntilTick: number | null;
+    readonly outsideLeashTicks: number;
+  }): Readonly<PredatorWorldView> | null;
 }
