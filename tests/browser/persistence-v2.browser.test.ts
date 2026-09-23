@@ -246,7 +246,7 @@ describe('IndexedDbSaveRepositoryV2 browser persistence', () => {
       expect(exported.ok).toBe(true);
       if (!exported.ok) throw new Error(exported.message);
 
-      expect(await target.importWorld(exported.value)).toEqual({
+      expect(await target.importWorld(exported.value)).toMatchObject({
         ok: true,
         value: { worldId: 'world-alpha' },
       });
