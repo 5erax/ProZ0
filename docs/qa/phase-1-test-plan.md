@@ -480,7 +480,7 @@ Default evidence layer: **Architecture/static boundary + integration/review**
 
 
 
-## 11. Source acceptance traceability — Specialized Technical ADRs
+## 9. Source acceptance traceability — Specialized Technical ADRs
 
 Every technical acceptance/self-check statement below is mapped. Statements such as “implementation authorization: NO” and “blocking open question: NONE” are treated as **REVIEW/scope checks**, not runtime behavior.
 
@@ -688,7 +688,7 @@ Default evidence layer: **PERF + CI/evidence + exact-main + architecture review*
 | blocking open question | `P1QA-TECH009-015` | PERF + CI/evidence + exact-main + architecture review |
 
 
-## 12. Mandatory content-registry evidence — P1-TECH-002
+## 10. Mandatory content-registry evidence — P1-TECH-002
 
 Use source-controlled exact Phase 1 content pack fixtures.
 
@@ -734,7 +734,7 @@ Use source-controlled exact Phase 1 content pack fixtures.
 35. exact pack identity fixture retained;
 36. save/network compatibility DTO round-trip is renderer-free and serializable.
 
-## 13. Mandatory item/container transaction evidence — P1-TECH-003
+## 9. Mandatory item/container transaction evidence — P1-TECH-003
 
 ### Identity/invariants
 - unique stack/container identities;
@@ -770,7 +770,7 @@ Use source-controlled exact Phase 1 content pack fixtures.
 - invalid content reference fails;
 - reconnect retry cannot duplicate committed item.
 
-## 14. Mandatory world/fog/delta evidence — P1-TECH-004
+## 10. Mandatory world/fog/delta evidence — P1-TECH-004
 
 1. same seed/generation/content identity/chunk -> same GeneratedBase;
 2. chunk A->B generation equals B->A;
@@ -793,7 +793,7 @@ Additional QA:
 - shared fog/discovery state received correctly on join/rejoin;
 - renderer/map culling never becomes chunk/fog authority.
 
-## 15. Mandatory survival/combat/death/recovery evidence — P1-TECH-005
+## 9. Mandatory survival/combat/death/recovery evidence — P1-TECH-005
 
 ### Survival/fixed-step
 - exact Water/Food drain after source-defined fixed ticks;
@@ -831,7 +831,7 @@ Additional QA:
 - repeated recovery OperationId cannot duplicate item;
 - same input/environment tape -> same canonical checkpoint.
 
-## 16. Mandatory building/power/machine evidence — P1-TECH-006
+## 10. Mandatory building/power/machine evidence — P1-TECH-006
 
 ### Placement
 - valid placement consumes exactly one correct Kit and creates exactly one structure;
@@ -877,7 +877,7 @@ Additional QA:
 - corrupt references fail;
 - reconnect/retry is idempotent.
 
-## 17. Mandatory hosted co-op protocol suite — P1-TECH-007
+## 9. Mandatory hosted co-op protocol suite — P1-TECH-007
 
 ### Handshake/session
 NET-001 compatible two-player join succeeds.  
@@ -933,7 +933,7 @@ NET-038 stale aggregate revision ignored.
 NET-039 slow-client backpressure cannot stall authority simulation.  
 NET-040 RTT/desync diagnostics cannot alter gameplay result.
 
-## 18. Mandatory Save V2 / migration / recovery suite — P1-TECH-008
+## 10. Mandatory Save V2 / migration / recovery suite — P1-TECH-008
 
 QA IDs below are intentionally unique because the source ADR contains repeated numeric labels in different subsections.
 
@@ -996,7 +996,7 @@ SAVEV2-041 graceful shutdown SAVE_FAILED never reports persistence success.
 
 Real Chromium IndexedDB is required for browser-persistence behavior; pure memory adapters cannot be the only evidence.
 
-## 19. Performance, responsiveness, observability and exact-main gates — P1-TECH-009
+## 9. Performance, responsiveness, observability and exact-main gates — P1-TECH-009
 
 All blocking performance evidence must retain raw samples, percentile method, fixture identity and environment.
 
@@ -1086,7 +1086,7 @@ Backpressure:
 
 Instrumentation is read-only/non-authoritative and must not change command ordering, deterministic state or gameplay behavior.
 
-## 20. Browser visual/readability evidence set
+## 10. Browser visual/readability evidence set
 
 Minimum PO-facing retained evidence should cover, on the exact candidate:
 - player on representative light and dark terrain;
@@ -1111,7 +1111,7 @@ Minimum PO-facing retained evidence should cover, on the exact candidate:
 
 Critical state distinctions must not rely on color alone.
 
-## 21. 30–60 minute PO-facing playtest protocol
+## 9. 30–60 minute PO-facing playtest protocol
 
 Record exact candidate/deployment identity and use a fresh world.
 
@@ -1143,7 +1143,7 @@ Record:
 
 The 30–60 minute value is the approved tuning target, not an automatic failure for every individual player outside the range.
 
-## 22. Hosted 2–4 player playtest protocol
+## 10. Hosted 2–4 player playtest protocol
 
 Required player-facing scenarios:
 - join compatible session;
@@ -1161,7 +1161,7 @@ Required player-facing scenarios:
 
 Record authority/client diagnostics without exposing secrets or ResumeCredential.
 
-## 23. Regression triggers
+## 9. Regression triggers
 
 Re-run affected suites after changes to:
 
@@ -1174,7 +1174,7 @@ Re-run affected suites after changes to:
 **Presentation/UI:** Pixi mapping, HUD/panels, fog/weather overlays, co-op identity, scale/DPR/camera sampling.  
 **Architecture:** module ownership/import boundaries, public authority seams, persistence non-authority, renderer/network/browser leakage.
 
-## 24. Failure severity / release gate
+## 10. Failure severity / release gate
 
 NOT READY for Product Review while any of these remain:
 - BLOCKER;
@@ -1188,7 +1188,7 @@ NOT READY for Product Review while any of these remain:
 
 Major non-core defects are returned to Producer with evidence for milestone/product decision; QA does not silently waive them.
 
-## 25. Evidence package for P1-QA-002
+## 9. Evidence package for P1-QA-002
 
 Permanent GitHub QA summary records:
 - exact candidate main SHA;
@@ -1210,7 +1210,7 @@ Retained evidence bundle should include as applicable:
 - visual screenshots/sequences;
 - Playwright trace/screenshot/console/page-error/server excerpts on failure.
 
-## 26. Traceability completeness self-check
+## 10. Traceability completeness self-check
 
 Mapped source acceptance statements:
 - gameplay + art/UI + P1-TECH-001: **245**
@@ -1219,7 +1219,7 @@ Mapped source acceptance statements:
 
 Expected activated-task target: **374 / 374**.
 
-Mandatory specialized ADR test-strategy coverage is separately expanded in Sections 12–19 and does not disappear into the source-acceptance count.
+Mandatory specialized ADR test-strategy coverage is separately expanded in Sections 10–17 and does not disappear into the source-acceptance count.
 
 Critical authority/data-loss/desync risks have explicit tests:
 **PASS**
@@ -1236,7 +1236,7 @@ Artifact is under `docs/qa/`:
 Blocking source ambiguity:
 **NONE FOUND**
 
-## 27. P1-QA-001 acceptance self-check
+## 9. P1-QA-001 acceptance self-check
 
 1. 100% approved source acceptance statements mapped: **PASS — 374/374**
 2. Critical authority/data-loss/desync risks have explicit tests: **PASS**
@@ -1245,7 +1245,7 @@ Blocking source ambiguity:
 5. Artifact under `docs/qa/`: **PASS**
 6. Handoff manifest: **PENDING GitHub PR/CI verification and final Issue handoff comment**
 
-## 28. Handoff state
+## 10. Handoff state
 
 Artifact content is complete for QA self-review. Lifecycle remains with A-QA-01 until branch/PR scope, CI and final persisted handoff are verified.
 
