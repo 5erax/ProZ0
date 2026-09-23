@@ -97,7 +97,19 @@ export class Phase1CombatAuthority {
       return this.cache(command.attackId, { status:'miss', attackId:command.attackId, targetEntityId:null, damage:0 });
     }
     const playerPos = this.world.getPlayerPosition(command.playerId);
-    if (squaredDistance(playerPos, predator.position) > range * range) {
+    const dx = predator.position.x - playerPos.x;
+    const dy = predator.position.y - playerPos.y;
+    const distanceSquared = dx * dx + dy * dy;
+    const facingLength = Math.hypot(command.facingX, command.facingY);
+    const targetLength = Math.sqrt(distanceSquared);
+    const inArc =
+      facingLength > 0
+      && targetLength > 0
+      && (
+        (command.facingX * dx + command.facingY * dy)
+        / (facingLength * targetLength)
+      ) >= Math.SQRT1_2;
+    if (distanceSquared > range * range || !inArc) {
       return this.cache(command.attackId, { status:'miss', attackId:command.attackId, targetEntityId:null, damage:0 });
     }
     const nextHealth = Math.max(0, predator.health - damage);
@@ -114,53 +126,138 @@ export class Phase1CombatAuthority {
       return this.cache(command.attackId, { status:'miss', attackId:command.attackId, targetEntityId:null, damage:0 });
     }
     if (spear && weaponStackId !== null) {
-      // Spear condition loss is authoritative hit-only. Reuse repair/death ledger
-      // extension later; Phase 1 acceptance locks this through death/item tests.
+      const wear = this.items.execute({
+        type: 'wear',
+        operationId: `attack-wear:${command.attackId}`,
+        playerId: command.playerId,
+        inventoryContainerId: command.inventoryContainerId,
+        expectedInventoryRevision: command.expectedInventoryRevision,
+        targetStackId: weaponStackId,
+        conditionLoss: 1,
+      });
+      if (wear.status !== 'committed') {
+        throw new Error('Validated spear hit condition mutation failed.');
+      }
     }
     return this.cache(command.attackId, { status:'hit', attackId:command.attackId, targetEntityId:predator.entityId, damage });
   }
 
   public tickPredator(predatorEntityId: string, playerIds: readonly PlayerId[]): void {
     const predator = this.world.getPredator(predatorEntityId);
-    if (predator === null || predator.state === 'dead') return;
+    if (predator === null || predator.state === 'dead' || playerIds.length === 0) return;
     const tick = Math.max(...playerIds.map((id) => this.survival.getPlayerState(id).tick));
-    const candidates = playerIds
+    const alive = playerIds
       .filter((id) => this.survival.getPlayerState(id).lifeState.type === 'alive')
-      .map((id) => ({ id, d: squaredDistance(this.world.getPlayerPosition(id), predator.position) }))
-      .sort((a,b) => a.d - b.d || a.id.localeCompare(b.id));
-    const target = candidates[0];
-    if (target === undefined) return;
+      .map((id) => ({
+        id,
+        dPredator: squaredDistance(this.world.getPlayerPosition(id), predator.position),
+        dAnchor: squaredDistance(this.world.getPlayerPosition(id), predator.encounterAnchor),
+      }))
+      .sort((a,b) => a.dPredator - b.dPredator || a.id.localeCompare(b.id));
+    if (alive.length === 0) return;
+
     const attackRange = 1.1 * PLAYER_COLLISION_FOOTPRINT.width;
     const aggression = 5 * PLAYER_COLLISION_FOOTPRINT.width;
-    if (predator.state === 'attack-windup' && predator.stateUntilTick !== null && tick >= predator.stateUntilTick) {
-      if (target.d <= attackRange * attackRange) {
+    const leash = 12 * PLAYER_COLLISION_FOOTPRINT.width;
+
+    if (predator.state === 'recovery') {
+      if (predator.stateUntilTick !== null && tick < predator.stateUntilTick) return;
+      const target = alive[0];
+      if (target === undefined) return;
+      this.world.commitPredatorRuntime({
+        entityId:predator.entityId, expectedRevision:predator.revision,
+        health:predator.health,state:'chase',targetPlayerId:target.id,
+        stateUntilTick:null,outsideLeashTicks:0,
+      });
+      return;
+    }
+
+    if (predator.state === 'alert') {
+      if (predator.stateUntilTick !== null && tick < predator.stateUntilTick) return;
+      const target = alive[0];
+      if (target === undefined) return;
+      this.world.commitPredatorRuntime({
+        entityId:predator.entityId, expectedRevision:predator.revision,
+        health:predator.health,state:'chase',targetPlayerId:target.id,
+        stateUntilTick:null,outsideLeashTicks:0,
+      });
+      return;
+    }
+
+    if (predator.state === 'attack-windup') {
+      const locked = predator.targetPlayerId === null
+        ? undefined
+        : alive.find((candidate) => candidate.id === predator.targetPlayerId);
+      if (predator.stateUntilTick !== null && tick < predator.stateUntilTick) return;
+      if (locked !== undefined && locked.dPredator <= attackRange * attackRange) {
         this.survival.applyAuthorityDamage({
           damageId: `predator:${predator.entityId}:attack:${predator.revision}`,
           sourceType:'hostile-attack',
           sourceEntityId:predator.entityId,
-          targetPlayerId: target.id,
+          targetPlayerId: locked.id,
           amount:20,
           tick,
         });
       }
       this.world.commitPredatorRuntime({
         entityId:predator.entityId, expectedRevision:predator.revision,
-        health:predator.health,state:'recovery',targetPlayerId:target.id,
+        health:predator.health,state:'recovery',
+        targetPlayerId:locked?.id ?? null,
         stateUntilTick:tick+72,outsideLeashTicks:0,
       });
       return;
     }
-    if (target.d <= attackRange * attackRange) {
+
+    if (predator.state === 'return') {
+      if (squaredDistance(predator.position, predator.encounterAnchor) <= 0.000001) {
+        this.world.commitPredatorRuntime({
+          entityId:predator.entityId,expectedRevision:predator.revision,
+          health:predator.health,state:'idle',targetPlayerId:null,
+          stateUntilTick:null,outsideLeashTicks:0,
+        });
+      }
+      return;
+    }
+
+    const currentTarget = predator.targetPlayerId === null
+      ? undefined
+      : alive.find((candidate) => candidate.id === predator.targetPlayerId);
+    const target = currentTarget ?? alive[0];
+    if (target === undefined) return;
+
+    if (predator.state === 'idle') {
+      if (target.dPredator <= aggression * aggression) {
+        this.world.commitPredatorRuntime({
+          entityId:predator.entityId,expectedRevision:predator.revision,
+          health:predator.health,state:'alert',targetPlayerId:target.id,
+          stateUntilTick:tick+24,outsideLeashTicks:0,
+        });
+      }
+      return;
+    }
+
+    const outsideLeash = target.dAnchor > leash * leash;
+    const outsideTicks = outsideLeash ? predator.outsideLeashTicks + 1 : 0;
+    if (outsideTicks >= 120) {
+      this.world.commitPredatorRuntime({
+        entityId:predator.entityId,expectedRevision:predator.revision,
+        health:predator.health,state:'return',targetPlayerId:null,
+        stateUntilTick:null,outsideLeashTicks:outsideTicks,
+      });
+      return;
+    }
+
+    if (target.dPredator <= attackRange * attackRange) {
       this.world.commitPredatorRuntime({
         entityId:predator.entityId, expectedRevision:predator.revision,
         health:predator.health,state:'attack-windup',targetPlayerId:target.id,
-        stateUntilTick:tick+33,outsideLeashTicks:0,
+        stateUntilTick:tick+33,outsideLeashTicks:outsideTicks,
       });
-    } else if (target.d <= aggression * aggression) {
+    } else {
       this.world.commitPredatorRuntime({
         entityId:predator.entityId, expectedRevision:predator.revision,
         health:predator.health,state:'chase',targetPlayerId:target.id,
-        stateUntilTick:null,outsideLeashTicks:0,
+        stateUntilTick:null,outsideLeashTicks:outsideTicks,
       });
     }
   }
