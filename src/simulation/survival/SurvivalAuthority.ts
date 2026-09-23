@@ -17,6 +17,8 @@ import {
   type PlayerSurvivalView,
   type SurvivalAuthoritySnapshot,
   type SurvivalDamageSource,
+  type SurvivalRespawnReservation,
+  type SurvivalStaminaReservation,
   type SurvivalTickContext,
 } from './SurvivalTypes';
 
@@ -48,6 +50,23 @@ interface ActiveConsume {
   readonly item: Readonly<ItemDefinitionV1>;
   elapsedTicks: number;
   canceledReason: 'CANCELED' | 'HOSTILE_DAMAGE' | null;
+}
+
+interface DamageBatch {
+  readonly tick: number;
+  readonly healthBeforeMilli: number;
+  readonly events: Map<string, DamageEvent>;
+}
+
+interface StaminaReservationState {
+  readonly reservation: SurvivalStaminaReservation;
+  committed: boolean;
+  released: boolean;
+}
+
+interface RespawnReservationState {
+  readonly reservation: SurvivalRespawnReservation;
+  committed: boolean;
 }
 
 function clampMilli(value: number): number {
@@ -146,6 +165,41 @@ function staminaPenalty(
   );
 }
 
+const ENVIRONMENT_DAMAGE_ORDER: Readonly<Record<
+  Exclude<SurvivalDamageSource, 'hostile-attack'>,
+  number
+>> = Object.freeze({
+  'severe-temperature': 0,
+  'critical-temperature': 1,
+  'critical-dehydration': 2,
+  'critical-starvation': 3,
+});
+
+function compareDamageEvents(left: DamageEvent, right: DamageEvent): number {
+  const leftHostile = left.sourceType === 'hostile-attack';
+  const rightHostile = right.sourceType === 'hostile-attack';
+  if (leftHostile !== rightHostile) {
+    return leftHostile ? 1 : -1;
+  }
+
+  if (!leftHostile && !rightHostile) {
+    const leftOrder = ENVIRONMENT_DAMAGE_ORDER[
+      left.sourceType as Exclude<SurvivalDamageSource, 'hostile-attack'>
+    ];
+    const rightOrder = ENVIRONMENT_DAMAGE_ORDER[
+      right.sourceType as Exclude<SurvivalDamageSource, 'hostile-attack'>
+    ];
+    if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  }
+
+  if (left.damageId !== right.damageId) {
+    return left.damageId < right.damageId ? -1 : 1;
+  }
+  const leftEntity = left.sourceEntityId ?? '';
+  const rightEntity = right.sourceEntityId ?? '';
+  return leftEntity < rightEntity ? -1 : leftEntity > rightEntity ? 1 : 0;
+}
+
 function damagingTemperature(
   value: number,
 ): { readonly source: SurvivalDamageSource; readonly cadence: number } | null {
@@ -195,6 +249,12 @@ export interface Phase1SurvivalAuthorityOptions {
 export class Phase1SurvivalAuthority {
   private readonly players = new Map<PlayerId, MutablePlayerState>();
   private readonly appliedDamageIds = new Set<string>();
+  private readonly lethalDamageEvents = new Map<PlayerId, DamageEvent>();
+  private readonly damageBatches = new Map<PlayerId, DamageBatch>();
+  private readonly staminaReservations =
+    new Map<string, StaminaReservationState>();
+  private readonly respawnReservations =
+    new Map<PlayerId, RespawnReservationState>();
   private readonly activeConsumes = new Map<PlayerId, ActiveConsume>();
 
   public constructor(private readonly options: Phase1SurvivalAuthorityOptions) {
@@ -211,6 +271,19 @@ export class Phase1SurvivalAuthority {
           throw new Error('Invalid applied DamageId snapshot.');
         }
         this.appliedDamageIds.add(damageId);
+      }
+      for (const event of options.snapshot.lethalDamageEvents ?? []) {
+        if (
+          event.damageId.length === 0
+          || this.lethalDamageEvents.has(event.targetPlayerId)
+          || !this.appliedDamageIds.has(event.damageId)
+        ) {
+          throw new Error('Invalid lethal DamageEvent snapshot.');
+        }
+        this.lethalDamageEvents.set(
+          event.targetPlayerId,
+          Object.freeze({ ...event }),
+        );
       }
     }
   }
@@ -273,6 +346,17 @@ export class Phase1SurvivalAuthority {
           .map(canonicalState),
       ),
       appliedDamageIds: Object.freeze([...this.appliedDamageIds].sort()),
+      lethalDamageEvents: Object.freeze(
+        [...this.lethalDamageEvents.values()]
+          .sort((left, right) =>
+            left.targetPlayerId < right.targetPlayerId
+              ? -1
+              : left.targetPlayerId > right.targetPlayerId
+                ? 1
+                : compareDamageEvents(left, right),
+          )
+          .map((event) => Object.freeze({ ...event })),
+      ),
     });
   }
 
@@ -415,6 +499,16 @@ export class Phase1SurvivalAuthority {
 
   public applyAuthorityDamage(event: DamageEvent): DamageResult {
     const state = this.requirePlayer(event.targetPlayerId);
+
+    if (
+      event.damageId.length === 0
+      || !Number.isSafeInteger(event.amount)
+      || event.amount <= 0
+      || event.tick !== state.tick
+    ) {
+      throw new Error('Damage event is invalid for current authoritative tick.');
+    }
+
     if (this.appliedDamageIds.has(event.damageId)) {
       return Object.freeze({
         status: 'duplicate',
@@ -423,6 +517,7 @@ export class Phase1SurvivalAuthority {
         event,
       });
     }
+
     this.appliedDamageIds.add(event.damageId);
 
     if (state.lifeState.type !== 'alive') {
@@ -434,18 +529,43 @@ export class Phase1SurvivalAuthority {
       });
     }
 
-    if (
-      !Number.isSafeInteger(event.amount)
-      || event.amount <= 0
-      || event.tick !== state.tick
-    ) {
-      throw new Error('Damage event is invalid for current authoritative tick.');
+    let batch = this.damageBatches.get(event.targetPlayerId);
+    if (batch === undefined || batch.tick !== event.tick) {
+      batch = {
+        tick: event.tick,
+        healthBeforeMilli: state.healthMilli,
+        events: new Map<string, DamageEvent>(),
+      };
+      this.damageBatches.set(event.targetPlayerId, batch);
+    }
+    batch.events.set(event.damageId, Object.freeze({ ...event }));
+
+    const orderedEvents = [...batch.events.values()].sort(compareDamageEvents);
+    let healthMilli = batch.healthBeforeMilli;
+    let lethalEvent: DamageEvent | null = null;
+    for (const orderedEvent of orderedEvents) {
+      const before = healthMilli;
+      healthMilli = Math.max(
+        0,
+        healthMilli - orderedEvent.amount * SURVIVAL_STAT_SCALE,
+      );
+      if (lethalEvent === null && before > 0 && healthMilli === 0) {
+        lethalEvent = orderedEvent;
+      }
     }
 
-    state.healthMilli = Math.max(
-      0,
-      state.healthMilli - event.amount * SURVIVAL_STAT_SCALE,
-    );
+    state.healthMilli = healthMilli;
+    if (lethalEvent === null) {
+      const existing = this.lethalDamageEvents.get(event.targetPlayerId);
+      if (existing?.tick === event.tick) {
+        this.lethalDamageEvents.delete(event.targetPlayerId);
+      }
+    } else {
+      this.lethalDamageEvents.set(
+        event.targetPlayerId,
+        Object.freeze({ ...lethalEvent }),
+      );
+    }
     state.revision += 1;
 
     if (event.sourceType === 'hostile-attack') {
@@ -463,14 +583,110 @@ export class Phase1SurvivalAuthority {
     });
   }
 
+  public getCanonicalLethalDamage(
+    playerId: PlayerId,
+    tick: number,
+  ): Readonly<DamageEvent> | null {
+    const event = this.lethalDamageEvents.get(playerId);
+    if (event === undefined || event.tick !== tick) return null;
+    return Object.freeze({ ...event });
+  }
+
   public canSpendStamina(playerId: PlayerId, amount: number): boolean {
     const state = this.requirePlayer(playerId);
+    const reservedMilli = [...this.staminaReservations.values()]
+      .filter(
+        (entry) =>
+          entry.reservation.playerId === playerId
+          && !entry.committed
+          && !entry.released,
+      )
+      .reduce((sum, entry) => sum + entry.reservation.amountMilli, 0);
     return (
       state.lifeState.type === 'alive'
       && Number.isSafeInteger(amount)
       && amount > 0
-      && state.staminaMilli >= amount * SURVIVAL_STAT_SCALE
+      && state.staminaMilli - reservedMilli
+        >= amount * SURVIVAL_STAT_SCALE
     );
+  }
+
+  public reserveStaminaSpend(
+    reservationId: string,
+    playerId: PlayerId,
+    amount: number,
+  ): Readonly<SurvivalStaminaReservation> | null {
+    const existing = this.staminaReservations.get(reservationId);
+    if (existing !== undefined) {
+      if (
+        existing.reservation.playerId !== playerId
+        || existing.reservation.amountMilli !== amount * SURVIVAL_STAT_SCALE
+      ) {
+        return null;
+      }
+      return existing.released
+        ? null
+        : existing.reservation;
+    }
+    if (
+      reservationId.length === 0
+      || !this.canSpendStamina(playerId, amount)
+    ) {
+      return null;
+    }
+    const state = this.requirePlayer(playerId);
+    const reservation: SurvivalStaminaReservation = Object.freeze({
+      reservationId,
+      playerId,
+      amountMilli: amount * SURVIVAL_STAT_SCALE,
+      reservedAtTick: state.tick,
+    });
+    this.staminaReservations.set(reservationId, {
+      reservation,
+      committed: false,
+      released: false,
+    });
+    return reservation;
+  }
+
+  public commitReservedStaminaSpend(
+    reservation: Readonly<SurvivalStaminaReservation>,
+  ): void {
+    const entry = this.staminaReservations.get(reservation.reservationId);
+    if (
+      entry === undefined
+      || entry.committed
+      || entry.released
+      || entry.reservation.playerId !== reservation.playerId
+      || entry.reservation.amountMilli !== reservation.amountMilli
+    ) {
+      return;
+    }
+    const state = this.players.get(reservation.playerId);
+    if (state === undefined) return;
+    state.staminaMilli = Math.max(
+      0,
+      state.staminaMilli - reservation.amountMilli,
+    );
+    state.lastStaminaSpendTick = state.tick;
+    state.staminaRegenRemainder = 0;
+    state.revision += 1;
+    entry.committed = true;
+  }
+
+  public releaseStaminaReservation(
+    reservation: Readonly<SurvivalStaminaReservation>,
+  ): void {
+    const entry = this.staminaReservations.get(reservation.reservationId);
+    if (
+      entry === undefined
+      || entry.committed
+      || entry.released
+      || entry.reservation.playerId !== reservation.playerId
+    ) {
+      return;
+    }
+    entry.released = true;
   }
 
   public commitStaminaSpend(
@@ -661,7 +877,7 @@ export class Phase1SurvivalAuthority {
   public markDead(
     playerId: PlayerId,
     deathId: string,
-    deathCause: SurvivalDamageSource,
+    lethalEvent: Readonly<DamageEvent>,
     deathCacheEntityId: string | null,
     deathTick: number,
   ): PlayerSurvivalState {
@@ -672,14 +888,20 @@ export class Phase1SurvivalAuthority {
       }
       return canonicalState(state);
     }
-    if (state.healthMilli !== 0 || state.tick !== deathTick) {
-      throw new Error('Death transition requires lethal current-tick state.');
+    const canonicalLethal = this.getCanonicalLethalDamage(playerId, deathTick);
+    if (
+      state.healthMilli !== 0
+      || state.tick !== deathTick
+      || canonicalLethal === null
+      || canonicalLethal.damageId !== lethalEvent.damageId
+    ) {
+      throw new Error('Death transition requires canonical lethal event.');
     }
     state.lifeState = {
       type: 'dead-pending-respawn',
       deathId,
       respawnAtTick: deathTick + 300,
-      deathCause,
+      deathCause: canonicalLethal.sourceType,
       deathCacheEntityId,
     };
     state.revision += 1;
@@ -687,15 +909,49 @@ export class Phase1SurvivalAuthority {
     return canonicalState(state);
   }
 
-  public processRespawn(playerId: PlayerId, tick: number): PlayerSurvivalState {
+  public reserveRespawn(
+    playerId: PlayerId,
+    tick: number,
+  ): Readonly<SurvivalRespawnReservation> | null {
+    const existing = this.respawnReservations.get(playerId);
+    if (existing !== undefined) {
+      return existing.committed ? null : existing.reservation;
+    }
     const state = this.requirePlayer(playerId);
     if (
       state.lifeState.type !== 'dead-pending-respawn'
       || tick < state.lifeState.respawnAtTick
     ) {
+      return null;
+    }
+    const reservation: SurvivalRespawnReservation = Object.freeze({
+      reservationId:
+        `survival-respawn:${playerId}:${state.lifeState.deathId}`,
+      playerId,
+      deathId: state.lifeState.deathId,
+      respawnTick: tick,
+    });
+    this.respawnReservations.set(playerId, {
+      reservation,
+      committed: false,
+    });
+    return reservation;
+  }
+
+  public commitReservedRespawn(
+    reservation: Readonly<SurvivalRespawnReservation>,
+  ): PlayerSurvivalState {
+    const entry = this.respawnReservations.get(reservation.playerId);
+    const state = this.requirePlayer(reservation.playerId);
+    if (
+      entry === undefined
+      || entry.committed
+      || entry.reservation.reservationId !== reservation.reservationId
+    ) {
       return canonicalState(state);
     }
-    state.tick = tick;
+
+    state.tick = reservation.respawnTick;
     state.healthMilli = 100000;
     state.waterMilli = 50000;
     state.foodMilli = 50000;
@@ -711,6 +967,9 @@ export class Phase1SurvivalAuthority {
     state.nextTemperatureDamageTick = null;
     state.lifeState = { type: 'alive' };
     state.revision += 1;
+    entry.committed = true;
+    this.damageBatches.delete(reservation.playerId);
+    this.lethalDamageEvents.delete(reservation.playerId);
     return canonicalState(state);
   }
 
