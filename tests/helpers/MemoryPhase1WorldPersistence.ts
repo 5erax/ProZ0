@@ -54,3 +54,64 @@ implements Phase1WorldPersistencePort {
     this.chunks.set(key(record.coord), record);
   }
 }
+
+
+export class DeferredPhase1WorldPersistence
+extends MemoryPhase1WorldPersistence {
+  public deferChunkSave = false;
+  private pending: {
+    readonly snapshot: Phase1WorldSliceChunkSnapshot;
+    readonly resolve: () => void;
+    readonly reject: (error: Error) => void;
+  } | null = null;
+
+  public override saveChunk(
+    snapshot: Phase1WorldSliceChunkSnapshot,
+  ): Promise<void> {
+    if (!this.deferChunkSave) {
+      return super.saveChunk(snapshot);
+    }
+
+    if (this.pending !== null) {
+      return Promise.reject(
+        new Error('Only one deferred Phase 1 chunk save is supported by this fixture.'),
+      );
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      this.pending = {
+        snapshot,
+        resolve,
+        reject,
+      };
+    });
+  }
+
+  public get pendingChunkSnapshot():
+    Phase1WorldSliceChunkSnapshot | null {
+    return this.pending?.snapshot ?? null;
+  }
+
+  public resolvePendingChunkSave(): void {
+    const pending = this.pending;
+    if (pending === null) {
+      throw new Error('No deferred Phase 1 chunk save is pending.');
+    }
+
+    this.putChunk(pending.snapshot);
+    this.pending = null;
+    pending.resolve();
+  }
+
+  public rejectPendingChunkSave(
+    error: Error = new Error('injected deferred Phase 1 save failure'),
+  ): void {
+    const pending = this.pending;
+    if (pending === null) {
+      throw new Error('No deferred Phase 1 chunk save is pending.');
+    }
+
+    this.pending = null;
+    pending.reject(error);
+  }
+}
