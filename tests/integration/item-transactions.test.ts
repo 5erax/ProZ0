@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createPhase1ContentCatalog } from '../../src/content';
 import {
   Phase1ItemAuthority,
-  createPhase1ContentCatalog,
   type ContainerKind,
   type ContainerState,
   type ItemLedgerSnapshot,
