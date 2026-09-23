@@ -27,6 +27,11 @@ export type ItemAuthorityEvent =
     };
 
 export interface ItemAuthorityEventSink {
+  /**
+   * External observers may throw. Phase1ItemAuthority contains those failures
+   * behind its authority-owned outbox and never lets them change commit/result
+   * semantics.
+   */
   emit(event: Readonly<ItemAuthorityEvent>): void;
 }
 
