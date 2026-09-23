@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
+import { createWorldPosition } from '../../src/foundation';
 import {
   IndexedDbSaveRepository,
   IndexedDbSaveRepositoryV2,
+  buildingSnapshotToRecordsV2,
+  containerRecordsV2ToItemLedgerSnapshot,
   createPhase1SaveV2Compatibility,
   deleteIndexedDbSaveDatabase,
+  itemLedgerSnapshotToContainerRecordsV2,
   migratePortableSaveBundleV1ToV2,
+  recordsV2ToBuildingSnapshot,
   type PortableSaveBundleV2,
 } from '../../src/persistence';
-import { PHASE0_WORLD_GENERATION_VERSION } from '../../src/world';
+import {
+  BuildingItemWorldAdapter,
+  PHASE0_WORLD_GENERATION_VERSION,
+  Phase1BuildingWorld,
+} from '../../src/world';
+import {
+  Phase1BuildingAuthority,
+  Phase1ItemAuthority,
+} from '../../src/simulation';
+import { Phase1BuildingTestSpatial } from '../support/Phase1BuildingTestSpatial';
+import { Phase1ItemTestWorld } from '../support/Phase1ItemTestWorld';
 import {
   makeChunkRecord,
   makePlayerRecord,
@@ -51,6 +66,92 @@ function migratedBundle(): PortableSaveBundleV2 {
   );
   if (!result.ok) throw new Error(result.message);
   return result.value;
+}
+
+function placementReopenBundle() {
+  const catalog = createPhase1ContentCatalog();
+  const base = migratedBundle();
+  const player = base.players[0];
+  const chunk = base.chunks[0];
+  if (player === undefined || chunk === undefined) {
+    throw new Error('Expected migrated player and chunk.');
+  }
+
+  const spatial = new Phase1BuildingTestSpatial();
+  const buildings = new Phase1BuildingWorld(spatial);
+  const items = new Phase1ItemAuthority({
+    catalog,
+    world: new BuildingItemWorldAdapter(
+      new Phase1ItemTestWorld(),
+      buildings,
+    ),
+    initialLedger: Object.freeze({
+      containers: Object.freeze([
+        Object.freeze({
+          containerId: player.inventoryContainerId,
+          kind: 'player-inventory' as const,
+          ownerPlayerId: player.playerId,
+          revision: 0,
+          stacks: Object.freeze([
+            Object.freeze({
+              stackId: 'workbench-kit',
+              itemDefinitionId: 'item:workbench-kit',
+              quantity: 1,
+              condition: null,
+            }),
+          ]),
+        }),
+      ]),
+    }),
+  });
+  const authority = new Phase1BuildingAuthority(catalog, items, buildings);
+  const command = Object.freeze({
+    operationId: 'place:persisted-workbench',
+    actorPlayerId: player.playerId,
+    structureDefinitionId: 'structure:workbench' as const,
+    sourceKitStackId: 'workbench-kit',
+    inventoryContainerId: player.inventoryContainerId,
+    expectedInventoryRevision: 0,
+    expectedBuildRevision: 0,
+    placement: Object.freeze({
+      mode: 'free' as const,
+      anchor: createWorldPosition(2.5, 0),
+      orientationQuarterTurns: 0 as const,
+    }),
+  });
+
+  const first = authority.place(command);
+  if (first.status !== 'committed') {
+    throw new Error('Expected initial placement to commit.');
+  }
+
+  const building = buildingSnapshotToRecordsV2(
+    base.world.worldId,
+    buildings.exportSnapshot(),
+  );
+  const containers = itemLedgerSnapshotToContainerRecordsV2(
+    base.world.worldId,
+    items.exportLedgerSnapshot(),
+    { resolveOwner: () => null },
+  );
+  const structureIds = building.structures.map(
+    (structure) => structure.structureId,
+  );
+
+  const bundle: PortableSaveBundleV2 = Object.freeze({
+    ...base,
+    containers,
+    chunks: Object.freeze([
+      Object.freeze({
+        ...chunk,
+        structureIds: Object.freeze(structureIds),
+      }),
+    ]),
+    footholds: Object.freeze([building.foothold]),
+    structures: building.structures,
+  });
+
+  return Object.freeze({ bundle, catalog, command, first });
 }
 
 async function seedLegacyV1(databaseName: string): Promise<void> {
@@ -273,6 +374,220 @@ describe('IndexedDbSaveRepositoryV2 browser persistence', () => {
     } finally {
       await cleanup(sourceName, [source]);
       await cleanup(targetName, [target]);
+    }
+  });
+
+
+  it('preserves #51 placement OperationId full-payload identity across real Save V2 reopen', async () => {
+    const databaseName = 'proz0-test-save-v2-placement-reopen';
+    const firstRepository = new IndexedDbSaveRepositoryV2(
+      options(databaseName),
+    );
+    const reopenedRepository = new IndexedDbSaveRepositoryV2(
+      options(databaseName),
+    );
+    const prepared = placementReopenBundle();
+
+    try {
+      expect(await firstRepository.commit({
+        world: prepared.bundle.world,
+        players: prepared.bundle.players,
+        containers: prepared.bundle.containers,
+        chunks: prepared.bundle.chunks,
+        footholds: prepared.bundle.footholds,
+        structures: prepared.bundle.structures,
+        expectedPreviousWorldRevision: null,
+      })).toMatchObject({ ok: true });
+
+      firstRepository.close();
+
+      const loaded = await reopenedRepository.loadWorld('world-alpha');
+      expect(loaded.ok).toBe(true);
+      if (!loaded.ok) throw new Error(loaded.message);
+
+      const foothold = loaded.value.footholds[0];
+      if (foothold === undefined) {
+        throw new Error('Expected persisted foothold.');
+      }
+
+      const buildings = new Phase1BuildingWorld(
+        new Phase1BuildingTestSpatial(),
+        recordsV2ToBuildingSnapshot(
+          foothold,
+          loaded.value.structures,
+          loaded.value.containers,
+          prepared.catalog,
+        ),
+      );
+      const items = new Phase1ItemAuthority({
+        catalog: prepared.catalog,
+        world: new BuildingItemWorldAdapter(
+          new Phase1ItemTestWorld(),
+          buildings,
+        ),
+        initialLedger: containerRecordsV2ToItemLedgerSnapshot(
+          loaded.value.containers,
+        ),
+      });
+      const authority = new Phase1BuildingAuthority(
+        prepared.catalog,
+        items,
+        buildings,
+      );
+
+      const beforeLedger = items.exportLedgerSnapshot();
+      const beforeStructures = buildings.exportSnapshot().foothold.structures;
+      expect(beforeLedger.containers[0]).toMatchObject({
+        revision: 1,
+        stacks: [],
+      });
+
+      expect(authority.place(prepared.command)).toEqual(prepared.first);
+
+      const conflicts = [
+        {
+          ...prepared.command,
+          sourceKitStackId: 'changed-kit',
+        },
+        {
+          ...prepared.command,
+          inventoryContainerId: 'changed-inventory',
+        },
+        {
+          ...prepared.command,
+          expectedInventoryRevision: 1,
+        },
+        {
+          ...prepared.command,
+          expectedBuildRevision: 1,
+        },
+        {
+          ...prepared.command,
+          placement: Object.freeze({
+            ...prepared.command.placement,
+            anchor: createWorldPosition(4, 0),
+          }),
+        },
+      ];
+      for (const changed of conflicts) {
+        expect(authority.place(changed)).toMatchObject({
+          status: 'rejected',
+          operationId: prepared.command.operationId,
+          reason: 'OPERATION_ID_CONFLICT',
+        });
+      }
+
+      expect(items.exportLedgerSnapshot()).toEqual(beforeLedger);
+      expect(buildings.exportSnapshot().foothold.structures).toEqual(
+        beforeStructures,
+      );
+    } finally {
+      await cleanup(
+        databaseName,
+        [firstRepository, reopenedRepository],
+      );
+    }
+  });
+
+  it('rejects each #52-invalid progression import before replacing the prior durable world', async () => {
+    const databaseName = 'proz0-test-save-v2-invalid-progression-import';
+    const repository = new IndexedDbSaveRepositoryV2(options(databaseName));
+    const base = migratedBundle();
+
+    try {
+      expect(await repository.importWorld(base)).toMatchObject({ ok: true });
+      const before = await repository.exportWorld('world-alpha');
+      expect(before.ok).toBe(true);
+      if (!before.ok) throw new Error(before.message);
+
+      const player = base.players[0];
+      if (player === undefined) throw new Error('Expected migrated player.');
+      const explorer = player.progression.professionQuests.find(
+        (quest) =>
+          quest.questDefinitionId
+            === 'profession-quest:chart-the-unknown',
+      );
+      const engineer = player.progression.professionQuests.find(
+        (quest) =>
+          quest.questDefinitionId
+            === 'profession-quest:bring-water-online',
+      );
+      if (explorer === undefined || engineer === undefined) {
+        throw new Error('Expected canonical profession quest records.');
+      }
+
+      const withProgression = (
+        progression: typeof player.progression,
+      ): PortableSaveBundleV2 => ({
+        ...base,
+        players: [{ ...player, progression }],
+      });
+
+      const eligible = {
+        ...player.progression,
+        totalXp: 225,
+        completedMilestoneRuleIds: ['first-expedition-band-entry'],
+        unlockedSkillIds: ['skill:fieldcraft-basics'],
+      } as const;
+      const eligibleWithRuin = {
+        ...eligible,
+        completedMilestoneRuleIds: [
+          'first-expedition-band-entry',
+          'first-ruin-locate:previous-civilization-ruin',
+          'first-ruin-inspect:previous-civilization-ruin',
+        ],
+      } as const;
+
+      const invalidBundles = [
+        withProgression({
+          ...player.progression,
+          professionQuests: [{
+            ...explorer,
+            completedObjectiveOrdinals: [1],
+          }, engineer],
+        }),
+        withProgression({
+          ...player.progression,
+          professionQuests: [{
+            ...explorer,
+            completedObjectiveOrdinals: [0],
+          }, engineer],
+        }),
+        withProgression({
+          ...eligible,
+          unlockedSkillIds: [],
+        }),
+        withProgression({
+          ...eligible,
+          professionQuests: [{
+            ...explorer,
+            completedObjectiveOrdinals: [0],
+          }, engineer],
+        }),
+        withProgression({
+          ...player.progression,
+          unlockedProfessionIds: ['profession:explorer-prototype'],
+        }),
+        withProgression({
+          ...eligibleWithRuin,
+          professionQuests: [{
+            ...explorer,
+            completedObjectiveOrdinals: [0, 1, 2],
+            completed: true,
+          }, engineer],
+          unlockedProfessionIds: [],
+        }),
+      ];
+
+      for (const invalid of invalidBundles) {
+        expect(await repository.importWorld(invalid)).toMatchObject({
+          ok: false,
+          code: 'CORRUPT_RECORD',
+        });
+        expect(await repository.exportWorld('world-alpha')).toEqual(before);
+      }
+    } finally {
+      await cleanup(databaseName, [repository]);
     }
   });
 
