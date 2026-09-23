@@ -1,3 +1,4 @@
+import type { PlayerId } from '../../foundation';
 import type { ContentId } from '../../content';
 
 export type ItemStackId = string;
@@ -21,6 +22,7 @@ export interface ItemStackState {
 export interface ContainerState {
   readonly containerId: ContainerId;
   readonly kind: ContainerKind;
+  readonly ownerPlayerId: PlayerId | null;
   readonly revision: number;
   readonly stacks: readonly ItemStackState[];
 }
