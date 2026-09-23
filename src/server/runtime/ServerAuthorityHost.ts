@@ -446,6 +446,25 @@ export class ServerAuthorityHost {
     return this.broadcastReady('AGGREGATE_UPDATE', asJson(view));
   }
 
+  public requireResync(
+    transportId: string,
+    reason:
+      | 'SERVER_SEQUENCE_GAP'
+      | 'AGGREGATE_REVISION_GAP'
+      | 'STATE_DIGEST_MISMATCH'
+      | 'SLOW_CLIENT',
+  ): readonly HostedOutboundMessage[] {
+    this.resyncCount += 1;
+    const message = this.envelope(
+      transportId,
+      'RESYNC_REQUIRED',
+      asJson({ reason }),
+    );
+    return message === null
+      ? Object.freeze([])
+      : Object.freeze([message]);
+  }
+
   public authorityCheckpoint(): readonly HostedOutboundMessage[] {
     const checkpoint: AuthorityCheckpointV1 = Object.freeze({
       authorityTick: this.authorityTick,
