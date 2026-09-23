@@ -108,6 +108,7 @@ export type {
   PredatorCombatState,
   PredatorEntityId,
   PredatorWorldView,
+  RespawnPlacementReservation,
   SurvivalWorldPort,
 } from './api/SurvivalWorld';
 
