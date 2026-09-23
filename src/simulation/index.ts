@@ -1,3 +1,6 @@
+export * from './survival';
+export * from './combat';
+export * from './death';
 import type { WorldPosition } from '../foundation';
 import type { WorldCollisionQuery } from '../world';
 import type { FacingDirection } from './api/SimulationSnapshot';
