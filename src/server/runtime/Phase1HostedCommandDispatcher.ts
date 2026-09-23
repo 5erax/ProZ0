@@ -14,6 +14,7 @@ import type {
   GameplayCommandEnvelopeV1,
   JsonValue,
   RevisionRefV1,
+  RevisionedAggregateViewV1,
 } from '../../protocol';
 import type {
   HostedCommandDispatcher,
@@ -49,7 +50,7 @@ function payloadObject(
   ) {
     throw new Error('INVALID_MESSAGE');
   }
-  return command.payload;
+  return command.payload as Readonly<Record<string, JsonValue>>;
 }
 
 function textField(
