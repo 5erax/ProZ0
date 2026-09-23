@@ -22,6 +22,7 @@ export interface StructureRecordV2 {
   readonly position: { readonly x: number; readonly y: number };
   readonly orientationQuarterTurns: 0 | 1 | 2 | 3;
   readonly placedByPlayerId: PlayerId | null;
+  readonly placementOperationFingerprint: string | null;
   readonly outputContainerId: ContainerId | null;
   readonly machine: CondenserSaveV2 | null;
 }
