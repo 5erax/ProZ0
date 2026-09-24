@@ -47,6 +47,7 @@ export interface Phase1AuthoritativeCommandFeedback {
   readonly inputLabel: string;
   readonly verb: string;
   readonly target: string;
+  readonly panelTargetId?: string | null;
 }
 
 export type Phase1PresentationPanelRequest =
@@ -95,6 +96,7 @@ export interface Phase1RuntimePresentationInput {
   readonly commandFeedback?: Phase1AuthoritativeCommandFeedback | null;
   readonly deathResult?: Readonly<DeathTransitionResult> | null;
   readonly panel?: Phase1PresentationPanelRequest | null;
+  readonly presentationPanel?: Readonly<Phase1PanelPresentation> | null;
 }
 
 function meter(
@@ -448,25 +450,93 @@ function mapPanel(
   });
 }
 
+export function applyPhase1AuthoritativeCommandFeedback(
+  basePanel: Readonly<Phase1PanelPresentation> | null,
+  feedback: Phase1AuthoritativeCommandFeedback | null | undefined,
+): Phase1PanelPresentation | null {
+  if (
+    basePanel === null
+    || feedback === null
+    || feedback === undefined
+    || feedback.result.status !== 'rejected'
+  ) {
+    return basePanel;
+  }
+
+  const reason = phase1FailureReasonLabel(
+    feedback.result.reason ?? 'COMMAND REJECTED',
+  );
+  switch (basePanel.kind) {
+    case 'container':
+      return Object.freeze({ ...basePanel, feedback: reason });
+    case 'craft':
+      return Object.freeze({
+        ...basePanel,
+        rows: Object.freeze(basePanel.rows.map((row) =>
+          feedback.panelTargetId !== null
+          && feedback.panelTargetId !== undefined
+          && row.id === feedback.panelTargetId
+            ? Object.freeze({
+                ...row,
+                state: 'BLOCKED' as const,
+                reason,
+              })
+            : row,
+        )),
+      });
+    case 'build':
+      return Object.freeze({
+        ...basePanel,
+        placementState: 'INVALID' as const,
+        reason,
+      });
+    case 'machine':
+      return Object.freeze({ ...basePanel, reason });
+    case 'inventory':
+    case 'recovery':
+    case 'progression':
+    case 'map':
+      return basePanel;
+  }
+}
+
 function panel(
   input: Phase1RuntimePresentationInput,
 ): Phase1PanelPresentation | null {
+  if (input.presentationPanel !== undefined) {
+    return applyPhase1AuthoritativeCommandFeedback(
+      input.presentationPanel,
+      input.commandFeedback,
+    );
+  }
+
   const request = input.panel;
   if (request === null || request === undefined) return null;
+  let projected: Phase1PanelPresentation;
   switch (request.kind) {
     case 'inventory':
-      return inventoryPanel(input, request.selectedStackId ?? null);
+      projected = inventoryPanel(input, request.selectedStackId ?? null);
+      break;
     case 'container':
-      return containerPanel(input, request.container);
+      projected = containerPanel(input, request.container);
+      break;
     case 'machine':
-      return machinePanel(request, input.commandFeedback);
+      projected = machinePanel(request, input.commandFeedback);
+      break;
     case 'recovery':
-      return recoveryPanel(input, request.deathCache);
+      projected = recoveryPanel(input, request.deathCache);
+      break;
     case 'progression':
-      return progressionPanel(input.catalog, input.progression);
+      projected = progressionPanel(input.catalog, input.progression);
+      break;
     case 'map':
-      return mapPanel(request);
+      projected = mapPanel(request);
+      break;
   }
+  return applyPhase1AuthoritativeCommandFeedback(
+    projected,
+    input.commandFeedback,
+  );
 }
 
 export function projectPhase1RuntimePresentation(

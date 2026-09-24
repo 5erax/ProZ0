@@ -23,6 +23,7 @@ import {
   HostedPhase1PresentationSource,
 } from '../../src/client/runtime/HostedPhase1PresentationSource';
 import {
+  applyPhase1AuthoritativeCommandFeedback,
   projectPhase1RuntimePresentation,
 } from '../../src/client/runtime/Phase1PresentationBinding';
 import { PHASE1_WORLD_GENERATION_VERSION } from '../../src/world/phase1/Phase1ChunkGenerator';
@@ -182,7 +183,14 @@ describe('P1-UI-001 authoritative presentation binding', () => {
           kind: 'storage-crate',
           ownerPlayerId: null,
           revision: 0,
-          stacks: Object.freeze([]),
+          stacks: Object.freeze([
+            Object.freeze({
+              stackId: 'ore',
+              itemDefinitionId: 'item:metal-ore',
+              quantity: 20,
+              condition: null,
+            }),
+          ]),
         } satisfies ContainerState),
       ]),
     });
@@ -225,6 +233,25 @@ describe('P1-UI-001 authoritative presentation binding', () => {
     });
     if (stale.status !== 'rejected') {
       throw new Error('Expected authoritative stale rejection.');
+    }
+
+    const capacity = items.execute({
+      type: 'transfer',
+      operationId: 'presentation:capacity-transfer',
+      playerId: 'p1',
+      sourceContainerId: 'crate:shared',
+      sourceExpectedRevision: 0,
+      targetContainerId: 'inventory:p1',
+      targetExpectedRevision: 0,
+      sourceStackId: 'ore',
+      quantity: 20,
+    });
+    expect(capacity).toMatchObject({
+      status: 'rejected',
+      reason: 'TARGET_CAPACITY_WEIGHT',
+    });
+    if (capacity.status !== 'rejected') {
+      throw new Error('Expected authoritative capacity rejection.');
     }
 
     const inventory = items.getContainerView('inventory:p1');
@@ -312,6 +339,97 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       kind: 'progression',
       levelLabel: 'Level 1',
       xpLabel: '20 / 100 XP',
+    });
+
+    const capacityState = projectPhase1RuntimePresentation({
+      catalog,
+      survival: survival.getPlayerView('p1'),
+      inventory,
+      environment: world.getEnvironmentView(),
+      progression: progression.getPlayerView('p1'),
+      commandFeedback: {
+        inputLabel: 'E',
+        verb: 'TRANSFER',
+        target: 'Player Inventory',
+        result: Object.freeze({
+          operationId: capacity.operationId,
+          status: 'rejected',
+          acceptedAuthorityTick: 2,
+          authorityIngressOrdinal: 2,
+          reason: capacity.reason,
+        }),
+      },
+    });
+    expect(capacityState.interaction).toMatchObject({
+      state: 'BLOCKED',
+      reason: 'INVENTORY WEIGHT LIMIT',
+    });
+
+    const rejection = Object.freeze({
+      inputLabel: 'E',
+      verb: 'CRAFT',
+      target: 'Cordage',
+      panelTargetId: 'recipe:cordage',
+      result: Object.freeze({
+        operationId: 'presentation:craft-rejected',
+        status: 'rejected' as const,
+        acceptedAuthorityTick: 3,
+        authorityIngressOrdinal: 3,
+        reason: 'STALE_REVISION',
+      }),
+    });
+    expect(applyPhase1AuthoritativeCommandFeedback(
+      Object.freeze({
+        kind: 'craft',
+        title: 'Craft',
+        rows: Object.freeze([
+          Object.freeze({
+            id: 'recipe:cordage',
+            name: 'Cordage',
+            outputLabel: '×1',
+            requirementLabel: 'Plant Fiber',
+            state: 'AVAILABLE' as const,
+            reason: null,
+          }),
+        ]),
+      }),
+      rejection,
+    )).toMatchObject({
+      kind: 'craft',
+      rows: [{
+        id: 'recipe:cordage',
+        state: 'BLOCKED',
+        reason: 'STALE / WORLD STATE CHANGED',
+      }],
+    });
+    expect(applyPhase1AuthoritativeCommandFeedback(
+      Object.freeze({
+        kind: 'build',
+        title: 'Build',
+        selectedStructure: 'Workbench',
+        sourceKitLabel: 'Workbench Kit ×1',
+        placementState: 'VALID' as const,
+        reason: null,
+      }),
+      rejection,
+    )).toMatchObject({
+      kind: 'build',
+      placementState: 'INVALID',
+      reason: 'STALE / WORLD STATE CHANGED',
+    });
+    expect(applyPhase1AuthoritativeCommandFeedback(
+      Object.freeze({
+        kind: 'machine',
+        title: 'Condenser',
+        stateLabel: 'RUNNING' as const,
+        powerLabel: '5 PU',
+        outputLabel: '0/4 Clean Water',
+        reason: null,
+      }),
+      rejection,
+    )).toMatchObject({
+      kind: 'machine',
+      reason: 'STALE / WORLD STATE CHANGED',
     });
   });
 
