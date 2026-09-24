@@ -2,9 +2,11 @@ import type {
   CommandResultV1,
   GameplayCommandEnvelopeV1,
   JsonValue,
+  OperationStatusV1,
 } from '../../protocol';
 
 interface PendingOperation {
+  readonly ownerPlayerId: string;
   readonly signature: string;
   readonly acceptedAuthorityTick: number;
   readonly authorityIngressOrdinal: number;
@@ -55,6 +57,7 @@ export class OperationResultCache {
 
   public begin(
     operationId: string,
+    ownerPlayerId: string,
     signature: string,
     acceptedAuthorityTick: number,
     authorityIngressOrdinal: number,
@@ -65,19 +68,22 @@ export class OperationResultCache {
     | { readonly status: 'conflict' } {
     const resolved = this.resolved.get(operationId);
     if (resolved !== undefined) {
-      return resolved.signature === signature
+      return resolved.ownerPlayerId === ownerPlayerId
+        && resolved.signature === signature
         ? Object.freeze({ status: 'resolved', result: resolved.result })
         : Object.freeze({ status: 'conflict' });
     }
 
     const pending = this.pending.get(operationId);
     if (pending !== undefined) {
-      return pending.signature === signature
+      return pending.ownerPlayerId === ownerPlayerId
+        && pending.signature === signature
         ? Object.freeze({ status: 'pending-duplicate' })
         : Object.freeze({ status: 'conflict' });
     }
 
     this.pending.set(operationId, Object.freeze({
+      ownerPlayerId,
       signature,
       acceptedAuthorityTick,
       authorityIngressOrdinal,
@@ -98,6 +104,41 @@ export class OperationResultCache {
       ...pending,
       result,
     }));
+  }
+
+  public status(
+    operationId: string,
+    ownerPlayerId: string,
+  ): OperationStatusV1 {
+    const resolved = this.resolved.get(operationId);
+    if (
+      resolved !== undefined
+      && resolved.ownerPlayerId === ownerPlayerId
+    ) {
+      return Object.freeze({
+        operationId,
+        state: 'resolved',
+        result: resolved.result,
+      });
+    }
+
+    const pending = this.pending.get(operationId);
+    if (
+      pending !== undefined
+      && pending.ownerPlayerId === ownerPlayerId
+    ) {
+      return Object.freeze({
+        operationId,
+        state: 'accepted-pending',
+        acceptedAuthorityTick: pending.acceptedAuthorityTick,
+        authorityIngressOrdinal: pending.authorityIngressOrdinal,
+      });
+    }
+
+    return Object.freeze({
+      operationId,
+      state: 'unknown',
+    });
   }
 
   public get(operationId: string): CommandResultV1 | null {
