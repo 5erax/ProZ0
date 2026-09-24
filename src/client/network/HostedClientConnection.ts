@@ -80,6 +80,7 @@ export class HostedClientConnection {
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
   private readonly playerMotions = new Map<string, PlayerMotionViewV1>();
+  private readonly readModelListeners = new Set<() => void>();
   private readonly operationStatuses =
     new Map<string, OperationStatusV1>();
   private durableSaveRevision: number | null = null;
@@ -99,6 +100,11 @@ export class HostedClientConnection {
   }
 
   public handleText(text: string): void {
+    this.applyServerText(text);
+    this.notifyReadModelListeners();
+  }
+
+  private applyServerText(text: string): void {
     const envelope = parseServerEnvelope(text);
     if (envelope === null) {
       this.state = 'RESYNC_REQUIRED';
@@ -197,6 +203,13 @@ export class HostedClientConnection {
           && typeof motion.position?.y === 'number'
           && Number.isFinite(motion.position.y)
           && typeof motion.locomotionState === 'string'
+          && [
+            'LOCAL',
+            'TEAM_A',
+            'TEAM_B',
+            'TEAM_C',
+            'UNASSIGNED',
+          ].includes(motion.presentationIdentitySlot)
         ) {
           this.playerMotions.set(
             motion.playerId,
@@ -347,6 +360,13 @@ export class HostedClientConnection {
     );
   }
 
+  public subscribeReadModel(listener: () => void): () => void {
+    this.readModelListeners.add(listener);
+    return () => {
+      this.readModelListeners.delete(listener);
+    };
+  }
+
   public getCommandResult(operationId: string): CommandResultV1 | null {
     return this.commandResults.get(operationId) ?? null;
   }
@@ -367,6 +387,12 @@ export class HostedClientConnection {
 
   public getSessionClosingStatus(): 'SUCCESS' | 'SAVE_FAILED' | null {
     return this.sessionClosingStatus;
+  }
+
+  private notifyReadModelListeners(): void {
+    for (const listener of this.readModelListeners) {
+      listener();
+    }
   }
 
   private send(

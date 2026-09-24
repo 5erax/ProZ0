@@ -161,8 +161,16 @@ export type OperationStatusV1 =
       readonly result: CommandResultV1;
     };
 
+export type PresentationIdentitySlotV1 =
+  | 'LOCAL'
+  | 'TEAM_A'
+  | 'TEAM_B'
+  | 'TEAM_C'
+  | 'UNASSIGNED';
+
 export interface PlayerMotionViewV1 {
   readonly playerId: string;
+  readonly presentationIdentitySlot: PresentationIdentitySlotV1;
   readonly authorityTick: number;
   readonly lastProcessedInputSeq: number;
   readonly position: {

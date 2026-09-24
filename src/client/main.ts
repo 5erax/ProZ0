@@ -20,6 +20,9 @@ import { resolvePhase1PresentationQaFixture } from './qa/Phase1PresentationFixtu
 import { resolveVisualQaFixture } from './qa/VisualQaFixture';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
+import {
+  mountPhase1Presentation,
+} from './runtime/Phase1PresentationMount';
 import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
@@ -28,18 +31,24 @@ export interface RuntimeHandle {
   destroy(): void;
 }
 
-export interface BootProZ0Options {
-  readonly phase1PresentationSource?: Phase1PresentationSource;
-}
+export type BootProZ0Options =
+  | {
+      readonly mode: 'local-demo';
+    }
+  | {
+      readonly mode: 'phase1-presentation';
+      readonly phase1PresentationSource: Phase1PresentationSource;
+      readonly presentationCanvas: HTMLCanvasElement;
+    };
 
-export async function bootProZ0(
+async function bootLocalDemo(
   root: HTMLElement,
-  options: BootProZ0Options = {},
 ): Promise<RuntimeHandle> {
-  root.dataset.runtimeStatus = 'booting';
-
   const visualQaFixture = resolveVisualQaFixture(window.location.search);
-  const phase1QaFixture = resolvePhase1PresentationQaFixture(window.location.search);
+  const phase1QaFixture = resolvePhase1PresentationQaFixture(
+    window.location.search,
+  );
+  root.dataset.runtimeMode = 'local-demo';
   root.dataset.visualQaMode = visualQaFixture.mode;
   root.dataset.phase1QaMode = phase1QaFixture?.mode ?? 'none';
 
@@ -60,20 +69,11 @@ export async function bootProZ0(
     presentation.canvas,
   );
   let phase1Hud: Phase1HudOverlay | null = null;
-  let unsubscribePhase1: (() => void) | null = null;
-  const phase1InitialState = options.phase1PresentationSource?.read()
-    ?? phase1QaFixture?.state
-    ?? null;
-  if (phase1InitialState !== null) {
+  if (phase1QaFixture !== null) {
     phase1Hud = createPhase1HudOverlay(
       root,
       presentation.canvas,
-      phase1InitialState,
-    );
-  }
-  if (options.phase1PresentationSource !== undefined) {
-    unsubscribePhase1 = options.phase1PresentationSource.subscribe(
-      (state) => phase1Hud?.update(state),
+      phase1QaFixture.state,
     );
   }
 
@@ -108,7 +108,6 @@ export async function bootProZ0(
       fixedStepHost.stop();
       input.stop();
       authority.stop();
-      unsubscribePhase1?.();
       phase1Hud?.destroy();
       viewportGuard.destroy();
       presentation.destroy();
@@ -118,11 +117,52 @@ export async function bootProZ0(
   };
 }
 
+function bootExternalPhase1Presentation(
+  root: HTMLElement,
+  options: Extract<
+    BootProZ0Options,
+    { readonly mode: 'phase1-presentation' }
+  >,
+): RuntimeHandle {
+  root.dataset.runtimeMode = 'phase1-presentation';
+  root.dataset.visualQaMode = 'none';
+  root.dataset.phase1QaMode = 'none';
+
+  const mount = mountPhase1Presentation(
+    root,
+    options.presentationCanvas,
+    options.phase1PresentationSource,
+  );
+
+  root.dataset.runtimeStatus = 'ready';
+  return {
+    destroy(): void {
+      mount.destroy();
+      root.dataset.runtimeStatus = 'stopped';
+    },
+  };
+}
+
+export async function bootProZ0(
+  root: HTMLElement,
+  options: BootProZ0Options,
+): Promise<RuntimeHandle> {
+  root.dataset.runtimeStatus = 'booting';
+
+  if (options.mode === 'phase1-presentation') {
+    return bootExternalPhase1Presentation(root, options);
+  }
+
+  return bootLocalDemo(root);
+}
+
 const autoBootRoot = document.querySelector<HTMLElement>('[data-proz0-autoboot]');
 
 if (autoBootRoot !== null) {
-  void bootProZ0(autoBootRoot).catch((error: unknown) => {
-    autoBootRoot.dataset.runtimeStatus = 'failed';
-    console.error('ProZ0 runtime failed to start.', error);
-  });
+  void bootProZ0(autoBootRoot, { mode: 'local-demo' }).catch(
+    (error: unknown) => {
+      autoBootRoot.dataset.runtimeStatus = 'failed';
+      console.error('ProZ0 runtime failed to start.', error);
+    },
+  );
 }

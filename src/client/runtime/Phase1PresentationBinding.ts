@@ -284,22 +284,50 @@ function worldTimeLabel(environment: Readonly<Phase1EnvironmentView>): string {
   return `${hours}:${minutes}`;
 }
 
+const TEAM_IDENTITY_PRESENTATION = Object.freeze({
+  TEAM_A: Object.freeze({
+    order: 0,
+    label: 'TEAM A',
+    markerShape: 'circle' as const,
+  }),
+  TEAM_B: Object.freeze({
+    order: 1,
+    label: 'TEAM B',
+    markerShape: 'diamond' as const,
+  }),
+  TEAM_C: Object.freeze({
+    order: 2,
+    label: 'TEAM C',
+    markerShape: 'triangle' as const,
+  }),
+});
+
 function teammates(
   localPlayerId: string,
   motions: readonly Readonly<PlayerMotionViewV1>[],
 ): readonly Phase1TeammatePresentation[] {
-  const shapes = ['circle', 'diamond', 'triangle'] as const;
   return Object.freeze(
     motions
-      .filter((motion) => motion.playerId !== localPlayerId)
-      .sort((left, right) => left.playerId.localeCompare(right.playerId))
-      .slice(0, 3)
-      .map((motion, index) => Object.freeze({
-        playerId: motion.playerId,
-        label: `TEAM ${String.fromCharCode(65 + index)}`,
-        markerShape: shapes[index] ?? 'circle',
-        stateLabel: motion.locomotionState.toUpperCase(),
-      })),
+      .filter((motion) =>
+        motion.playerId !== localPlayerId
+        && motion.presentationIdentitySlot !== 'LOCAL'
+        && motion.presentationIdentitySlot !== 'UNASSIGNED',
+      )
+      .map((motion) => {
+        const identity =
+          TEAM_IDENTITY_PRESENTATION[motion.presentationIdentitySlot];
+        return Object.freeze({
+          order: identity.order,
+          presentation: Object.freeze({
+            playerId: motion.playerId,
+            label: identity.label,
+            markerShape: identity.markerShape,
+            stateLabel: motion.locomotionState.toUpperCase(),
+          }),
+        });
+      })
+      .sort((left, right) => left.order - right.order)
+      .map((entry) => entry.presentation),
   );
 }
 

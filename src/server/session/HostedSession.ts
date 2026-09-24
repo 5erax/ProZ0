@@ -3,6 +3,7 @@ import type {
   ClientHelloV1,
   ContentCompatibilityIdentityV1Wire,
   MovementInputV1,
+  PresentationIdentitySlotV1,
   ServerEnvelopeV1,
   ServerMessageTypeV1,
   SessionRejectionReasonV1,
@@ -129,6 +130,8 @@ export class HostedSession {
   private readonly activeTransportByPlayer = new Map<string, string>();
   private readonly resumeToPlayer = new Map<string, string>();
   private readonly playerToResume = new Map<string, string>();
+  private readonly presentationSlotsByViewer =
+    new Map<string, Map<string, PresentationIdentitySlotV1>>();
   private nextPlayerOrdinal = 1;
 
   public constructor(private readonly config: HostedSessionConfig) {
@@ -413,6 +416,33 @@ export class HostedSession {
         .filter((connection) => connection.state !== 'DISCONNECTED')
         .map(freezeConnection),
     );
+  }
+
+  public getPresentationIdentitySlot(
+    viewerPlayerId: string,
+    subjectPlayerId: string,
+  ): PresentationIdentitySlotV1 {
+    if (viewerPlayerId === subjectPlayerId) {
+      return 'LOCAL';
+    }
+
+    let slots = this.presentationSlotsByViewer.get(viewerPlayerId);
+    if (slots === undefined) {
+      slots = new Map<string, PresentationIdentitySlotV1>();
+      this.presentationSlotsByViewer.set(viewerPlayerId, slots);
+    }
+
+    const existing = slots.get(subjectPlayerId);
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const used = new Set(slots.values());
+    const slot = (['TEAM_A', 'TEAM_B', 'TEAM_C'] as const).find(
+      (candidate) => !used.has(candidate),
+    ) ?? 'UNASSIGNED';
+    slots.set(subjectPlayerId, slot);
+    return slot;
   }
 
   public nextServerEnvelope(

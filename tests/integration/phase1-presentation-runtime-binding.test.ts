@@ -22,6 +22,7 @@ import { HostedClientConnection, type HostedClientTransport } from '../../src/cl
 import {
   HostedPhase1PresentationSource,
 } from '../../src/client/runtime/HostedPhase1PresentationSource';
+import { resolvePhase1PresentationQaFixture } from '../../src/client/qa/Phase1PresentationFixture';
 import {
   applyPhase1AuthoritativeCommandFeedback,
   projectPhase1RuntimePresentation,
@@ -94,6 +95,7 @@ function baseline(
     players: Object.freeze([
       Object.freeze({
         playerId: 'player:1',
+        presentationIdentitySlot: 'LOCAL',
         authorityTick: 8,
         lastProcessedInputSeq: 4,
         position: Object.freeze({ x: 10, y: 12 }),
@@ -103,6 +105,7 @@ function baseline(
       ...(includeSharedState
         ? [Object.freeze({
             playerId: 'player:2',
+            presentationIdentitySlot: 'TEAM_A',
             authorityTick: 8,
             lastProcessedInputSeq: 3,
             position: Object.freeze({ x: 20, y: 22 }),
@@ -266,6 +269,7 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       playerMotions: Object.freeze([
         Object.freeze({
           playerId: 'p1',
+          presentationIdentitySlot: 'LOCAL',
           authorityTick: 1,
           lastProcessedInputSeq: 0,
           position: Object.freeze({ x: 0, y: 0 }),
@@ -274,6 +278,7 @@ describe('P1-UI-001 authoritative presentation binding', () => {
         }),
         Object.freeze({
           playerId: 'p2',
+          presentationIdentitySlot: 'TEAM_B',
           authorityTick: 1,
           lastProcessedInputSeq: 0,
           position: Object.freeze({ x: 1, y: 1 }),
@@ -417,6 +422,68 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       placementState: 'INVALID',
       reason: 'STALE / WORLD STATE CHANGED',
     });
+
+
+    const identityCommon = {
+      catalog,
+      survival: survival.getPlayerView('p1'),
+      inventory,
+      environment: world.getEnvironmentView(),
+      progression: progression.getPlayerView('p1'),
+    } as const;
+    const identityA = Object.freeze({
+      playerId: 'p2',
+      presentationIdentitySlot: 'TEAM_A' as const,
+      authorityTick: 3,
+      lastProcessedInputSeq: 0,
+      position: Object.freeze({ x: 1, y: 0 }),
+      facing: 'west',
+      locomotionState: 'moving',
+    });
+    const identityB = Object.freeze({
+      playerId: 'p3',
+      presentationIdentitySlot: 'TEAM_B' as const,
+      authorityTick: 3,
+      lastProcessedInputSeq: 0,
+      position: Object.freeze({ x: 2, y: 0 }),
+      facing: 'west',
+      locomotionState: 'idle',
+    });
+    const localMotion = Object.freeze({
+      playerId: 'p1',
+      presentationIdentitySlot: 'LOCAL' as const,
+      authorityTick: 3,
+      lastProcessedInputSeq: 0,
+      position: Object.freeze({ x: 0, y: 0 }),
+      facing: 'east',
+      locomotionState: 'idle',
+    });
+
+    const rosterForward = projectPhase1RuntimePresentation({
+      ...identityCommon,
+      playerMotions: Object.freeze([localMotion, identityA, identityB]),
+    });
+    const rosterReverse = projectPhase1RuntimePresentation({
+      ...identityCommon,
+      playerMotions: Object.freeze([identityB, identityA, localMotion]),
+    });
+    expect(rosterForward.teammates).toEqual(rosterReverse.teammates);
+    expect(rosterForward.teammates).toContainEqual(expect.objectContaining({
+      playerId: 'p2',
+      label: 'TEAM A',
+      markerShape: 'circle',
+    }));
+
+    const afterLeave = projectPhase1RuntimePresentation({
+      ...identityCommon,
+      playerMotions: Object.freeze([localMotion, identityA]),
+    });
+    expect(afterLeave.teammates).toContainEqual(expect.objectContaining({
+      playerId: 'p2',
+      label: 'TEAM A',
+      markerShape: 'circle',
+    }));
+
     expect(applyPhase1AuthoritativeCommandFeedback(
       Object.freeze({
         kind: 'machine',
@@ -442,11 +509,26 @@ describe('P1-UI-001 authoritative presentation binding', () => {
     const initial = baseline('snapshot:a', 'epoch:a', true);
     connect(first, initial, 'epoch:a');
 
-    const source = new HostedPhase1PresentationSource(first);
+    const fixture = resolvePhase1PresentationQaFixture('?qaPhase1=overview');
+    if (fixture === null) {
+      throw new Error('Expected Phase 1 overview fixture.');
+    }
+    const source = new HostedPhase1PresentationSource({
+      connection: first,
+      initialState: fixture.state,
+      project: (readModel) => Object.freeze({
+        ...fixture.state,
+        world: Object.freeze({
+          ...fixture.state.world,
+          teammateCount: readModel.getPlayerMotions().length,
+        }),
+      }),
+    });
     expect(source.getPlayerMotions().map((entry) => entry.playerId)).toEqual([
       'player:1',
       'player:2',
     ]);
+    expect(source.read().world.teammateCount).toBe(2);
     expect(source.getExploration('region:0,0')).toMatchObject({
       revision: 4,
       words: [1, 2, 3],
@@ -503,10 +585,21 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       baseline('snapshot:b', 'epoch:b', false),
       'epoch:b',
     );
-    const refreshed = new HostedPhase1PresentationSource(rejoined);
+    const refreshed = new HostedPhase1PresentationSource({
+      connection: rejoined,
+      initialState: fixture.state,
+      project: (readModel) => Object.freeze({
+        ...fixture.state,
+        world: Object.freeze({
+          ...fixture.state.world,
+          teammateCount: readModel.getPlayerMotions().length,
+        }),
+      }),
+    });
     expect(refreshed.getPlayerMotions().map((entry) => entry.playerId)).toEqual([
       'player:1',
     ]);
+    expect(refreshed.read().world.teammateCount).toBe(1);
     expect(refreshed.getExploration('region:0,0')).toBeNull();
     expect(refreshed.getRuin('ruin:alpha')).toBeNull();
     expect(refreshed.getCommandResult('operation:stale')).toBeNull();

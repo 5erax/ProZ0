@@ -265,6 +265,7 @@ function runtimeBindingFixtureState(): Phase1PresentationState {
     playerMotions: Object.freeze([
       Object.freeze({
         playerId: 'local-player',
+        presentationIdentitySlot: 'LOCAL',
         authorityTick: 60,
         lastProcessedInputSeq: 10,
         position: Object.freeze({ x: 10, y: 10 }),
@@ -273,6 +274,7 @@ function runtimeBindingFixtureState(): Phase1PresentationState {
       }),
       Object.freeze({
         playerId: 'player:remote',
+        presentationIdentitySlot: 'TEAM_A',
         authorityTick: 60,
         lastProcessedInputSeq: 8,
         position: Object.freeze({ x: 14, y: 12 }),
