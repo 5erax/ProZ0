@@ -8,6 +8,7 @@ import {
   type GameplayCommandEnvelopeV1,
   type JsonValue,
   type MovementInputV1,
+  type OperationStatusV1,
   type RevisionedAggregateViewV1,
   type ServerEnvelopeV1,
 } from '../../protocol';
@@ -77,6 +78,8 @@ export class HostedClientConnection {
   private resumeCredential: string | null;
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
+  private readonly operationStatuses =
+    new Map<string, OperationStatusV1>();
   private durableSaveRevision: number | null = null;
   private rttMs: number | null = null;
   private sessionClosingStatus: 'SUCCESS' | 'SAVE_FAILED' | null = null;
@@ -175,18 +178,24 @@ export class HostedClientConnection {
 
       case 'COMMAND_RESULT': {
         const result = envelope.payload as unknown as CommandResultV1;
-        this.commandResults.set(result.operationId, Object.freeze({
-          ...result,
+        const frozen = Object.freeze({ ...result });
+        this.commandResults.set(result.operationId, frozen);
+        this.operationStatuses.set(result.operationId, Object.freeze({
+          operationId: result.operationId,
+          state: 'resolved',
+          result: frozen,
         }));
         break;
       }
 
       case 'OPERATION_STATUS': {
-        const status = envelope.payload as unknown as {
-          readonly known: boolean;
-          readonly result?: CommandResultV1;
-        };
-        if (status.known && status.result !== undefined) {
+        const status =
+          envelope.payload as unknown as OperationStatusV1;
+        this.operationStatuses.set(
+          status.operationId,
+          Object.freeze({ ...status }),
+        );
+        if (status.state === 'resolved') {
           this.commandResults.set(
             status.result.operationId,
             Object.freeze({ ...status.result }),
@@ -300,6 +309,12 @@ export class HostedClientConnection {
 
   public getCommandResult(operationId: string): CommandResultV1 | null {
     return this.commandResults.get(operationId) ?? null;
+  }
+
+  public getOperationStatus(
+    operationId: string,
+  ): OperationStatusV1 | null {
+    return this.operationStatuses.get(operationId) ?? null;
   }
 
   public getDurableSaveRevision(): number | null {
