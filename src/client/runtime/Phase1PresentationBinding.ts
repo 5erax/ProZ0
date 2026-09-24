@@ -302,30 +302,44 @@ const TEAM_IDENTITY_PRESENTATION = Object.freeze({
   }),
 });
 
+function teamIdentityPresentation(
+  slot: PlayerMotionViewV1['presentationIdentitySlot'],
+) {
+  switch (slot) {
+    case 'TEAM_A':
+      return TEAM_IDENTITY_PRESENTATION.TEAM_A;
+    case 'TEAM_B':
+      return TEAM_IDENTITY_PRESENTATION.TEAM_B;
+    case 'TEAM_C':
+      return TEAM_IDENTITY_PRESENTATION.TEAM_C;
+    case 'LOCAL':
+    case 'UNASSIGNED':
+      return null;
+  }
+}
+
 function teammates(
   localPlayerId: string,
   motions: readonly Readonly<PlayerMotionViewV1>[],
 ): readonly Phase1TeammatePresentation[] {
+  const projected = motions.flatMap((motion) => {
+    if (motion.playerId === localPlayerId) return [];
+    const identity = teamIdentityPresentation(
+      motion.presentationIdentitySlot,
+    );
+    if (identity === null) return [];
+    return [Object.freeze({
+      order: identity.order,
+      presentation: Object.freeze({
+        playerId: motion.playerId,
+        label: identity.label,
+        markerShape: identity.markerShape,
+        stateLabel: motion.locomotionState.toUpperCase(),
+      }),
+    })];
+  });
   return Object.freeze(
-    motions
-      .filter((motion) =>
-        motion.playerId !== localPlayerId
-        && motion.presentationIdentitySlot !== 'LOCAL'
-        && motion.presentationIdentitySlot !== 'UNASSIGNED',
-      )
-      .map((motion) => {
-        const identity =
-          TEAM_IDENTITY_PRESENTATION[motion.presentationIdentitySlot];
-        return Object.freeze({
-          order: identity.order,
-          presentation: Object.freeze({
-            playerId: motion.playerId,
-            label: identity.label,
-            markerShape: identity.markerShape,
-            stateLabel: motion.locomotionState.toUpperCase(),
-          }),
-        });
-      })
+    projected
       .sort((left, right) => left.order - right.order)
       .map((entry) => entry.presentation),
   );
