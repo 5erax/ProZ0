@@ -137,11 +137,14 @@ export class HostedPhase1PresentationSource
       ruinEntityId,
       ruinDefinitionId: 'ruin:previous-civilization-ruin',
       revision: aggregate.revision,
-      discoveryState:
-        state.discoveryState as Phase1RuinRuntimeState['discoveryState'],
-      physicalRewardState:
+      discoveryState: (
+        state.discoveryState
+        as Phase1RuinRuntimeState['discoveryState']
+      ),
+      physicalRewardState: (
         state.physicalRewardState
-          as Phase1RuinRuntimeState['physicalRewardState'],
+        as Phase1RuinRuntimeState['physicalRewardState']
+      ),
     });
   }
 
