@@ -10,7 +10,13 @@ import {
   isMovementInputCode,
   mapMovementInput,
 } from './input/MovementInputMapper';
-import { createPixiPresentationAdapter } from './presentation';
+import {
+  createPhase1HudOverlay,
+  createPixiPresentationAdapter,
+  createViewportPresentationGuard,
+  type Phase1HudOverlay,
+} from './presentation';
+import { resolvePhase1PresentationQaFixture } from './qa/Phase1PresentationFixture';
 import { resolveVisualQaFixture } from './qa/VisualQaFixture';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
@@ -25,7 +31,9 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
   root.dataset.runtimeStatus = 'booting';
 
   const visualQaFixture = resolveVisualQaFixture(window.location.search);
+  const phase1QaFixture = resolvePhase1PresentationQaFixture(window.location.search);
   root.dataset.visualQaMode = visualQaFixture.mode;
+  root.dataset.phase1QaMode = phase1QaFixture?.mode ?? 'none';
 
   const authority = new LocalAuthorityHost({
     worldQuery: createPhase0MovementDemoWorld(),
@@ -39,6 +47,18 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
     solids: PHASE0_MOVEMENT_DEMO_SOLIDS,
     ...visualQaFixture.presentation,
   });
+  const viewportGuard = createViewportPresentationGuard(
+    root,
+    presentation.canvas,
+  );
+  let phase1Hud: Phase1HudOverlay | null = null;
+  if (phase1QaFixture !== null) {
+    phase1Hud = createPhase1HudOverlay(
+      root,
+      presentation.canvas,
+      phase1QaFixture.state,
+    );
+  }
 
   authority.start();
   input.start();
@@ -71,6 +91,8 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
       fixedStepHost.stop();
       input.stop();
       authority.stop();
+      phase1Hud?.destroy();
+      viewportGuard.destroy();
       presentation.destroy();
       root.replaceChildren();
       root.dataset.runtimeStatus = 'stopped';
