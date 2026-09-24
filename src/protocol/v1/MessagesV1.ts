@@ -144,11 +144,22 @@ export interface OperationStatusQueryV1 {
   readonly operationId: string;
 }
 
-export interface OperationStatusV1 {
-  readonly operationId: string;
-  readonly known: boolean;
-  readonly result?: CommandResultV1;
-}
+export type OperationStatusV1 =
+  | {
+      readonly operationId: string;
+      readonly state: 'unknown';
+    }
+  | {
+      readonly operationId: string;
+      readonly state: 'accepted-pending';
+      readonly acceptedAuthorityTick: number;
+      readonly authorityIngressOrdinal: number;
+    }
+  | {
+      readonly operationId: string;
+      readonly state: 'resolved';
+      readonly result: CommandResultV1;
+    };
 
 export interface PlayerMotionViewV1 {
   readonly playerId: string;
