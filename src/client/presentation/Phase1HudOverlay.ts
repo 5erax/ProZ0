@@ -7,9 +7,6 @@ import {
   type Phase1TeammatePresentation,
 } from './Phase1PresentationModel';
 
-const INTERNAL_WIDTH = 640;
-const INTERNAL_HEIGHT = 360;
-
 function createElement<K extends keyof HTMLElementTagNameMap>(
   document: Document,
   tag: K,
