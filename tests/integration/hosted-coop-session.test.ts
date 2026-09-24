@@ -39,11 +39,13 @@ interface ClientHarness {
 class CounterDispatcher implements HostedCommandDispatcher {
   public count = 0;
   public readonly ingress: number[] = [];
+  public readonly authorityTicks: number[] = [];
 
   public execute(
     context: HostedDomainCommandContext,
   ): HostedDomainCommandResult {
     this.ingress.push(context.authorityIngressOrdinal);
+    this.authorityTicks.push(context.authorityTick);
     if (context.command.commandType === 'reject-stale') {
       return Object.freeze({
         status: 'rejected',
@@ -624,7 +626,7 @@ describe('P1-NET-001 hosted session protocol', () => {
 
   it('continues canonical authority time from a nonzero durable checkpoint without offline replay', async () => {
     const persistence = new MemoryHostedPersistence(false, 22);
-    const { host } = createHost({
+    const { host, dispatcher } = createHost({
       persistence,
       idsPrefix: 'restart',
       initialDurabilityCheckpoint: {
@@ -640,8 +642,19 @@ describe('P1-NET-001 hosted session protocol', () => {
     });
     expect(host.getAuthorityTick()).toBe(240);
 
+    const restartedCommand = clientEnvelope(
+      player,
+      host,
+      'GAMEPLAY_COMMAND',
+      asJson(command('operation:restart-tick')),
+    );
+    player.nextClientSeq += 1;
+    expect(send(host, player.transportId, restartedCommand)).toEqual([]);
+
     host.step();
     expect(host.getAuthorityTick()).toBe(241);
+    expect(host.diagnostics().commandCommittedCount).toBe(1);
+    expect(dispatcher.authorityTicks).toEqual([241]);
 
     const closing = await host.drainSaveAndClose();
     expect(persistence.savedAuthorityTicks).toEqual([241]);
