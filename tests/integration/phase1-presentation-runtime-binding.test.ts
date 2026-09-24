@@ -529,6 +529,10 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       'player:2',
     ]);
     expect(source.read().world.teammateCount).toBe(2);
+    let sourceUpdateCount = 0;
+    const unsubscribeSource = source.subscribe(() => {
+      sourceUpdateCount += 1;
+    });
     expect(source.getExploration('region:0,0')).toMatchObject({
       revision: 4,
       words: [1, 2, 3],
@@ -546,6 +550,7 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       tombstone: true,
       state: null,
     }), { epoch: 'epoch:a', authorityTick: 9 }));
+    expect(sourceUpdateCount).toBe(1);
     expect(source.getRuin('ruin:alpha')).toBeNull();
 
     first.handleText(server(4, 'AGGREGATE_UPDATE', asJson({
@@ -571,6 +576,9 @@ describe('P1-UI-001 authoritative presentation binding', () => {
       status: 'rejected',
       reason: 'STALE_REVISION',
     });
+    expect(sourceUpdateCount).toBe(3);
+    unsubscribeSource();
+    source.destroy();
 
     const rejoinTransport = new MemoryTransport();
     const rejoined = new HostedClientConnection({
@@ -603,5 +611,6 @@ describe('P1-UI-001 authoritative presentation binding', () => {
     expect(refreshed.getExploration('region:0,0')).toBeNull();
     expect(refreshed.getRuin('ruin:alpha')).toBeNull();
     expect(refreshed.getCommandResult('operation:stale')).toBeNull();
+    refreshed.destroy();
   });
 });
