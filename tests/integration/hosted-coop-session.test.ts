@@ -71,14 +71,21 @@ class CounterDispatcher implements HostedCommandDispatcher {
 
 class MemoryHostedPersistence implements HostedPersistencePort {
   public saveCount = 0;
+  public readonly savedAuthorityTicks: number[] = [];
+  public readonly observedStatesAtSave: number[] = [];
 
   public constructor(
     private readonly fail = false,
     private readonly revision = 7,
+    private readonly observeState: (() => number) | null = null,
   ) {}
 
   public async save(authorityTick: number) {
     this.saveCount += 1;
+    this.savedAuthorityTicks.push(authorityTick);
+    if (this.observeState !== null) {
+      this.observedStatesAtSave.push(this.observeState());
+    }
     if (this.fail) throw new Error('injected-save-failure');
     return Object.freeze({
       authorityTick,
@@ -120,6 +127,10 @@ function createHost(options: {
   readonly persistence?: HostedPersistencePort;
   readonly resumeBindings?: ReadonlyMap<string, string>;
   readonly idsPrefix?: string;
+  readonly initialDurabilityCheckpoint?: {
+    readonly authorityTick: number;
+    readonly durableSaveRevision: number;
+  };
 } = {}) {
   const dispatcher = options.dispatcher ?? new CounterDispatcher();
   const persistence = options.persistence ?? new MemoryHostedPersistence();
@@ -152,6 +163,12 @@ function createHost(options: {
     },
     commandDispatcher: dispatcher,
     persistence,
+    ...(options.initialDurabilityCheckpoint === undefined
+      ? {}
+      : {
+          initialDurabilityCheckpoint:
+            options.initialDurabilityCheckpoint,
+        }),
   });
   host.start();
   return { host, dispatcher, persistence };
@@ -568,7 +585,8 @@ describe('P1-NET-001 hosted session protocol', () => {
     expect(send(host, resumed.transportId, query)[0]?.envelope).toMatchObject({
       messageType: 'OPERATION_STATUS',
       payload: {
-        known: true,
+        operationId: 'operation:lost-response',
+        state: 'resolved',
         result: {
           operationId: 'operation:lost-response',
           status: 'committed',
@@ -599,7 +617,278 @@ describe('P1-NET-001 hosted session protocol', () => {
       messageType: 'OPERATION_STATUS',
       payload: {
         operationId: 'operation:lost-response',
-        known: false,
+        state: 'unknown',
+      },
+    });
+  });
+
+  it('continues canonical authority time from a nonzero durable checkpoint without offline replay', async () => {
+    const persistence = new MemoryHostedPersistence(false, 22);
+    const { host } = createHost({
+      persistence,
+      idsPrefix: 'restart',
+      initialDurabilityCheckpoint: {
+        authorityTick: 240,
+        durableSaveRevision: 21,
+      },
+    });
+
+    const player = join(host, 'transport:restart');
+    expect(player.baseline).toMatchObject({
+      authorityTick: 240,
+      durableSaveRevision: 21,
+    });
+    expect(host.getAuthorityTick()).toBe(240);
+
+    host.step();
+    expect(host.getAuthorityTick()).toBe(241);
+
+    const closing = await host.drainSaveAndClose();
+    expect(persistence.savedAuthorityTicks).toEqual([241]);
+    expect(closing.some(
+      (entry) =>
+        entry.envelope.messageType === 'DURABILITY_CHECKPOINT'
+        && entry.envelope.authorityTick === 241
+        && (
+          entry.envelope.payload as unknown as {
+            readonly authorityTick: number;
+            readonly durableSaveRevision: number;
+          }
+        ).authorityTick === 241,
+    )).toBe(true);
+  });
+
+  it('drains every pre-cutoff accepted command exactly once before save and rejects post-cutoff commands', async () => {
+    const dispatcher = new CounterDispatcher();
+    const persistence = new MemoryHostedPersistence(
+      false,
+      31,
+      () => dispatcher.count,
+    );
+    const { host } = createHost({
+      dispatcher,
+      persistence,
+      idsPrefix: 'drain',
+    });
+    const player = join(host, 'transport:drain');
+
+    const accepted = clientEnvelope(
+      player,
+      host,
+      'GAMEPLAY_COMMAND',
+      asJson(command('operation:pre-cutoff', { amount: 1 })),
+    );
+    player.nextClientSeq += 1;
+    expect(send(host, player.transportId, accepted)).toEqual([]);
+    expect(dispatcher.count).toBe(0);
+    expect(host.getAuthorityTick()).toBe(0);
+
+    const closingPromise = host.drainSaveAndClose();
+    expect(host.getSessionState()).toBe('SAVING');
+
+    const postCutoff = clientEnvelope(
+      player,
+      host,
+      'GAMEPLAY_COMMAND',
+      asJson(command('operation:post-cutoff', { amount: 1 })),
+    );
+    player.nextClientSeq += 1;
+    expect(send(host, player.transportId, postCutoff)[0]?.envelope)
+      .toMatchObject({
+        messageType: 'ERROR',
+        payload: { reason: 'SESSION_CLOSING' },
+      });
+
+    const closing = await closingPromise;
+    expect(dispatcher.count).toBe(1);
+    expect(dispatcher.ingress).toEqual([1]);
+    expect(persistence.observedStatesAtSave).toEqual([1]);
+    expect(persistence.savedAuthorityTicks).toEqual([1]);
+    expect(closing.filter(
+      (entry) =>
+        entry.envelope.messageType === 'COMMAND_RESULT'
+        && (
+          entry.envelope.payload as unknown as CommandResultV1
+        ).operationId === 'operation:pre-cutoff',
+    )).toHaveLength(1);
+    expect(closing.some(
+      (entry) =>
+        entry.envelope.messageType === 'DURABILITY_CHECKPOINT'
+        && (
+          entry.envelope.payload as unknown as {
+            readonly authorityTick: number;
+          }
+        ).authorityTick === 1,
+    )).toBe(true);
+  });
+
+  it('keeps pre-cutoff resolved live authority canonical when the final save fails', async () => {
+    const dispatcher = new CounterDispatcher();
+    const persistence = new MemoryHostedPersistence(
+      true,
+      1,
+      () => dispatcher.count,
+    );
+    const { host } = createHost({
+      dispatcher,
+      persistence,
+      idsPrefix: 'drain-fail',
+    });
+    const player = join(host, 'transport:drain-fail');
+
+    const accepted = clientEnvelope(
+      player,
+      host,
+      'GAMEPLAY_COMMAND',
+      asJson(command('operation:survives-save-failure')),
+    );
+    player.nextClientSeq += 1;
+    send(host, player.transportId, accepted);
+
+    const closing = await host.drainSaveAndClose();
+    expect(dispatcher.count).toBe(1);
+    expect(persistence.observedStatesAtSave).toEqual([1]);
+    expect(host.getAuthorityTick()).toBe(1);
+    expect(host.getSessionState()).toBe('FAILED');
+    expect(closing.some(
+      (entry) =>
+        entry.envelope.messageType === 'COMMAND_RESULT'
+        && (
+          entry.envelope.payload as unknown as CommandResultV1
+        ).operationId === 'operation:survives-save-failure',
+    )).toBe(true);
+    expect(closing.some(
+      (entry) =>
+        entry.envelope.messageType === 'SESSION_CLOSING'
+        && (
+          entry.envelope.payload as unknown as {
+            readonly saveStatus: string;
+          }
+        ).saveStatus === 'SAVE_FAILED',
+    )).toBe(true);
+  });
+
+  it('reports accepted-pending and resolved operation states only to the owning PlayerId', () => {
+    const dispatcher = new CounterDispatcher();
+    const { host } = createHost({
+      dispatcher,
+      idsPrefix: 'pending-owner',
+    });
+    const owner = join(host, 'transport:pending-owner');
+    const other = join(host, 'transport:pending-other');
+
+    const pendingCommand = clientEnvelope(
+      owner,
+      host,
+      'GAMEPLAY_COMMAND',
+      asJson(command('operation:pending-owner', { amount: 1 })),
+    );
+    owner.nextClientSeq += 1;
+    expect(send(host, owner.transportId, pendingCommand)).toEqual([]);
+
+    host.disconnect(owner.transportId);
+    const resumed = join(
+      host,
+      'transport:pending-resumed',
+      owner.resumeCredential,
+    );
+
+    const pendingQuery = clientEnvelope(
+      resumed,
+      host,
+      'OPERATION_STATUS_QUERY',
+      asJson({ operationId: 'operation:pending-owner' }),
+    );
+    resumed.nextClientSeq += 1;
+    expect(send(host, resumed.transportId, pendingQuery)[0]?.envelope)
+      .toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId: 'operation:pending-owner',
+          state: 'accepted-pending',
+          acceptedAuthorityTick: 0,
+          authorityIngressOrdinal: 1,
+        },
+      });
+
+    const crossPlayerQuery = clientEnvelope(
+      other,
+      host,
+      'OPERATION_STATUS_QUERY',
+      asJson({ operationId: 'operation:pending-owner' }),
+    );
+    other.nextClientSeq += 1;
+    expect(send(host, other.transportId, crossPlayerQuery)[0]?.envelope)
+      .toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId: 'operation:pending-owner',
+          state: 'unknown',
+        },
+      });
+
+    host.step();
+    expect(dispatcher.count).toBe(1);
+
+    const resolvedQuery = clientEnvelope(
+      resumed,
+      host,
+      'OPERATION_STATUS_QUERY',
+      asJson({ operationId: 'operation:pending-owner' }),
+    );
+    resumed.nextClientSeq += 1;
+    expect(send(host, resumed.transportId, resolvedQuery)[0]?.envelope)
+      .toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          state: 'resolved',
+          result: {
+            operationId: 'operation:pending-owner',
+            status: 'committed',
+          },
+        },
+      });
+
+    const crossPlayerResolved = clientEnvelope(
+      other,
+      host,
+      'OPERATION_STATUS_QUERY',
+      asJson({ operationId: 'operation:pending-owner' }),
+    );
+    other.nextClientSeq += 1;
+    expect(
+      send(host, other.transportId, crossPlayerResolved)[0]?.envelope,
+    ).toMatchObject({
+      messageType: 'OPERATION_STATUS',
+      payload: {
+        operationId: 'operation:pending-owner',
+        state: 'unknown',
+      },
+    });
+
+    const restarted = createHost({
+      resumeBindings: host.exportResumeBindings(),
+      idsPrefix: 'pending-new-epoch',
+    }).host;
+    const newEpochOwner = join(
+      restarted,
+      'transport:pending-new-epoch',
+      owner.resumeCredential,
+    );
+    const oldQuery = clientEnvelope(
+      newEpochOwner,
+      restarted,
+      'OPERATION_STATUS_QUERY',
+      asJson({ operationId: 'operation:pending-owner' }),
+    );
+    newEpochOwner.nextClientSeq += 1;
+    expect(
+      send(restarted, newEpochOwner.transportId, oldQuery)[0]?.envelope,
+    ).toMatchObject({
+      messageType: 'OPERATION_STATUS',
+      payload: {
+        operationId: 'operation:pending-owner',
+        state: 'unknown',
       },
     });
   });
