@@ -20,6 +20,7 @@ import { resolvePhase1PresentationQaFixture } from './qa/Phase1PresentationFixtu
 import { resolveVisualQaFixture } from './qa/VisualQaFixture';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
+import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -27,7 +28,14 @@ export interface RuntimeHandle {
   destroy(): void;
 }
 
-export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
+export interface BootProZ0Options {
+  readonly phase1PresentationSource?: Phase1PresentationSource;
+}
+
+export async function bootProZ0(
+  root: HTMLElement,
+  options: BootProZ0Options = {},
+): Promise<RuntimeHandle> {
   root.dataset.runtimeStatus = 'booting';
 
   const visualQaFixture = resolveVisualQaFixture(window.location.search);
@@ -52,11 +60,20 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
     presentation.canvas,
   );
   let phase1Hud: Phase1HudOverlay | null = null;
-  if (phase1QaFixture !== null) {
+  let unsubscribePhase1: (() => void) | null = null;
+  const phase1InitialState = options.phase1PresentationSource?.read()
+    ?? phase1QaFixture?.state
+    ?? null;
+  if (phase1InitialState !== null) {
     phase1Hud = createPhase1HudOverlay(
       root,
       presentation.canvas,
-      phase1QaFixture.state,
+      phase1InitialState,
+    );
+  }
+  if (options.phase1PresentationSource !== undefined) {
+    unsubscribePhase1 = options.phase1PresentationSource.subscribe(
+      (state) => phase1Hud?.update(state),
     );
   }
 
@@ -91,6 +108,7 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
       fixedStepHost.stop();
       input.stop();
       authority.stop();
+      unsubscribePhase1?.();
       phase1Hud?.destroy();
       viewportGuard.destroy();
       presentation.destroy();

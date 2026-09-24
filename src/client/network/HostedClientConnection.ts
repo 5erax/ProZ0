@@ -9,6 +9,7 @@ import {
   type JsonValue,
   type MovementInputV1,
   type OperationStatusV1,
+  type PlayerMotionViewV1,
   type RevisionedAggregateViewV1,
   type ServerEnvelopeV1,
 } from '../../protocol';
@@ -78,6 +79,7 @@ export class HostedClientConnection {
   private resumeCredential: string | null;
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
+  private readonly playerMotions = new Map<string, PlayerMotionViewV1>();
   private readonly operationStatuses =
     new Map<string, OperationStatusV1>();
   private durableSaveRevision: number | null = null;
@@ -163,6 +165,16 @@ export class HostedClientConnection {
           break;
         }
         this.replication.applyBaseline(baseline);
+        this.playerMotions.clear();
+        for (const motion of baseline.players) {
+          this.playerMotions.set(
+            motion.playerId,
+            Object.freeze({
+              ...motion,
+              position: Object.freeze({ ...motion.position }),
+            }),
+          );
+        }
         this.send(
           'BASELINE_APPLIED',
           asJson({ snapshotId: baseline.snapshotId }),
@@ -173,8 +185,29 @@ export class HostedClientConnection {
         break;
       }
 
-      case 'PLAYER_MOTION':
+      case 'PLAYER_MOTION': {
+        const motion = envelope.payload as unknown as PlayerMotionViewV1;
+        if (
+          typeof motion.playerId === 'string'
+          && motion.playerId.length > 0
+          && Number.isSafeInteger(motion.authorityTick)
+          && Number.isSafeInteger(motion.lastProcessedInputSeq)
+          && typeof motion.position?.x === 'number'
+          && Number.isFinite(motion.position.x)
+          && typeof motion.position?.y === 'number'
+          && Number.isFinite(motion.position.y)
+          && typeof motion.locomotionState === 'string'
+        ) {
+          this.playerMotions.set(
+            motion.playerId,
+            Object.freeze({
+              ...motion,
+              position: Object.freeze({ ...motion.position }),
+            }),
+          );
+        }
         break;
+      }
 
       case 'COMMAND_RESULT': {
         const result = envelope.payload as unknown as CommandResultV1;
@@ -305,6 +338,13 @@ export class HostedClientConnection {
 
   public getResumeCredential(): string | null {
     return this.resumeCredential;
+  }
+
+  public getPlayerMotions(): readonly Readonly<PlayerMotionViewV1>[] {
+    return Object.freeze(
+      [...this.playerMotions.values()]
+        .sort((left, right) => left.playerId.localeCompare(right.playerId)),
+    );
   }
 
   public getCommandResult(operationId: string): CommandResultV1 | null {
