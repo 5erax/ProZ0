@@ -41,6 +41,38 @@ test('Phase 1 panels expose non-color failure and progression semantics', async 
   await expect(page.locator('[data-marker-shape="triangle"]')).toHaveCount(1);
 });
 
+
+
+test('runtime binding route renders authoritative derived state and stale rejection feedback', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?qaPhase1=runtime&qaScale=2');
+
+  const root = page.locator('[data-proz0-autoboot]');
+  const ui = page.locator('#proz0-phase1-ui');
+
+  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  await expect(root).toHaveAttribute('data-phase1-qa-mode', 'runtime');
+  await expect(ui).toHaveAttribute(
+    'data-presentation-authority',
+    'derived-read-only',
+  );
+  await expect(ui.locator('[data-region="survival"]')).toContainText(
+    'DEHYDRATED',
+  );
+  await expect(ui.locator('[data-region="survival"]')).toContainText('COLD');
+  await expect(ui.locator('[data-region="interaction"]')).toHaveAttribute(
+    'data-state',
+    'BLOCKED',
+  );
+  await expect(ui.locator('[data-region="interaction"]')).toContainText(
+    'STALE / WORLD STATE CHANGED',
+  );
+  await expect(ui.locator('[data-panel-kind="container"]')).toContainText(
+    'STALE / WORLD STATE CHANGED',
+  );
+  await expect(ui.locator('[data-marker-shape="circle"]')).toHaveCount(1);
+});
+
 test('viewport below 640x360 shows explicit no-fractional-scale guard', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 340 });
   await page.goto('/?qaPhase1=overview');

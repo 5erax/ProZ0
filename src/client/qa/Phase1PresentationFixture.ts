@@ -1,7 +1,9 @@
+import { createPhase1ContentCatalog } from '../../content';
 import type {
   Phase1PanelPresentation,
   Phase1PresentationState,
 } from '../presentation/Phase1PresentationModel';
+import { projectPhase1RuntimePresentation } from '../runtime/Phase1PresentationBinding';
 
 export type Phase1PresentationQaMode =
   | 'overview'
@@ -13,7 +15,8 @@ export type Phase1PresentationQaMode =
   | 'death'
   | 'progression'
   | 'map'
-  | 'coop';
+  | 'coop'
+  | 'runtime';
 
 export interface Phase1PresentationQaFixture {
   readonly mode: Phase1PresentationQaMode;
@@ -26,6 +29,7 @@ function panelForMode(
   switch (mode) {
     case 'overview':
     case 'coop':
+    case 'runtime':
       return null;
 
     case 'inventory':
@@ -171,7 +175,132 @@ function panelForMode(
   }
 }
 
+function runtimeBindingFixtureState(): Phase1PresentationState {
+  const catalog = createPhase1ContentCatalog();
+  const inventory = Object.freeze({
+    containerId: 'inventory:local-player',
+    kind: 'player-inventory' as const,
+    ownerPlayerId: 'local-player',
+    revision: 7,
+    stacks: Object.freeze([
+      Object.freeze({
+        stackId: 'runtime-spear',
+        itemDefinitionId: 'item:basic-spear',
+        quantity: 1,
+        condition: 73,
+      }),
+    ]),
+    totalWeightKg: 1.8,
+    totalVolume: 2.5,
+    playerWeightState: 'NORMAL' as const,
+  });
+  const crate = Object.freeze({
+    containerId: 'container:runtime-crate',
+    kind: 'storage-crate' as const,
+    ownerPlayerId: null,
+    revision: 12,
+    stacks: Object.freeze([
+      Object.freeze({
+        stackId: 'runtime-stone',
+        itemDefinitionId: 'item:stone',
+        quantity: 4,
+        condition: null,
+      }),
+    ]),
+    totalWeightKg: 3,
+    totalVolume: 3,
+    playerWeightState: null,
+  });
+
+  return projectPhase1RuntimePresentation({
+    catalog,
+    survival: Object.freeze({
+      playerId: 'local-player',
+      revision: 11,
+      tick: 3600,
+      health: 72,
+      food: 34,
+      water: 21,
+      stamina: 58,
+      temperature: 27,
+      lifeState: Object.freeze({ type: 'alive' as const }),
+      staminaRegenPenaltyPercent: 30,
+    }),
+    inventory,
+    equippedStackId: 'runtime-spear',
+    environment: Object.freeze({
+      state: Object.freeze({
+        activeTick: 3600,
+        cycleStartLocalMinute: 480,
+        weatherEvents: Object.freeze([]),
+      }),
+      localMinuteOfDay: 1120,
+      dayPeriod: 'night' as const,
+      coldRainStatus: 'warning' as const,
+    }),
+    progression: Object.freeze({
+      playerId: 'local-player',
+      revision: 4,
+      totalXp: 270,
+      level: 3,
+      milestoneRuleIds: Object.freeze([]),
+      repeatCounts: Object.freeze({ gather: 0, craft: 0, repair: 0 }),
+      skillIds: Object.freeze(['skill:fieldcraft-basics' as const]),
+      quests: Object.freeze([
+        Object.freeze({
+          questId: 'profession-quest:chart-the-unknown' as const,
+          status: 'in-progress' as const,
+          completedObjectives: 2,
+          totalObjectives: 3,
+        }),
+        Object.freeze({
+          questId: 'profession-quest:bring-water-online' as const,
+          status: 'locked' as const,
+          completedObjectives: 0,
+          totalObjectives: 3,
+        }),
+      ]),
+      professionIds: Object.freeze([]),
+    }),
+    playerMotions: Object.freeze([
+      Object.freeze({
+        playerId: 'local-player',
+        authorityTick: 60,
+        lastProcessedInputSeq: 10,
+        position: Object.freeze({ x: 10, y: 10 }),
+        facing: 'east',
+        locomotionState: 'idle',
+      }),
+      Object.freeze({
+        playerId: 'player:remote',
+        authorityTick: 60,
+        lastProcessedInputSeq: 8,
+        position: Object.freeze({ x: 14, y: 12 }),
+        facing: 'west',
+        locomotionState: 'moving',
+      }),
+    ]),
+    commandFeedback: Object.freeze({
+      inputLabel: 'E',
+      verb: 'TRANSFER',
+      target: 'Shared Storage',
+      result: Object.freeze({
+        operationId: 'runtime:stale-transfer',
+        status: 'rejected' as const,
+        acceptedAuthorityTick: 60,
+        authorityIngressOrdinal: 3,
+        reason: 'STALE_REVISION',
+      }),
+    }),
+    panel: Object.freeze({
+      kind: 'container' as const,
+      container: crate,
+    }),
+  });
+}
+
 function fixtureState(mode: Phase1PresentationQaMode): Phase1PresentationState {
+  if (mode === 'runtime') return runtimeBindingFixtureState();
   const coOp = mode === 'coop';
   return Object.freeze({
     health: Object.freeze({
@@ -289,6 +418,7 @@ function parseMode(value: string | null): Phase1PresentationQaMode | null {
     case 'progression':
     case 'map':
     case 'coop':
+    case 'runtime':
       return value;
     default:
       return null;
