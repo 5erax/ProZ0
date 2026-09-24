@@ -1,6 +1,8 @@
 import {
   HOSTED_PROTOCOL_VERSION,
   serializeClientEnvelopeV1,
+  validateBaselineSnapshotV1,
+  validatePlayerMotionViewV1,
   type BaselineSnapshotV1,
   type ClientEnvelopeV1,
   type ClientHelloV1,
@@ -161,7 +163,13 @@ export class HostedClientConnection {
           this.state = 'RESYNC_REQUIRED';
           break;
         }
-        const baseline = envelope.payload as unknown as BaselineSnapshotV1;
+        const validatedBaseline =
+          validateBaselineSnapshotV1(envelope.payload);
+        if (!validatedBaseline.ok) {
+          this.state = 'RESYNC_REQUIRED';
+          break;
+        }
+        const baseline = validatedBaseline.value;
         if (
           baseline.snapshotId !== this.pendingSnapshotId
           || baseline.sessionEpoch !== this.sessionEpoch
@@ -192,25 +200,10 @@ export class HostedClientConnection {
       }
 
       case 'PLAYER_MOTION': {
-        const motion = envelope.payload as unknown as PlayerMotionViewV1;
-        if (
-          typeof motion.playerId === 'string'
-          && motion.playerId.length > 0
-          && Number.isSafeInteger(motion.authorityTick)
-          && Number.isSafeInteger(motion.lastProcessedInputSeq)
-          && typeof motion.position?.x === 'number'
-          && Number.isFinite(motion.position.x)
-          && typeof motion.position?.y === 'number'
-          && Number.isFinite(motion.position.y)
-          && typeof motion.locomotionState === 'string'
-          && [
-            'LOCAL',
-            'TEAM_A',
-            'TEAM_B',
-            'TEAM_C',
-            'UNASSIGNED',
-          ].includes(motion.presentationIdentitySlot)
-        ) {
+        const validatedMotion =
+          validatePlayerMotionViewV1(envelope.payload);
+        if (validatedMotion.ok) {
+          const motion = validatedMotion.value;
           this.playerMotions.set(
             motion.playerId,
             Object.freeze({

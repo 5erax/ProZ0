@@ -45,7 +45,7 @@ It must not:
 
 1. **Hosted authority runs in a headless ServerAuthorityHost using the same simulation/world/content contracts as solo LocalAuthorityHost.**
 2. **Transport is replaceable and non-authoritative.**
-3. **Phase 1 network transport profile is reliable ordered WebSocket with UTF-8 JSON protocol V1.**
+3. **Phase 1 network transport profile is reliable ordered WebSocket with UTF-8 JSON protocol compatibility version 2.**
 4. **Wire DTO/schema lives in a shared protocol module; simulation/world do not depend on wire protocol.**
 5. **PlayerId is durable gameplay identity; ConnectionId is ephemeral transport identity.**
 6. **Opaque server-issued ResumeCredential binds a client to an existing PlayerId without introducing a production account system.**
@@ -169,10 +169,18 @@ Solo remains able to run without `src/server/`.
 ## 5. Protocol version
 
 ```ts
-export const HOSTED_PROTOCOL_VERSION = 1 as const;
+export const HOSTED_PROTOCOL_VERSION = 2 as const;
 ```
 
 Protocol version changes when message meaning/shape becomes incompatible.
+
+Compatibility version 2 was introduced when the hosted player-motion/baseline
+wire shape gained the required runtime-assigned `presentationIdentitySlot`.
+Version 1 peers are intentionally rejected before baseline/READY; Phase 1 has
+no implicit feature negotiation.
+
+The existing TypeScript `*V1` DTO names and `src/protocol/v1/` module path
+are historical source API names and are not the wire compatibility identity.
 
 Protocol version is separate from:
 - content schema/pack version;
@@ -212,7 +220,7 @@ Conceptual client envelope:
 
 ```ts
 interface ClientEnvelopeV1 {
-  readonly protocolVersion: 1;
+  readonly protocolVersion: 2;
   readonly messageType: ClientMessageTypeV1;
   readonly clientMessageSeq: number;
   readonly sessionId?: string;
@@ -225,7 +233,7 @@ Server envelope:
 
 ```ts
 interface ServerEnvelopeV1 {
-  readonly protocolVersion: 1;
+  readonly protocolVersion: 2;
   readonly messageType: ServerMessageTypeV1;
   readonly serverMessageSeq: number;
   readonly sessionId: string;

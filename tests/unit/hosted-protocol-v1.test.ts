@@ -7,6 +7,7 @@ import {
 import {
   HOSTED_PROTOCOL_VERSION,
   parseClientEnvelopeV1,
+  validateBaselineSnapshotV1,
   validateClientHelloV1,
   validateGameplayCommandEnvelopeV1,
   validateMovementInputV1,
@@ -26,7 +27,11 @@ function validHello() {
   };
 }
 
-describe('Hosted protocol V1 fail-closed validation', () => {
+describe('Hosted protocol compatibility fail-closed validation', () => {
+  it('uses protocol version 2 for the required presentation identity wire shape', () => {
+    expect(HOSTED_PROTOCOL_VERSION).toBe(2);
+  });
+
   it('rejects invalid JSON, protocol drift, and unknown envelope fields', () => {
     expect(parseClientEnvelopeV1('{')).toMatchObject({
       ok: false,
@@ -104,4 +109,51 @@ describe('Hosted protocol V1 fail-closed validation', () => {
       reason: 'INVALID_MESSAGE',
     });
   });
+
+  it('rejects baselines whose player motion identity token is missing or invalid', () => {
+    const validBaseline = {
+      snapshotId: 'snapshot:test',
+      sessionEpoch: 'epoch:test',
+      authorityTick: 1,
+      worldId: 'world-alpha',
+      playerId: 'player:1',
+      contentCompatibility: validHello().contentCompatibility,
+      durableSaveRevision: null,
+      players: [{
+        playerId: 'player:1',
+        presentationIdentitySlot: 'LOCAL',
+        authorityTick: 1,
+        lastProcessedInputSeq: -1,
+        position: { x: 0, y: 0 },
+        facing: null,
+        locomotionState: 'IDLE',
+      }],
+      aggregates: [],
+    };
+
+    expect(validateBaselineSnapshotV1(validBaseline)).toMatchObject({
+      ok: true,
+    });
+    expect(validateBaselineSnapshotV1({
+      ...validBaseline,
+      players: [{
+        ...validBaseline.players[0],
+        presentationIdentitySlot: undefined,
+      }],
+    })).toMatchObject({
+      ok: false,
+      reason: 'INVALID_MESSAGE',
+    });
+    expect(validateBaselineSnapshotV1({
+      ...validBaseline,
+      players: [{
+        ...validBaseline.players[0],
+        presentationIdentitySlot: 'TEAM_Z',
+      }],
+    })).toMatchObject({
+      ok: false,
+      reason: 'INVALID_MESSAGE',
+    });
+  });
+
 });

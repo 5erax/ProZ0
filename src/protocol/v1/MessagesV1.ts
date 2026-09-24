@@ -1,4 +1,4 @@
-export const HOSTED_PROTOCOL_VERSION = 1 as const;
+export const HOSTED_PROTOCOL_VERSION = 2 as const;
 export const MOVEMENT_INPUT_REFRESH_MAX_TICKS = 15 as const;
 export const MOVEMENT_INPUT_LEASE_TICKS = 60 as const;
 

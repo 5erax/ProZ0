@@ -1,11 +1,13 @@
 import {
   HOSTED_PROTOCOL_VERSION,
+  type BaselineSnapshotV1,
   type ClientEnvelopeV1,
   type ClientHelloV1,
   type ClientMessageTypeV1,
   type GameplayCommandEnvelopeV1,
   type JsonValue,
   type MovementInputV1,
+  type PlayerMotionViewV1,
 } from './MessagesV1';
 
 export interface ProtocolValidationFailure {
@@ -32,6 +34,14 @@ const CLIENT_MESSAGE_TYPES = new Set<ClientMessageTypeV1>([
   'PING',
   'CLIENT_CHECKPOINT',
   'LEAVE_SESSION',
+]);
+
+const PRESENTATION_IDENTITY_SLOTS = new Set([
+  'LOCAL',
+  'TEAM_A',
+  'TEAM_B',
+  'TEAM_C',
+  'UNASSIGNED',
 ]);
 
 function success<T>(value: T): ProtocolValidationSuccess<T> {
@@ -65,8 +75,12 @@ function nonEmpty(value: unknown, maxLength = 256): value is string {
     && value.length <= maxLength;
 }
 
+function safeInteger(value: unknown): value is number {
+  return Number.isSafeInteger(value);
+}
+
 function nonNegativeSafeInteger(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) >= 0;
+  return safeInteger(value) && Number(value) >= 0;
 }
 
 function finite(value: unknown): value is number {
@@ -208,6 +222,122 @@ export function validateClientHelloV1(
   }
 
   return success(input as unknown as ClientHelloV1);
+}
+
+export function validatePlayerMotionViewV1(
+  input: unknown,
+): ProtocolValidationResult<PlayerMotionViewV1> {
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, [
+      'playerId',
+      'presentationIdentitySlot',
+      'authorityTick',
+      'lastProcessedInputSeq',
+      'position',
+      'facing',
+      'locomotionState',
+    ])
+    || !nonEmpty(input.playerId)
+    || typeof input.presentationIdentitySlot !== 'string'
+    || !PRESENTATION_IDENTITY_SLOTS.has(input.presentationIdentitySlot)
+    || !nonNegativeSafeInteger(input.authorityTick)
+    || !safeInteger(input.lastProcessedInputSeq)
+    || !objectValue(input.position)
+    || !onlyKeys(input.position, ['x', 'y'])
+    || !finite(input.position.x)
+    || !finite(input.position.y)
+    || (
+      input.facing !== null
+      && !nonEmpty(input.facing, 64)
+    )
+    || !nonEmpty(input.locomotionState, 64)
+  ) {
+    return failure('INVALID_MESSAGE', 'Player motion view is invalid.');
+  }
+
+  return success(input as unknown as PlayerMotionViewV1);
+}
+
+export function validateBaselineSnapshotV1(
+  input: unknown,
+): ProtocolValidationResult<BaselineSnapshotV1> {
+  if (
+    !objectValue(input)
+    || !onlyKeys(input, [
+      'snapshotId',
+      'sessionEpoch',
+      'authorityTick',
+      'worldId',
+      'playerId',
+      'contentCompatibility',
+      'durableSaveRevision',
+      'players',
+      'aggregates',
+    ])
+    || !nonEmpty(input.snapshotId)
+    || !nonEmpty(input.sessionEpoch)
+    || !nonNegativeSafeInteger(input.authorityTick)
+    || !nonEmpty(input.worldId)
+    || !nonEmpty(input.playerId)
+    || !objectValue(input.contentCompatibility)
+    || !onlyKeys(input.contentCompatibility, [
+      'formatId',
+      'schemaVersion',
+      'packId',
+      'packVersion',
+      'canonicalFingerprint',
+    ])
+    || !nonEmpty(input.contentCompatibility.formatId)
+    || !nonNegativeSafeInteger(input.contentCompatibility.schemaVersion)
+    || !nonEmpty(input.contentCompatibility.packId)
+    || !nonNegativeSafeInteger(input.contentCompatibility.packVersion)
+    || !nonEmpty(input.contentCompatibility.canonicalFingerprint, 512)
+    || (
+      input.durableSaveRevision !== null
+      && !nonNegativeSafeInteger(input.durableSaveRevision)
+    )
+    || !Array.isArray(input.players)
+    || input.players.length > 10
+    || !Array.isArray(input.aggregates)
+    || input.aggregates.length > 4096
+  ) {
+    return failure('INVALID_MESSAGE', 'Baseline snapshot fields are invalid.');
+  }
+
+  for (const player of input.players) {
+    if (!validatePlayerMotionViewV1(player).ok) {
+      return failure(
+        'INVALID_MESSAGE',
+        'Baseline snapshot player identity state is invalid.',
+      );
+    }
+  }
+
+  for (const aggregate of input.aggregates) {
+    if (
+      !objectValue(aggregate)
+      || !onlyKeys(aggregate, [
+        'aggregateType',
+        'aggregateId',
+        'revision',
+        'tombstone',
+        'state',
+      ])
+      || !nonEmpty(aggregate.aggregateType, 128)
+      || !nonEmpty(aggregate.aggregateId, 256)
+      || !nonNegativeSafeInteger(aggregate.revision)
+      || typeof aggregate.tombstone !== 'boolean'
+      || !jsonValue(aggregate.state)
+    ) {
+      return failure(
+        'INVALID_MESSAGE',
+        'Baseline snapshot aggregate is invalid.',
+      );
+    }
+  }
+
+  return success(input as unknown as BaselineSnapshotV1);
 }
 
 export function validateMovementInputV1(

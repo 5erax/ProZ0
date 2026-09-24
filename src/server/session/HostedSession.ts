@@ -1,5 +1,6 @@
-import type {
-  ClientEnvelopeV1,
+import {
+  HOSTED_PROTOCOL_VERSION,
+  type ClientEnvelopeV1,
   ClientHelloV1,
   ContentCompatibilityIdentityV1Wire,
   MovementInputV1,
@@ -457,7 +458,7 @@ export class HostedSession {
     }
     connection.lastServerMessageSeq += 1;
     return Object.freeze({
-      protocolVersion: 1,
+      protocolVersion: HOSTED_PROTOCOL_VERSION,
       messageType,
       serverMessageSeq: connection.lastServerMessageSeq,
       sessionId: this.sessionId,
