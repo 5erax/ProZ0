@@ -5,3 +5,4 @@ export * from './session/HostedSession';
 export * from './session/OperationResultCache';
 export * from './session/ReplicationCoordinator';
 export * from './network/WebSocketServerTransport';
+export * from './diagnostics/AuthorityDigest';
