@@ -143,6 +143,17 @@ export class ServerAuthorityHost {
     this.session = new HostedSession(options.session);
     this.lastDurabilityCheckpoint =
       options.initialDurabilityCheckpoint ?? null;
+    const initialAuthorityTick =
+      options.initialDurabilityCheckpoint?.authorityTick ?? 0;
+    if (
+      !Number.isSafeInteger(initialAuthorityTick)
+      || initialAuthorityTick < 0
+    ) {
+      throw new RangeError(
+        'Initial hosted authority tick must be a non-negative safe integer.',
+      );
+    }
+    this.authorityTick = initialAuthorityTick;
   }
 
   public start(): void {
@@ -329,15 +340,14 @@ export class ServerAuthorityHost {
         if (!query.ok) {
           return this.singleConnectionError(transportId, 'INVALID_MESSAGE');
         }
-        const result = this.operations.get(query.value.operationId);
+        const status = this.operations.status(
+          query.value.operationId,
+          connection.playerId,
+        );
         const response = this.envelope(
           transportId,
           'OPERATION_STATUS',
-          asJson({
-            operationId: query.value.operationId,
-            known: result !== null,
-            ...(result === null ? {} : { result }),
-          }),
+          asJson(status),
         );
         return response === null
           ? Object.freeze([])
@@ -399,22 +409,11 @@ export class ServerAuthorityHost {
       this.movementLeaseExpiryCount += 1;
     }
 
-    const step = createSimulationStep(toSimulationTick(nextTick));
-    for (const runtime of this.runtimes.values()) {
-      runtime.step(step);
-    }
-    this.authorityTick = nextTick;
+    this.advanceAuthorityTick();
 
-    const outbound: HostedOutboundMessage[] = [];
-    this.commandQueue.sort(
-      (left, right) =>
-        left.authorityIngressOrdinal - right.authorityIngressOrdinal,
-    );
-    while (this.commandQueue.length > 0) {
-      const queued = this.commandQueue.shift();
-      if (queued === undefined) break;
-      outbound.push(...this.executeQueuedCommand(queued));
-    }
+    const outbound: HostedOutboundMessage[] = [
+      ...this.resolveAcceptedCommands(),
+    ];
 
     for (const connection of this.session.getReadyConnections()) {
       for (const [playerId, runtime] of this.runtimes) {
@@ -493,6 +492,13 @@ export class ServerAuthorityHost {
       const runtime = this.runtimes.get(connection.playerId);
       runtime?.submitInput(connection.playerId, NEUTRAL_PLAYER_INPUT);
     }
+
+    const drained: HostedOutboundMessage[] = [];
+    if (this.commandQueue.length > 0) {
+      this.advanceAuthorityTick();
+      drained.push(...this.resolveAcceptedCommands());
+    }
+
     this.session.beginSaving();
 
     try {
@@ -512,7 +518,7 @@ export class ServerAuthorityHost {
         }),
       );
       this.session.close();
-      return Object.freeze([...closing, ...final]);
+      return Object.freeze([...drained, ...closing, ...final]);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       const final = this.broadcastLive(
@@ -523,7 +529,7 @@ export class ServerAuthorityHost {
         }),
       );
       this.session.fail();
-      return final;
+      return Object.freeze([...drained, ...final]);
     }
   }
 
@@ -553,10 +559,18 @@ export class ServerAuthorityHost {
     playerId: PlayerId,
     command: GameplayCommandEnvelopeV1,
   ): readonly HostedOutboundMessage[] {
+    if (this.session.getState() !== 'OPEN') {
+      return this.singleConnectionError(
+        transportId,
+        'SESSION_CLOSING',
+      );
+    }
+
     const signature = commandSignature(playerId, command);
     const ingress = this.nextIngressOrdinal;
     const begun = this.operations.begin(
       command.operationId,
+      playerId,
       signature,
       this.authorityTick,
       ingress,
@@ -605,6 +619,30 @@ export class ServerAuthorityHost {
       authorityIngressOrdinal: ingress,
     }));
     return Object.freeze([]);
+  }
+
+  private advanceAuthorityTick(): void {
+    for (const runtime of this.runtimes.values()) {
+      const localNextTick = Number(runtime.getSnapshot().tick) + 1;
+      runtime.step(
+        createSimulationStep(toSimulationTick(localNextTick)),
+      );
+    }
+    this.authorityTick += 1;
+  }
+
+  private resolveAcceptedCommands(): readonly HostedOutboundMessage[] {
+    const outbound: HostedOutboundMessage[] = [];
+    this.commandQueue.sort(
+      (left, right) =>
+        left.authorityIngressOrdinal - right.authorityIngressOrdinal,
+    );
+    while (this.commandQueue.length > 0) {
+      const queued = this.commandQueue.shift();
+      if (queued === undefined) break;
+      outbound.push(...this.executeQueuedCommand(queued));
+    }
+    return Object.freeze(outbound);
   }
 
   private executeQueuedCommand(
@@ -755,9 +793,6 @@ export class ServerAuthorityHost {
 
     const runtime = this.options.runtimeFactory.create(playerId);
     runtime.submitInput(playerId, NEUTRAL_PLAYER_INPUT);
-    for (let tick = 1; tick <= this.authorityTick; tick += 1) {
-      runtime.step(createSimulationStep(toSimulationTick(tick)));
-    }
     this.runtimes.set(playerId, runtime);
     this.lastProcessedInputSeq.set(playerId, -1);
     return runtime;
