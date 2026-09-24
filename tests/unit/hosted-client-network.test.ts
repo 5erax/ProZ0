@@ -137,6 +137,62 @@ describe('Hosted client network state', () => {
     });
   });
 
+  it('preserves accepted-pending versus resolved operation reconciliation state', () => {
+    const transport = new MemoryTransport();
+    const client = new HostedClientConnection({
+      transport,
+      hello: hello(),
+    });
+    client.start();
+    client.handleText(server(1, 'SESSION_ACCEPTED', asJson({
+      worldId: 'world-alpha',
+      playerId: 'player:1',
+      connectionId: 'connection:test',
+      resumeCredential: 'resume:test',
+      snapshotId: 'snapshot:test',
+      maxPlayers: 4,
+    })));
+    client.handleText(server(2, 'BASELINE_SNAPSHOT', asJson(baseline())));
+    expect(client.getState()).toBe('READY');
+
+    client.handleText(server(3, 'OPERATION_STATUS', asJson({
+      operationId: 'operation:test',
+      state: 'accepted-pending',
+      acceptedAuthorityTick: 7,
+      authorityIngressOrdinal: 3,
+    }), 7));
+    expect(client.getOperationStatus('operation:test')).toEqual({
+      operationId: 'operation:test',
+      state: 'accepted-pending',
+      acceptedAuthorityTick: 7,
+      authorityIngressOrdinal: 3,
+    });
+    expect(client.getCommandResult('operation:test')).toBeNull();
+
+    client.handleText(server(4, 'OPERATION_STATUS', asJson({
+      operationId: 'operation:test',
+      state: 'resolved',
+      result: {
+        operationId: 'operation:test',
+        status: 'committed',
+        acceptedAuthorityTick: 7,
+        committedAuthorityTick: 8,
+        authorityIngressOrdinal: 3,
+      },
+    }), 8));
+    expect(client.getOperationStatus('operation:test')).toMatchObject({
+      state: 'resolved',
+      result: {
+        operationId: 'operation:test',
+        status: 'committed',
+      },
+    });
+    expect(client.getCommandResult('operation:test')).toMatchObject({
+      status: 'committed',
+      committedAuthorityTick: 8,
+    });
+  });
+
   it('ignores stale aggregate revisions and tombstones prevent stale resurrection', () => {
     const store = new ClientReplicationStore();
     store.applyBaseline(baseline());
