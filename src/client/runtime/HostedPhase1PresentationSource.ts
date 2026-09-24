@@ -133,10 +133,11 @@ export class HostedPhase1PresentationSource
     ) {
       return null;
     }
-    const discoveryState = String(state.discoveryState) as
-      'unknown' | 'located' | 'investigated';
-    const physicalRewardState = String(state.physicalRewardState) as
-      'unspawned' | 'claimable' | 'claimed';
+    const discoveryState =
+      state.discoveryState as Phase1RuinRuntimeState['discoveryState'];
+    const physicalRewardState =
+      state.physicalRewardState
+        as Phase1RuinRuntimeState['physicalRewardState'];
     return Object.freeze({
       ruinEntityId,
       ruinDefinitionId: 'ruin:previous-civilization-ruin',
