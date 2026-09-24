@@ -1,15 +1,15 @@
 import {
   HOSTED_PROTOCOL_VERSION,
   type ClientEnvelopeV1,
-  ClientHelloV1,
-  ContentCompatibilityIdentityV1Wire,
-  MovementInputV1,
-  PresentationIdentitySlotV1,
-  ServerEnvelopeV1,
-  ServerMessageTypeV1,
-  SessionRejectionReasonV1,
-  WorldCompatibilityV1,
-  JsonValue,
+  type ClientHelloV1,
+  type ContentCompatibilityIdentityV1Wire,
+  type JsonValue,
+  type MovementInputV1,
+  type PresentationIdentitySlotV1,
+  type ServerEnvelopeV1,
+  type ServerMessageTypeV1,
+  type SessionRejectionReasonV1,
+  type WorldCompatibilityV1,
 } from '../../protocol';
 
 export type HostedSessionState =

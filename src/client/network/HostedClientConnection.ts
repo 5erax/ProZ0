@@ -3,7 +3,6 @@ import {
   serializeClientEnvelopeV1,
   validateBaselineSnapshotV1,
   validatePlayerMotionViewV1,
-  type BaselineSnapshotV1,
   type ClientEnvelopeV1,
   type ClientHelloV1,
   type CommandResultV1,

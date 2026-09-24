@@ -278,6 +278,7 @@ async function connectBrowserClient(
           sessionId: string | null;
           connectionId: string | null;
           playerId: string | null;
+          protocolVersion: number;
         } = {
           socket,
           messages: [],
