@@ -135,3 +135,75 @@ test('viewport below 640x360 shows explicit no-fractional-scale guard', async ({
   await expect(warning).toBeVisible();
   await expect(warning).toContainText('640×360');
 });
+
+
+test('direct Product Review URL boots canonical persisted slice without console setup', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Explicit integration-test tuning only. Production remains fail-closed
+  // until the owner-approved values replace these launch parameters.
+  const query = new URLSearchParams({
+    proz0Mode: 'phase1-product-review',
+    proz0WorldId: 'world:e2e-product-review-direct',
+    proz0WorldSeed: 'p1-world-golden',
+    proz0Players: 'e2e-player',
+    proz0Player: 'e2e-player',
+    proz0InteractionRange: '21',
+    proz0SpawnClearance: '0',
+    proz0AccessClearance: '0',
+    proz0SaveDb: 'proz0-e2e-product-review-direct',
+  });
+  await page.goto('/?' + query.toString());
+
+  const root = page.locator('[data-proz0-autoboot]');
+  const canvas = page.locator('#proz0-canvas');
+  const controls = page.locator('[data-product-review-controls]');
+  const interaction = page.locator('[data-region="interaction"]');
+
+  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  await expect(root).toHaveAttribute(
+    'data-runtime-mode',
+    'phase1-product-review',
+  );
+  await expect(root).toHaveAttribute(
+    'data-product-review-authority',
+    'canonical',
+  );
+  await expect(root).toHaveAttribute(
+    'data-product-review-persistence',
+    'indexeddb-save-v2',
+  );
+  await expect(canvas).toHaveAttribute(
+    'data-renderer',
+    'phase1-production-raster',
+  );
+  await expect(
+    page.locator('[data-product-review-world="canonical"]'),
+  ).toHaveAttribute('data-production-asset-foundation', 'p1-75-78');
+  await expect(page.locator('[data-production-world-preview]')).toHaveCount(0);
+
+  await expect(controls).toHaveAttribute(
+    'data-product-review-controls',
+    'closed',
+  );
+  await page.keyboard.press('h');
+  await expect(controls).toHaveAttribute(
+    'data-product-review-controls',
+    'open',
+  );
+  await expect(controls).toContainText('WASD / ARROWS');
+  await expect(controls).toContainText('SPACE · ATTACK');
+  await page.keyboard.press('h');
+
+  const initialX = Number(await canvas.getAttribute('data-player-x'));
+  await page.keyboard.down('d');
+  await page.waitForTimeout(180);
+  await page.keyboard.up('d');
+  await page.waitForTimeout(50);
+  expect(Number(await canvas.getAttribute('data-player-x')))
+    .toBeGreaterThan(initialX);
+
+  await expect(interaction).toContainText('GATHER');
+  await page.keyboard.press('e');
+  await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
+});

@@ -155,26 +155,53 @@ function bootExternalPhase1Presentation(
   };
 }
 
+function autoBootText(
+  root: HTMLElement,
+  key: keyof DOMStringMap,
+  query: URLSearchParams,
+  queryKey: string,
+): string | undefined {
+  const datasetValue = root.dataset[key]?.trim();
+  if (datasetValue !== undefined && datasetValue.length > 0) {
+    return datasetValue;
+  }
+  const queryValue = query.get(queryKey)?.trim();
+  return queryValue === undefined || queryValue.length === 0
+    ? undefined
+    : queryValue;
+}
+
 function requiredAutoBootText(
   root: HTMLElement,
   key: keyof DOMStringMap,
   attributeName: string,
+  query: URLSearchParams,
+  queryKey: string,
 ): string {
-  const value = root.dataset[key];
-  if (value === undefined || value.trim().length === 0) {
+  const value = autoBootText(root, key, query, queryKey);
+  if (value === undefined) {
     throw new Error(
-      'Product Review autoboot requires ' + attributeName + '.',
+      'Product Review autoboot requires ' + attributeName
+      + ' or ?' + queryKey + '=...',
     );
   }
-  return value.trim();
+  return value;
 }
 
 function requiredAutoBootNumber(
   root: HTMLElement,
   key: keyof DOMStringMap,
   attributeName: string,
+  query: URLSearchParams,
+  queryKey: string,
 ): number {
-  const raw = requiredAutoBootText(root, key, attributeName);
+  const raw = requiredAutoBootText(
+    root,
+    key,
+    attributeName,
+    query,
+    queryKey,
+  );
   const value = Number(raw);
   if (!Number.isFinite(value)) {
     throw new Error(
@@ -186,11 +213,15 @@ function requiredAutoBootNumber(
 
 export function resolveProductReviewAutoBootConfig(
   root: HTMLElement,
+  search = '',
 ): PersistedPhase1ProductReviewConfig {
+  const query = new URLSearchParams(search);
   const playerIds = requiredAutoBootText(
     root,
     'proz0PlayerIds',
     'data-proz0-player-ids',
+    query,
+    'proz0Players',
   )
     .split(',')
     .map((value) => value.trim())
@@ -202,41 +233,58 @@ export function resolveProductReviewAutoBootConfig(
     );
   }
 
-  const databaseName = root.dataset.proz0SaveDatabase?.trim();
+  const databaseName = autoBootText(
+    root,
+    'proz0SaveDatabase',
+    query,
+    'proz0SaveDb',
+  );
 
   return Object.freeze({
     worldId: requiredAutoBootText(
       root,
       'proz0WorldId',
       'data-proz0-world-id',
+      query,
+      'proz0WorldId',
     ),
     worldSeed: requiredAutoBootText(
       root,
       'proz0WorldSeed',
       'data-proz0-world-seed',
+      query,
+      'proz0WorldSeed',
     ),
     playerIds: Object.freeze(playerIds),
     localPlayerId: requiredAutoBootText(
       root,
       'proz0LocalPlayerId',
       'data-proz0-local-player-id',
+      query,
+      'proz0Player',
     ),
     interactionRangeWorldUnits: requiredAutoBootNumber(
       root,
       'proz0InteractionRangeWorldUnits',
       'data-proz0-interaction-range-world-units',
+      query,
+      'proz0InteractionRange',
     ),
     spawnClearanceRadiusWorldUnits: requiredAutoBootNumber(
       root,
       'proz0SpawnClearanceRadiusWorldUnits',
       'data-proz0-spawn-clearance-radius-world-units',
+      query,
+      'proz0SpawnClearance',
     ),
     requiredAccessRadiusWorldUnits: requiredAutoBootNumber(
       root,
       'proz0RequiredAccessRadiusWorldUnits',
       'data-proz0-required-access-radius-world-units',
+      query,
+      'proz0AccessClearance',
     ),
-    ...(databaseName === undefined || databaseName.length === 0
+    ...(databaseName === undefined
       ? {}
       : { persistence: { databaseName } }),
   });
@@ -244,8 +292,13 @@ export function resolveProductReviewAutoBootConfig(
 
 export async function bootAutoProZ0(
   root: HTMLElement,
+  search = window.location.search,
 ): Promise<RuntimeHandle> {
-  const mode = root.dataset.proz0Mode?.trim() || 'local-demo';
+  const query = new URLSearchParams(search);
+  const mode =
+    root.dataset.proz0Mode?.trim()
+    || query.get('proz0Mode')?.trim()
+    || 'local-demo';
 
   if (mode === 'local-demo') {
     return bootProZ0(root, { mode: 'local-demo' });
@@ -257,7 +310,7 @@ export async function bootAutoProZ0(
 
   const persisted = await bootPersistedPhase1ProductReview(
     root,
-    resolveProductReviewAutoBootConfig(root),
+    resolveProductReviewAutoBootConfig(root, search),
   );
   root.dataset.productReviewPersistence = 'indexeddb-save-v2';
   root.dataset.productReviewReopened = String(persisted.reopened);
