@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   Phase1HostedAuthorityComposition,
 } from '../../src/integration';
@@ -205,6 +205,120 @@ describe('Phase 1 hosted vertical-slice composition', () => {
       }
     },
   );
+
+  it('routes hosted building placement through shared personal progression exactly once', async () => {
+    const composition = await Phase1HostedAuthorityComposition.create({
+      worldId: 'world:p1-hosted-building-progression',
+      worldSeed: 'p1-world-golden',
+      maxPlayers: 2,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: new NoopHostedPersistence(),
+      sessionId: 'session:p1-hosted-building-progression',
+      sessionEpoch: 'epoch:p1-hosted-building-progression',
+    });
+
+    try {
+      const client = join(
+        composition,
+        'transport:hosted-building-progression',
+      );
+      const landing = composition.bundle.buildings.getStructure(
+        'structure-instance:landing-module',
+      );
+      if (landing === null) {
+        throw new Error('Expected canonical Landing Module.');
+      }
+
+      const committed = Object.freeze({
+        status: 'committed' as const,
+        operationId: 'hosted:place:storage',
+        structure: Object.freeze({
+          ...landing,
+          structureId: 'structure-instance:hosted:place:storage',
+          definitionId: 'structure:storage-crate' as const,
+        }),
+        buildRevision: 1,
+        inventoryRevision: 1,
+      });
+      vi.spyOn(
+        composition.bundle.buildingAuthority,
+        'place',
+      ).mockReturnValue(committed);
+
+      const command = Object.freeze({
+        operationId: committed.operationId,
+        commandType: 'building.place',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: 'inventory:' + client.playerId,
+            revision: 0,
+          },
+          {
+            aggregateType: 'foothold',
+            aggregateId: 'foothold:landing',
+            revision: 0,
+          },
+        ]),
+        payload: {
+          structureDefinitionId: 'structure:storage-crate',
+          sourceKitStackId: 'test:storage-kit',
+          inventoryContainerId: 'inventory:' + client.playerId,
+          placement: {
+            mode: 'free',
+            x: 2,
+            y: 2,
+            orientationQuarterTurns: 0,
+          },
+        },
+      } satisfies GameplayCommandEnvelopeV1);
+
+      sendCommand(composition.host, client, command);
+      const outbound = await composition.step();
+      expect(
+        outbound.find(
+          (entry) =>
+            entry.transportId === client.transportId
+            && entry.envelope.messageType === 'COMMAND_RESULT',
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId: committed.operationId,
+        status: 'committed',
+      });
+
+      const progressed =
+        composition.bundle.progression.getPlayerView(client.playerId);
+      expect(progressed.milestoneRuleIds).toContain(
+        'first-place:storage-crate',
+      );
+      expect(progressed.totalXp).toBe(15);
+
+      // The integration event ID is stable by placement operation, so even
+      // an authority retry cannot duplicate personal progression.
+      composition.bundle.placeStructure({
+        operationId: committed.operationId,
+        actorPlayerId: client.playerId,
+        structureDefinitionId: 'structure:storage-crate',
+        sourceKitStackId: 'test:storage-kit',
+        inventoryContainerId: 'inventory:' + client.playerId,
+        expectedInventoryRevision: 0,
+        expectedBuildRevision: 0,
+        placement: {
+          mode: 'free',
+          anchor: { x: 2, y: 2 },
+          orientationQuarterTurns: 0,
+        },
+      });
+      expect(
+        composition.bundle.progression.getPlayerView(client.playerId).totalXp,
+      ).toBe(15);
+    } finally {
+      vi.restoreAllMocks();
+      await composition.destroy();
+    }
+  });
 
   it('integrates 4 admitted players, stable co-op identity, shared discovery and authoritative ruin inspect', async () => {
     const composition = await Phase1HostedAuthorityComposition.create({
