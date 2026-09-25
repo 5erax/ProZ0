@@ -649,6 +649,62 @@ export class Phase1AuthorityBundle {
     return result;
   }
 
+  public executeItemCommand(
+    command: Parameters<Phase1ItemAuthority['execute']>[0],
+  ): ReturnType<Phase1ItemAuthority['execute']> {
+    const machineOutput = command.type === 'transfer'
+      ? (() => {
+          const condenser = this.buildings
+            .exportSnapshot()
+            .foothold.condensers.find(
+              (entry) =>
+                entry.outputContainerId === command.sourceContainerId,
+            );
+          if (condenser === undefined) return null;
+          const source = this.items.getContainerView(
+            command.sourceContainerId,
+          );
+          const stack = source.stacks.find(
+            (entry) => entry.stackId === command.sourceStackId,
+          );
+          if (stack === undefined) return null;
+          return Object.freeze({
+            itemId: stack.itemDefinitionId,
+            quantity: command.quantity,
+          });
+        })()
+      : null;
+
+    const result = this.items.execute(command);
+    if (result.status === 'committed' && machineOutput !== null) {
+      this.progression.applyEvent(Object.freeze({
+        type: 'machine-output-collected',
+        eventId: 'machine-output-collected:' + result.operationId,
+        playerId: command.playerId,
+        machineId: 'machine:atmospheric-water-condenser',
+        itemId: machineOutput.itemId,
+        quantity: machineOutput.quantity,
+      }));
+    }
+    return result;
+  }
+
+  public setCondenserEnabled(
+    command: Parameters<Phase1CondenserAuthority['setEnabled']>[0],
+  ): ReturnType<Phase1CondenserAuthority['setEnabled']> {
+    const result = this.machines.setEnabled(command);
+    if (result.status === 'committed') {
+      this.progression.applyEvent(Object.freeze({
+        type: 'powered-machine-interacted',
+        eventId: 'powered-machine-interacted:' + result.operationId,
+        playerId: command.actorPlayerId,
+        machineId: 'machine:atmospheric-water-condenser',
+        powered: this.buildings.isCondenserPowered(command.structureId),
+      }));
+    }
+    return result;
+  }
+
   public async stepSolo(): Promise<void> {
     const nextAuthorityTick = this.authorityTickRef.value + 1;
     await this.prepareAuthorityTick(nextAuthorityTick);

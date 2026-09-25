@@ -464,7 +464,7 @@ export async function createPhase1ProductReviewRuntime(
       'inventory:' + config.localPlayerId,
     );
     const workbench = accessibleWorkbench();
-    const result = bundle.items.execute({
+    const result = bundle.executeItemCommand({
       type: 'craft',
       operationId: nextOperationId('craft'),
       playerId: config.localPlayerId,
@@ -837,7 +837,7 @@ export async function createPhase1ProductReviewRuntime(
     );
 
     if (outputStack !== undefined) {
-      const result = bundle.items.execute({
+      const result = bundle.executeItemCommand({
         type: 'transfer',
         operationId: nextOperationId('machine-output'),
         playerId: config.localPlayerId,
@@ -848,17 +848,6 @@ export async function createPhase1ProductReviewRuntime(
         sourceStackId: outputStack.stackId,
         quantity: outputStack.quantity,
       });
-
-      if (result.status === 'committed') {
-        bundle.progression.applyEvent(Object.freeze({
-          type: 'machine-output-collected',
-          eventId: 'machine-output-collected:' + result.operationId,
-          playerId: config.localPlayerId,
-          machineId: 'machine:atmospheric-water-condenser',
-          itemId: outputStack.itemDefinitionId,
-          quantity: outputStack.quantity,
-        }));
-      }
 
       actionPanel = 'machine';
       machineStructureId = structure.structureId;
@@ -875,25 +864,13 @@ export async function createPhase1ProductReviewRuntime(
       return true;
     }
 
-    const result = bundle.machines.setEnabled({
+    const result = bundle.setCondenserEnabled({
       operationId: nextOperationId('machine-toggle'),
       actorPlayerId: config.localPlayerId,
       structureId: structure.structureId,
       expectedRevision: view.revision,
       enabled: !view.enabled,
     });
-
-    if (result.status === 'committed') {
-      bundle.progression.applyEvent(Object.freeze({
-        type: 'powered-machine-interacted',
-        eventId: 'powered-machine-interacted:' + result.operationId,
-        playerId: config.localPlayerId,
-        machineId: 'machine:atmospheric-water-condenser',
-        powered: bundle.buildings.isCondenserPowered(
-          structure.structureId,
-        ),
-      }));
-    }
 
     actionPanel = 'machine';
     machineStructureId = structure.structureId;
@@ -937,7 +914,7 @@ export async function createPhase1ProductReviewRuntime(
       return true;
     }
 
-    const result = bundle.items.execute({
+    const result = bundle.executeItemCommand({
       type: 'repair',
       operationId: nextOperationId('repair'),
       playerId: config.localPlayerId,
