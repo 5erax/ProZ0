@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SIMULATION_HZ } from '../../src/foundation';
 import {
   Phase1HostedAuthorityComposition,
 } from '../../src/integration';
@@ -135,6 +136,25 @@ function sendCommand(
   );
 }
 
+function queryOperationStatus(
+  host: ServerAuthorityHost,
+  client: HostedClientHarness,
+  operationId: string,
+): HostedOutboundMessage | undefined {
+  const envelope: ClientEnvelopeV1 = {
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    messageType: 'OPERATION_STATUS_QUERY',
+    clientMessageSeq: client.nextSeq++,
+    sessionId: host.getSessionId(),
+    connectionId: client.connectionId,
+    payload: { operationId },
+  };
+  return host.receiveText(
+    client.transportId,
+    JSON.stringify(envelope),
+  )[0];
+}
+
 describe('Phase 1 hosted vertical-slice composition', () => {
   it.each([2, 3] as const)(
     'runs the same canonical hosted authority composition at %i-player capacity',
@@ -206,6 +226,183 @@ describe('Phase 1 hosted vertical-slice composition', () => {
       }
     },
   );
+
+  it('keeps hosted gather accepted-pending until the canonical terminal tick and ignores exact pending duplicates', async () => {
+    const composition = await Phase1HostedAuthorityComposition.create({
+      worldId: 'world:p1-hosted-gather-pending',
+      worldSeed: 'p1-world-golden',
+      maxPlayers: 2,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: new NoopHostedPersistence(),
+      sessionId: 'session:p1-hosted-gather-pending',
+      sessionEpoch: 'epoch:p1-hosted-gather-pending',
+    });
+
+    try {
+      const client = join(
+        composition,
+        'transport:hosted-gather-pending',
+      );
+      const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
+        'resource:fiber-plant',
+      );
+      if (fiber === null || fiber.type !== 'resource') {
+        throw new Error('Expected canonical Fiber Plant.');
+      }
+      composition.bundle.getRuntime(client.playerId).relocatePlayer(
+        fiber.position,
+      );
+      const resource =
+        composition.bundle.worldStore.getResourceState(fiber.entityId);
+      if (resource === undefined) {
+        throw new Error('Expected canonical Fiber Plant runtime state.');
+      }
+      const inventory = composition.bundle.items.getContainerView(
+        'inventory:' + client.playerId,
+      );
+      const operationId = 'hosted:gather:pending:fiber';
+      const command = Object.freeze({
+        operationId,
+        commandType: 'item.gather',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: inventory.containerId,
+            revision: inventory.revision,
+          },
+          {
+            aggregateType: 'resource',
+            aggregateId: fiber.entityId,
+            revision: resource.revision,
+          },
+        ]),
+        payload: {
+          inventoryContainerId: inventory.containerId,
+          resourceEntityId: fiber.entityId,
+        },
+      } satisfies GameplayCommandEnvelopeV1);
+
+      sendCommand(composition.host, client, command);
+      const first = await composition.step();
+      expect(first.some(
+        (entry) =>
+          entry.transportId === client.transportId
+          && entry.envelope.messageType === 'COMMAND_RESULT'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly operationId: string;
+            }
+          ).operationId === operationId,
+      )).toBe(false);
+      expect(queryOperationStatus(
+        composition.host,
+        client,
+        operationId,
+      )?.envelope).toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId,
+          state: 'accepted-pending',
+          acceptedAuthorityTick: 0,
+          authorityIngressOrdinal: 1,
+        },
+      });
+
+      // Same semantic OperationId while pending must not restart the channel.
+      sendCommand(composition.host, client, command);
+
+      const requiredTicks = Math.round(
+        composition.bundle.catalog.getAs(
+          'resource:fiber-plant',
+          'resource',
+        ).gatherChannelSeconds * SIMULATION_HZ,
+      );
+      for (let elapsed = 1; elapsed < requiredTicks - 1; elapsed += 1) {
+        const interim = await composition.step();
+        expect(interim.some(
+          (entry) =>
+            entry.transportId === client.transportId
+            && entry.envelope.messageType === 'COMMAND_RESULT'
+            && (
+              entry.envelope.payload as unknown as {
+                readonly operationId: string;
+              }
+            ).operationId === operationId,
+        )).toBe(false);
+      }
+
+      expect(queryOperationStatus(
+        composition.host,
+        client,
+        operationId,
+      )?.envelope).toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId,
+          state: 'accepted-pending',
+        },
+      });
+
+      const terminal = await composition.step();
+      expect(
+        terminal.find(
+          (entry) =>
+            entry.transportId === client.transportId
+            && entry.envelope.messageType === 'COMMAND_RESULT'
+            && (
+              entry.envelope.payload as unknown as {
+                readonly operationId: string;
+              }
+            ).operationId === operationId,
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId,
+        status: 'committed',
+        acceptedAuthorityTick: 0,
+        authorityIngressOrdinal: 1,
+        resultingRevisions: expect.arrayContaining([
+          expect.objectContaining({
+            aggregateType: 'container',
+            aggregateId: inventory.containerId,
+            revision: inventory.revision + 1,
+          }),
+          expect.objectContaining({
+            aggregateType: 'resource',
+            aggregateId: fiber.entityId,
+            revision: resource.revision + 1,
+          }),
+        ]),
+      });
+      expect(queryOperationStatus(
+        composition.host,
+        client,
+        operationId,
+      )?.envelope).toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId,
+          state: 'resolved',
+          result: {
+            operationId,
+            status: 'committed',
+            acceptedAuthorityTick: 0,
+            authorityIngressOrdinal: 1,
+          },
+        },
+      });
+      expect(
+        composition.bundle.items
+          .getContainerView(inventory.containerId).stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:plant-fiber',
+        quantity: 2,
+      }));
+    } finally {
+      await composition.destroy();
+    }
+  });
 
   it('routes hosted building placement through shared personal progression exactly once', async () => {
     const composition = await Phase1HostedAuthorityComposition.create({
