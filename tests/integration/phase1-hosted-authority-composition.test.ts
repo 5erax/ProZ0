@@ -23,6 +23,7 @@ interface HostedClientHarness {
   readonly transportId: string;
   readonly playerId: string;
   readonly connectionId: string;
+  readonly resumeCredential: string;
   nextSeq: number;
 }
 
@@ -50,13 +51,19 @@ function helloPayload(
 function join(
   composition: Phase1HostedAuthorityComposition,
   transportId: string,
+  resumeCredential?: string,
 ): HostedClientHarness {
   const host = composition.host;
   const joined = host.receiveText(transportId, JSON.stringify({
     protocolVersion: HOSTED_PROTOCOL_VERSION,
     messageType: 'CLIENT_HELLO',
     clientMessageSeq: 0,
-    payload: helloPayload(composition),
+    payload: {
+      ...helloPayload(composition),
+      ...(resumeCredential === undefined
+        ? {}
+        : { resumeCredential }),
+    },
   }));
   const accepted = joined.find(
     (entry) => entry.envelope.messageType === 'SESSION_ACCEPTED',
@@ -74,6 +81,7 @@ function join(
     transportId,
     playerId: metadata.playerId,
     connectionId: metadata.connectionId,
+    resumeCredential: metadata.resumeCredential,
     nextSeq: 1,
   };
   host.receiveText(transportId, JSON.stringify({
@@ -399,6 +407,114 @@ describe('Phase 1 hosted vertical-slice composition', () => {
         itemDefinitionId: 'item:plant-fiber',
         quantity: 2,
       }));
+    } finally {
+      await composition.destroy();
+    }
+  });
+
+  it('cancels hosted gather on disconnect and reconciles the same OperationId as rejected after same-epoch resume', async () => {
+    const composition = await Phase1HostedAuthorityComposition.create({
+      worldId: 'world:p1-hosted-gather-disconnect',
+      worldSeed: 'p1-world-golden',
+      maxPlayers: 2,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: new NoopHostedPersistence(),
+      sessionId: 'session:p1-hosted-gather-disconnect',
+      sessionEpoch: 'epoch:p1-hosted-gather-disconnect',
+    });
+
+    try {
+      const client = join(
+        composition,
+        'transport:hosted-gather-disconnect',
+      );
+      const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
+        'resource:fiber-plant',
+      );
+      if (fiber === null || fiber.type !== 'resource') {
+        throw new Error('Expected canonical Fiber Plant.');
+      }
+      composition.bundle.getRuntime(client.playerId).relocatePlayer(
+        fiber.position,
+      );
+      const resource =
+        composition.bundle.worldStore.getResourceState(fiber.entityId);
+      if (resource === undefined) {
+        throw new Error('Expected canonical Fiber Plant runtime state.');
+      }
+      const inventory = composition.bundle.items.getContainerView(
+        'inventory:' + client.playerId,
+      );
+      const operationId = 'hosted:gather:disconnect:fiber';
+      sendCommand(composition.host, client, {
+        operationId,
+        commandType: 'item.gather',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: inventory.containerId,
+            revision: inventory.revision,
+          },
+          {
+            aggregateType: 'resource',
+            aggregateId: fiber.entityId,
+            revision: resource.revision,
+          },
+        ]),
+        payload: {
+          inventoryContainerId: inventory.containerId,
+          resourceEntityId: fiber.entityId,
+        },
+      });
+      await composition.step();
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(1);
+
+      composition.host.disconnect(client.transportId);
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(0);
+      const resumed = join(
+        composition,
+        'transport:hosted-gather-disconnect-resumed',
+        client.resumeCredential,
+      );
+      expect(resumed.playerId).toBe(client.playerId);
+      expect(queryOperationStatus(
+        composition.host,
+        resumed,
+        operationId,
+      )?.envelope).toMatchObject({
+        messageType: 'OPERATION_STATUS',
+        payload: {
+          operationId,
+          state: 'resolved',
+          result: {
+            operationId,
+            status: 'rejected',
+            acceptedAuthorityTick: 0,
+            authorityIngressOrdinal: 1,
+            reason: 'GATHER_INTERRUPTED',
+          },
+        },
+      });
+
+      for (let tick = 0; tick < SIMULATION_HZ; tick += 1) {
+        await composition.step();
+      }
+      expect(
+        composition.bundle.items
+          .getContainerView(inventory.containerId).stacks,
+      ).not.toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:plant-fiber',
+      }));
+      expect(
+        composition.bundle.worldStore.getResourceState(fiber.entityId),
+      ).toMatchObject({
+        revision: resource.revision,
+        remainingGatherActions: resource.remainingGatherActions,
+      });
     } finally {
       await composition.destroy();
     }
