@@ -590,55 +590,71 @@ describe('Phase 1 hosted vertical-slice composition', () => {
       composition.bundle.getRuntime('player:2').relocatePlayer(
         fiber.position,
       );
-      const cache =
-        composition.bundle.items.getContainerView(death.cacheContainerId);
-      const teammateInventory =
-        composition.bundle.items.getContainerView('inventory:player:2');
-      const recoveredStack = cache.stacks[0];
-      if (recoveredStack === undefined) {
-        throw new Error('Expected recoverable Death Cache stack.');
-      }
+      let recoveryOrdinal = 0;
+      let recoveryStep: readonly HostedOutboundMessage[] = Object.freeze([]);
+      while (
+        composition.bundle.items
+          .getContainerView(death.cacheContainerId).stacks.length > 0
+      ) {
+        const cache =
+          composition.bundle.items.getContainerView(death.cacheContainerId);
+        const teammateInventory =
+          composition.bundle.items.getContainerView('inventory:player:2');
+        const recoveredStack = cache.stacks[0];
+        if (recoveredStack === undefined) {
+          throw new Error('Expected recoverable Death Cache stack.');
+        }
+        const operationId =
+          'hosted:death-cache-recover:p2:' + String(++recoveryOrdinal);
 
-      sendCommand(composition.host, clients[1]!, {
-        operationId: 'hosted:death-cache-recover:p2',
-        commandType: 'death-cache.recover',
-        expectedRevisions: Object.freeze([
-          {
-            aggregateType: 'container',
-            aggregateId: cache.containerId,
-            revision: cache.revision,
+        sendCommand(composition.host, clients[1]!, {
+          operationId,
+          commandType: 'death-cache.recover',
+          expectedRevisions: Object.freeze([
+            {
+              aggregateType: 'container',
+              aggregateId: cache.containerId,
+              revision: cache.revision,
+            },
+            {
+              aggregateType: 'container',
+              aggregateId: teammateInventory.containerId,
+              revision: teammateInventory.revision,
+            },
+          ]),
+          payload: {
+            sourceContainerId: cache.containerId,
+            targetContainerId: teammateInventory.containerId,
+            sourceStackId: recoveredStack.stackId,
+            quantity: recoveredStack.quantity,
           },
-          {
-            aggregateType: 'container',
-            aggregateId: teammateInventory.containerId,
-            revision: teammateInventory.revision,
-          },
-        ]),
-        payload: {
-          sourceContainerId: cache.containerId,
-          targetContainerId: teammateInventory.containerId,
-          sourceStackId: recoveredStack.stackId,
-          quantity: recoveredStack.quantity,
-        },
-      });
-      const recoveryStep = await composition.step();
-      expect(
-        recoveryStep.find(
-          (entry) =>
-            entry.transportId === 'transport:b'
-            && entry.envelope.messageType === 'COMMAND_RESULT',
-        )?.envelope.payload,
-      ).toMatchObject({
-        operationId: 'hosted:death-cache-recover:p2',
-        status: 'committed',
-      });
+        });
+        recoveryStep = await composition.step();
+        expect(
+          recoveryStep.find(
+            (entry) =>
+              entry.transportId === 'transport:b'
+              && entry.envelope.messageType === 'COMMAND_RESULT',
+          )?.envelope.payload,
+        ).toMatchObject({
+          operationId,
+          status: 'committed',
+        });
+      }
       expect(
         composition.bundle.items
           .getContainerView('inventory:player:2').stacks,
-      ).toContainEqual(expect.objectContaining({
-        itemDefinitionId: 'item:plant-fiber',
-        quantity: 2,
-      }));
+      ).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          itemDefinitionId: 'item:plant-fiber',
+          quantity: 2,
+        }),
+        expect.objectContaining({
+          itemDefinitionId: 'item:stone-field-tool',
+          quantity: 1,
+          condition: 100,
+        }),
+      ]));
       expect(
         composition.bundle.world.getDeathCacheByContainer(
           death.cacheContainerId,
