@@ -434,6 +434,36 @@ describe('Phase 0 browser runtime', () => {
     ).not.toBeNull();
   });
 
+  it('routes Product Review consume input through canonical survival authority', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-consume',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyV',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    const warning =
+      root.querySelector<HTMLElement>('.p1-toast[data-toast-kind="warning"]');
+    expect(warning).not.toBeNull();
+    expect(warning?.textContent).toContain('SOURCE MISSING');
+    expect(warning?.textContent).toContain('Consumable');
+  });
+
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
     root = document.createElement('div');
     document.body.append(root);

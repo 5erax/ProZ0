@@ -5,6 +5,8 @@ import {
   type Phase1AuthorityBundleConfig,
 } from '../../integration/Phase1AuthorityBundle';
 import type {
+  ConsumeStartResult,
+  ConsumeTickResult,
   FacingDirection,
   GatherStartResult,
   GatherTickResult,
@@ -55,6 +57,12 @@ export interface Phase1ProductReviewRuntime {
 }
 
 interface GatherInteractionState {
+  readonly operationId: string;
+  readonly targetName: string;
+  readonly requiredTicks: number;
+}
+
+interface ConsumeInteractionState {
   readonly operationId: string;
   readonly targetName: string;
   readonly requiredTicks: number;
@@ -168,6 +176,7 @@ export async function createPhase1ProductReviewRuntime(
 
   let operationOrdinal = 0;
   let activeGather: GatherInteractionState | null = null;
+  let activeConsume: ConsumeInteractionState | null = null;
   let actionPanel: 'craft' | 'build' | 'machine' | null = null;
   let machineStructureId: string | null = null;
   let craftPage = 0;
@@ -958,6 +967,119 @@ export async function createPhase1ProductReviewRuntime(
     return true;
   };
 
+  const presentConsumeStart = (
+    start: Readonly<ConsumeStartResult>,
+    targetName: string,
+  ): void => {
+    if (start.status === 'started') {
+      activeConsume = Object.freeze({
+        operationId: start.operationId,
+        targetName,
+        requiredTicks: start.requiredTicks,
+      });
+      source.setInteraction(Object.freeze({
+        inputLabel: 'V',
+        verb: 'CONSUME',
+        target: targetName,
+        state: 'CHANNELING',
+        reason: null,
+        progress: 0,
+      }));
+      return;
+    }
+
+    source.setLocalCommandFeedback({
+      operationId: start.operationId,
+      status: 'rejected',
+      reason: start.reason,
+      verb: 'CONSUME',
+      target: targetName,
+    });
+  };
+
+  const beginConsume = (): void => {
+    if (activeConsume !== null) {
+      bundle.survival.cancelConsume(config.localPlayerId);
+      return;
+    }
+
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const stack = inventory.stacks
+      .filter((candidate) =>
+        bundle.catalog.getAs(candidate.itemDefinitionId, 'item')
+          .capabilities.includes('consumable'),
+      )
+      .sort((left, right) => {
+        const leftPriority =
+          left.itemDefinitionId === 'item:clean-water' ? 0 : 1;
+        const rightPriority =
+          right.itemDefinitionId === 'item:clean-water' ? 0 : 1;
+        return leftPriority - rightPriority
+          || left.stackId.localeCompare(right.stackId);
+      })[0];
+    const operationId = nextOperationId('consume');
+    const targetName = stack === undefined
+      ? 'Consumable'
+      : bundle.catalog.get(stack.itemDefinitionId).displayName;
+    const start = bundle.survival.beginConsume({
+      operationId,
+      playerId: config.localPlayerId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      sourceStackId: stack?.stackId ?? 'missing-consumable',
+    });
+    presentConsumeStart(start, targetName);
+  };
+
+  const updateConsume = (
+    result: Readonly<ConsumeTickResult> | null,
+  ): void => {
+    if (activeConsume === null || result === null) return;
+
+    switch (result.status) {
+      case 'idle':
+        return;
+      case 'channeling':
+        if (result.operationId !== activeConsume.operationId) return;
+        source.setInteraction(Object.freeze({
+          inputLabel: 'V',
+          verb: 'CONSUME',
+          target: activeConsume.targetName,
+          state: 'CHANNELING',
+          reason: null,
+          progress: result.requiredTicks <= 0
+            ? 1
+            : result.elapsedTicks / result.requiredTicks,
+        }));
+        return;
+      case 'canceled': {
+        const targetName = activeConsume.targetName;
+        activeConsume = null;
+        source.setLocalCommandFeedback({
+          operationId: result.operationId,
+          status: 'rejected',
+          reason: result.reason,
+          verb: 'CONSUME',
+          target: targetName,
+        });
+        return;
+      }
+      case 'resolved': {
+        const targetName = activeConsume.targetName;
+        activeConsume = null;
+        source.setLocalCommandFeedback({
+          operationId: result.operationId,
+          status: result.committed ? 'committed' : 'rejected',
+          ...(result.committed ? {} : { reason: 'SOURCE_MISSING' }),
+          verb: 'CONSUME',
+          target: targetName,
+        });
+      }
+    }
+  };
+
   const inspectRuin = (): boolean => {
     const target = ruinTarget();
     if (target === null) return false;
@@ -980,7 +1102,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const refreshContextInteraction = (): void => {
-    if (activeGather !== null) return;
+    if (activeGather !== null || activeConsume !== null) return;
 
     const cache = deathCacheTarget();
     if (cache !== null) {
@@ -1251,6 +1373,10 @@ export async function createPhase1ProductReviewRuntime(
         event.preventDefault();
         toggleThermalWrap();
         break;
+      case 'KeyV':
+        event.preventDefault();
+        beginConsume();
+        break;
       case 'Space':
         event.preventDefault();
         attackPredator();
@@ -1342,6 +1468,9 @@ export async function createPhase1ProductReviewRuntime(
         await bundle.stepSolo();
         updateGather(
           bundle.getLastGatherResult(config.localPlayerId),
+        );
+        updateConsume(
+          bundle.getLastConsumeResult(config.localPlayerId),
         );
         source.refresh();
         refreshCraftPanel();

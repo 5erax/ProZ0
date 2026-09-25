@@ -25,6 +25,7 @@ import {
   createSimulationRuntime,
   type AuthorityRuntime,
   type ContainerState,
+  type ConsumeTickResult,
   type DeathTransitionResult,
   type GatherCostPort,
   type GatherCostReservation,
@@ -365,6 +366,7 @@ export class Phase1AuthorityBundle {
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly registeredSurvival = new Set<PlayerId>();
   private readonly lastGatherResults = new Map<PlayerId, GatherTickResult>();
+  private readonly lastConsumeResults = new Map<PlayerId, ConsumeTickResult>();
   private readonly lastDeathResults =
     new Map<PlayerId, DeathTransitionResult>();
   private readonly lastRespawnResults =
@@ -689,7 +691,10 @@ export class Phase1AuthorityBundle {
         playerId,
         this.items.tickGather(playerId),
       );
-      this.survival.tickConsume(playerId);
+      this.lastConsumeResults.set(
+        playerId,
+        this.survival.tickConsume(playerId),
+      );
       const ruinEntity = this.world.findGeneratedEntityByDefinition(
         'ruin:previous-civilization-ruin',
       );
@@ -738,6 +743,12 @@ export class Phase1AuthorityBundle {
     playerId: PlayerId,
   ): Readonly<GatherTickResult> | null {
     return this.lastGatherResults.get(playerId) ?? null;
+  }
+
+  public getLastConsumeResult(
+    playerId: PlayerId,
+  ): Readonly<ConsumeTickResult> | null {
+    return this.lastConsumeResults.get(playerId) ?? null;
   }
 
   public getLastDeathResult(
