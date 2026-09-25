@@ -453,4 +453,85 @@ describe('Phase 1 Save V2 integration composition', () => {
     }
   });
 
+  it('reopens a valid Save V2 predator PATROL state without remapping or rejecting it', async () => {
+    const worldId = 'world:p1-save-patrol';
+    const worldSeed = 'p1-world-golden';
+    const original = await Phase1AuthorityBundle.create({
+      worldId,
+      worldSeed,
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 21,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      const request = composePhase1SaveV2(original, {
+        nowUtc: '2026-09-26T00:04:00.000Z',
+      });
+      let patrolInjected = false;
+      const chunks = Object.freeze(request.chunks.map((chunk) => {
+        if (chunk.predatorStates.length === 0) return chunk;
+        patrolInjected = true;
+        return Object.freeze({
+          ...chunk,
+          predatorStates: Object.freeze(chunk.predatorStates.map(
+            (predator) => Object.freeze({
+              ...predator,
+              state: 'patrol' as const,
+              targetPlayerId: null,
+              stateUntilTick: null,
+            }),
+          )),
+        });
+      }));
+      expect(patrolInjected).toBe(true);
+
+      const portable = Object.freeze({
+        formatId: SAVE_FORMAT_ID,
+        schemaVersion: SAVE_SCHEMA_VERSION_V2,
+        recordKind: 'portable-bundle' as const,
+        world: request.world,
+        players: request.players,
+        containers: request.containers,
+        chunks,
+        footholds: request.footholds,
+        structures: request.structures,
+      });
+      const compatibility = createPhase1SaveV2Compatibility(
+        original.catalog,
+        [PHASE1_WORLD_GENERATION_VERSION],
+      );
+      const reconstructed = reconstructPhase1ReopenState(
+        portable,
+        compatibility,
+      );
+      expect(reconstructed.ok).toBe(true);
+      if (!reconstructed.ok) {
+        throw new Error(reconstructed.message);
+      }
+
+      const reopened = await Phase1AuthorityBundle.create({
+        worldId,
+        worldSeed,
+        playerIds: ['p1'],
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+        reopen: reconstructed.value,
+      });
+      try {
+        expect(reopened.world.exportSnapshot().predators).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ state: 'patrol' }),
+          ]),
+        );
+      } finally {
+        await reopened.destroy();
+      }
+    } finally {
+      await original.destroy();
+    }
+  });
+
 });
