@@ -122,3 +122,16 @@ export {
 } from './phase1/DeathCacheWorldState';
 
 export * from './building';
+
+
+export {
+  Phase1SessionWorldPersistence,
+  type Phase1SessionWorldPersistenceSeed,
+} from './phase1/Phase1SessionWorldPersistence';
+
+export {
+  Phase1VerticalSliceWorldAdapter,
+  type Phase1VerticalSlicePlayerPositionPort,
+  type Phase1VerticalSliceWorldAdapterOptions,
+  type Phase1VerticalSliceWorldSnapshot,
+} from './phase1/Phase1VerticalSliceWorldAdapter';
