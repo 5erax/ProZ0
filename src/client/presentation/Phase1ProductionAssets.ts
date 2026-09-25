@@ -49,20 +49,56 @@ const PLAYER_URL = new URL(
   '../../../assets/phase1/actors/player_pioneer.png',
   import.meta.url,
 ).href;
+const THERMAL_WRAP_URL = new URL(
+  '../../../assets/phase1/actors/player_thermal_wrap_overlay.png',
+  import.meta.url,
+).href;
+const PASSIVE_WILDLIFE_URL = new URL(
+  '../../../assets/phase1/actors/wildlife_passive_phase1.png',
+  import.meta.url,
+).href;
 const PREDATOR_URL = new URL(
   '../../../assets/phase1/actors/territorial_predator.png',
   import.meta.url,
 ).href;
-const RUIN_URL = new URL(
-  '../../../assets/phase1/world/discovery/previous_civilization_ruin.png',
+const LANDING_MODULE_URL = new URL(
+  '../../../assets/phase1/world/structures/landing_module.png',
   import.meta.url,
 ).href;
 const HABITAT_URL = new URL(
   '../../../assets/phase1/world/structures/habitat_room.png',
   import.meta.url,
 ).href;
+const STORAGE_CRATE_URL = new URL(
+  '../../../assets/phase1/world/structures/storage_crate.png',
+  import.meta.url,
+).href;
+const WORKBENCH_URL = new URL(
+  '../../../assets/phase1/world/structures/workbench.png',
+  import.meta.url,
+).href;
+const POWER_UNIT_URL = new URL(
+  '../../../assets/phase1/world/structures/compact_power_unit.png',
+  import.meta.url,
+).href;
 const CONDENSER_URL = new URL(
   '../../../assets/phase1/world/structures/atmospheric_water_condenser.png',
+  import.meta.url,
+).href;
+const FIBER_PLANT_URL = new URL(
+  '../../../assets/phase1/world/resources/fiber_plant.png',
+  import.meta.url,
+).href;
+const FOOD_PLANT_URL = new URL(
+  '../../../assets/phase1/world/resources/food_plant.png',
+  import.meta.url,
+).href;
+const TREE_TIMBER_URL = new URL(
+  '../../../assets/phase1/world/resources/tree_timber.png',
+  import.meta.url,
+).href;
+const STONE_OUTCROP_URL = new URL(
+  '../../../assets/phase1/world/resources/stone_outcrop.png',
   import.meta.url,
 ).href;
 const METAL_ORE_URL = new URL(
@@ -73,8 +109,36 @@ const POTABLE_WATER_URL = new URL(
   '../../../assets/phase1/world/resources/potable_water_source.png',
   import.meta.url,
 ).href;
+const RUIN_URL = new URL(
+  '../../../assets/phase1/world/discovery/previous_civilization_ruin.png',
+  import.meta.url,
+).href;
+const RUIN_INSPECT_URL = new URL(
+  '../../../assets/phase1/world/discovery/ruin_inspect_marker.png',
+  import.meta.url,
+).href;
 const DEATH_CACHE_URL = new URL(
   '../../../assets/phase1/world/discovery/death_cache.png',
+  import.meta.url,
+).href;
+const WORLD_DROP_URL = new URL(
+  '../../../assets/phase1/world/discovery/world_drop_base.png',
+  import.meta.url,
+).href;
+const FOG_MASK_URL = new URL(
+  '../../../assets/phase1/world/effects/fog_mask_atlas.png',
+  import.meta.url,
+).href;
+const COLD_RAIN_URL = new URL(
+  '../../../assets/phase1/world/effects/cold_rain_fx.png',
+  import.meta.url,
+).href;
+const WEATHER_DITHER_URL = new URL(
+  '../../../assets/phase1/world/effects/weather_dither_pattern.png',
+  import.meta.url,
+).href;
+const NONBUILDABLE_PATTERN_URL = new URL(
+  '../../../assets/phase1/world/terrain/nonbuildable_pattern.png',
   import.meta.url,
 ).href;
 
@@ -321,6 +385,16 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     6,
     0,
   ),
+  nonbuildablePattern: atlasSprite(
+    'assets/phase1/world/terrain/nonbuildable_pattern.png',
+    NONBUILDABLE_PATTERN_URL,
+    8,
+    8,
+    8,
+    8,
+    1,
+    0,
+  ),
   player: atlasSprite(
     'assets/phase1/actors/player_pioneer.png',
     PLAYER_URL,
@@ -329,6 +403,26 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     1056,
     240,
     33,
+    0,
+  ),
+  thermalWrap: atlasSprite(
+    'assets/phase1/actors/player_thermal_wrap_overlay.png',
+    THERMAL_WRAP_URL,
+    32,
+    48,
+    1056,
+    240,
+    33,
+    0,
+  ),
+  passiveWildlife: atlasSprite(
+    'assets/phase1/actors/wildlife_passive_phase1.png',
+    PASSIVE_WILDLIFE_URL,
+    32,
+    32,
+    192,
+    32,
+    6,
     0,
   ),
   predator: atlasSprite(
@@ -341,14 +435,14 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     28,
     0,
   ),
-  ruin: atlasSprite(
-    'assets/phase1/world/discovery/previous_civilization_ruin.png',
-    RUIN_URL,
+  landingModule: atlasSprite(
+    'assets/phase1/world/structures/landing_module.png',
+    LANDING_MODULE_URL,
     128,
-    128,
-    128,
-    128,
-    1,
+    96,
+    256,
+    96,
+    2,
     0,
   ),
   habitat: atlasSprite(
@@ -361,6 +455,36 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     4,
     0,
   ),
+  storageCrate: atlasSprite(
+    'assets/phase1/world/structures/storage_crate.png',
+    STORAGE_CRATE_URL,
+    32,
+    32,
+    32,
+    32,
+    1,
+    0,
+  ),
+  workbench: atlasSprite(
+    'assets/phase1/world/structures/workbench.png',
+    WORKBENCH_URL,
+    48,
+    40,
+    48,
+    40,
+    1,
+    0,
+  ),
+  powerUnit: atlasSprite(
+    'assets/phase1/world/structures/compact_power_unit.png',
+    POWER_UNIT_URL,
+    48,
+    48,
+    240,
+    48,
+    5,
+    0,
+  ),
   condenser: atlasSprite(
     'assets/phase1/world/structures/atmospheric_water_condenser.png',
     CONDENSER_URL,
@@ -369,6 +493,46 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     448,
     64,
     7,
+    0,
+  ),
+  fiberPlant: atlasSprite(
+    'assets/phase1/world/resources/fiber_plant.png',
+    FIBER_PLANT_URL,
+    32,
+    32,
+    64,
+    32,
+    2,
+    0,
+  ),
+  foodPlant: atlasSprite(
+    'assets/phase1/world/resources/food_plant.png',
+    FOOD_PLANT_URL,
+    32,
+    32,
+    64,
+    32,
+    2,
+    0,
+  ),
+  treeTimber: atlasSprite(
+    'assets/phase1/world/resources/tree_timber.png',
+    TREE_TIMBER_URL,
+    48,
+    64,
+    96,
+    64,
+    2,
+    0,
+  ),
+  stoneOutcrop: atlasSprite(
+    'assets/phase1/world/resources/stone_outcrop.png',
+    STONE_OUTCROP_URL,
+    48,
+    40,
+    96,
+    40,
+    2,
     0,
   ),
   metalOre: atlasSprite(
@@ -391,6 +555,26 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     1,
     0,
   ),
+  ruin: atlasSprite(
+    'assets/phase1/world/discovery/previous_civilization_ruin.png',
+    RUIN_URL,
+    128,
+    128,
+    128,
+    128,
+    1,
+    0,
+  ),
+  ruinInspectMarker: atlasSprite(
+    'assets/phase1/world/discovery/ruin_inspect_marker.png',
+    RUIN_INSPECT_URL,
+    16,
+    16,
+    16,
+    48,
+    1,
+    0,
+  ),
   deathCache: atlasSprite(
     'assets/phase1/world/discovery/death_cache.png',
     DEATH_CACHE_URL,
@@ -401,7 +585,224 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     3,
     0,
   ),
+  worldDrop: atlasSprite(
+    'assets/phase1/world/discovery/world_drop_base.png',
+    WORLD_DROP_URL,
+    16,
+    12,
+    16,
+    12,
+    1,
+    0,
+  ),
+  fogMask: atlasSprite(
+    'assets/phase1/world/effects/fog_mask_atlas.png',
+    FOG_MASK_URL,
+    32,
+    32,
+    128,
+    128,
+    4,
+    0,
+  ),
+  coldRain: atlasSprite(
+    'assets/phase1/world/effects/cold_rain_fx.png',
+    COLD_RAIN_URL,
+    16,
+    16,
+    64,
+    32,
+    4,
+    0,
+  ),
+  weatherDither: atlasSprite(
+    'assets/phase1/world/effects/weather_dither_pattern.png',
+    WEATHER_DITHER_URL,
+    16,
+    16,
+    16,
+    16,
+    1,
+    0,
+  ),
 });
+
+export const PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS = Object.freeze([
+  'ground',
+  'player',
+  'thermalWrap',
+  'passiveWildlife',
+  'predator',
+  'landingModule',
+  'habitat',
+  'storageCrate',
+  'workbench',
+  'powerUnit',
+  'condenser',
+  'fiberPlant',
+  'foodPlant',
+  'treeTimber',
+  'stoneOutcrop',
+  'metalOre',
+  'potableWater',
+  'ruin',
+  'ruinInspectMarker',
+  'deathCache',
+  'worldDrop',
+  'fogMask',
+  'coldRain',
+  'weatherDither',
+  'nonbuildablePattern',
+] as const);
+
+export type Phase1VerticalSliceVisualKey =
+  (typeof PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS)[number];
+
+export function productionSpriteFrame(
+  definition: Phase1ProductionSprite,
+  index: number,
+): Phase1ProductionSprite {
+  const rows = definition.sourceHeight / definition.cellHeight;
+  const totalFrames = definition.columns * rows;
+
+  if (
+    !Number.isInteger(rows)
+    || !Number.isInteger(index)
+    || index < 0
+    || index >= totalFrames
+  ) {
+    throw new Error(
+      'Production sprite frame index must fit the accepted atlas geometry.',
+    );
+  }
+
+  return Object.freeze({ ...definition, index });
+}
+
+export type Phase1ResourceVisualKind =
+  | 'fiberPlant'
+  | 'foodPlant'
+  | 'treeTimber'
+  | 'stoneOutcrop'
+  | 'metalOre';
+
+export function resourceNodeSprite(
+  kind: Phase1ResourceVisualKind,
+  state: 'NORMAL' | 'DEPLETED',
+): Phase1ProductionSprite {
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES[kind],
+    state === 'NORMAL' ? 0 : 1,
+  );
+}
+
+export function deathCacheSprite(
+  state: 'ACTIVE' | 'TARGETED' | 'RECOVERED',
+): Phase1ProductionSprite {
+  const index = state === 'ACTIVE' ? 0 : state === 'TARGETED' ? 1 : 2;
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.deathCache,
+    index,
+  );
+}
+
+export function ruinInspectMarkerSprite(
+  state: 'AVAILABLE' | 'TARGETED' | 'INVESTIGATED',
+): Phase1ProductionSprite {
+  const index = state === 'AVAILABLE' ? 0 : state === 'TARGETED' ? 1 : 2;
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.ruinInspectMarker,
+    index,
+  );
+}
+
+export function fogMaskSprite(mask: number): Phase1ProductionSprite {
+  if (!Number.isInteger(mask) || mask < 0 || mask > 15) {
+    throw new Error('Fog adjacency mask must be an integer in 0..15.');
+  }
+
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.fogMask,
+    mask,
+  );
+}
+
+export function coldRainSprite(
+  kind: 'RAIN_STREAK' | 'GROUND_SPLASH',
+  frame: 0 | 1 | 2 | 3,
+): Phase1ProductionSprite {
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.coldRain,
+    kind === 'RAIN_STREAK' ? frame : frame + 4,
+  );
+}
+
+export function habitatSprite(
+  orientation: 0 | 90 | 180 | 270,
+  state: 'NORMAL' | 'CONNECTOR_TARGET' | 'SHELTER_ACTIVE',
+): Phase1ProductionSprite {
+  const orientationIndex = orientation === 0
+    ? 0
+    : orientation === 90
+      ? 1
+      : orientation === 180
+        ? 2
+        : 3;
+  const stateRow = state === 'NORMAL'
+    ? 0
+    : state === 'CONNECTOR_TARGET'
+      ? 1
+      : 2;
+
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.habitat,
+    stateRow * 4 + orientationIndex,
+  );
+}
+
+export function powerUnitSprite(
+  state: 'OPERATING_0' | 'OPERATING_1' | 'OPERATING_2' | 'OPERATING_3' | 'SELECTED',
+): Phase1ProductionSprite {
+  const index = state === 'OPERATING_0'
+    ? 0
+    : state === 'OPERATING_1'
+      ? 1
+      : state === 'OPERATING_2'
+        ? 2
+        : state === 'OPERATING_3'
+          ? 3
+          : 4;
+
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit,
+    index,
+  );
+}
+
+export function condenserSprite(
+  state:
+    | 'DISABLED'
+    | 'UNPOWERED'
+    | 'RUNNING_0'
+    | 'RUNNING_1'
+    | 'RUNNING_2'
+    | 'RUNNING_3'
+    | 'OUTPUT_FULL',
+): Phase1ProductionSprite {
+  const order = Object.freeze([
+    'DISABLED',
+    'UNPOWERED',
+    'RUNNING_0',
+    'RUNNING_1',
+    'RUNNING_2',
+    'RUNNING_3',
+    'OUTPUT_FULL',
+  ] as const);
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.condenser,
+    order.indexOf(state),
+  );
+}
 
 export function applyProductionSprite(
   element: HTMLElement,
