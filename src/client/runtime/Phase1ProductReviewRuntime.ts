@@ -32,6 +32,7 @@ import {
 import type {
   Phase1BuildPanelPresentation,
   Phase1CraftPanelPresentation,
+  Phase1MachinePanelPresentation,
 } from '../presentation/Phase1PresentationModel';
 import {
   mountPhase1Presentation,
@@ -150,7 +151,8 @@ export async function createPhase1ProductReviewRuntime(
 
   let operationOrdinal = 0;
   let activeGather: GatherInteractionState | null = null;
-  let actionPanel: 'craft' | 'build' | null = null;
+  let actionPanel: 'craft' | 'build' | 'machine' | null = null;
+  let machineStructureId: string | null = null;
   let craftPage = 0;
   let buildIndex = 0;
   let buildConnectorIndex = 0;
@@ -240,6 +242,58 @@ export async function createPhase1ProductReviewRuntime(
       return null;
     }
     return Object.freeze({ entity, state });
+  };
+
+  const machineTarget = () => {
+    return bundle.buildings
+      .exportSnapshot()
+      .foothold.structures
+      .filter(
+        (structure) =>
+          structure.definitionId
+            === 'structure:atmospheric-water-condenser'
+          && bundle.world.isPlayerInInteractionRange(
+            config.localPlayerId,
+            structure.structureId,
+          ),
+      )
+      .sort((left, right) =>
+        left.structureId.localeCompare(right.structureId),
+      )[0] ?? null;
+  };
+
+  const machinePanel = (
+    structureId: string,
+  ): Phase1MachinePanelPresentation => {
+    const view = bundle.machines.getView(structureId);
+    const power = bundle.buildings.getPowerNetwork();
+    const machine = bundle.catalog.getAs(
+      'machine:atmospheric-water-condenser',
+      'machine',
+    );
+    return Object.freeze({
+      kind: 'machine',
+      title: 'Atmospheric Water Condenser · [E] INTERACT',
+      stateLabel: view.derivedState === 'OUTPUT_FULL'
+        ? 'OUTPUT FULL'
+        : view.derivedState,
+      powerLabel:
+        String(machine.powerDemandPu)
+        + ' PU demand · '
+        + String(power.capacityPu)
+        + ' PU capacity',
+      outputLabel:
+        String(view.outputCount)
+        + '/'
+        + String(machine.outputBufferCapacity)
+        + ' Clean Water',
+      reason: null,
+    });
+  };
+
+  const refreshMachinePanel = (): void => {
+    if (actionPanel !== 'machine' || machineStructureId === null) return;
+    source.setPresentationPanel(machinePanel(machineStructureId));
   };
 
   const craftRecipes = () =>
@@ -747,6 +801,93 @@ export async function createPhase1ProductReviewRuntime(
     return true;
   };
 
+  const interactWithMachine = (): boolean => {
+    const structure = machineTarget();
+    if (structure === null) return false;
+
+    const view = bundle.machines.getView(structure.structureId);
+    const output = bundle.items.getContainerView(view.outputContainerId);
+    const outputStack = output.stacks[0];
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+
+    if (outputStack !== undefined) {
+      const result = bundle.items.execute({
+        type: 'transfer',
+        operationId: nextOperationId('machine-output'),
+        playerId: config.localPlayerId,
+        sourceContainerId: output.containerId,
+        sourceExpectedRevision: output.revision,
+        targetContainerId: inventory.containerId,
+        targetExpectedRevision: inventory.revision,
+        sourceStackId: outputStack.stackId,
+        quantity: outputStack.quantity,
+      });
+
+      if (result.status === 'committed') {
+        bundle.progression.applyEvent(Object.freeze({
+          type: 'machine-output-collected',
+          eventId: 'machine-output-collected:' + result.operationId,
+          playerId: config.localPlayerId,
+          machineId: 'machine:atmospheric-water-condenser',
+          itemId: outputStack.itemDefinitionId,
+          quantity: outputStack.quantity,
+        }));
+      }
+
+      actionPanel = 'machine';
+      machineStructureId = structure.structureId;
+      source.setPresentationPanel(machinePanel(structure.structureId));
+      source.setLocalCommandFeedback({
+        operationId: result.operationId,
+        status: result.status,
+        ...(result.status === 'rejected'
+          ? { reason: result.reason }
+          : {}),
+        verb: 'COLLECT',
+        target: 'Clean Water',
+      });
+      return true;
+    }
+
+    const result = bundle.machines.setEnabled({
+      operationId: nextOperationId('machine-toggle'),
+      actorPlayerId: config.localPlayerId,
+      structureId: structure.structureId,
+      expectedRevision: view.revision,
+      enabled: !view.enabled,
+    });
+
+    if (result.status === 'committed') {
+      bundle.progression.applyEvent(Object.freeze({
+        type: 'powered-machine-interacted',
+        eventId: 'powered-machine-interacted:' + result.operationId,
+        playerId: config.localPlayerId,
+        machineId: 'machine:atmospheric-water-condenser',
+        powered: bundle.buildings.isCondenserPowered(
+          structure.structureId,
+        ),
+      }));
+    }
+
+    actionPanel = 'machine';
+    machineStructureId = structure.structureId;
+    source.setPresentationPanel(machinePanel(structure.structureId));
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: result.status === 'committed' && result.enabled
+        ? 'ENABLE'
+        : 'DISABLE',
+      target: 'Atmospheric Water Condenser',
+    });
+    return true;
+  };
+
   const inspectRuin = (): boolean => {
     const target = ruinTarget();
     if (target === null) return false;
@@ -797,6 +938,20 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    const machine = machineTarget();
+    if (machine !== null) {
+      const view = bundle.machines.getView(machine.structureId);
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E',
+        verb: view.outputCount > 0 ? 'COLLECT' : 'USE MACHINE',
+        target: 'Atmospheric Water Condenser',
+        state: 'AVAILABLE',
+        reason: view.derivedState,
+        progress: null,
+      }));
+      return;
+    }
+
     const resource = resourceTarget();
     if (resource !== null && resource.type === 'resource') {
       const definition = bundle.catalog.getAs(
@@ -833,6 +988,7 @@ export async function createPhase1ProductReviewRuntime(
     }
     if (recoverDeathCache()) return;
     if (inspectRuin()) return;
+    if (interactWithMachine()) return;
     beginGather();
   };
 
@@ -936,6 +1092,7 @@ export async function createPhase1ProductReviewRuntime(
       case 'Escape':
         event.preventDefault();
         actionPanel = null;
+        machineStructureId = null;
         source.setPresentationPanel(null);
         source.setPanel(null);
         break;
@@ -970,6 +1127,7 @@ export async function createPhase1ProductReviewRuntime(
         source.refresh();
         refreshCraftPanel();
         refreshBuildPanel();
+        refreshMachinePanel();
         refreshContextInteraction();
         worldRenderer.render();
       }).catch((error: unknown) => {
