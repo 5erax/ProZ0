@@ -490,6 +490,67 @@ describe('Phase 1 hosted vertical-slice composition', () => {
           .getPlayerView('player:2').milestoneRuleIds,
       ).not.toContain('first-ruin-inspect:previous-civilization-ruin');
 
+      const claimable =
+        composition.bundle.worldStore.getRuinState(ruin.entityId);
+      const claimantInventory =
+        composition.bundle.items.getContainerView('inventory:player:1');
+      sendCommand(composition.host, clients[0]!, {
+        operationId: 'hosted:ruin-reward-claim:p1',
+        commandType: 'world.ruin-reward-claim',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'ruin',
+            aggregateId: ruin.entityId,
+            revision: claimable!.revision,
+          },
+          {
+            aggregateType: 'container',
+            aggregateId: claimantInventory.containerId,
+            revision: claimantInventory.revision,
+          },
+        ]),
+        payload: {
+          ruinEntityId: ruin.entityId,
+          inventoryContainerId: claimantInventory.containerId,
+        },
+      });
+      const claimStep = await composition.step();
+      expect(
+        claimStep.find(
+          (entry) =>
+            entry.transportId === 'transport:a'
+            && entry.envelope.messageType === 'COMMAND_RESULT',
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId: 'hosted:ruin-reward-claim:p1',
+        status: 'committed',
+        resultingRevisions: expect.arrayContaining([
+          expect.objectContaining({
+            aggregateType: 'ruin',
+            aggregateId: ruin.entityId,
+            revision: claimable!.revision + 1,
+          }),
+          expect.objectContaining({
+            aggregateType: 'container',
+            aggregateId: claimantInventory.containerId,
+            revision: claimantInventory.revision + 1,
+          }),
+        ]),
+      });
+      expect(
+        composition.bundle.worldStore.getRuinState(ruin.entityId),
+      ).toMatchObject({
+        discoveryState: 'investigated',
+        physicalRewardState: 'claimed',
+      });
+      expect(
+        composition.bundle.items
+          .getContainerView('inventory:player:1').stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:ancient-alloy-shard',
+        quantity: 1,
+      }));
+
       const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
         'resource:fiber-plant',
       );
