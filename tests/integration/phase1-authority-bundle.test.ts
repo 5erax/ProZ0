@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Phase1AuthorityBundle } from '../../src/integration';
 import {
   PHASE1_STRUCTURE_PLACEMENT_PROFILES,
@@ -86,6 +86,120 @@ describe('Phase 1 canonical authority bundle', () => {
         /advance exactly one/,
       );
     } finally {
+      await bundle.destroy();
+    }
+  });
+
+  it('centralizes machine progression for canonical item transfer and machine interaction', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-machine-progression-integration',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 0,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      const baseline = bundle.buildings.exportSnapshot();
+      vi.spyOn(bundle.buildings, 'exportSnapshot').mockReturnValue(
+        Object.freeze({
+          ...baseline,
+          foothold: Object.freeze({
+            ...baseline.foothold,
+            condensers: Object.freeze([
+              Object.freeze({
+                structureId: 'structure-instance:test-condenser',
+                revision: 0,
+                enabled: true,
+                productionProgressTicks: 0,
+                completedCycleOrdinal: 1,
+                outputContainerId: 'machine-output:test-condenser',
+              }),
+            ]),
+          }),
+        }),
+      );
+
+      const originalGetContainer =
+        bundle.items.getContainerView.bind(bundle.items);
+      vi.spyOn(bundle.items, 'getContainerView').mockImplementation(
+        (containerId) => containerId === 'machine-output:test-condenser'
+          ? Object.freeze({
+              containerId,
+              kind: 'machine-output' as const,
+              ownerPlayerId: null,
+              revision: 0,
+              stacks: Object.freeze([
+                Object.freeze({
+                  stackId: 'stack:test-clean-water',
+                  itemDefinitionId: 'item:clean-water',
+                  quantity: 1,
+                  condition: null,
+                }),
+              ]),
+              totalWeightKg: 0.5,
+              totalVolume: 0.5,
+              playerWeightState: null,
+            })
+          : originalGetContainer(containerId),
+      );
+      vi.spyOn(bundle.items, 'execute').mockReturnValue(Object.freeze({
+        status: 'committed' as const,
+        operationId: 'machine-output:test-collect',
+        resultingRevisions: Object.freeze([]),
+        resultingWorldRevisions: Object.freeze([]),
+        createdStackIds: Object.freeze([]),
+        removedStackIds: Object.freeze([]),
+      }));
+
+      const transfer = {
+        type: 'transfer' as const,
+        operationId: 'machine-output:test-collect',
+        playerId: 'p1',
+        sourceContainerId: 'machine-output:test-condenser',
+        sourceExpectedRevision: 0,
+        targetContainerId: 'inventory:p1',
+        targetExpectedRevision: 0,
+        sourceStackId: 'stack:test-clean-water',
+        quantity: 1,
+      };
+      expect(bundle.executeItemCommand(transfer).status).toBe('committed');
+      expect(bundle.progression.getPlayerView('p1').totalXp).toBe(20);
+      expect(
+        bundle.progression.getPlayerView('p1').milestoneRuleIds,
+      ).toContain('first-machine-output:clean-water');
+
+      // Same operation ID maps to the same progression event receipt.
+      expect(bundle.executeItemCommand(transfer).status).toBe('committed');
+      expect(bundle.progression.getPlayerView('p1').totalXp).toBe(20);
+
+      const applyEvent = vi.spyOn(bundle.progression, 'applyEvent');
+      applyEvent.mockClear();
+      vi.spyOn(bundle.machines, 'setEnabled').mockReturnValue(Object.freeze({
+        status: 'committed' as const,
+        operationId: 'machine-toggle:test',
+        revision: 1,
+        enabled: true,
+      }));
+      vi.spyOn(bundle.buildings, 'isCondenserPowered').mockReturnValue(true);
+
+      expect(bundle.setCondenserEnabled({
+        operationId: 'machine-toggle:test',
+        actorPlayerId: 'p1',
+        structureId: 'structure-instance:test-condenser',
+        expectedRevision: 0,
+        enabled: true,
+      }).status).toBe('committed');
+      expect(applyEvent).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'powered-machine-interacted',
+        eventId: 'powered-machine-interacted:machine-toggle:test',
+        playerId: 'p1',
+        machineId: 'machine:atmospheric-water-condenser',
+        powered: true,
+      }));
+    } finally {
+      vi.restoreAllMocks();
       await bundle.destroy();
     }
   });
