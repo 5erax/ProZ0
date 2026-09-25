@@ -1,6 +1,8 @@
 import type { PlayerId } from '../../foundation';
-import type { Phase1AuthorityBundleConfig } from '../../integration';
-import { Phase1AuthorityBundle } from '../../integration';
+import {
+  Phase1AuthorityBundle,
+  type Phase1AuthorityBundleConfig,
+} from '../../integration/Phase1AuthorityBundle';
 import type {
   GatherStartResult,
   GatherTickResult,

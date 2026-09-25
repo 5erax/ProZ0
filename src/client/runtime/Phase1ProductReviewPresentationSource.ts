@@ -1,5 +1,7 @@
 import type { CommandResultV1 } from '../../protocol';
-import type { Phase1AuthorityBundle } from '../../integration';
+import type {
+  Phase1AuthorityBundle,
+} from '../../integration/Phase1AuthorityBundle';
 import {
   fromWorldPosition,
 } from '../../world';
