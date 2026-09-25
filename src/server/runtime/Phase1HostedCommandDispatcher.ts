@@ -29,12 +29,35 @@ export interface Phase1HostedReplicationAdapter {
   ): readonly RevisionedAggregateViewV1[];
 }
 
+export interface Phase1HostedRuinAuthority {
+  inspectRuin(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRevision: number;
+  }):
+    | {
+        readonly status: 'committed';
+        readonly operationId: string;
+        readonly revision: number;
+        readonly changed: boolean;
+        readonly rewardItemId: string | null;
+        readonly rewardQuantity: number;
+      }
+    | {
+        readonly status: 'rejected';
+        readonly operationId: string;
+        readonly reason: string;
+      };
+}
+
 export interface Phase1HostedCommandDispatcherOptions {
   readonly items: Phase1ItemAuthority;
   readonly buildings: Phase1BuildingAuthority;
   readonly machines: Phase1CondenserAuthority;
   readonly death: Phase1DeathAuthority;
   readonly combat?: Phase1CombatAuthority;
+  readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
 }
 
@@ -344,6 +367,9 @@ implements HostedCommandDispatcher {
       case 'death-cache.recover':
         return this.recoverDeathCache(context.playerId, command, payload);
 
+      case 'world.ruin-inspect':
+        return this.inspectRuin(context.playerId, command, payload);
+
       case 'combat.attack':
         return this.attack(context.playerId, command, payload);
 
@@ -596,6 +622,48 @@ implements HostedCommandDispatcher {
             resultingRevisions: itemResultRevisions(result),
           }
         : { status: 'rejected', reason: result.reason },
+    );
+  }
+
+  private inspectRuin(
+    playerId: PlayerId,
+    envelope: GameplayCommandEnvelopeV1,
+    payload: PayloadObject,
+  ): HostedDomainCommandResult {
+    if (this.options.ruins === undefined) {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'INVALID_MESSAGE',
+      });
+    }
+    const ruinEntityId = textField(payload, 'ruinEntityId');
+    const result = this.options.ruins.inspectRuin({
+      operationId: envelope.operationId,
+      playerId,
+      ruinEntityId,
+      expectedRevision: expectedRevision(
+        envelope,
+        'ruin',
+        ruinEntityId,
+      ),
+    });
+    return withReplication(
+      this.options,
+      envelope.commandType,
+      playerId,
+      result.status === 'committed'
+        ? {
+            status: 'committed',
+            resultingRevisions: Object.freeze([{
+              aggregateType: 'ruin',
+              aggregateId: ruinEntityId,
+              revision: result.revision,
+            }]),
+          }
+        : {
+            status: 'rejected',
+            reason: result.reason,
+          },
     );
   }
 

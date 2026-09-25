@@ -52,6 +52,7 @@ import {
   getPhase1WorldLandmarks,
 } from '../world/phase1/Phase1ChunkGenerator';
 import {
+  PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS,
   Phase1WorldStore,
 } from '../world/phase1/Phase1WorldStore';
 
@@ -306,6 +307,25 @@ function corridorChunkCoords(worldSeed: string) {
   }
   return Object.freeze(values);
 }
+
+export type Phase1RuinInspectResult =
+  | {
+      readonly status: 'committed';
+      readonly operationId: string;
+      readonly revision: number;
+      readonly changed: boolean;
+      readonly rewardItemId: string | null;
+      readonly rewardQuantity: number;
+    }
+  | {
+      readonly status: 'rejected';
+      readonly operationId: string;
+      readonly reason:
+        | 'SOURCE_MISSING'
+        | 'OUT_OF_RANGE'
+        | 'STALE_REVISION'
+        | 'RUIN_NOT_LOCATED';
+    };
 
 export interface Phase1AuthorityBundleConfig {
   readonly worldId: string;
@@ -635,9 +655,26 @@ export class Phase1AuthorityBundle {
         this.items.tickGather(playerId),
       );
       this.survival.tickConsume(playerId);
+      const ruinEntity = this.world.findGeneratedEntityByDefinition(
+        'ruin:previous-civilization-ruin',
+      );
       await this.worldStore.revealResolvedPlayerPosition(
         this.positions.get(playerId),
       );
+      if (
+        ruinEntity !== null
+        && this.isWithinRuinLocateRange(
+          this.positions.get(playerId),
+          ruinEntity.position,
+        )
+      ) {
+        this.progression.applyEvent(Object.freeze({
+          type: 'ruin-located',
+          eventId: 'ruin-located:' + playerId + ':' + ruinEntity.entityId,
+          playerId,
+          ruinId: 'ruin:previous-civilization-ruin',
+        }));
+      }
     }
 
     for (const structure of this.buildings.exportSnapshot().foothold.structures) {
@@ -661,6 +698,92 @@ export class Phase1AuthorityBundle {
     playerId: PlayerId,
   ): Readonly<GatherTickResult> | null {
     return this.lastGatherResults.get(playerId) ?? null;
+  }
+
+  public inspectRuin(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRevision: number;
+  }): Phase1RuinInspectResult {
+    const entity = this.world.getActiveGeneratedEntities().find(
+      (candidate) =>
+        candidate.entityId === request.ruinEntityId
+        && candidate.type === 'ruin',
+    );
+    if (entity === undefined) {
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'SOURCE_MISSING',
+      });
+    }
+    if (
+      !this.world.isGeneratedEntityInInteractionRange(
+        request.playerId,
+        request.ruinEntityId,
+      )
+    ) {
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'OUT_OF_RANGE',
+      });
+    }
+
+    const current = this.worldStore.getRuinState(request.ruinEntityId);
+    if (current === undefined) {
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'SOURCE_MISSING',
+      });
+    }
+    if (current.revision !== request.expectedRevision) {
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'STALE_REVISION',
+      });
+    }
+    if (current.discoveryState === 'unknown') {
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'RUIN_NOT_LOCATED',
+      });
+    }
+
+    const result = this.worldStore.investigateRuin(
+      request.ruinEntityId,
+      request.expectedRevision,
+    );
+    this.progression.applyEvent(Object.freeze({
+      type: 'ruin-inspected',
+      eventId: 'ruin-inspected:' + request.playerId + ':'
+        + request.ruinEntityId,
+      playerId: request.playerId,
+      ruinId: 'ruin:previous-civilization-ruin',
+    }));
+
+    return Object.freeze({
+      status: 'committed',
+      operationId: request.operationId,
+      revision: result.state.revision,
+      changed: result.changed,
+      rewardItemId: result.rewardItemId,
+      rewardQuantity: result.rewardQuantity,
+    });
+  }
+
+  private isWithinRuinLocateRange(
+    player: WorldPosition,
+    ruin: WorldPosition,
+  ): boolean {
+    const dx = player.x - ruin.x;
+    const dy = player.y - ruin.y;
+    return dx * dx + dy * dy
+      <= PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS ** 2;
   }
 
   public getRuntime(playerId: PlayerId): AuthorityRuntime {

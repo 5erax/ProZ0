@@ -367,6 +367,18 @@ export class Phase1VerticalSliceWorldAdapter
     });
   }
 
+  public isGeneratedEntityInInteractionRange(
+    playerId: PlayerId,
+    entityId: string,
+  ): boolean {
+    const entity = this.findGeneratedEntity(entityId);
+    return entity !== null
+      && this.inInteractionRange(
+        this.getPlayerPosition(playerId),
+        entity.position,
+      );
+  }
+
   public isResourceInInteractionRange(
     playerId: PlayerId,
     resourceEntityId: string,
