@@ -25,6 +25,11 @@ import {
 } from './runtime/Phase1PresentationMount';
 import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
 import {
+  PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+  PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+  PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+} from '../integration';
+import {
   bootPersistedPhase1ProductReview,
   type PersistedPhase1ProductReviewConfig,
 } from './runtime/Phase1ProductReviewPersistence';
@@ -188,28 +193,6 @@ function requiredAutoBootText(
   return value;
 }
 
-function requiredAutoBootNumber(
-  root: HTMLElement,
-  key: keyof DOMStringMap,
-  attributeName: string,
-  query: URLSearchParams,
-  queryKey: string,
-): number {
-  const raw = requiredAutoBootText(
-    root,
-    key,
-    attributeName,
-    query,
-    queryKey,
-  );
-  const value = Number(raw);
-  if (!Number.isFinite(value)) {
-    throw new Error(
-      'Product Review autoboot requires finite ' + attributeName + '.',
-    );
-  }
-  return value;
-}
 
 export function resolveProductReviewAutoBootConfig(
   root: HTMLElement,
@@ -263,27 +246,12 @@ export function resolveProductReviewAutoBootConfig(
       query,
       'proz0Player',
     ),
-    interactionRangeWorldUnits: requiredAutoBootNumber(
-      root,
-      'proz0InteractionRangeWorldUnits',
-      'data-proz0-interaction-range-world-units',
-      query,
-      'proz0InteractionRange',
-    ),
-    spawnClearanceRadiusWorldUnits: requiredAutoBootNumber(
-      root,
-      'proz0SpawnClearanceRadiusWorldUnits',
-      'data-proz0-spawn-clearance-radius-world-units',
-      query,
-      'proz0SpawnClearance',
-    ),
-    requiredAccessRadiusWorldUnits: requiredAutoBootNumber(
-      root,
-      'proz0RequiredAccessRadiusWorldUnits',
-      'data-proz0-required-access-radius-world-units',
-      query,
-      'proz0AccessClearance',
-    ),
+    interactionRangeWorldUnits:
+      PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+    spawnClearanceRadiusWorldUnits:
+      PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+    requiredAccessRadiusWorldUnits:
+      PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
     ...(databaseName === undefined
       ? {}
       : { persistence: { databaseName } }),
