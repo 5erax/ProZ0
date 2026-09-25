@@ -50,7 +50,7 @@ export interface HostedDomainCommandContext {
 }
 
 export interface HostedDomainCommandResult {
-  readonly status: 'committed' | 'rejected';
+  readonly status: 'committed' | 'rejected' | 'pending';
   readonly reason?: string;
   readonly resultingRevisions?: readonly RevisionRefV1[];
   readonly aggregateUpdates?: readonly RevisionedAggregateViewV1[];
@@ -60,6 +60,13 @@ export interface HostedCommandDispatcher {
   execute(
     context: HostedDomainCommandContext,
   ): HostedDomainCommandResult;
+  shouldInterruptOnDisconnect?(
+    command: GameplayCommandEnvelopeV1,
+  ): boolean;
+  cancelPendingForPlayer?(
+    playerId: PlayerId,
+  ): readonly string[];
+  cancelAllPending?(): readonly string[];
 }
 
 export interface HostedBaselineProvider {
@@ -130,6 +137,7 @@ export class ServerAuthorityHost {
   private readonly operations = new OperationResultCache();
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly commandQueue: QueuedCommand[] = [];
+  private readonly pendingDomainCommands = new Map<string, QueuedCommand>();
   private readonly lastProcessedInputSeq = new Map<PlayerId, number>();
   private authorityTick = 0;
   private nextIngressOrdinal = 1;
@@ -391,6 +399,49 @@ export class ServerAuthorityHost {
     if (connection === null) return;
     const runtime = this.runtimes.get(connection.playerId);
     runtime?.submitInput(connection.playerId, NEUTRAL_PLAYER_INPUT);
+
+    const interruptedQueued = this.commandQueue.filter(
+      (queued) =>
+        queued.playerId === connection.playerId
+        && (
+          this.options.commandDispatcher.shouldInterruptOnDisconnect?.(
+            queued.command,
+          ) ?? false
+        ),
+    );
+    if (interruptedQueued.length > 0) {
+      const interruptedIds = new Set(
+        interruptedQueued.map((queued) => queued.command.operationId),
+      );
+      const retained = this.commandQueue.filter(
+        (queued) => !interruptedIds.has(queued.command.operationId),
+      );
+      this.commandQueue.splice(0, this.commandQueue.length, ...retained);
+      for (const queued of interruptedQueued) {
+        this.finalizeCommand(
+          queued,
+          Object.freeze({
+            status: 'rejected',
+            reason: 'GATHER_INTERRUPTED',
+          }),
+        );
+      }
+    }
+
+    for (
+      const operationId
+      of this.options.commandDispatcher.cancelPendingForPlayer?.(
+        connection.playerId,
+      ) ?? []
+    ) {
+      this.resolvePendingDomainCommand(
+        operationId,
+        Object.freeze({
+          status: 'rejected',
+          reason: 'GATHER_INTERRUPTED',
+        }),
+      );
+    }
   }
 
   public step(): readonly HostedOutboundMessage[] {
@@ -504,6 +555,24 @@ export class ServerAuthorityHost {
       drained.push(...this.resolveAcceptedCommands());
     }
 
+    for (
+      const operationId
+      of this.options.commandDispatcher.cancelAllPending?.() ?? []
+    ) {
+      drained.push(...this.resolvePendingDomainCommand(
+        operationId,
+        Object.freeze({
+          status: 'rejected',
+          reason: 'GATHER_INTERRUPTED',
+        }),
+      ));
+    }
+    if (this.pendingDomainCommands.size !== 0) {
+      throw new Error(
+        'Hosted pending domain commands must resolve before persistence.',
+      );
+    }
+
     this.session.beginSaving();
 
     try {
@@ -548,6 +617,7 @@ export class ServerAuthorityHost {
       nextAuthorityIngressOrdinal: this.nextIngressOrdinal,
       commandCommittedCount: this.commandCommittedCount,
       commandRejectedCount: this.commandRejectedCount,
+      pendingDomainCommandCount: this.pendingDomainCommands.size,
       movementLeaseExpiryCount: this.movementLeaseExpiryCount,
       resyncCount: this.resyncCount,
       lastDurableSaveRevision:
@@ -668,6 +738,54 @@ export class ServerAuthorityHost {
       });
     }
 
+    if (domain.status === 'pending') {
+      if (
+        domain.reason !== undefined
+        || (domain.resultingRevisions?.length ?? 0) > 0
+        || (domain.aggregateUpdates?.length ?? 0) > 0
+      ) {
+        throw new Error(
+          'Pending hosted command cannot publish terminal result data.',
+        );
+      }
+      this.pendingDomainCommands.set(
+        queued.command.operationId,
+        queued,
+      );
+      return Object.freeze([]);
+    }
+
+    return this.finalizeCommand(queued, domain);
+  }
+
+  public resolvePendingDomainCommand(
+    operationId: string,
+    domain: HostedDomainCommandResult,
+  ): readonly HostedOutboundMessage[] {
+    if (domain.status === 'pending') {
+      throw new Error('Pending command cannot finalize as pending.');
+    }
+    const queued = this.pendingDomainCommands.get(operationId);
+    if (queued === undefined) {
+      if (this.operations.get(operationId) !== null) {
+        return Object.freeze([]);
+      }
+      throw new Error(
+        'Cannot finalize an unknown hosted pending domain command.',
+      );
+    }
+    this.pendingDomainCommands.delete(operationId);
+    return this.finalizeCommand(queued, domain);
+  }
+
+  private finalizeCommand(
+    queued: QueuedCommand,
+    domain: Exclude<HostedDomainCommandResult, { readonly status: 'pending' }>
+      | HostedDomainCommandResult,
+  ): readonly HostedOutboundMessage[] {
+    if (domain.status === 'pending') {
+      throw new Error('Hosted command finalization requires a terminal result.');
+    }
     const result: CommandResultV1 = Object.freeze({
       operationId: queued.command.operationId,
       status: domain.status,
@@ -688,10 +806,12 @@ export class ServerAuthorityHost {
     }
 
     const outbound: HostedOutboundMessage[] = [];
-    const connection = this.session.getConnection(queued.transportId);
-    if (connection?.state === 'READY') {
+    const connection = this.session.getReadyConnections().find(
+      (candidate) => candidate.playerId === queued.playerId,
+    );
+    if (connection !== undefined) {
       const message = this.envelope(
-        queued.transportId,
+        connection.transportId,
         'COMMAND_RESULT',
         asJson(result),
       );
