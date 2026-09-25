@@ -115,6 +115,18 @@ describe('Phase 0 browser runtime', () => {
     expect(root.dataset.runtimeMode).toBe('phase1-presentation');
     expect(root.querySelectorAll('canvas')).toHaveLength(1);
     expect(canvas.dataset.renderer).toBeUndefined();
+    expect(
+      root.querySelector<HTMLElement>('#proz0-phase1-ui')
+        ?.dataset.productionAssetFoundation,
+    ).toBe('p1-75-78');
+    expect(
+      root.querySelector('[data-production-world-preview]'),
+    ).toBeNull();
+    expect(
+      root.querySelector(
+        '[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]',
+      ),
+    ).not.toBeNull();
 
     window.dispatchEvent(new KeyboardEvent('keydown', {
       code: 'KeyD',
