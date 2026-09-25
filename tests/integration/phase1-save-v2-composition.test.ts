@@ -19,7 +19,7 @@ describe('Phase 1 Save V2 integration composition', () => {
       worldId: 'world:p1-save-roundtrip',
       worldSeed: 'p1-world-golden',
       playerIds: ['p1'],
-      interactionRangeWorldUnits: 2,
+      interactionRangeWorldUnits: 21,
       spawnClearanceRadiusWorldUnits: 0,
       requiredAccessRadiusWorldUnits: 0,
     });
@@ -32,6 +32,79 @@ describe('Phase 1 Save V2 integration composition', () => {
         moveRight: true,
       });
       await original.stepSolo();
+
+      original.submitInput('p1', {
+        moveUp: false,
+        moveDown: false,
+        moveLeft: false,
+        moveRight: false,
+      });
+
+      const fiber = original.world.getActiveGeneratedEntities().find(
+        (entity) =>
+          entity.type === 'resource'
+          && entity.definitionId === 'resource:fiber-plant',
+      );
+      if (fiber === undefined || fiber.type !== 'resource') {
+        throw new Error('Expected canonical nearby Fiber Plant.');
+      }
+
+      for (const ordinal of [1, 2] as const) {
+        const inventory = original.items.getContainerView('inventory:p1');
+        const resource = original.world.getResource(fiber.entityId);
+        if (resource === null) {
+          throw new Error('Expected canonical Fiber Plant runtime state.');
+        }
+        const gather = original.items.beginGather({
+          operationId: 'save-roundtrip:gather:' + String(ordinal),
+          playerId: 'p1',
+          inventoryContainerId: inventory.containerId,
+          expectedInventoryRevision: inventory.revision,
+          resourceEntityId: fiber.entityId,
+          expectedResourceRevision: resource.revision,
+        });
+        expect(gather.status).toBe('started');
+        if (gather.status !== 'started') {
+          throw new Error('Expected Fiber gather channel to start.');
+        }
+        for (let tick = 0; tick < gather.requiredTicks; tick += 1) {
+          await original.stepSolo();
+        }
+      }
+
+      const gatheredInventory =
+        original.items.getContainerView('inventory:p1');
+      expect(gatheredInventory.stacks).toContainEqual(
+        expect.objectContaining({
+          itemDefinitionId: 'item:plant-fiber',
+          quantity: 4,
+        }),
+      );
+
+      const crafted = original.items.execute({
+        type: 'craft',
+        operationId: 'save-roundtrip:craft:cordage',
+        playerId: 'p1',
+        inventoryContainerId: gatheredInventory.containerId,
+        expectedInventoryRevision: gatheredInventory.revision,
+        recipeId: 'recipe:cordage',
+      });
+      expect(crafted.status).toBe('committed');
+
+      const craftedInventory =
+        original.items.getContainerView('inventory:p1');
+      expect(craftedInventory.stacks).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            itemDefinitionId: 'item:plant-fiber',
+            quantity: 1,
+          }),
+          expect.objectContaining({
+            itemDefinitionId: 'item:cordage',
+            quantity: 1,
+          }),
+        ]),
+      );
 
       const beforePosition = original.getPlayerPosition('p1');
       const beforeSurvival = original.survival.getPlayerState('p1');
@@ -72,7 +145,7 @@ describe('Phase 1 Save V2 integration composition', () => {
         worldId: 'world:p1-save-roundtrip',
         worldSeed: 'p1-world-golden',
         playerIds: ['p1'],
-        interactionRangeWorldUnits: 2,
+        interactionRangeWorldUnits: 21,
         spawnClearanceRadiusWorldUnits: 0,
         requiredAccessRadiusWorldUnits: 0,
         reopen: reconstructed.value,
@@ -86,6 +159,18 @@ describe('Phase 1 Save V2 integration composition', () => {
         expect(reopened.items.exportLedgerSnapshot()).toEqual(
           original.items.exportLedgerSnapshot(),
         );
+        expect(
+          reopened.items.getContainerView('inventory:p1').stacks,
+        ).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            itemDefinitionId: 'item:plant-fiber',
+            quantity: 1,
+          }),
+          expect.objectContaining({
+            itemDefinitionId: 'item:cordage',
+            quantity: 1,
+          }),
+        ]));
         expect(
           reopened.buildings.exportSnapshot(),
         ).toEqual(original.buildings.exportSnapshot());
