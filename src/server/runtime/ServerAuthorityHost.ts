@@ -434,6 +434,7 @@ export class ServerAuthorityHost {
         connection.playerId,
       ) ?? []
     ) {
+      if (!this.hasPendingDomainCommand(operationId)) continue;
       this.resolvePendingDomainCommand(
         operationId,
         Object.freeze({
@@ -559,6 +560,7 @@ export class ServerAuthorityHost {
       const operationId
       of this.options.commandDispatcher.cancelAllPending?.() ?? []
     ) {
+      if (!this.hasPendingDomainCommand(operationId)) continue;
       drained.push(...this.resolvePendingDomainCommand(
         operationId,
         Object.freeze({
