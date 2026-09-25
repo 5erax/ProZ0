@@ -94,6 +94,46 @@ function predatorRecords(
   );
 }
 
+function ledgerSnapshotForPersistence(
+  bundle: Phase1AuthorityBundle,
+) {
+  const snapshot = bundle.items.exportLedgerSnapshot();
+  const world = bundle.world.exportSnapshot();
+  const liveWorldContainerIds = new Set([
+    ...world.deathCaches.caches.map((entry) => entry.containerId),
+    ...world.drops
+      .filter((entry) => entry.available)
+      .map((entry) => entry.containerId),
+  ]);
+
+  return Object.freeze({
+    containers: Object.freeze(
+      snapshot.containers.filter((container) => {
+        if (
+          container.kind !== 'death-cache'
+          && container.kind !== 'world-drop'
+        ) {
+          return true;
+        }
+        if (liveWorldContainerIds.has(container.containerId)) {
+          return true;
+        }
+        if (container.stacks.length === 0) {
+          // Live authority intentionally retains an empty world-container
+          // revision surface so stale/concurrent retries remain deterministic.
+          // Once its world entity is gone, that empty retry tombstone has no
+          // durable owner and must not be serialized into Save V2.
+          return false;
+        }
+        throw new Error(
+          'Non-empty world item container lost its canonical world owner: '
+            + container.containerId,
+        );
+      }),
+    ),
+  });
+}
+
 function ownerResolver(
   bundle: Phase1AuthorityBundle,
 ): { resolveOwner(containerId: string): ContainerOwnerRefV2 | null } {
@@ -196,7 +236,7 @@ export function composePhase1SaveV2(
 
   const containers = itemLedgerSnapshotToContainerRecordsV2(
     bundle.config.worldId,
-    bundle.items.exportLedgerSnapshot(),
+    ledgerSnapshotForPersistence(bundle),
     ownerResolver(bundle),
   );
 
