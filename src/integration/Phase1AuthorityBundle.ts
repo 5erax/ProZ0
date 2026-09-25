@@ -60,6 +60,10 @@ import {
   Phase1WorldStore,
 } from '../world/phase1/Phase1WorldStore';
 
+export const PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS = 1.25;
+export const PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS = 1.25;
+export const PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS = 1.25;
+
 class DeferredGatherCostPort implements GatherCostPort {
   private target: GatherCostPort | null = null;
 
@@ -152,13 +156,23 @@ class RuntimePositionPort {
   }
 }
 
-function emptyInventory(playerId: PlayerId): ContainerState {
+function emptyInventory(
+  playerId: PlayerId,
+  includeNewWorldStarterTool: boolean,
+): ContainerState {
   return Object.freeze({
     containerId: 'inventory:' + playerId,
     kind: 'player-inventory',
     ownerPlayerId: playerId,
     revision: 0,
-    stacks: Object.freeze([]),
+    stacks: includeNewWorldStarterTool
+      ? Object.freeze([Object.freeze({
+          stackId: 'starter:stone-field-tool:' + playerId,
+          itemDefinitionId: 'item:stone-field-tool',
+          quantity: 1,
+          condition: 100,
+        })])
+      : Object.freeze([]),
   });
 }
 
@@ -175,7 +189,10 @@ function initialLedger(
   for (const playerId of playerIds) {
     const id = 'inventory:' + playerId;
     if (!existing.has(id)) {
-      existing.set(id, emptyInventory(playerId));
+      existing.set(
+        id,
+        emptyInventory(playerId, reopen === undefined),
+      );
     }
   }
   return Object.freeze({
