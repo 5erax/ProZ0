@@ -4,12 +4,20 @@ import {
   type PlayerId,
   type WorldPosition,
 } from '../../foundation';
+import {
+  PHASE1_STRUCTURE_PLACEMENT_PROFILES,
+} from '../building/Phase1BuildingWorld';
 import type {
   BuildingSpatialQuery,
   QuarterTurn,
   StructurePlacementProfile,
   StructureRuntimeState,
 } from '../building/BuildingTypes';
+import type {
+  AxisSweepRequest,
+  AxisSweepResult,
+  WorldCollisionQuery,
+} from '../api/WorldCollisionQuery';
 import type {
   DropPlacementReservation,
   ItemInteractionWorldPort,
@@ -149,7 +157,11 @@ function copyPredator(
  * port so this adapter never creates a second movement authority.
  */
 export class Phase1VerticalSliceWorldAdapter
-  implements ItemInteractionWorldPort, SurvivalWorldPort, BuildingSpatialQuery {
+  implements
+    ItemInteractionWorldPort,
+    SurvivalWorldPort,
+    BuildingSpatialQuery,
+    WorldCollisionQuery {
   private readonly activeChunks = new Map<string, Phase1WorldChunkView>();
   private readonly activeCoords = new Map<string, ChunkCoord>();
   private readonly drops = new Map<string, MutableWorldDrop>();
@@ -253,6 +265,36 @@ export class Phase1VerticalSliceWorldAdapter
   public getPlayerPosition(playerId: PlayerId): WorldPosition {
     return this.options.playerPositions.get(playerId);
   }
+
+  public sweepAabbAxis(request: AxisSweepRequest): AxisSweepResult {
+    if (!Number.isFinite(request.desiredDelta)) {
+      throw new RangeError('Movement desiredDelta must be finite.');
+    }
+    if (request.desiredDelta === 0) {
+      return Object.freeze({ allowedDelta: 0, blocked: false });
+    }
+
+    const target = createWorldPosition(
+      request.center.x
+        + (request.axis === 'x' ? request.desiredDelta : 0),
+      request.center.y
+        + (request.axis === 'y' ? request.desiredDelta : 0),
+    );
+
+    if (this.isMovementPassable(target, request.footprint)) {
+      return Object.freeze({
+        allowedDelta: request.desiredDelta,
+        blocked: false,
+      });
+    }
+
+    return Object.freeze({
+      allowedDelta: 0,
+      blocked: true,
+      hitSolidId: 'phase1-world-boundary',
+    });
+  }
+
 
   public isContainerAccessible(
     playerId: PlayerId,
@@ -732,6 +774,54 @@ export class Phase1VerticalSliceWorldAdapter
           .map(copyPredator),
       ),
     });
+  }
+
+  private isMovementPassable(
+    center: WorldPosition,
+    footprint: AxisSweepRequest['footprint'],
+  ): boolean {
+    const samples = [
+      createWorldPosition(
+        center.x - footprint.halfWidth,
+        center.y - footprint.halfDepth,
+      ),
+      createWorldPosition(
+        center.x + footprint.halfWidth,
+        center.y - footprint.halfDepth,
+      ),
+      createWorldPosition(
+        center.x - footprint.halfWidth,
+        center.y + footprint.halfDepth,
+      ),
+      createWorldPosition(
+        center.x + footprint.halfWidth,
+        center.y + footprint.halfDepth,
+      ),
+    ];
+
+    if (!samples.every((sample) => this.isPositionBuildable(sample))) {
+      return false;
+    }
+
+    for (const structure of this.structureValues()) {
+      const definitionId = structure.definitionId;
+      if (definitionId === 'structure:landing-module') {
+        const profile =
+          PHASE1_STRUCTURE_PLACEMENT_PROFILES[definitionId];
+        const halfWidth = profile.footprint.width / 2;
+        const halfDepth = profile.footprint.depth / 2;
+        if (
+          Math.abs(center.x - structure.position.x)
+            < halfWidth + footprint.halfWidth
+          && Math.abs(center.y - structure.position.y)
+            < halfDepth + footprint.halfDepth
+        ) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   private findGeneratedEntity(
