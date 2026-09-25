@@ -1,4 +1,21 @@
 export {
+  PHASE1_PRODUCTION_WORLD_SPRITES,
+  PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS,
+  coldRainSprite,
+  condenserSprite,
+  deathCacheSprite,
+  fogMaskSprite,
+  habitatSprite,
+  powerUnitSprite,
+  productionSpriteFrame,
+  resourceNodeSprite,
+  ruinInspectMarkerSprite,
+  type Phase1ProductionSprite,
+  type Phase1ResourceVisualKind,
+  type Phase1VerticalSliceVisualKey,
+} from './Phase1ProductionAssets';
+
+export {
   createPixiPresentationAdapter,
   type PixiPresentationAdapter,
   type PixiPresentationOptions,
