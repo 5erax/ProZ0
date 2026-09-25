@@ -890,7 +890,8 @@ export class Phase1VerticalSliceWorldAdapter
   }
 
   private isPositionExplored(position: WorldPosition): boolean {
-    const view = this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
+    const coord = fromWorldPosition(position);
+    const view = this.options.store.query(coord);
     if (view === undefined) return false;
     const local = toChunkLocalPosition(position, view.base.coord);
     const cellX = Math.floor(

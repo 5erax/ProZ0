@@ -564,24 +564,37 @@ export class Phase1AuthorityBundle {
 
   public async stepSolo(): Promise<void> {
     const nextAuthorityTick = this.authorityTickRef.value + 1;
+    await this.prepareAuthorityTick(nextAuthorityTick);
+
     for (const playerId of this.config.playerIds) {
       const runtime = this.createPlayerRuntime(playerId);
       const localTick = Number(runtime.getSnapshot().tick) + 1;
       runtime.step(createSimulationStep(toSimulationTick(localTick)));
     }
-    await this.advanceDomainTick(nextAuthorityTick);
+
+    await this.completeAuthorityTick(nextAuthorityTick);
   }
 
-  public async advanceDomainTick(authorityTick: number): Promise<void> {
+  public async prepareAuthorityTick(authorityTick: number): Promise<void> {
     if (
       !Number.isSafeInteger(authorityTick)
       || authorityTick !== this.authorityTickRef.value + 1
     ) {
-      throw new Error('Phase 1 domain authority tick must advance exactly one.');
+      throw new Error(
+        'Phase 1 authority tick preparation must advance exactly one.',
+      );
     }
-    this.authorityTickRef.value = authorityTick;
 
     await this.worldStore.advanceEnvironment(authorityTick);
+    this.authorityTickRef.value = authorityTick;
+  }
+
+  public async completeAuthorityTick(authorityTick: number): Promise<void> {
+    if (authorityTick !== this.authorityTickRef.value) {
+      throw new Error(
+        'Phase 1 authority tick completion must match the prepared tick.',
+      );
+    }
 
     for (const playerId of this.config.playerIds) {
       if (!this.registeredSurvival.has(playerId)) continue;
