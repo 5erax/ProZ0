@@ -11,6 +11,7 @@ import {
 } from '../../src/persistence';
 import {
   PHASE1_WORLD_GENERATION_VERSION,
+  getPhase1WorldLandmarks,
 } from '../../src/world/phase1/Phase1ChunkGenerator';
 
 describe('Phase 1 Save V2 integration composition', () => {
@@ -207,4 +208,240 @@ describe('Phase 1 Save V2 integration composition', () => {
       await original.destroy();
     }
   });
+
+  it('reopens located ruin, pending death and Death Cache, then respawns and recovers canonically', async () => {
+    const worldId = 'world:p1-save-death-recovery';
+    const worldSeed = 'p1-world-golden';
+    const original = await Phase1AuthorityBundle.create({
+      worldId,
+      worldSeed,
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 21,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      const fiber = original.world.getActiveGeneratedEntities().find(
+        (entity) =>
+          entity.type === 'resource'
+          && entity.definitionId === 'resource:fiber-plant'
+          && original.world.isResourceInInteractionRange(
+            'p1',
+            entity.entityId,
+          ),
+      );
+      if (fiber === undefined || fiber.type !== 'resource') {
+        throw new Error('Expected canonical nearby Fiber Plant.');
+      }
+
+      const inventoryBeforeGather =
+        original.items.getContainerView('inventory:p1');
+      const resource = original.world.getResource(fiber.entityId);
+      if (resource === null) {
+        throw new Error('Expected canonical Fiber Plant runtime state.');
+      }
+      const gather = original.items.beginGather({
+        operationId: 'save-death:gather',
+        playerId: 'p1',
+        inventoryContainerId: inventoryBeforeGather.containerId,
+        expectedInventoryRevision: inventoryBeforeGather.revision,
+        resourceEntityId: fiber.entityId,
+        expectedResourceRevision: resource.revision,
+      });
+      expect(gather.status).toBe('started');
+      if (gather.status !== 'started') {
+        throw new Error('Expected Fiber gather channel to start.');
+      }
+      for (let tick = 0; tick < gather.requiredTicks; tick += 1) {
+        await original.stepSolo();
+      }
+
+      const landmarks = getPhase1WorldLandmarks(worldSeed);
+      const ruin = original.world.findGeneratedEntityByDefinition(
+        'ruin:previous-civilization-ruin',
+      );
+      if (ruin === null || ruin.type !== 'ruin') {
+        throw new Error('Expected canonical Phase 1 ruin.');
+      }
+      original.getRuntime('p1').relocatePlayer(landmarks.ruinPosition);
+      await original.stepSolo();
+      expect(
+        original.worldStore.getRuinState(ruin.entityId)?.discoveryState,
+      ).toBe('located');
+
+      const deathTick = original.authorityTick;
+      expect(original.survival.applyAuthorityDamage({
+        damageId: 'save-death:lethal',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'save-death:test-predator',
+        targetPlayerId: 'p1',
+        amount: 100,
+        tick: deathTick,
+      })).toMatchObject({
+        status: 'applied',
+        healthAfter: 0,
+      });
+
+      const inventoryAtDeath =
+        original.items.getContainerView('inventory:p1');
+      const death = original.death.processDeath({
+        deathId: 'death:save-reopen:p1',
+        playerId: 'p1',
+        deathPosition: landmarks.ruinPosition,
+        deathTick,
+        inventoryContainerId: inventoryAtDeath.containerId,
+        expectedInventoryRevision: inventoryAtDeath.revision,
+        equippedStackIds: Object.freeze([]),
+      });
+      expect(death).toMatchObject({
+        status: 'committed',
+      });
+      if (
+        death.status !== 'committed'
+        || death.cacheContainerId === null
+        || death.cacheEntityId === null
+      ) {
+        throw new Error('Expected canonical persisted Death Cache.');
+      }
+
+      const deadBeforeSave = original.survival.getPlayerState('p1');
+      expect(deadBeforeSave.lifeState.type).toBe('dead-pending-respawn');
+      const cacheBeforeSave =
+        original.world.getDeathCacheByContainer(death.cacheContainerId);
+      expect(cacheBeforeSave).not.toBeNull();
+      expect(
+        original.items.getContainerView(death.cacheContainerId).stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:plant-fiber',
+        quantity: 2,
+      }));
+
+      const request = composePhase1SaveV2(original, {
+        nowUtc: '2026-09-26T00:02:00.000Z',
+      });
+      const portable = Object.freeze({
+        formatId: SAVE_FORMAT_ID,
+        schemaVersion: SAVE_SCHEMA_VERSION_V2,
+        recordKind: 'portable-bundle' as const,
+        world: request.world,
+        players: request.players,
+        containers: request.containers,
+        chunks: request.chunks,
+        footholds: request.footholds,
+        structures: request.structures,
+      });
+      const compatibility = createPhase1SaveV2Compatibility(
+        original.catalog,
+        [PHASE1_WORLD_GENERATION_VERSION],
+      );
+      const reconstructed = reconstructPhase1ReopenState(
+        portable,
+        compatibility,
+      );
+      expect(reconstructed.ok).toBe(true);
+      if (!reconstructed.ok) {
+        throw new Error(reconstructed.message);
+      }
+
+      const reopened = await Phase1AuthorityBundle.create({
+        worldId,
+        worldSeed,
+        playerIds: ['p1'],
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+        reopen: reconstructed.value,
+      });
+      try {
+        expect(
+          reopened.worldStore.getRuinState(ruin.entityId)?.discoveryState,
+        ).toBe('located');
+        const reopenedLife = reopened.survival.getPlayerState('p1').lifeState;
+        expect(reopenedLife.type).toBe('dead-pending-respawn');
+        if (reopenedLife.type !== 'dead-pending-respawn') {
+          throw new Error('Expected reopened pending respawn state.');
+        }
+
+        const reopenedCache =
+          reopened.world.getDeathCacheByContainer(death.cacheContainerId);
+        expect(reopenedCache).not.toBeNull();
+        expect(
+          reopened.items.getContainerView(death.cacheContainerId).stacks,
+        ).toContainEqual(expect.objectContaining({
+          itemDefinitionId: 'item:plant-fiber',
+          quantity: 2,
+        }));
+        expect(
+          reopened.items.getContainerView('inventory:p1').stacks,
+        ).toEqual([]);
+
+        while (reopened.authorityTick < reopenedLife.respawnAtTick) {
+          await reopened.stepSolo();
+        }
+        expect(reopened.survival.getPlayerState('p1').lifeState)
+          .toMatchObject({ type: 'alive' });
+        expect(reopened.getPlayerPosition('p1'))
+          .toMatchObject({ x: 0, y: 0 });
+
+        const cache = reopened.world.getDeathCacheByContainer(
+          death.cacheContainerId,
+        );
+        if (cache === null) {
+          throw new Error('Expected reopened Death Cache before recovery.');
+        }
+        reopened.getRuntime('p1').relocatePlayer(cache.position);
+
+        const cacheContainer =
+          reopened.items.getContainerView(death.cacheContainerId);
+        const stack = cacheContainer.stacks[0];
+        if (stack === undefined) {
+          throw new Error('Expected reopened Death Cache item.');
+        }
+        const target =
+          reopened.items.getContainerView('inventory:p1');
+        const recovered = reopened.death.recoverFromDeathCache({
+          type: 'transfer',
+          operationId: 'save-death:recover',
+          playerId: 'p1',
+          sourceContainerId: cacheContainer.containerId,
+          sourceExpectedRevision: cacheContainer.revision,
+          targetContainerId: target.containerId,
+          targetExpectedRevision: target.revision,
+          sourceStackId: stack.stackId,
+          quantity: stack.quantity,
+        });
+        expect(recovered.status).toBe('committed');
+        expect(
+          reopened.items.getContainerView('inventory:p1').stacks,
+        ).toContainEqual(expect.objectContaining({
+          itemDefinitionId: 'item:plant-fiber',
+          quantity: 2,
+        }));
+        expect(
+          reopened.world.getDeathCacheByContainer(
+            death.cacheContainerId,
+          ),
+        ).toBeNull();
+
+        const afterRecovery = composePhase1SaveV2(reopened, {
+          nowUtc: '2026-09-26T00:03:00.000Z',
+        });
+        expect(
+          afterRecovery.chunks.flatMap(
+            (chunk) => chunk.createdEntities,
+          ).some(
+            (entity) =>
+              entity.type === 'death-cache'
+              && entity.entityId === death.cacheEntityId,
+          ),
+        ).toBe(false);
+      } finally {
+        await reopened.destroy();
+      }
+    } finally {
+      await original.destroy();
+    }
+  });
+
 });
