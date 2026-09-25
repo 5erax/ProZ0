@@ -28,7 +28,7 @@ import {
   PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
   PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
   PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
-} from '../integration';
+} from '../integration/Phase1AuthorityBundle';
 import {
   bootPersistedPhase1ProductReview,
   type PersistedPhase1ProductReviewConfig,
