@@ -431,6 +431,12 @@ describe('Phase 1 Save V2 integration composition', () => {
           nowUtc: '2026-09-26T00:03:00.000Z',
         });
         expect(
+          afterRecovery.containers.some(
+            (container) =>
+              container.containerId === death.cacheContainerId,
+          ),
+        ).toBe(false);
+        expect(
           afterRecovery.chunks.flatMap(
             (chunk) => chunk.createdEntities,
           ).some(
