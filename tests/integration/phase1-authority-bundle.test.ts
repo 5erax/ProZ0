@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Phase1AuthorityBundle } from '../../src/integration';
+import {
+  PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+  PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+  PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+  Phase1AuthorityBundle,
+} from '../../src/integration';
 import {
   PHASE1_STRUCTURE_PLACEMENT_PROFILES,
 } from '../../src/world';
@@ -13,14 +18,27 @@ describe('Phase 1 canonical authority bundle', () => {
       worldId: 'world:p1-integration-new',
       worldSeed: 'p1-world-golden',
       playerIds: ['p1'],
-      interactionRangeWorldUnits: 0,
-      spawnClearanceRadiusWorldUnits: 0,
-      requiredAccessRadiusWorldUnits: 0,
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+      spawnClearanceRadiusWorldUnits:
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+      requiredAccessRadiusWorldUnits:
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
     });
 
     try {
       const inventory = bundle.items.getContainerView('inventory:p1');
-      expect(inventory.stacks).toEqual([]);
+      expect(inventory.stacks).toEqual([
+        expect.objectContaining({
+          stackId: 'starter:stone-field-tool:p1',
+          itemDefinitionId: 'item:stone-field-tool',
+          quantity: 1,
+          condition: 100,
+        }),
+      ]);
+      expect(PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS).toBe(1.25);
+      expect(PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS).toBe(1.25);
+      expect(PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS).toBe(1.25);
       expect(bundle.survival.getPlayerView('p1')).toMatchObject({
         health: 100,
         food: 70,
@@ -250,6 +268,75 @@ describe('Phase 1 canonical authority bundle', () => {
       expect(
         bundle.progression.getPlayerView('p2').milestoneRuleIds,
       ).not.toContain('first-ruin-inspect:previous-civilization-ruin');
+
+      const claimable = bundle.worldStore.getRuinState(ruin!.entityId);
+      const inventory = bundle.items.getContainerView('inventory:p1');
+      const claim = bundle.claimRuinReward({
+        operationId: 'op:ruin-reward:p1',
+        playerId: 'p1',
+        ruinEntityId: ruin!.entityId,
+        expectedRuinRevision: claimable!.revision,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision,
+      });
+      expect(claim).toMatchObject({
+        status: 'committed',
+        operationId: 'op:ruin-reward:p1',
+        inventoryRevision: inventory.revision + 1,
+        ruinRevision: claimable!.revision + 1,
+      });
+      expect(
+        bundle.items.getContainerView('inventory:p1').stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:ancient-alloy-shard',
+        quantity: 1,
+      }));
+      expect(bundle.worldStore.getRuinState(ruin!.entityId)).toMatchObject({
+        discoveryState: 'investigated',
+        physicalRewardState: 'claimed',
+      });
+
+      expect(bundle.claimRuinReward({
+        operationId: 'op:ruin-reward:p1',
+        playerId: 'p1',
+        ruinEntityId: ruin!.entityId,
+        expectedRuinRevision: claimable!.revision,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision,
+      })).toEqual(claim);
+      expect(
+        bundle.items.getContainerView('inventory:p1').stacks.filter(
+          (stack) =>
+            stack.itemDefinitionId === 'item:ancient-alloy-shard',
+        ),
+      ).toHaveLength(1);
+
+      expect(bundle.claimRuinReward({
+        operationId: 'op:ruin-reward:p1',
+        playerId: 'p1',
+        ruinEntityId: ruin!.entityId,
+        expectedRuinRevision: claimable!.revision,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision + 1,
+      })).toMatchObject({
+        status: 'rejected',
+        reason: 'OPERATION_ID_CONFLICT',
+      });
+
+      bundle.getRuntime('p2').relocatePlayer(landmarks.ruinPosition);
+      const claimed = bundle.worldStore.getRuinState(ruin!.entityId)!;
+      const p2Inventory = bundle.items.getContainerView('inventory:p2');
+      expect(bundle.claimRuinReward({
+        operationId: 'op:ruin-reward:p2',
+        playerId: 'p2',
+        ruinEntityId: ruin!.entityId,
+        expectedRuinRevision: claimed.revision,
+        inventoryContainerId: p2Inventory.containerId,
+        expectedInventoryRevision: p2Inventory.revision,
+      })).toMatchObject({
+        status: 'rejected',
+        reason: 'REWARD_NOT_CLAIMABLE',
+      });
     } finally {
       await bundle.destroy();
     }
@@ -292,9 +379,22 @@ describe('Phase 1 canonical authority bundle', () => {
       expect(death).toMatchObject({
         status: 'committed',
         deathId: 'death:p1:test:lethal:boundary',
-        cacheEntityId: null,
-        cacheContainerId: null,
       });
+      if (
+        death === null
+        || death.status !== 'committed'
+        || death.cacheEntityId === null
+        || death.cacheContainerId === null
+      ) {
+        throw new Error('Starter tool must enter the canonical Death Cache.');
+      }
+      expect(
+        bundle.items.getContainerView(death.cacheContainerId).stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:stone-field-tool',
+        quantity: 1,
+        condition: 100,
+      }));
       const dead = bundle.survival.getPlayerState('p1');
       expect(dead.lifeState).toMatchObject({
         type: 'dead-pending-respawn',
@@ -316,6 +416,8 @@ describe('Phase 1 canonical authority bundle', () => {
       });
       expect(bundle.survival.getPlayerState('p1').lifeState)
         .toEqual({ type: 'alive' });
+      expect(bundle.items.getContainerView('inventory:p1').stacks)
+        .toEqual([]);
       expect(bundle.getPlayerPosition('p1')).toMatchObject({
         x: 0,
         y: 0,
