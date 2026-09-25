@@ -209,6 +209,198 @@ describe('Phase 1 Save V2 integration composition', () => {
     }
   });
 
+  it('reopens Ruin reward claimable/claimed states without auto-creating or reissuing the Shard', async () => {
+    const worldId = 'world:p1-save-ruin-reward';
+    const worldSeed = 'p1-world-golden';
+    const original = await Phase1AuthorityBundle.create({
+      worldId,
+      worldSeed,
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      const landmarks = getPhase1WorldLandmarks(worldSeed);
+      const ruin = original.world.findGeneratedEntityByDefinition(
+        'ruin:previous-civilization-ruin',
+      );
+      if (ruin === null || ruin.type !== 'ruin') {
+        throw new Error('Expected canonical Phase 1 ruin.');
+      }
+      original.getRuntime('p1').relocatePlayer(landmarks.ruinPosition);
+      await original.stepSolo();
+      const located = original.worldStore.getRuinState(ruin.entityId);
+      if (located === undefined) {
+        throw new Error('Expected located Ruin state.');
+      }
+      expect(original.inspectRuin({
+        operationId: 'save-ruin:inspect',
+        playerId: 'p1',
+        ruinEntityId: ruin.entityId,
+        expectedRevision: located.revision,
+      }).status).toBe('committed');
+      expect(original.worldStore.getRuinState(ruin.entityId)).toMatchObject({
+        discoveryState: 'investigated',
+        physicalRewardState: 'claimable',
+      });
+      expect(
+        original.items.getContainerView('inventory:p1').stacks,
+      ).not.toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:ancient-alloy-shard',
+      }));
+
+      const claimableSave = composePhase1SaveV2(original, {
+        nowUtc: '2026-09-26T00:10:00.000Z',
+      });
+      const claimablePortable = Object.freeze({
+        formatId: SAVE_FORMAT_ID,
+        schemaVersion: SAVE_SCHEMA_VERSION_V2,
+        recordKind: 'portable-bundle' as const,
+        world: claimableSave.world,
+        players: claimableSave.players,
+        containers: claimableSave.containers,
+        chunks: claimableSave.chunks,
+        footholds: claimableSave.footholds,
+        structures: claimableSave.structures,
+      });
+      const compatibility = createPhase1SaveV2Compatibility(
+        original.catalog,
+        [PHASE1_WORLD_GENERATION_VERSION],
+      );
+      const claimableReconstruction = reconstructPhase1ReopenState(
+        claimablePortable,
+        compatibility,
+      );
+      expect(claimableReconstruction.ok).toBe(true);
+      if (!claimableReconstruction.ok) {
+        throw new Error(claimableReconstruction.message);
+      }
+
+      const claimableReopen = await Phase1AuthorityBundle.create({
+        worldId,
+        worldSeed,
+        playerIds: ['p1'],
+        interactionRangeWorldUnits: 2,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+        reopen: claimableReconstruction.value,
+      });
+      try {
+        const reopenedClaimable =
+          claimableReopen.worldStore.getRuinState(ruin.entityId);
+        expect(reopenedClaimable).toMatchObject({
+          discoveryState: 'investigated',
+          physicalRewardState: 'claimable',
+        });
+        expect(
+          claimableReopen.items.getContainerView('inventory:p1').stacks,
+        ).toEqual([
+          expect.objectContaining({
+            itemDefinitionId: 'item:stone-field-tool',
+            quantity: 1,
+            condition: 100,
+          }),
+        ]);
+
+        const inventory =
+          claimableReopen.items.getContainerView('inventory:p1');
+        expect(claimableReopen.claimRuinReward({
+          operationId: 'save-ruin:claim',
+          playerId: 'p1',
+          ruinEntityId: ruin.entityId,
+          expectedRuinRevision: reopenedClaimable!.revision,
+          inventoryContainerId: inventory.containerId,
+          expectedInventoryRevision: inventory.revision,
+        })).toMatchObject({
+          status: 'committed',
+          ruinRevision: reopenedClaimable!.revision + 1,
+          inventoryRevision: inventory.revision + 1,
+        });
+
+        const claimedSave = composePhase1SaveV2(claimableReopen, {
+          nowUtc: '2026-09-26T00:11:00.000Z',
+        });
+        const claimedPortable = Object.freeze({
+          formatId: SAVE_FORMAT_ID,
+          schemaVersion: SAVE_SCHEMA_VERSION_V2,
+          recordKind: 'portable-bundle' as const,
+          world: claimedSave.world,
+          players: claimedSave.players,
+          containers: claimedSave.containers,
+          chunks: claimedSave.chunks,
+          footholds: claimedSave.footholds,
+          structures: claimedSave.structures,
+        });
+        const claimedReconstruction = reconstructPhase1ReopenState(
+          claimedPortable,
+          compatibility,
+        );
+        expect(claimedReconstruction.ok).toBe(true);
+        if (!claimedReconstruction.ok) {
+          throw new Error(claimedReconstruction.message);
+        }
+
+        const claimedReopen = await Phase1AuthorityBundle.create({
+          worldId,
+          worldSeed,
+          playerIds: ['p1'],
+          interactionRangeWorldUnits: 2,
+          spawnClearanceRadiusWorldUnits: 0,
+          requiredAccessRadiusWorldUnits: 0,
+          reopen: claimedReconstruction.value,
+        });
+        try {
+          const claimed =
+            claimedReopen.worldStore.getRuinState(ruin.entityId);
+          expect(claimed).toMatchObject({
+            discoveryState: 'investigated',
+            physicalRewardState: 'claimed',
+          });
+          const claimedInventory =
+            claimedReopen.items.getContainerView('inventory:p1');
+          expect(
+            claimedInventory.stacks.filter(
+              (stack) =>
+                stack.itemDefinitionId === 'item:ancient-alloy-shard',
+            ),
+          ).toHaveLength(1);
+          expect(
+            claimedInventory.stacks.filter(
+              (stack) =>
+                stack.itemDefinitionId === 'item:stone-field-tool',
+            ),
+          ).toHaveLength(1);
+          expect(claimedReopen.claimRuinReward({
+            operationId: 'save-ruin:claim-again',
+            playerId: 'p1',
+            ruinEntityId: ruin.entityId,
+            expectedRuinRevision: claimed!.revision,
+            inventoryContainerId: claimedInventory.containerId,
+            expectedInventoryRevision: claimedInventory.revision,
+          })).toMatchObject({
+            status: 'rejected',
+            reason: 'REWARD_NOT_CLAIMABLE',
+          });
+          expect(
+            claimedReopen.items
+              .getContainerView('inventory:p1').stacks.filter(
+                (stack) =>
+                  stack.itemDefinitionId === 'item:ancient-alloy-shard',
+              ),
+          ).toHaveLength(1);
+        } finally {
+          await claimedReopen.destroy();
+        }
+      } finally {
+        await claimableReopen.destroy();
+      }
+    } finally {
+      await original.destroy();
+    }
+  });
+
   it('reopens located ruin, pending death and Death Cache, then respawns and recovers canonically', async () => {
     const worldId = 'world:p1-save-death-recovery';
     const worldSeed = 'p1-world-golden';
