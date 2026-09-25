@@ -14,6 +14,9 @@ import {
 } from '../server';
 import type { Phase1ReopenState } from '../persistence';
 import {
+  PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+  PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+  PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
   Phase1AuthorityBundle,
   type Phase1AuthorityBundleConfig,
 } from './Phase1AuthorityBundle';
@@ -197,11 +200,12 @@ export class Phase1HostedAuthorityComposition {
       worldId: config.worldId,
       worldSeed: config.worldSeed,
       playerIds,
-      interactionRangeWorldUnits: config.interactionRangeWorldUnits,
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
       spawnClearanceRadiusWorldUnits:
-        config.spawnClearanceRadiusWorldUnits,
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
       requiredAccessRadiusWorldUnits:
-        config.requiredAccessRadiusWorldUnits,
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
       ...(config.catalog === undefined ? {} : { catalog: config.catalog }),
       ...(config.reopen === undefined ? {} : { reopen: config.reopen }),
       activatePlayersOnCreate: false,
