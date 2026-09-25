@@ -149,6 +149,30 @@ describe('Phase 1 combat authority', () => {
     expect(world.getPredator('predator:1')?.health).toBe(70);
   });
 
+  it('restores PATROL as a valid non-hostile state until aggression range is entered', () => {
+    const { catalog, world, items, survival } = setup();
+    world.setPlayerPosition('p1', createWorldPosition(20, 0));
+    world.addPredator({
+      entityId: 'predator:patrol',
+      position: createWorldPosition(0, 0),
+      encounterAnchor: createWorldPosition(0, 0),
+      revision: 0,
+      health: 75,
+      state: 'patrol',
+      targetPlayerId: null,
+      stateUntilTick: null,
+      outsideLeashTicks: 0,
+    });
+    const combat = new Phase1CombatAuthority(catalog, survival, items, world);
+
+    combat.tickPredator('predator:patrol', ['p1']);
+    expect(world.getPredator('predator:patrol')?.state).toBe('patrol');
+
+    world.setPlayerPosition('p1', createWorldPosition(1, 0));
+    combat.tickPredator('predator:patrol', ['p1']);
+    expect(world.getPredator('predator:patrol')?.state).toBe('alert');
+  });
+
   it('Basic Spear spends 15 stamina and loses condition only on authoritative hit', () => {
     const { catalog, world, items, survival } = setup([{
       stackId:'spear',
