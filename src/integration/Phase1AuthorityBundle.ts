@@ -257,11 +257,6 @@ function initialWorldSnapshot(
       }
     }
     for (const predator of chunk.predatorStates) {
-      if (predator.state === 'patrol') {
-        throw new Error(
-          'Save V2 predator patrol state has no accepted combat-runtime equivalent.',
-        );
-      }
       predators.push(Object.freeze({
         entityId: predator.entityId,
         revision: predator.revision,
