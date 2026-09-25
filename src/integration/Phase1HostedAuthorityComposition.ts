@@ -307,17 +307,22 @@ export class Phase1HostedAuthorityComposition {
       }
 
       if (gather.status === 'canceled') {
-        outbound.push(...this.host.resolvePendingDomainCommand(
-          gather.operationId,
-          Object.freeze({
-            status: 'rejected',
-            reason: gather.reason,
-          }),
-        ));
+        if (this.host.hasPendingDomainCommand(gather.operationId)) {
+          outbound.push(...this.host.resolvePendingDomainCommand(
+            gather.operationId,
+            Object.freeze({
+              status: 'rejected',
+              reason: gather.reason,
+            }),
+          ));
+        }
         continue;
       }
 
       const result = gather.result;
+      if (!this.host.hasPendingDomainCommand(result.operationId)) {
+        continue;
+      }
       outbound.push(...this.host.resolvePendingDomainCommand(
         result.operationId,
         result.status === 'committed'
