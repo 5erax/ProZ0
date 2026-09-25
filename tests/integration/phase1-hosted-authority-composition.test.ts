@@ -520,6 +520,102 @@ describe('Phase 1 hosted vertical-slice composition', () => {
     }
   });
 
+  it('cancels accepted-pending hosted gather before graceful durability save', async () => {
+    const composition = await Phase1HostedAuthorityComposition.create({
+      worldId: 'world:p1-hosted-gather-drain',
+      worldSeed: 'p1-world-golden',
+      maxPlayers: 2,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: new NoopHostedPersistence(),
+      sessionId: 'session:p1-hosted-gather-drain',
+      sessionEpoch: 'epoch:p1-hosted-gather-drain',
+    });
+
+    try {
+      const client = join(
+        composition,
+        'transport:hosted-gather-drain',
+      );
+      const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
+        'resource:fiber-plant',
+      );
+      if (fiber === null || fiber.type !== 'resource') {
+        throw new Error('Expected canonical Fiber Plant.');
+      }
+      composition.bundle.getRuntime(client.playerId).relocatePlayer(
+        fiber.position,
+      );
+      const resource =
+        composition.bundle.worldStore.getResourceState(fiber.entityId);
+      if (resource === undefined) {
+        throw new Error('Expected canonical Fiber Plant runtime state.');
+      }
+      const inventory = composition.bundle.items.getContainerView(
+        'inventory:' + client.playerId,
+      );
+      const operationId = 'hosted:gather:drain:fiber';
+      sendCommand(composition.host, client, {
+        operationId,
+        commandType: 'item.gather',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: inventory.containerId,
+            revision: inventory.revision,
+          },
+          {
+            aggregateType: 'resource',
+            aggregateId: fiber.entityId,
+            revision: resource.revision,
+          },
+        ]),
+        payload: {
+          inventoryContainerId: inventory.containerId,
+          resourceEntityId: fiber.entityId,
+        },
+      });
+      await composition.step();
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(1);
+
+      const drained = await composition.host.drainSaveAndClose();
+      expect(composition.host.getSessionState()).toBe('CLOSED');
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(0);
+      expect(
+        drained.find(
+          (entry) =>
+            entry.envelope.messageType === 'COMMAND_RESULT'
+            && (
+              entry.envelope.payload as unknown as {
+                readonly operationId: string;
+              }
+            ).operationId === operationId,
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId,
+        status: 'rejected',
+        reason: 'GATHER_INTERRUPTED',
+      });
+      expect(
+        composition.bundle.items
+          .getContainerView(inventory.containerId).stacks,
+      ).not.toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:plant-fiber',
+      }));
+      expect(
+        composition.bundle.worldStore.getResourceState(fiber.entityId),
+      ).toMatchObject({
+        revision: resource.revision,
+        remainingGatherActions: resource.remainingGatherActions,
+      });
+    } finally {
+      await composition.destroy();
+    }
+  });
+
   it('routes hosted building placement through shared personal progression exactly once', async () => {
     const composition = await Phase1HostedAuthorityComposition.create({
       worldId: 'world:p1-hosted-building-progression',
