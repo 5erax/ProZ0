@@ -1,7 +1,8 @@
 import {
   HOSTED_PROTOCOL_VERSION,
   serializeClientEnvelopeV1,
-  type BaselineSnapshotV1,
+  validateBaselineSnapshotV1,
+  validatePlayerMotionViewV1,
   type ClientEnvelopeV1,
   type ClientHelloV1,
   type CommandResultV1,
@@ -9,6 +10,7 @@ import {
   type JsonValue,
   type MovementInputV1,
   type OperationStatusV1,
+  type PlayerMotionViewV1,
   type RevisionedAggregateViewV1,
   type ServerEnvelopeV1,
 } from '../../protocol';
@@ -78,6 +80,8 @@ export class HostedClientConnection {
   private resumeCredential: string | null;
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
+  private readonly playerMotions = new Map<string, PlayerMotionViewV1>();
+  private readonly readModelListeners = new Set<() => void>();
   private readonly operationStatuses =
     new Map<string, OperationStatusV1>();
   private durableSaveRevision: number | null = null;
@@ -97,6 +101,11 @@ export class HostedClientConnection {
   }
 
   public handleText(text: string): void {
+    this.applyServerText(text);
+    this.notifyReadModelListeners();
+  }
+
+  private applyServerText(text: string): void {
     const envelope = parseServerEnvelope(text);
     if (envelope === null) {
       this.state = 'RESYNC_REQUIRED';
@@ -153,7 +162,13 @@ export class HostedClientConnection {
           this.state = 'RESYNC_REQUIRED';
           break;
         }
-        const baseline = envelope.payload as unknown as BaselineSnapshotV1;
+        const validatedBaseline =
+          validateBaselineSnapshotV1(envelope.payload);
+        if (!validatedBaseline.ok) {
+          this.state = 'RESYNC_REQUIRED';
+          break;
+        }
+        const baseline = validatedBaseline.value;
         if (
           baseline.snapshotId !== this.pendingSnapshotId
           || baseline.sessionEpoch !== this.sessionEpoch
@@ -163,6 +178,16 @@ export class HostedClientConnection {
           break;
         }
         this.replication.applyBaseline(baseline);
+        this.playerMotions.clear();
+        for (const motion of baseline.players) {
+          this.playerMotions.set(
+            motion.playerId,
+            Object.freeze({
+              ...motion,
+              position: Object.freeze({ ...motion.position }),
+            }),
+          );
+        }
         this.send(
           'BASELINE_APPLIED',
           asJson({ snapshotId: baseline.snapshotId }),
@@ -173,8 +198,21 @@ export class HostedClientConnection {
         break;
       }
 
-      case 'PLAYER_MOTION':
+      case 'PLAYER_MOTION': {
+        const validatedMotion =
+          validatePlayerMotionViewV1(envelope.payload);
+        if (validatedMotion.ok) {
+          const motion = validatedMotion.value;
+          this.playerMotions.set(
+            motion.playerId,
+            Object.freeze({
+              ...motion,
+              position: Object.freeze({ ...motion.position }),
+            }),
+          );
+        }
         break;
+      }
 
       case 'COMMAND_RESULT': {
         const result = envelope.payload as unknown as CommandResultV1;
@@ -307,6 +345,20 @@ export class HostedClientConnection {
     return this.resumeCredential;
   }
 
+  public getPlayerMotions(): readonly Readonly<PlayerMotionViewV1>[] {
+    return Object.freeze(
+      [...this.playerMotions.values()]
+        .sort((left, right) => left.playerId.localeCompare(right.playerId)),
+    );
+  }
+
+  public subscribeReadModel(listener: () => void): () => void {
+    this.readModelListeners.add(listener);
+    return () => {
+      this.readModelListeners.delete(listener);
+    };
+  }
+
   public getCommandResult(operationId: string): CommandResultV1 | null {
     return this.commandResults.get(operationId) ?? null;
   }
@@ -327,6 +379,12 @@ export class HostedClientConnection {
 
   public getSessionClosingStatus(): 'SUCCESS' | 'SAVE_FAILED' | null {
     return this.sessionClosingStatus;
+  }
+
+  private notifyReadModelListeners(): void {
+    for (const listener of this.readModelListeners) {
+      listener();
+    }
   }
 
   private send(

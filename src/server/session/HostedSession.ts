@@ -1,13 +1,15 @@
-import type {
-  ClientEnvelopeV1,
-  ClientHelloV1,
-  ContentCompatibilityIdentityV1Wire,
-  MovementInputV1,
-  ServerEnvelopeV1,
-  ServerMessageTypeV1,
-  SessionRejectionReasonV1,
-  WorldCompatibilityV1,
-  JsonValue,
+import {
+  HOSTED_PROTOCOL_VERSION,
+  type ClientEnvelopeV1,
+  type ClientHelloV1,
+  type ContentCompatibilityIdentityV1Wire,
+  type JsonValue,
+  type MovementInputV1,
+  type PresentationIdentitySlotV1,
+  type ServerEnvelopeV1,
+  type ServerMessageTypeV1,
+  type SessionRejectionReasonV1,
+  type WorldCompatibilityV1,
 } from '../../protocol';
 
 export type HostedSessionState =
@@ -129,6 +131,8 @@ export class HostedSession {
   private readonly activeTransportByPlayer = new Map<string, string>();
   private readonly resumeToPlayer = new Map<string, string>();
   private readonly playerToResume = new Map<string, string>();
+  private readonly presentationSlotsByViewer =
+    new Map<string, Map<string, PresentationIdentitySlotV1>>();
   private nextPlayerOrdinal = 1;
 
   public constructor(private readonly config: HostedSessionConfig) {
@@ -415,6 +419,33 @@ export class HostedSession {
     );
   }
 
+  public getPresentationIdentitySlot(
+    viewerPlayerId: string,
+    subjectPlayerId: string,
+  ): PresentationIdentitySlotV1 {
+    if (viewerPlayerId === subjectPlayerId) {
+      return 'LOCAL';
+    }
+
+    let slots = this.presentationSlotsByViewer.get(viewerPlayerId);
+    if (slots === undefined) {
+      slots = new Map<string, PresentationIdentitySlotV1>();
+      this.presentationSlotsByViewer.set(viewerPlayerId, slots);
+    }
+
+    const existing = slots.get(subjectPlayerId);
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const used = new Set(slots.values());
+    const slot = (['TEAM_A', 'TEAM_B', 'TEAM_C'] as const).find(
+      (candidate) => !used.has(candidate),
+    ) ?? 'UNASSIGNED';
+    slots.set(subjectPlayerId, slot);
+    return slot;
+  }
+
   public nextServerEnvelope(
     transportId: string,
     messageType: ServerMessageTypeV1,
@@ -427,7 +458,7 @@ export class HostedSession {
     }
     connection.lastServerMessageSeq += 1;
     return Object.freeze({
-      protocolVersion: 1,
+      protocolVersion: HOSTED_PROTOCOL_VERSION,
       messageType,
       serverMessageSeq: connection.lastServerMessageSeq,
       sessionId: this.sessionId,

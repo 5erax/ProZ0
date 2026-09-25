@@ -1,4 +1,4 @@
-export const HOSTED_PROTOCOL_VERSION = 1 as const;
+export const HOSTED_PROTOCOL_VERSION = 2 as const;
 export const MOVEMENT_INPUT_REFRESH_MAX_TICKS = 15 as const;
 export const MOVEMENT_INPUT_LEASE_TICKS = 60 as const;
 
@@ -161,8 +161,16 @@ export type OperationStatusV1 =
       readonly result: CommandResultV1;
     };
 
+export type PresentationIdentitySlotV1 =
+  | 'LOCAL'
+  | 'TEAM_A'
+  | 'TEAM_B'
+  | 'TEAM_C'
+  | 'UNASSIGNED';
+
 export interface PlayerMotionViewV1 {
   readonly playerId: string;
+  readonly presentationIdentitySlot: PresentationIdentitySlotV1;
   readonly authorityTick: number;
   readonly lastProcessedInputSeq: number;
   readonly position: {

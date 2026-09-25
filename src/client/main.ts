@@ -10,10 +10,20 @@ import {
   isMovementInputCode,
   mapMovementInput,
 } from './input/MovementInputMapper';
-import { createPixiPresentationAdapter } from './presentation';
+import {
+  createPhase1HudOverlay,
+  createPixiPresentationAdapter,
+  createViewportPresentationGuard,
+  type Phase1HudOverlay,
+} from './presentation';
+import { resolvePhase1PresentationQaFixture } from './qa/Phase1PresentationFixture';
 import { resolveVisualQaFixture } from './qa/VisualQaFixture';
 import { FixedStepHost } from './runtime/FixedStepHost';
 import { LocalAuthorityHost } from './runtime/LocalAuthorityHost';
+import {
+  mountPhase1Presentation,
+} from './runtime/Phase1PresentationMount';
+import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -21,11 +31,26 @@ export interface RuntimeHandle {
   destroy(): void;
 }
 
-export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
-  root.dataset.runtimeStatus = 'booting';
+export type BootProZ0Options =
+  | {
+      readonly mode: 'local-demo';
+    }
+  | {
+      readonly mode: 'phase1-presentation';
+      readonly phase1PresentationSource: Phase1PresentationSource;
+      readonly presentationCanvas: HTMLCanvasElement;
+    };
 
+async function bootLocalDemo(
+  root: HTMLElement,
+): Promise<RuntimeHandle> {
   const visualQaFixture = resolveVisualQaFixture(window.location.search);
+  const phase1QaFixture = resolvePhase1PresentationQaFixture(
+    window.location.search,
+  );
+  root.dataset.runtimeMode = 'local-demo';
   root.dataset.visualQaMode = visualQaFixture.mode;
+  root.dataset.phase1QaMode = phase1QaFixture?.mode ?? 'none';
 
   const authority = new LocalAuthorityHost({
     worldQuery: createPhase0MovementDemoWorld(),
@@ -39,6 +64,18 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
     solids: PHASE0_MOVEMENT_DEMO_SOLIDS,
     ...visualQaFixture.presentation,
   });
+  const viewportGuard = createViewportPresentationGuard(
+    root,
+    presentation.canvas,
+  );
+  let phase1Hud: Phase1HudOverlay | null = null;
+  if (phase1QaFixture !== null) {
+    phase1Hud = createPhase1HudOverlay(
+      root,
+      presentation.canvas,
+      phase1QaFixture.state,
+    );
+  }
 
   authority.start();
   input.start();
@@ -71,6 +108,8 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
       fixedStepHost.stop();
       input.stop();
       authority.stop();
+      phase1Hud?.destroy();
+      viewportGuard.destroy();
       presentation.destroy();
       root.replaceChildren();
       root.dataset.runtimeStatus = 'stopped';
@@ -78,11 +117,52 @@ export async function bootProZ0(root: HTMLElement): Promise<RuntimeHandle> {
   };
 }
 
+function bootExternalPhase1Presentation(
+  root: HTMLElement,
+  options: Extract<
+    BootProZ0Options,
+    { readonly mode: 'phase1-presentation' }
+  >,
+): RuntimeHandle {
+  root.dataset.runtimeMode = 'phase1-presentation';
+  root.dataset.visualQaMode = 'none';
+  root.dataset.phase1QaMode = 'none';
+
+  const mount = mountPhase1Presentation(
+    root,
+    options.presentationCanvas,
+    options.phase1PresentationSource,
+  );
+
+  root.dataset.runtimeStatus = 'ready';
+  return {
+    destroy(): void {
+      mount.destroy();
+      root.dataset.runtimeStatus = 'stopped';
+    },
+  };
+}
+
+export async function bootProZ0(
+  root: HTMLElement,
+  options: BootProZ0Options,
+): Promise<RuntimeHandle> {
+  root.dataset.runtimeStatus = 'booting';
+
+  if (options.mode === 'phase1-presentation') {
+    return bootExternalPhase1Presentation(root, options);
+  }
+
+  return bootLocalDemo(root);
+}
+
 const autoBootRoot = document.querySelector<HTMLElement>('[data-proz0-autoboot]');
 
 if (autoBootRoot !== null) {
-  void bootProZ0(autoBootRoot).catch((error: unknown) => {
-    autoBootRoot.dataset.runtimeStatus = 'failed';
-    console.error('ProZ0 runtime failed to start.', error);
-  });
+  void bootProZ0(autoBootRoot, { mode: 'local-demo' }).catch(
+    (error: unknown) => {
+      autoBootRoot.dataset.runtimeStatus = 'failed';
+      console.error('ProZ0 runtime failed to start.', error);
+    },
+  );
 }

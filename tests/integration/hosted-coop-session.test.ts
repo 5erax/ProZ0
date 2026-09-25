@@ -305,6 +305,30 @@ describe('P1-NET-001 hosted session protocol', () => {
 
     expect(() => createHost({ maxPlayers: 10 })).not.toThrow();
 
+    const legacyProtocolMismatch = send(
+      host,
+      'transport:legacy-protocol',
+      {
+        protocolVersion: 1,
+        messageType: 'CLIENT_HELLO',
+        clientMessageSeq: 0,
+        payload: {
+          ...hello(),
+          protocolVersion: 1,
+        },
+      },
+    );
+    expect(legacyProtocolMismatch).toHaveLength(1);
+    expect(legacyProtocolMismatch[0]?.envelope).toMatchObject({
+      messageType: 'SESSION_REJECTED',
+      payload: { reason: 'PROTOCOL_MISMATCH' },
+    });
+    expect(
+      legacyProtocolMismatch.some(
+        (entry) => entry.envelope.messageType === 'BASELINE_SNAPSHOT',
+      ),
+    ).toBe(false);
+
     const protocolMismatch = send(host, 'transport:protocol-mismatch', {
       protocolVersion: 99,
       messageType: 'CLIENT_HELLO',

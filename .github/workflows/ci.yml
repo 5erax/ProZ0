@@ -58,3 +58,12 @@ jobs:
           path: test-results/p0-bug-002/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload P1-UI-001 production visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-ui-001-production-visual-evidence-${{ github.sha }}
+          path: test-results/p1-ui-001/
+          if-no-files-found: ignore
+          retention-days: 30

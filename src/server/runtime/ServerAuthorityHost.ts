@@ -420,6 +420,11 @@ export class ServerAuthorityHost {
         const snapshot = runtime.getSnapshot();
         const motion: PlayerMotionViewV1 = Object.freeze({
           playerId,
+          presentationIdentitySlot:
+            this.session.getPresentationIdentitySlot(
+              connection.playerId,
+              playerId,
+            ),
           authorityTick: this.authorityTick,
           lastProcessedInputSeq:
             this.lastProcessedInputSeq.get(playerId) ?? -1,
@@ -762,6 +767,8 @@ export class ServerAuthorityHost {
       const snapshot = runtime.getSnapshot();
       return Object.freeze({
         playerId: id,
+        presentationIdentitySlot:
+          this.session.getPresentationIdentitySlot(playerId, id),
         authorityTick: this.authorityTick,
         lastProcessedInputSeq: this.lastProcessedInputSeq.get(id) ?? -1,
         position: Object.freeze({

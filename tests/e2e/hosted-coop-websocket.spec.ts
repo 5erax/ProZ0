@@ -262,7 +262,7 @@ async function connectBrowserClient(
 ): Promise<BrowserHostedState> {
   await page.goto('/');
   return page.evaluate(
-    ({ websocketUrl, clientHello }) =>
+    ({ websocketUrl, clientHello, protocolVersion }) =>
       new Promise<BrowserHostedState>((resolve, reject) => {
         const socket = new WebSocket(websocketUrl);
         const state: {
@@ -278,6 +278,7 @@ async function connectBrowserClient(
           sessionId: string | null;
           connectionId: string | null;
           playerId: string | null;
+          protocolVersion: number;
         } = {
           socket,
           messages: [],
@@ -285,6 +286,7 @@ async function connectBrowserClient(
           sessionId: null,
           connectionId: null,
           playerId: null,
+          protocolVersion,
         };
         (
           globalThis as unknown as {
@@ -303,7 +305,7 @@ async function connectBrowserClient(
         };
         socket.onopen = () => {
           socket.send(JSON.stringify({
-            protocolVersion: 1,
+            protocolVersion,
             messageType: 'CLIENT_HELLO',
             clientMessageSeq: state.nextClientSeq++,
             payload: clientHello,
@@ -336,7 +338,7 @@ async function connectBrowserClient(
               return;
             }
             socket.send(JSON.stringify({
-              protocolVersion: 1,
+              protocolVersion,
               messageType: 'BASELINE_APPLIED',
               clientMessageSeq: state.nextClientSeq++,
               sessionId: state.sessionId,
@@ -353,7 +355,11 @@ async function connectBrowserClient(
           }
         };
       }),
-    { websocketUrl: url, clientHello: hello },
+    {
+      websocketUrl: url,
+      clientHello: hello,
+      protocolVersion: HOSTED_PROTOCOL_VERSION,
+    },
   );
 }
 
@@ -366,6 +372,7 @@ async function sendRightMovement(page: Page): Promise<void> {
           nextClientSeq: number;
           sessionId: string | null;
           connectionId: string | null;
+          protocolVersion: number;
         };
       }
     ).__proz0HostedTest;
@@ -377,7 +384,7 @@ async function sendRightMovement(page: Page): Promise<void> {
       throw new Error('Hosted browser client is not connected.');
     }
     state.socket.send(JSON.stringify({
-      protocolVersion: 1,
+      protocolVersion: state.protocolVersion,
       messageType: 'MOVEMENT_INPUT',
       clientMessageSeq: state.nextClientSeq++,
       sessionId: state.sessionId,

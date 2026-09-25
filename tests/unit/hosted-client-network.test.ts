@@ -137,6 +137,72 @@ describe('Hosted client network state', () => {
     });
   });
 
+
+  it('fails closed before READY when a same-version baseline omits required presentation identity', () => {
+    const transport = new MemoryTransport();
+    const client = new HostedClientConnection({
+      transport,
+      hello: hello(),
+    });
+    client.start();
+    client.handleText(server(1, 'SESSION_ACCEPTED', asJson({
+      worldId: 'world-alpha',
+      playerId: 'player:1',
+      connectionId: 'connection:test',
+      resumeCredential: 'resume:test',
+      snapshotId: 'snapshot:test',
+      maxPlayers: 4,
+    })));
+    expect(client.getState()).toBe('BASELINING');
+
+    client.handleText(server(2, 'BASELINE_SNAPSHOT', asJson({
+      ...baseline(),
+      players: [{
+        playerId: 'player:1',
+        authorityTick: 0,
+        lastProcessedInputSeq: -1,
+        position: { x: 0, y: 0 },
+        facing: null,
+        locomotionState: 'IDLE',
+      }],
+    })));
+
+    expect(client.getState()).toBe('RESYNC_REQUIRED');
+    expect(transport.sent).toHaveLength(1);
+    expect(client.getPlayerMotions()).toEqual([]);
+  });
+
+  it('ignores malformed incremental player motion identity without fabricating a teammate slot', () => {
+    const transport = new MemoryTransport();
+    const client = new HostedClientConnection({
+      transport,
+      hello: hello(),
+    });
+    client.start();
+    client.handleText(server(1, 'SESSION_ACCEPTED', asJson({
+      worldId: 'world-alpha',
+      playerId: 'player:1',
+      connectionId: 'connection:test',
+      resumeCredential: 'resume:test',
+      snapshotId: 'snapshot:test',
+      maxPlayers: 4,
+    })));
+    client.handleText(server(2, 'BASELINE_SNAPSHOT', asJson(baseline())));
+    expect(client.getState()).toBe('READY');
+
+    client.handleText(server(3, 'PLAYER_MOTION', asJson({
+      playerId: 'player:2',
+      authorityTick: 1,
+      lastProcessedInputSeq: 0,
+      position: { x: 1, y: 1 },
+      facing: 'east',
+      locomotionState: 'MOVING',
+    }), 1));
+
+    expect(client.getState()).toBe('READY');
+    expect(client.getPlayerMotions()).toEqual([]);
+  });
+
   it('preserves accepted-pending versus resolved operation reconciliation state', () => {
     const transport = new MemoryTransport();
     const client = new HostedClientConnection({
