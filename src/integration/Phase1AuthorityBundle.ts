@@ -26,6 +26,7 @@ import {
   type ContainerState,
   type GatherCostPort,
   type GatherCostReservation,
+  type GatherTickResult,
   type GatherCostReservationResult,
   type ItemLedgerSnapshot,
   type PlayerInput,
@@ -333,6 +334,7 @@ export class Phase1AuthorityBundle {
 
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly registeredSurvival = new Set<PlayerId>();
+  private readonly lastGatherResults = new Map<PlayerId, GatherTickResult>();
 
   private constructor(
     public readonly config: Phase1AuthorityBundleConfig,
@@ -610,7 +612,10 @@ export class Phase1AuthorityBundle {
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',
       });
-      this.items.tickGather(playerId);
+      this.lastGatherResults.set(
+        playerId,
+        this.items.tickGather(playerId),
+      );
       this.survival.tickConsume(playerId);
       await this.worldStore.revealResolvedPlayerPosition(
         this.positions.get(playerId),
@@ -634,6 +639,12 @@ export class Phase1AuthorityBundle {
         ),
       );
     }
+  }
+
+  public getLastGatherResult(
+    playerId: PlayerId,
+  ): Readonly<GatherTickResult> | null {
+    return this.lastGatherResults.get(playerId) ?? null;
   }
 
   public getRuntime(playerId: PlayerId): AuthorityRuntime {

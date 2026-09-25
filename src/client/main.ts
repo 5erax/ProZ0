@@ -24,6 +24,10 @@ import {
   mountPhase1Presentation,
 } from './runtime/Phase1PresentationMount';
 import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
+import {
+  createPhase1ProductReviewRuntime,
+  type Phase1ProductReviewRuntimeConfig,
+} from './runtime/Phase1ProductReviewRuntime';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -39,6 +43,10 @@ export type BootProZ0Options =
       readonly mode: 'phase1-presentation';
       readonly phase1PresentationSource: Phase1PresentationSource;
       readonly presentationCanvas: HTMLCanvasElement;
+    }
+  | {
+      readonly mode: 'phase1-product-review';
+      readonly config: Phase1ProductReviewRuntimeConfig;
     };
 
 async function bootLocalDemo(
@@ -151,6 +159,10 @@ export async function bootProZ0(
 
   if (options.mode === 'phase1-presentation') {
     return bootExternalPhase1Presentation(root, options);
+  }
+
+  if (options.mode === 'phase1-product-review') {
+    return createPhase1ProductReviewRuntime(root, options.config);
   }
 
   return bootLocalDemo(root);

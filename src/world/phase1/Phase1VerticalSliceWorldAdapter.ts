@@ -247,6 +247,23 @@ export class Phase1VerticalSliceWorldAdapter
     }
   }
 
+  public getActiveGeneratedEntities(): readonly Readonly<Phase1GeneratedWorldEntity>[] {
+    const values: Phase1GeneratedWorldEntity[] = [];
+    for (const coord of this.activeCoords.values()) {
+      const view = this.options.store.query(coord);
+      if (view === undefined) continue;
+      values.push(...view.base.entities);
+    }
+    return Object.freeze(
+      values
+        .sort((left, right) => left.entityId.localeCompare(right.entityId))
+        .map((entry) => Object.freeze({
+          ...entry,
+          position: createWorldPosition(entry.position.x, entry.position.y),
+        })),
+    );
+  }
+
   public findGeneratedEntityByDefinition(
     definitionId: string,
   ): Readonly<Phase1GeneratedWorldEntity> | null {
