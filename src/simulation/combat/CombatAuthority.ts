@@ -225,7 +225,7 @@ export class Phase1CombatAuthority {
     const target = currentTarget ?? alive[0];
     if (target === undefined) return;
 
-    if (predator.state === 'idle') {
+    if (predator.state === 'idle' || predator.state === 'patrol') {
       if (target.dPredator <= aggression * aggression) {
         this.world.commitPredatorRuntime({
           entityId:predator.entityId,expectedRevision:predator.revision,
