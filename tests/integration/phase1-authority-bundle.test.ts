@@ -141,4 +141,75 @@ describe('Phase 1 canonical authority bundle', () => {
     }
   });
 
+
+  it('orchestrates one stable death transition and canonical respawn after lethal authority damage', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-integration-death',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 0,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      await bundle.stepSolo();
+      expect(bundle.authorityTick).toBe(1);
+
+      const lethal = bundle.survival.applyAuthorityDamage({
+        damageId: 'test:lethal:boundary',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'test:predator',
+        targetPlayerId: 'p1',
+        amount: 100,
+        tick: 1,
+      });
+      expect(lethal).toMatchObject({
+        status: 'applied',
+        lethal: true,
+        healthAfter: 0,
+      });
+
+      // The next tick resolves the completed prior-tick lethal event before
+      // advancing survival, preserving its canonical source tick/DeathId.
+      await bundle.stepSolo();
+
+      const death = bundle.getLastDeathResult('p1');
+      expect(death).toMatchObject({
+        status: 'committed',
+        deathId: 'death:p1:test:lethal:boundary',
+        cacheEntityId: null,
+        cacheContainerId: null,
+      });
+      const dead = bundle.survival.getPlayerState('p1');
+      expect(dead.lifeState).toMatchObject({
+        type: 'dead-pending-respawn',
+        deathId: 'death:p1:test:lethal:boundary',
+      });
+      if (dead.lifeState.type !== 'dead-pending-respawn') {
+        throw new Error('Expected canonical pending respawn.');
+      }
+
+      const respawnAtTick = dead.lifeState.respawnAtTick;
+      while (bundle.authorityTick < respawnAtTick) {
+        await bundle.stepSolo();
+      }
+
+      expect(bundle.getLastRespawnResult('p1')).toMatchObject({
+        status: 'respawned',
+        playerId: 'p1',
+        position: { x: 0, y: 0 },
+      });
+      expect(bundle.survival.getPlayerState('p1').lifeState)
+        .toEqual({ type: 'alive' });
+      expect(bundle.getPlayerPosition('p1')).toMatchObject({
+        x: 0,
+        y: 0,
+      });
+      expect(bundle.death.exportSnapshot().processed).toHaveLength(1);
+    } finally {
+      await bundle.destroy();
+    }
+  });
+
 });

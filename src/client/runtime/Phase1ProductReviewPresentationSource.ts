@@ -169,13 +169,20 @@ export class Phase1ProductReviewPresentationSource
         break;
     }
 
+    const equipment = this.bundle.equipment.reconcile(this.playerId);
+    const equippedStackId =
+      equipment.equippedWeaponStackId
+      ?? equipment.equippedThermalWrapStackId;
+
     const projected = projectPhase1RuntimePresentation({
       catalog: this.bundle.catalog,
       survival: this.bundle.survival.getPlayerView(this.playerId),
       inventory,
+      equippedStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
       progression: this.bundle.progression.getPlayerView(this.playerId),
       commandFeedback: this.commandFeedback,
+      deathResult: this.bundle.getLastDeathResult(this.playerId),
       panel,
     });
 

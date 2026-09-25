@@ -4,6 +4,7 @@ export * from './death';
 export * from './building';
 export * from './machines';
 export * from './progression';
+export * from './equipment';
 import type { WorldPosition } from '../foundation';
 import type { WorldCollisionQuery } from '../world';
 import type { FacingDirection } from './api/SimulationSnapshot';

@@ -175,9 +175,7 @@ export function composePhase1SaveV2(
       throw new Error('Save checkpoint is missing player progression state.');
     }
 
-    const reopened = bundle.config.reopen?.players.find(
-      (entry) => entry.record.playerId === playerId,
-    );
+    const equipment = bundle.equipment.reconcile(playerId);
     return playerStateToRecordV2({
       worldId: bundle.config.worldId,
       playerId,
@@ -188,10 +186,9 @@ export function composePhase1SaveV2(
       position: movement.position,
       facing: movement.facing,
       inventoryContainerId: 'inventory:' + playerId,
-      equippedWeaponStackId:
-        reopened?.record.equipment.equippedWeaponStackId ?? null,
+      equippedWeaponStackId: equipment.equippedWeaponStackId,
       equippedThermalWrapStackId:
-        reopened?.record.equipment.equippedThermalWrapStackId ?? null,
+        equipment.equippedThermalWrapStackId,
       survival: bundle.survival.getPlayerState(playerId),
       progression: progressionState,
     }, bundle.catalog);

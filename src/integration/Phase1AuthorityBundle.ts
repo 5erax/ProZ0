@@ -16,6 +16,7 @@ import {
   Phase1CombatAuthority,
   Phase1CondenserAuthority,
   Phase1DeathAuthority,
+  Phase1EquipmentAuthority,
   Phase1ItemAuthority,
   Phase1ProgressionAuthority,
   Phase1SurvivalAuthority,
@@ -24,6 +25,7 @@ import {
   createSimulationRuntime,
   type AuthorityRuntime,
   type ContainerState,
+  type DeathTransitionResult,
   type GatherCostPort,
   type GatherCostReservation,
   type GatherTickResult,
@@ -31,6 +33,7 @@ import {
   type ItemLedgerSnapshot,
   type PlayerInput,
   type ProgressionAuthoritySnapshot,
+  type RespawnResult,
   type SurvivalAuthoritySnapshot,
 } from '../simulation';
 import type {
@@ -351,6 +354,7 @@ export class Phase1AuthorityBundle {
   public readonly world: Phase1VerticalSliceWorldAdapter;
   public readonly buildings: Phase1BuildingWorld;
   public readonly items: Phase1ItemAuthority;
+  public readonly equipment: Phase1EquipmentAuthority;
   public readonly survival: Phase1SurvivalAuthority;
   public readonly progression: Phase1ProgressionAuthority;
   public readonly buildingAuthority: Phase1BuildingAuthority;
@@ -361,6 +365,10 @@ export class Phase1AuthorityBundle {
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly registeredSurvival = new Set<PlayerId>();
   private readonly lastGatherResults = new Map<PlayerId, GatherTickResult>();
+  private readonly lastDeathResults =
+    new Map<PlayerId, DeathTransitionResult>();
+  private readonly lastRespawnResults =
+    new Map<PlayerId, RespawnResult>();
 
   private constructor(
     public readonly config: Phase1AuthorityBundleConfig,
@@ -372,6 +380,7 @@ export class Phase1AuthorityBundle {
     world: Phase1VerticalSliceWorldAdapter,
     buildings: Phase1BuildingWorld,
     items: Phase1ItemAuthority,
+    equipment: Phase1EquipmentAuthority,
     survival: Phase1SurvivalAuthority,
     progression: Phase1ProgressionAuthority,
     buildingAuthority: Phase1BuildingAuthority,
@@ -385,6 +394,7 @@ export class Phase1AuthorityBundle {
     this.world = world;
     this.buildings = buildings;
     this.items = items;
+    this.equipment = equipment;
     this.survival = survival;
     this.progression = progression;
     this.buildingAuthority = buildingAuthority;
@@ -504,6 +514,18 @@ export class Phase1AuthorityBundle {
       gatherCost,
       events: new ProgressionItemEventSink(progression),
     });
+    const equipment = new Phase1EquipmentAuthority(
+      items,
+      Object.freeze(
+        (reopen?.players ?? []).map((entry) => Object.freeze({
+          playerId: entry.record.playerId,
+          equippedWeaponStackId:
+            entry.record.equipment.equippedWeaponStackId,
+          equippedThermalWrapStackId:
+            entry.record.equipment.equippedThermalWrapStackId,
+        })),
+      ),
+    );
     const reopenedSurvival = survivalSnapshot(reopen);
     const survival = new Phase1SurvivalAuthority({
       catalog,
@@ -540,6 +562,7 @@ export class Phase1AuthorityBundle {
       world,
       buildings,
       items,
+      equipment,
       survival,
       progression,
       buildingAuthority,
@@ -589,6 +612,12 @@ export class Phase1AuthorityBundle {
     this.positions.bind(playerId, runtime);
     this.runtimes.set(playerId, runtime);
 
+    this.equipment.registerPlayer(playerId);
+    this.combat.setEquippedWeapon(
+      playerId,
+      this.equipment.getView(playerId).equippedWeaponStackId,
+    );
+
     if (!this.registeredSurvival.has(playerId)) {
       this.survival.registerPlayer(playerId);
       this.registeredSurvival.add(playerId);
@@ -626,6 +655,10 @@ export class Phase1AuthorityBundle {
       );
     }
 
+    // Resolve any canonical lethal event published at the completed prior
+    // tick before advancing survival state past that DeathId source tick.
+    this.processPendingDeaths(this.authorityTickRef.value);
+
     await this.worldStore.advanceEnvironment(authorityTick);
     this.authorityTickRef.value = authorityTick;
   }
@@ -640,11 +673,13 @@ export class Phase1AuthorityBundle {
     for (const playerId of this.getActivePlayerIds()) {
       const inventory = this.items.getContainerView('inventory:' + playerId);
       const exposure = this.world.getEnvironmentExposure(playerId);
-      const thermalWrapActive = inventory.stacks.some((stack) =>
-        stack.itemDefinitionId === 'item:thermal-wrap'
-        && stack.condition !== null
-        && stack.condition > 0,
+      const equipment = this.equipment.reconcile(playerId);
+      this.combat.setEquippedWeapon(
+        playerId,
+        equipment.equippedWeaponStackId,
       );
+      const thermalWrapActive =
+        this.equipment.isThermalWrapActive(playerId);
       this.survival.stepPlayer(playerId, authorityTick, {
         thermalTarget: exposure.thermalTarget,
         thermalWrapActive,
@@ -677,6 +712,8 @@ export class Phase1AuthorityBundle {
       }
     }
 
+    this.processPendingDeaths(authorityTick);
+
     for (const structure of this.buildings.exportSnapshot().foothold.structures) {
       if (structure.definitionId === 'structure:atmospheric-water-condenser') {
         this.machines.tick(structure.structureId);
@@ -692,12 +729,48 @@ export class Phase1AuthorityBundle {
         this.getActivePlayerIds(),
       );
     }
+
+    this.processPendingDeaths(authorityTick);
+    this.processPendingRespawns(authorityTick);
   }
 
   public getLastGatherResult(
     playerId: PlayerId,
   ): Readonly<GatherTickResult> | null {
     return this.lastGatherResults.get(playerId) ?? null;
+  }
+
+  public getLastDeathResult(
+    playerId: PlayerId,
+  ): Readonly<DeathTransitionResult> | null {
+    return this.lastDeathResults.get(playerId) ?? null;
+  }
+
+  public getLastRespawnResult(
+    playerId: PlayerId,
+  ): Readonly<RespawnResult> | null {
+    return this.lastRespawnResults.get(playerId) ?? null;
+  }
+
+  public equipWeapon(
+    playerId: PlayerId,
+    stackId: string | null,
+  ) {
+    const result = this.equipment.equipWeapon(playerId, stackId);
+    if (result.status === 'committed') {
+      this.combat.setEquippedWeapon(
+        playerId,
+        result.view.equippedWeaponStackId,
+      );
+    }
+    return result;
+  }
+
+  public equipThermalWrap(
+    playerId: PlayerId,
+    stackId: string | null,
+  ) {
+    return this.equipment.equipThermalWrap(playerId, stackId);
   }
 
   public inspectRuin(request: {
@@ -774,6 +847,61 @@ export class Phase1AuthorityBundle {
       rewardItemId: result.rewardItemId,
       rewardQuantity: result.rewardQuantity,
     });
+  }
+
+  private processPendingDeaths(authorityTick: number): void {
+    for (const playerId of this.getActivePlayerIds()) {
+      const state = this.survival.getPlayerState(playerId);
+      if (
+        state.lifeState.type !== 'alive'
+        || state.healthMilli !== 0
+      ) {
+        continue;
+      }
+
+      const lethal = this.survival.getCanonicalLethalDamage(
+        playerId,
+        authorityTick,
+      );
+      if (lethal === null) continue;
+
+      const inventory = this.items.getContainerView(
+        'inventory:' + playerId,
+      );
+      const deathId =
+        'death:' + playerId + ':' + lethal.damageId;
+      const result = this.death.processDeath({
+        deathId,
+        playerId,
+        deathPosition: this.positions.get(playerId),
+        deathTick: authorityTick,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision,
+        equippedStackIds:
+          this.equipment.equippedStackIds(playerId),
+      });
+      this.lastDeathResults.set(playerId, result);
+
+      if (
+        result.status === 'committed'
+        || result.status === 'duplicate'
+      ) {
+        this.equipment.clear(playerId);
+        this.combat.setEquippedWeapon(playerId, null);
+      }
+    }
+  }
+
+  private processPendingRespawns(authorityTick: number): void {
+    for (const playerId of this.getActivePlayerIds()) {
+      const state = this.survival.getPlayerState(playerId);
+      if (state.lifeState.type !== 'dead-pending-respawn') continue;
+      const result = this.death.processRespawn(
+        playerId,
+        authorityTick,
+      );
+      this.lastRespawnResults.set(playerId, result);
+    }
   }
 
   private isWithinRuinLocateRange(
