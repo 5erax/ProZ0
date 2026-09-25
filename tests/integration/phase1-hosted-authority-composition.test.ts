@@ -135,6 +135,77 @@ function sendCommand(
 }
 
 describe('Phase 1 hosted vertical-slice composition', () => {
+  it.each([2, 3] as const)(
+    'runs the same canonical hosted authority composition at %i-player capacity',
+    async (maxPlayers) => {
+      const composition = await Phase1HostedAuthorityComposition.create({
+        worldId: 'world:p1-hosted-capacity-' + String(maxPlayers),
+        worldSeed: 'p1-world-golden',
+        maxPlayers,
+        interactionRangeWorldUnits: 2,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+        persistence: new NoopHostedPersistence(),
+        sessionId: 'session:p1-hosted-capacity-' + String(maxPlayers),
+        sessionEpoch: 'epoch:p1-hosted-capacity-' + String(maxPlayers),
+      });
+
+      try {
+        const clients = Array.from(
+          { length: maxPlayers },
+          (_, index) => join(
+            composition,
+            'transport:capacity:' + String(maxPlayers) + ':' + String(index),
+          ),
+        );
+
+        expect(composition.bundle.getActivePlayerIds()).toHaveLength(
+          maxPlayers,
+        );
+
+        const outbound = await composition.step();
+        for (const client of clients) {
+          expect(
+            outbound.filter(
+              (entry) =>
+                entry.transportId === client.transportId
+                && entry.envelope.messageType === 'PLAYER_MOTION',
+            ),
+          ).toHaveLength(maxPlayers);
+        }
+
+        const firstViewer = clients[0];
+        if (firstViewer === undefined) {
+          throw new Error('Expected admitted hosted capacity viewer.');
+        }
+        const slots = outbound
+          .filter(
+            (entry) =>
+              entry.transportId === firstViewer.transportId
+              && entry.envelope.messageType === 'PLAYER_MOTION',
+          )
+          .map((entry) => (
+            entry.envelope.payload as unknown as {
+              readonly playerId: string;
+              readonly presentationIdentitySlot: string;
+            }
+          ))
+          .sort((left, right) =>
+            left.playerId.localeCompare(right.playerId),
+          );
+
+        expect(slots.map((entry) => entry.presentationIdentitySlot))
+          .toEqual(
+            maxPlayers === 2
+              ? ['LOCAL', 'TEAM_A']
+              : ['LOCAL', 'TEAM_A', 'TEAM_B'],
+          );
+      } finally {
+        await composition.destroy();
+      }
+    },
+  );
+
   it('integrates 4 admitted players, stable co-op identity, shared discovery and authoritative ruin inspect', async () => {
     const composition = await Phase1HostedAuthorityComposition.create({
       worldId: 'world:p1-hosted-integration',
