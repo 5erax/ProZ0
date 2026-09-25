@@ -198,22 +198,20 @@ test('direct Product Review URL boots canonical persisted slice without console 
   await page.keyboard.press('Escape');
 
   // Reach the canonical local Fiber Plant at (18, 10) using only normal
-  // player movement. The 1.25 WU interaction range is intentionally close.
+  // player movement. Hold durations target the node center from the approved
+  // 2.8125 WU/s cardinal movement speed, avoiding poll-induced overshoot.
   await page.keyboard.down('d');
-  await expect.poll(
-    async () => Number(await canvas.getAttribute('data-player-x')),
-    { timeout: 10_000 },
-  ).toBeGreaterThan(17.4);
+  await page.waitForTimeout(6_300);
   await page.keyboard.up('d');
 
   await page.keyboard.down('s');
-  await expect.poll(
-    async () => Number(await canvas.getAttribute('data-player-y')),
-    { timeout: 10_000 },
-  ).toBeGreaterThan(9.4);
+  await page.waitForTimeout(3_500);
   await page.keyboard.up('s');
   await page.waitForTimeout(100);
 
+  const gatherX = Number(await canvas.getAttribute('data-player-x'));
+  const gatherY = Number(await canvas.getAttribute('data-player-y'));
+  expect(Math.hypot(gatherX - 18, gatherY - 10)).toBeLessThanOrEqual(1.25);
   await expect(interaction).toContainText('GATHER');
 
   // Complete two canonical Fiber Plant gather channels using only the
