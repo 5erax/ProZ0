@@ -28,6 +28,9 @@ import {
 import {
   Phase1ProductReviewPresentationSource,
 } from './Phase1ProductReviewPresentationSource';
+import type {
+  Phase1CraftPanelPresentation,
+} from '../presentation/Phase1PresentationModel';
 import {
   mountPhase1Presentation,
 } from './Phase1PresentationMount';
@@ -52,6 +55,8 @@ interface GatherInteractionState {
   readonly targetName: string;
   readonly requiredTicks: number;
 }
+
+const CRAFT_PAGE_SIZE = 6;
 
 function squaredDistance(
   ax: number,
@@ -123,6 +128,8 @@ export async function createPhase1ProductReviewRuntime(
 
   let operationOrdinal = 0;
   let activeGather: GatherInteractionState | null = null;
+  let actionPanel: 'craft' | null = null;
+  let craftPage = 0;
   let destroyed = false;
   let stepQueue = Promise.resolve();
 
@@ -208,6 +215,172 @@ export async function createPhase1ProductReviewRuntime(
       return null;
     }
     return Object.freeze({ entity, state });
+  };
+
+  const craftRecipes = () =>
+    Object.freeze(
+      [...bundle.catalog.list('recipe')].sort(
+        (left, right) => left.id.localeCompare(right.id),
+      ),
+    );
+
+  const accessibleWorkbench = () => {
+    const workbench = bundle.buildings
+      .exportSnapshot()
+      .foothold.structures
+      .find(
+        (structure) =>
+          structure.definitionId === 'structure:workbench'
+          && bundle.world.isWorkbenchAccessible(
+            config.localPlayerId,
+            structure.structureId,
+          ),
+      );
+    return workbench ?? null;
+  };
+
+  const itemQuantity = (itemDefinitionId: string): number =>
+    bundle.items
+      .getContainerView('inventory:' + config.localPlayerId)
+      .stacks
+      .filter((stack) => stack.itemDefinitionId === itemDefinitionId)
+      .reduce((sum, stack) => sum + stack.quantity, 0);
+
+  const craftPanel = (): Phase1CraftPanelPresentation => {
+    const recipes = craftRecipes();
+    const pageCount = Math.max(
+      1,
+      Math.ceil(recipes.length / CRAFT_PAGE_SIZE),
+    );
+    craftPage = Math.min(Math.max(0, craftPage), pageCount - 1);
+    const workbench = accessibleWorkbench();
+    const page = recipes.slice(
+      craftPage * CRAFT_PAGE_SIZE,
+      (craftPage + 1) * CRAFT_PAGE_SIZE,
+    );
+
+    return Object.freeze({
+      kind: 'craft',
+      title:
+        'CRAFT · PAGE '
+        + String(craftPage + 1)
+        + '/'
+        + String(pageCount)
+        + ' · [1-6] CRAFT · [ / ] PAGE',
+      rows: Object.freeze(page.map((recipe, index) => {
+        const missing = recipe.inputs.find(
+          (input) => itemQuantity(input.itemId) < input.quantity,
+        );
+        const stationBlocked =
+          recipe.requiredStationStructureId !== null
+          && workbench === null;
+        const reason = missing !== undefined
+          ? 'NEED '
+            + String(missing.quantity)
+            + ' '
+            + bundle.catalog.get(missing.itemId).displayName
+          : stationBlocked
+            ? 'WORKBENCH REQUIRED'
+            : null;
+
+        return Object.freeze({
+          id: recipe.id,
+          name: '[' + String(index + 1) + '] ' + recipe.displayName,
+          outputLabel: recipe.outputs
+            .map((output) =>
+              String(output.quantity)
+              + '× '
+              + bundle.catalog.get(output.itemId).displayName,
+            )
+            .join(' + '),
+          requirementLabel: recipe.inputs
+            .map((input) =>
+              String(input.quantity)
+              + '× '
+              + bundle.catalog.get(input.itemId).displayName,
+            )
+            .concat(
+              recipe.requiredStationStructureId === null
+                ? []
+                : ['Workbench'],
+            )
+            .join(' + '),
+          state: reason === null ? 'AVAILABLE' : 'BLOCKED',
+          reason,
+        });
+      })),
+    });
+  };
+
+  const refreshCraftPanel = (): void => {
+    if (actionPanel !== 'craft') return;
+    source.setPresentationPanel(craftPanel());
+  };
+
+  const toggleCraftPanel = (): void => {
+    if (actionPanel === 'craft') {
+      actionPanel = null;
+      source.setPresentationPanel(null);
+      return;
+    }
+    actionPanel = 'craft';
+    craftPage = 0;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(craftPanel());
+  };
+
+  const changeCraftPage = (delta: number): void => {
+    if (actionPanel !== 'craft') return;
+    const pageCount = Math.max(
+      1,
+      Math.ceil(craftRecipes().length / CRAFT_PAGE_SIZE),
+    );
+    craftPage =
+      (craftPage + delta + pageCount) % pageCount;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(craftPanel());
+  };
+
+  const craftRecipeAtSlot = (slot: number): void => {
+    if (actionPanel !== 'craft') return;
+    const recipe = craftRecipes()[
+      craftPage * CRAFT_PAGE_SIZE + slot
+    ];
+    if (recipe === undefined) return;
+
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const workbench = accessibleWorkbench();
+    const result = bundle.items.execute({
+      type: 'craft',
+      operationId: nextOperationId('craft'),
+      playerId: config.localPlayerId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      recipeId: recipe.id,
+      ...(recipe.requiredStationStructureId === null
+        || workbench === null
+        ? {}
+        : {
+            workbench: {
+              structureInstanceId: workbench.structureId,
+              expectedRevision: workbench.revision,
+            },
+          }),
+    });
+
+    source.setPresentationPanel(craftPanel());
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'CRAFT',
+      target: recipe.displayName,
+      panelTargetId: recipe.id,
+    });
   };
 
   const resolveGatherTool = (
@@ -495,16 +668,48 @@ export async function createPhase1ProductReviewRuntime(
         event.preventDefault();
         beginContextInteraction();
         break;
+      case 'KeyC':
+        event.preventDefault();
+        toggleCraftPanel();
+        break;
+      case 'BracketLeft':
+        event.preventDefault();
+        changeCraftPage(-1);
+        break;
+      case 'BracketRight':
+        event.preventDefault();
+        changeCraftPage(1);
+        break;
+      case 'Digit1':
+      case 'Digit2':
+      case 'Digit3':
+      case 'Digit4':
+      case 'Digit5':
+      case 'Digit6':
+        if (actionPanel === 'craft') {
+          event.preventDefault();
+          craftRecipeAtSlot(Number(event.code.slice(-1)) - 1);
+        }
+        break;
+      case 'Escape':
+        event.preventDefault();
+        actionPanel = null;
+        source.setPresentationPanel(null);
+        source.setPanel(null);
+        break;
       case 'KeyI':
         event.preventDefault();
+        actionPanel = null;
         source.togglePanel('inventory');
         break;
       case 'KeyM':
         event.preventDefault();
+        actionPanel = null;
         source.togglePanel('map');
         break;
       case 'KeyP':
         event.preventDefault();
+        actionPanel = null;
         source.togglePanel('progression');
         break;
     }
@@ -521,6 +726,7 @@ export async function createPhase1ProductReviewRuntime(
           bundle.getLastGatherResult(config.localPlayerId),
         );
         source.refresh();
+        refreshCraftPanel();
         refreshContextInteraction();
         worldRenderer.render();
       }).catch((error: unknown) => {

@@ -348,6 +348,49 @@ describe('Phase 0 browser runtime', () => {
     expect(channeling?.textContent).toContain('GATHER');
   });
 
+  it('routes Product Review craft choices through canonical item authority', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-craft',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyC',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    const panel =
+      root.querySelector<HTMLElement>('[data-panel-kind="craft"]');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain('PAGE 1/');
+    expect(panel?.textContent).toContain('[1]');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'Digit1',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    expect(
+      root.querySelector<HTMLElement>('.p1-toast[data-toast-kind="warning"]'),
+    ).not.toBeNull();
+    expect(
+      root.querySelector<HTMLElement>('[data-panel-kind="craft"]'),
+    ).not.toBeNull();
+  });
+
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
     root = document.createElement('div');
     document.body.append(root);

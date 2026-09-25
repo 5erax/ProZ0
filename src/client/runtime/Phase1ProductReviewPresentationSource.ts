@@ -7,6 +7,7 @@ import {
 } from '../../world';
 import type {
   Phase1InteractionPresentation,
+  Phase1PanelPresentation,
   Phase1PresentationState,
 } from '../presentation/Phase1PresentationModel';
 import {
@@ -45,6 +46,8 @@ export class Phase1ProductReviewPresentationSource
   private readonly listeners =
     new Set<(state: Readonly<Phase1PresentationState>) => void>();
   private panel: Phase1ProductReviewPanel = null;
+  private presentationPanelOverride: Readonly<Phase1PanelPresentation> | null =
+    null;
   private interactionOverride: Phase1InteractionPresentation | null = null;
   private commandFeedback: Phase1AuthoritativeCommandFeedback | null = null;
   private current: Readonly<Phase1PresentationState>;
@@ -70,11 +73,21 @@ export class Phase1ProductReviewPresentationSource
   }
 
   public setPanel(panel: Phase1ProductReviewPanel): void {
+    this.presentationPanelOverride = null;
     this.panel = panel;
     this.refresh();
   }
 
+  public setPresentationPanel(
+    panel: Readonly<Phase1PanelPresentation> | null,
+  ): void {
+    this.panel = null;
+    this.presentationPanelOverride = panel;
+    this.refresh();
+  }
+
   public togglePanel(panel: Exclude<Phase1ProductReviewPanel, null>): void {
+    this.presentationPanelOverride = null;
     this.panel = this.panel === panel ? null : panel;
     this.refresh();
   }
