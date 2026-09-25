@@ -966,6 +966,12 @@ describe('Phase 1 hosted vertical-slice composition', () => {
       if (fiber === null || fiber.type !== 'resource') {
         throw new Error('Expected canonical local Fiber Plant.');
       }
+      sendMovement(
+        composition.host,
+        clients[0]!,
+        2,
+        { up: false, down: false, left: false, right: false },
+      );
       composition.bundle.getRuntime('player:1').relocatePlayer(
         fiber.position,
       );
