@@ -5,6 +5,11 @@ import {
   resolveProductReviewAutoBootConfig,
   type RuntimeHandle,
 } from '../../src/client/main';
+import {
+  PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+  PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+  PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+} from '../../src/integration';
 import { resolvePhase1PresentationQaFixture } from '../../src/client/qa/Phase1PresentationFixture';
 import type { Phase1PresentationSource } from '../../src/client/runtime/Phase1PresentationBinding';
 import {
@@ -213,9 +218,6 @@ describe('Phase 0 browser runtime', () => {
     root.dataset.proz0WorldSeed = 'p1-world-golden';
     root.dataset.proz0PlayerIds = 'browser-player';
     root.dataset.proz0LocalPlayerId = 'browser-player';
-    root.dataset.proz0InteractionRangeWorldUnits = '21';
-    root.dataset.proz0SpawnClearanceRadiusWorldUnits = '0';
-    root.dataset.proz0RequiredAccessRadiusWorldUnits = '0';
     root.dataset.proz0SaveDatabase = databaseName;
     document.body.append(root);
 
@@ -238,18 +240,23 @@ describe('Phase 0 browser runtime', () => {
     }
   });
 
-  it('fails Product Review autoboot closed when deployment tuning is incomplete', () => {
+  it('uses approved canonical Product Review tuning without deployment overrides', () => {
     root = document.createElement('div');
     root.dataset.proz0Mode = 'phase1-product-review';
-    root.dataset.proz0WorldId = 'world:browser-product-review-incomplete';
+    root.dataset.proz0WorldId = 'world:browser-product-review-approved-tuning';
     root.dataset.proz0WorldSeed = 'p1-world-golden';
     root.dataset.proz0PlayerIds = 'browser-player';
     root.dataset.proz0LocalPlayerId = 'browser-player';
     document.body.append(root);
 
-    expect(() => resolveProductReviewAutoBootConfig(root!)).toThrow(
-      /data-proz0-interaction-range-world-units/,
-    );
+    expect(resolveProductReviewAutoBootConfig(root!)).toMatchObject({
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+      spawnClearanceRadiusWorldUnits:
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+      requiredAccessRadiusWorldUnits:
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+    });
   });
 
   it('boots canonical Phase 1 Product Review runtime without QA fixtures', async () => {
