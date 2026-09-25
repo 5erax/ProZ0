@@ -466,6 +466,10 @@ describe('Phase 1 Save V2 integration composition', () => {
     });
 
     try {
+      original.getRuntime('p1').relocatePlayer(
+        original.getPlayerPosition('p1'),
+        'E',
+      );
       const request = composePhase1SaveV2(original, {
         nowUtc: '2026-09-26T00:04:00.000Z',
       });
