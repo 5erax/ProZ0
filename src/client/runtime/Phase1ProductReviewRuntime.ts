@@ -27,6 +27,9 @@ import {
   mapMovementInput,
 } from '../input/MovementInputMapper';
 import {
+  createPhase1ProductReviewControls,
+} from './Phase1ProductReviewControls';
+import {
   createPhase1ProductReviewWorldRenderer,
 } from './Phase1ProductReviewWorldRenderer';
 import {
@@ -172,6 +175,10 @@ export async function createPhase1ProductReviewRuntime(
     root,
     worldRenderer.canvas,
     source,
+  );
+  const controls = createPhase1ProductReviewControls(
+    root,
+    worldRenderer.canvas,
   );
 
   let operationOrdinal = 0;
@@ -1361,6 +1368,10 @@ export async function createPhase1ProductReviewRuntime(
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
     switch (event.code) {
+      case 'KeyH':
+        event.preventDefault();
+        controls.toggle();
+        break;
       case 'KeyE':
         event.preventDefault();
         beginContextInteraction();
@@ -1436,6 +1447,7 @@ export async function createPhase1ProductReviewRuntime(
         break;
       case 'Escape':
         event.preventDefault();
+        controls.close();
         actionPanel = null;
         machineStructureId = null;
         source.setPresentationPanel(null);
@@ -1522,6 +1534,7 @@ export async function createPhase1ProductReviewRuntime(
       host.stop();
       input.stop();
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
+      controls.destroy();
       presentation.destroy();
       worldRenderer.destroy();
       void bundle.destroy();

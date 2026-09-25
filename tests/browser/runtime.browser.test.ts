@@ -166,6 +166,43 @@ describe('Phase 0 browser runtime', () => {
   });
 
 
+  it('exposes discoverable Product Review controls without debug-console knowledge', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-controls',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    const controls = root.querySelector<HTMLElement>(
+      '[data-product-review-controls]',
+    );
+    expect(controls?.dataset.productReviewControls).toBe('closed');
+    expect(controls?.textContent).toContain('H · CONTROLS');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyH',
+      cancelable: true,
+    }));
+    await wait(10);
+
+    expect(controls?.dataset.productReviewControls).toBe('open');
+    expect(controls?.textContent).toContain('WASD / ARROWS');
+    expect(controls?.textContent).toContain('V · CONSUME');
+    expect(controls?.textContent).toContain('SPACE · ATTACK');
+    expect(controls?.textContent).toContain('C · CRAFT');
+    expect(controls?.textContent).toContain('B · BUILD');
+  });
+
   it('resolves Product Review autoboot from declarative deployment config and uses persisted Save V2', async () => {
     const databaseName = 'proz0-test-product-review-autoboot';
     await deleteIndexedDbSaveDatabase(databaseName);
