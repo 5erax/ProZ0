@@ -1,0 +1,72 @@
+name: Bug report
+description: Report a reproducible defect in an existing approved behavior
+title: "[BUG] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for defects in existing behavior. Security-sensitive vulnerabilities must follow SECURITY.md instead.
+  - type: input
+    id: build
+    attributes:
+      label: Commit / build
+      description: Exact SHA, PR build, deployment or version where observed
+    validations:
+      required: true
+  - type: input
+    id: task
+    attributes:
+      label: Related Task / Issue
+      description: Source task or subsystem Issue, if known
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem
+      description: Concise description of the defect
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Preconditions and numbered steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Reproduction rate
+      options:
+        - Always
+        - Often
+        - Intermittent
+        - Once / unknown
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Logs, screenshots, video, test output, relevant links
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked for an existing duplicate Issue.
+          required: true
+        - label: This report does not contain secrets or sensitive vulnerability details.
+          required: true

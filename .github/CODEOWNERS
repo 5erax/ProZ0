@@ -1,0 +1,10 @@
+# Governance/source-of-truth operating contracts require Project Owner review.
+/docs/team/ @5erax
+/.github/PROZ0_AGENT_BOOTSTRAP.md @5erax
+/GOVERNANCE.md @5erax
+
+# Repository automation may be reviewed by either established PM-side GitHub representative.
+/.github/workflows/ @5erax @trisnef2293
+/.github/dependabot.yml @5erax @trisnef2293
+/.github/ISSUE_TEMPLATE/ @5erax @trisnef2293
+/.github/PULL_REQUEST_TEMPLATE.md @5erax @trisnef2293

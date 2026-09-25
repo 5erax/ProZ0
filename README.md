@@ -1,61 +1,238 @@
 # ProZ0
 
-ProZ0 is a 2D pixel-art, top-down/3/4 survival sandbox about rebuilding human civilization on a newly settled planet. One to ten pioneers can share a persistent, procedurally generated world: explore beyond the fog of war, survive dangerous expeditions, build a modular habitat, specialize without permanent class locks, and uncover evidence that another civilization lived there first.
+[![CI](https://github.com/5erax/ProZ0/actions/workflows/ci.yml/badge.svg)](https://github.com/5erax/ProZ0/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/5erax/ProZ0/actions/workflows/codeql.yml/badge.svg)](https://github.com/5erax/ProZ0/actions/workflows/codeql.yml)
 
-## The promise
+**ProZ0** is a web-first, 2D pixel-art survival/exploration sandbox about rebuilding human civilization on a newly settled planet—and discovering why traces of another civilization were already there.
 
-> We are the first people to make this planet ours—and we are not the first civilization to live here.
+> Start from zero. Prepare carefully. Build something that lasts. Keep exploring because the planet is not empty history.
 
-The game gives players a large direction rather than a fixed route: rebuild humanity and investigate the planet's hidden history. Players decide where to settle, which professions to learn, which risks to take, and when to pursue the mystery.
+## Current milestone
 
-## Core loop
+The active product milestone is **Phase 1 — Vertical Slice**: a 30–60 minute playable loop that proves landing, gathering, survival preparation, an expedition, death/recovery, first-base progression, shared discovery, and one prior-civilization ruin.
+
+Operational state changes frequently, so task truth lives in GitHub rather than this README:
+
+- [Project board — ProZ0 Project #4](https://github.com/users/5erax/projects/4/views/1)
+- [Cross-company coordination baseline — Issue #67](https://github.com/5erax/ProZ0/issues/67)
+- [Phase 1 integration — Issue #56](https://github.com/5erax/ProZ0/issues/56)
+
+Phase 0 is accepted and closed. Phase 1 work is integrated through the repository's Issue/PR/QA gates.
+
+## Game direction
+
+### Core loop
 
 `Explore → Gather → Prepare → Survive → Return → Craft → Build → Research → Expand`
 
-Short activities take minutes; expeditions take 30–120 minutes; the long-term arc moves from survivor to pioneer, specialist, industrialist, colony builder, and planetary historian.
+### Core pillars
 
-## Pillars
+- **Exploration:** fog of war, deterministic procedural regions, resources, wildlife, hazards, ruins, and shared discoveries.
+- **Balanced survival:** mistakes can ruin an expedition, so preparation matters; failure is consequential but recoverable.
+- **Colony building:** modular rooms, storage, workbenches, power, machines, and later industry.
+- **Persistent world:** one mutable world per host/server, with versioned save data and chunk deltas.
+- **Flexible progression:** levels, skills, professions, and colony research without permanent class locks.
+- **Emergent pressure:** wildlife, alien nests, extraction, pollution, noise, and territory matter more than fixed raid timers.
+- **Mystery:** the player gradually discovers evidence of an earlier civilization without turning the game into a linear campaign.
 
-- **Exploration:** a fully hidden map, shared discoveries, procedural biomes, ruins, wildlife, hazards, and escalating rewards.
-- **Balanced survival:** preparation matters. Death returns a player to base, drops their inventory at the death site, and costs a small amount of XP and durability.
-- **Creative colony building:** modular habitat rooms connect into storage, laboratories, greenhouses, power rooms, garages, and industry.
-- **Emergent history:** mining, noise, pollution, and territorial expansion alter wildlife and alien events instead of triggering a fixed raid timer.
+### MVP / vertical-slice target
 
-## Product shape
+The Phase 1 slice targets:
 
-- 2D pixel-art with a top-down/3/4 view.
-- Single-player or hosted co-op for 2–10 players.
-- One persistent world per server/host; it remains until the host deletes it.
-- Near-infinite procedural generation with saved, mutable chunks.
-- Fog of war is opened by physical exploration and shared across the team.
-- Progression combines character level, personal skills, professions, and colony research.
-- Offline time is resolved on world re-open: machines do not produce while offline, but require maintenance and may accumulate dust, wear, and state changes.
-- PvE combat is purposeful and moderate: wildlife, alien nests, environmental events, and expedition danger.
+- desktop browser delivery;
+- solo plus small hosted co-op, initially 2–4 players;
+- top-down / 3/4 pixel-art presentation;
+- movement, fog, day/night, one weather event, resources and wildlife;
+- weight-based inventory and containers;
+- gathering, crafting and repair;
+- survival needs, one hostile encounter, death drop and recovery;
+- landing module, habitat, storage, workbench, power and first useful machine;
+- early progression plus profession prototypes;
+- one ruin that clearly implies a prior civilization and leaves a larger question unanswered.
 
-## Developer setup
+See [MVP scope](docs/mvp-scope.md) and [Phase 1 vertical-slice plan](docs/phase-1-vertical-slice-plan.md).
 
-For the current clean-checkout build/test path, start with [Phase 0 browser runtime workflow](docs/development/phase-0-runtime.md). It documents dependency installation, Playwright Chromium/system provisioning, aggregate verification, local development, and production preview.
+## Technical stack
 
-The repository-proven parity path is the Ubuntu/GitHub-Actions path. Non-Ubuntu host provisioning is not fully defined by the repository. For exact CI evidence, commit-to-run traceability, and known reproducibility limitations, see the [Phase 1 Build & CI Reproducibility Audit](docs/technical/phase-1-build-ci-reproducibility-audit.md).
+Current implementation is browser-first:
 
-## Documentation
+- **TypeScript**
+- **Vite**
+- **PixiJS**
+- **Vitest**
+- **Playwright**
+- **Node.js 24**
 
-The design and implementation scope live in [`docs/`](docs/):
+The architecture is deliberately separated into presentation/client concerns, shared simulation, world/persistence, content/data, and hosted-authority seams. Determinism, versioned saves, explicit state ownership, and testable authority boundaries are project requirements rather than afterthoughts.
+
+Key architecture sources:
+
+- [Runtime architecture](docs/adr/ADR-P0-TECH-002-runtime-architecture-module-boundaries.md)
+- [Determinism strategy](docs/adr/ADR-P0-TECH-003-determinism-simulation-strategy.md)
+- [Multiplayer authority boundary](docs/adr/ADR-P0-TECH-006-multiplayer-readiness-authority-boundary.md)
+- [Phase 1 architecture plan](docs/technical/phase-1-vertical-slice-architecture-plan.md)
+- [Hosted co-op protocol](docs/adr/ADR-P1-TECH-007-hosted-coop-protocol.md)
+- [Save schema V2](docs/adr/ADR-P1-TECH-008-save-schema-v2.md)
+
+## Quick start
+
+Requirements:
+
+- Node.js **24.x**
+- npm
+- Chromium dependencies for browser/E2E validation
+
+```bash
+git clone https://github.com/5erax/ProZ0.git
+cd ProZ0
+
+npm ci
+npx playwright install --with-deps chromium
+
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+npm run preview
+```
+
+Full repository verification:
+
+```bash
+npm run ci
+```
+
+Individual checks are also available:
+
+```bash
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run test:integration
+npm run test:determinism
+npm run test:browser
+npm run test:e2e
+```
+
+For the reproducible browser setup path, see [Phase 0 browser runtime workflow](docs/development/phase-0-runtime.md). For current CI reproducibility findings, see [Phase 1 Build & CI Reproducibility Audit](docs/technical/phase-1-build-ci-reproducibility-audit.md).
+
+## Repository map
+
+```text
+ProZ0/
+├── .github/       GitHub automation, templates, bootstrap and repository policy
+├── assets/        Game/audio/visual assets used by the current slice
+├── docs/          Product, design, narrative, art, ADR, QA and team contracts
+├── src/           Runtime source code
+├── tests/         Unit, integration, determinism, browser and E2E tests
+├── README.md      Project entry point
+├── CONTRIBUTING.md
+├── GOVERNANCE.md
+├── SECURITY.md
+└── SUPPORT.md
+```
+
+## Documentation map
+
+### Product and gameplay
 
 - [Game vision](docs/game-vision.md)
 - [Gameplay pillars and loops](docs/gameplay-pillars-and-loops.md)
 - [World and procedural generation](docs/world-and-procedural-generation.md)
-- [Survival, exploration, and ecology](docs/survival-and-exploration.md)
-- [Building, crafting, and automation](docs/building-crafting-and-automation.md)
-- [Progression, professions, and research](docs/progression-and-professions.md)
+- [Survival and exploration](docs/survival-and-exploration.md)
+- [Building, crafting and automation](docs/building-crafting-and-automation.md)
+- [Progression and professions](docs/progression-and-professions.md)
 - [Multiplayer and persistence](docs/multiplayer-and-persistence.md)
-- [MVP scope](docs/mvp-scope.md)
 - [Roadmap and technical requirements](docs/roadmap-and-technical-requirements.md)
 
-## Project status
+### Phase 1 specialist sources
 
-This repository is the product/design foundation for ProZ0. The MVP target is a 30–60 minute playable loop that proves landing, gathering, preparation, a dangerous expedition, a first habitat, co-op presence, and a discoverable alien ruin. Long-term systems such as NPC colonists, aircraft, advanced robotics, and full civilization simulation are intentionally documented as follow-on scope.
+- [Master gameplay spec](docs/design/phase-1-vertical-slice-master-gameplay.md)
+- [Narrative ruin hook](docs/narrative/phase-1-ruin-mystery-hook.md)
+- [World / ruin expedition brief](docs/world-design/phase-1-ruin-expedition-spatial-brief.md)
+- [Visual / UI production spec](docs/art/phase-1-asset-ui-production-spec.md)
+- [Audio direction and event map](docs/audio/phase-1-audio-direction-event-map.md)
+- [Phase 1 QA plan](docs/qa/phase-1-test-plan.md)
 
-## Working principles
+### Team operating system
 
-Keep the world readable, the preparation meaningful, the consequences recoverable, and the player's choices visible in the colony. Prefer data-driven systems so new biomes, professions, machines, and events can be added without rewriting the simulation.
+- [Team Operating System](docs/team/TEAM_OPERATING_SYSTEM.md)
+- [Role Registry](docs/team/ROLE_REGISTRY.md)
+- [Member Registry](docs/team/MEMBER_REGISTRY.md)
+- [Source of Truth](docs/team/SOURCE_OF_TRUTH.md)
+- [Task Lock Protocol](docs/team/TASK_LOCK_PROTOCOL.md)
+- [Cross-Company Protocol](docs/team/CROSS_COMPANY_PROTOCOL.md)
+- [Definition of Done](docs/team/DEFINITION_OF_DONE.md)
+
+## Two-company operating model
+
+ProZ0 is one project developed by two peer delivery companies under one Project Owner.
+
+- **13 role contracts**
+- **14 member slots**
+- **2 Project Manager / Producer instances: PM-A and PM-B**
+- **1 shared repository**
+- **1 shared backlog and dependency graph**
+- **1 task-lock system**
+- **1 authoritative GitHub project state**
+
+Each active task has one owner company, one owner role/member, one Coordinating PM, and one implementation lock. Company identity does not override role authority.
+
+The permanent cross-company baseline is maintained in [Issue #67](https://github.com/5erax/ProZ0/issues/67).
+
+See [GOVERNANCE.md](GOVERNANCE.md) for the repository-facing summary.
+
+## Contribution workflow
+
+Core project work is GitHub-first:
+
+1. Start from an approved Issue or proposal.
+2. Confirm task ownership, dependencies and lock state.
+3. Work on a task-specific branch.
+4. Open a PR linked to the source Issue.
+5. Pass CI/security checks and required specialist review.
+6. Resolve conversations and hand back to the Coordinating PM.
+7. Route through QA/review gates where required.
+
+Do **not** self-activate an unclaimed implementation task.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before contributing.
+
+## CI, security and repository automation
+
+Repository automation includes:
+
+- full TypeScript/build/test CI;
+- dependency review for pull requests;
+- CodeQL analysis;
+- Dependabot update configuration;
+- manual GitHub Pages deployment workflow;
+- Issue and PR templates;
+- CODEOWNERS for governance/automation paths.
+
+Repository-level administrative settings that cannot be represented as files are documented in [.github/REPOSITORY_ADMIN_BASELINE.md](.github/REPOSITORY_ADMIN_BASELINE.md).
+
+Security issues should follow [SECURITY.md](SECURITY.md), not public bug-report details.
+
+## Deployment
+
+`npm run build` produces the static browser build in `dist/`.
+
+A manual GitHub Pages workflow is prepared at `.github/workflows/pages.yml`. Pages must first be enabled for this repository with **GitHub Actions** as the source. The workflow intentionally deploys manually so the production/review build remains an explicit release action rather than every push to `main`.
+
+## Community and support
+
+- Bugs and reproducible defects: use the Bug Report Issue form.
+- Design/product ideas: use the Proposal / Discovery Issue form.
+- Project work: use the ProZ0 Task template and task-lock protocol.
+- Setup/support questions: see [SUPPORT.md](SUPPORT.md).
+- Conduct expectations: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
+GitHub Discussions is intended for Q&A, ideas and non-task community conversation once enabled at repository level.
+
+## Licensing
+
+No open-source license is currently declared by this repository. Do not assume permission to reuse or redistribute project code/assets beyond rights explicitly granted by the project owners or applicable agreements.
