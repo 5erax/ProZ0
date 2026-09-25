@@ -4,9 +4,6 @@ import {
   type PlayerId,
   type WorldPosition,
 } from '../../foundation';
-import {
-  PHASE1_STRUCTURE_PLACEMENT_PROFILES,
-} from '../building/Phase1BuildingWorld';
 import type {
   BuildingSpatialQuery,
   QuarterTurn,
@@ -801,24 +798,6 @@ export class Phase1VerticalSliceWorldAdapter
 
     if (!samples.every((sample) => this.isPositionBuildable(sample))) {
       return false;
-    }
-
-    for (const structure of this.structureValues()) {
-      const definitionId = structure.definitionId;
-      if (definitionId === 'structure:landing-module') {
-        const profile =
-          PHASE1_STRUCTURE_PLACEMENT_PROFILES[definitionId];
-        const halfWidth = profile.footprint.width / 2;
-        const halfDepth = profile.footprint.depth / 2;
-        if (
-          Math.abs(center.x - structure.position.x)
-            < halfWidth + footprint.halfWidth
-          && Math.abs(center.y - structure.position.y)
-            < halfDepth + footprint.halfDepth
-        ) {
-          return false;
-        }
-      }
     }
 
     return true;

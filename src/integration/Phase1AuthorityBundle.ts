@@ -40,7 +40,6 @@ import {
   Phase1BuildingWorld,
   Phase1SessionWorldPersistence,
   Phase1VerticalSliceWorldAdapter,
-  PLAYER_COLLISION_FOOTPRINT,
   createChunkCoord,
   fromWorldPosition,
   type BuildingWorldSnapshot,
@@ -252,6 +251,11 @@ function initialWorldSnapshot(
       }
     }
     for (const predator of chunk.predatorStates) {
+      if (predator.state === 'patrol') {
+        throw new Error(
+          'Save V2 predator patrol state has no accepted combat-runtime equivalent.',
+        );
+      }
       predators.push(Object.freeze({
         entityId: predator.entityId,
         revision: predator.revision,
@@ -425,6 +429,7 @@ export class Phase1AuthorityBundle {
       value: reopen?.bundle.world.authorityTick ?? 0,
     };
     let buildings: Phase1BuildingWorld | null = null;
+    const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       catalog,
       store: worldStore,
@@ -442,7 +447,9 @@ export class Phase1AuthorityBundle {
           && structure.definitionId === 'structure:habitat-room'
           && (buildings?.isSheltered(positions.get(playerId)) ?? false);
       },
-      initialSnapshot: initialWorldSnapshot(reopen),
+      ...(reopenedWorld === undefined
+        ? {}
+        : { initialSnapshot: reopenedWorld }),
     });
 
     for (const coord of corridorChunkCoords(config.worldSeed)) {
@@ -454,11 +461,12 @@ export class Phase1AuthorityBundle {
       buildingSnapshot(reopen),
     );
     const itemWorld = new BuildingItemWorldAdapter(world, buildings);
+    const reopenedProgression = progressionSnapshot(reopen);
     const progression = new Phase1ProgressionAuthority({
       catalog,
-      ...(progressionSnapshot(reopen) === undefined
+      ...(reopenedProgression === undefined
         ? {}
-        : { snapshot: progressionSnapshot(reopen) }),
+        : { snapshot: reopenedProgression }),
     });
     const gatherCost = new DeferredGatherCostPort();
     const items = new Phase1ItemAuthority({
@@ -468,12 +476,13 @@ export class Phase1AuthorityBundle {
       gatherCost,
       events: new ProgressionItemEventSink(progression),
     });
+    const reopenedSurvival = survivalSnapshot(reopen);
     const survival = new Phase1SurvivalAuthority({
       catalog,
       items,
-      ...(survivalSnapshot(reopen) === undefined
+      ...(reopenedSurvival === undefined
         ? {}
-        : { snapshot: survivalSnapshot(reopen) }),
+        : { snapshot: reopenedSurvival }),
     });
     gatherCost.bind(new SurvivalGatherCostPort(catalog, survival));
 
