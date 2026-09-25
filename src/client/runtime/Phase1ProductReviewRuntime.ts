@@ -888,6 +888,59 @@ export async function createPhase1ProductReviewRuntime(
     return true;
   };
 
+  const interactWithWorkbench = (): boolean => {
+    const workbench = accessibleWorkbench();
+    if (workbench === null) return false;
+
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const repairTarget = inventory.stacks.find((stack) => {
+      if (stack.condition === null) return false;
+      const definition = bundle.catalog.getAs(
+        stack.itemDefinitionId,
+        'item',
+      );
+      return definition.conditionMax !== null
+        && stack.condition < definition.conditionMax;
+    });
+
+    if (repairTarget === undefined) {
+      actionPanel = 'craft';
+      craftPage = 0;
+      source.clearCommandFeedback();
+      source.setPresentationPanel(craftPanel());
+      return true;
+    }
+
+    const result = bundle.items.execute({
+      type: 'repair',
+      operationId: nextOperationId('repair'),
+      playerId: config.localPlayerId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      targetStackId: repairTarget.stackId,
+      workbench: {
+        structureInstanceId: workbench.structureId,
+        expectedRevision: workbench.revision,
+      },
+    });
+    const definition = bundle.catalog.getAs(
+      repairTarget.itemDefinitionId,
+      'item',
+    );
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'REPAIR',
+      target: definition.displayName,
+    });
+    return true;
+  };
+
   const inspectRuin = (): boolean => {
     const target = ruinTarget();
     if (target === null) return false;
@@ -952,6 +1005,35 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    const workbench = accessibleWorkbench();
+    if (workbench !== null) {
+      const inventory = bundle.items.getContainerView(
+        'inventory:' + config.localPlayerId,
+      );
+      const repairTarget = inventory.stacks.find((stack) => {
+        if (stack.condition === null) return false;
+        const definition = bundle.catalog.getAs(
+          stack.itemDefinitionId,
+          'item',
+        );
+        return definition.conditionMax !== null
+          && stack.condition < definition.conditionMax;
+      });
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E',
+        verb: repairTarget === undefined ? 'CRAFT' : 'REPAIR',
+        target: repairTarget === undefined
+          ? 'Workbench'
+          : bundle.catalog.get(
+              repairTarget.itemDefinitionId,
+            ).displayName,
+        state: 'AVAILABLE',
+        reason: null,
+        progress: null,
+      }));
+      return;
+    }
+
     const resource = resourceTarget();
     if (resource !== null && resource.type === 'resource') {
       const definition = bundle.catalog.getAs(
@@ -989,6 +1071,7 @@ export async function createPhase1ProductReviewRuntime(
     if (recoverDeathCache()) return;
     if (inspectRuin()) return;
     if (interactWithMachine()) return;
+    if (interactWithWorkbench()) return;
     beginGather();
   };
 
