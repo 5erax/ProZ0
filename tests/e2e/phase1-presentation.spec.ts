@@ -204,6 +204,33 @@ test('direct Product Review URL boots canonical persisted slice without console 
     .toBeGreaterThan(initialX);
 
   await expect(interaction).toContainText('GATHER');
+
+  // Complete two canonical Fiber Plant gather channels using only the
+  // player-facing context control. Each gather yields 2 Plant Fiber.
   await page.keyboard.press('e');
   await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
+  await expect(interaction).toHaveAttribute('data-state', 'AVAILABLE', {
+    timeout: 2_000,
+  });
+
+  await page.keyboard.press('e');
+  await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
+  await expect(interaction).toHaveAttribute('data-state', 'AVAILABLE', {
+    timeout: 2_000,
+  });
+
+  // Cordage is the second recipe on the first canonical craft page and
+  // consumes 3 Plant Fiber. No test fixture mutates the item ledger.
+  await page.keyboard.press('c');
+  const craftPanel = page.locator('[data-panel-kind="craft"]');
+  await expect(craftPanel).toBeVisible();
+  await expect(craftPanel).toContainText('[2] Cordage');
+  await page.keyboard.press('2');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('i');
+  const inventory = page.locator('[data-panel-kind="inventory"]');
+  await expect(inventory).toBeVisible();
+  await expect(inventory).toContainText('Cordage');
+  await expect(inventory).toContainText('Plant Fiber');
 });
