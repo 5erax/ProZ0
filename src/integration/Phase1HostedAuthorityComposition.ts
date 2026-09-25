@@ -83,6 +83,62 @@ function aggregateViews(
   );
 }
 
+function aggregateKey(view: {
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+}): string {
+  return view.aggregateType + '\u0000' + view.aggregateId;
+}
+
+function reconcileAggregateViews(
+  bundle: Phase1AuthorityBundle,
+  known: Map<string, RevisionedAggregateViewV1>,
+): readonly RevisionedAggregateViewV1[] {
+  const current = aggregateViews(bundle);
+  const currentKeys = new Set<string>();
+  const values: RevisionedAggregateViewV1[] = [];
+
+  for (const view of current) {
+    const key = aggregateKey(view);
+    currentKeys.add(key);
+    const previous = known.get(key);
+    if (
+      previous !== undefined
+      && previous.tombstone
+      && view.revision <= previous.revision
+    ) {
+      throw new Error(
+        'Hosted aggregate cannot resurrect at or below its tombstone revision.',
+      );
+    }
+    known.set(key, view);
+    values.push(view);
+  }
+
+  for (const [key, previous] of known) {
+    if (currentKeys.has(key) || previous.tombstone) continue;
+    if (previous.revision >= Number.MAX_SAFE_INTEGER) {
+      throw new Error('Hosted aggregate tombstone revision exhausted.');
+    }
+    const tombstone = Object.freeze({
+      aggregateType: previous.aggregateType,
+      aggregateId: previous.aggregateId,
+      revision: previous.revision + 1,
+      tombstone: true,
+      state: null,
+    }) satisfies RevisionedAggregateViewV1;
+    known.set(key, tombstone);
+    values.push(tombstone);
+  }
+
+  return Object.freeze(
+    values.sort((left, right) =>
+      left.aggregateType.localeCompare(right.aggregateType)
+      || left.aggregateId.localeCompare(right.aggregateId),
+    ),
+  );
+}
+
 export interface Phase1HostedAuthorityCompositionConfig
   extends Omit<
     Phase1AuthorityBundleConfig,
@@ -102,6 +158,8 @@ export class Phase1HostedAuthorityComposition {
   private constructor(
     bundle: Phase1AuthorityBundle,
     host: ServerAuthorityHost,
+    private readonly collectSharedViews:
+      () => readonly RevisionedAggregateViewV1[],
   ) {
     this.bundle = bundle;
     this.host = host;
@@ -125,9 +183,14 @@ export class Phase1HostedAuthorityComposition {
       activatePlayersOnCreate: false,
     });
 
+    const knownAggregates =
+      new Map<string, RevisionedAggregateViewV1>();
+    const collectSharedViews = (): readonly RevisionedAggregateViewV1[] =>
+      reconcileAggregateViews(bundle, knownAggregates);
+
     const replication = Object.freeze({
       afterCommand(): readonly RevisionedAggregateViewV1[] {
-        return aggregateViews(bundle);
+        return collectSharedViews();
       },
     });
 
@@ -173,6 +236,7 @@ export class Phase1HostedAuthorityComposition {
     const composition = new Phase1HostedAuthorityComposition(
       bundle,
       host,
+      collectSharedViews,
     );
     composition.publishSharedState();
     return composition;
@@ -189,7 +253,7 @@ export class Phase1HostedAuthorityComposition {
 
   public publishSharedState(): readonly HostedOutboundMessage[] {
     const outbound: HostedOutboundMessage[] = [];
-    for (const view of aggregateViews(this.bundle)) {
+    for (const view of this.collectSharedViews()) {
       outbound.push(...this.host.publishAggregate(view));
     }
     return Object.freeze(outbound);

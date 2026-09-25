@@ -303,6 +303,193 @@ describe('Phase 1 hosted vertical-slice composition', () => {
         composition.bundle.progression
           .getPlayerView('player:2').milestoneRuleIds,
       ).not.toContain('first-ruin-inspect:previous-civilization-ruin');
+
+      const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
+        'resource:fiber-plant',
+      );
+      if (fiber === null || fiber.type !== 'resource') {
+        throw new Error('Expected canonical local Fiber Plant.');
+      }
+      composition.bundle.getRuntime('player:1').relocatePlayer(
+        fiber.position,
+      );
+      const fiberState =
+        composition.bundle.worldStore.getResourceState(fiber.entityId);
+      if (fiberState === undefined) {
+        throw new Error('Expected active Fiber Plant runtime state.');
+      }
+      const inventoryBeforeGather =
+        composition.bundle.items.getContainerView('inventory:player:1');
+      const gather = composition.bundle.items.beginGather({
+        operationId: 'hosted:recovery-seed-gather',
+        playerId: 'player:1',
+        inventoryContainerId: inventoryBeforeGather.containerId,
+        expectedInventoryRevision: inventoryBeforeGather.revision,
+        resourceEntityId: fiber.entityId,
+        expectedResourceRevision: fiberState.revision,
+      });
+      expect(gather.status).toBe('started');
+      if (gather.status !== 'started') {
+        throw new Error('Expected Fiber Plant gather channel to start.');
+      }
+      for (let tick = 0; tick < gather.requiredTicks; tick += 1) {
+        await composition.step();
+      }
+      const gatheredInventory =
+        composition.bundle.items.getContainerView('inventory:player:1');
+      const fiberStack = gatheredInventory.stacks.find(
+        (stack) => stack.itemDefinitionId === 'item:plant-fiber',
+      );
+      expect(fiberStack?.quantity).toBe(2);
+      if (fiberStack === undefined) {
+        throw new Error('Expected gathered Plant Fiber.');
+      }
+
+      const deathTick = composition.bundle.authorityTick;
+      expect(composition.bundle.survival.applyAuthorityDamage({
+        damageId: 'hosted:recovery-lethal',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'hosted:test-predator',
+        targetPlayerId: 'player:1',
+        amount: 100,
+        tick: deathTick,
+      })).toMatchObject({
+        status: 'applied',
+        healthAfter: 0,
+      });
+      const death = composition.bundle.death.processDeath({
+        deathId: 'death:hosted:recovery',
+        playerId: 'player:1',
+        deathPosition: fiber.position,
+        deathTick,
+        inventoryContainerId: gatheredInventory.containerId,
+        expectedInventoryRevision: gatheredInventory.revision,
+        equippedStackIds: Object.freeze([]),
+      });
+      expect(death).toMatchObject({
+        status: 'committed',
+      });
+      if (
+        death.status !== 'committed'
+        || death.cacheContainerId === null
+        || death.cacheEntityId === null
+      ) {
+        throw new Error('Expected hosted recovery Death Cache.');
+      }
+
+      const cachePublished = composition.publishSharedState().filter(
+        (entry) =>
+          entry.envelope.messageType === 'AGGREGATE_UPDATE'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateType: string;
+              readonly aggregateId: string;
+              readonly tombstone: boolean;
+            }
+          ).aggregateType === 'death-cache'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateId: string;
+            }
+          ).aggregateId === death.cacheEntityId,
+      );
+      expect(
+        new Set(cachePublished.map((entry) => entry.transportId)),
+      ).toEqual(new Set([
+        'transport:a',
+        'transport:b',
+        'transport:c',
+        'transport:d',
+      ]));
+
+      composition.bundle.getRuntime('player:2').relocatePlayer(
+        fiber.position,
+      );
+      const cache =
+        composition.bundle.items.getContainerView(death.cacheContainerId);
+      const teammateInventory =
+        composition.bundle.items.getContainerView('inventory:player:2');
+      const recoveredStack = cache.stacks[0];
+      if (recoveredStack === undefined) {
+        throw new Error('Expected recoverable Death Cache stack.');
+      }
+
+      sendCommand(composition.host, clients[1]!, {
+        operationId: 'hosted:death-cache-recover:p2',
+        commandType: 'death-cache.recover',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: cache.containerId,
+            revision: cache.revision,
+          },
+          {
+            aggregateType: 'container',
+            aggregateId: teammateInventory.containerId,
+            revision: teammateInventory.revision,
+          },
+        ]),
+        payload: {
+          sourceContainerId: cache.containerId,
+          targetContainerId: teammateInventory.containerId,
+          sourceStackId: recoveredStack.stackId,
+          quantity: recoveredStack.quantity,
+        },
+      });
+      const recoveryStep = await composition.step();
+      expect(
+        recoveryStep.find(
+          (entry) =>
+            entry.transportId === 'transport:b'
+            && entry.envelope.messageType === 'COMMAND_RESULT',
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId: 'hosted:death-cache-recover:p2',
+        status: 'committed',
+      });
+      expect(
+        composition.bundle.items
+          .getContainerView('inventory:player:2').stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:plant-fiber',
+        quantity: 2,
+      }));
+      expect(
+        composition.bundle.world.getDeathCacheByContainer(
+          death.cacheContainerId,
+        ),
+      ).toBeNull();
+
+      const tombstones = recoveryStep.filter(
+        (entry) =>
+          entry.envelope.messageType === 'AGGREGATE_UPDATE'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateType: string;
+              readonly aggregateId: string;
+              readonly tombstone: boolean;
+            }
+          ).aggregateType === 'death-cache'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateId: string;
+              readonly tombstone: boolean;
+            }
+          ).aggregateId === death.cacheEntityId
+          && (
+            entry.envelope.payload as unknown as {
+              readonly tombstone: boolean;
+            }
+          ).tombstone,
+      );
+      expect(
+        new Set(tombstones.map((entry) => entry.transportId)),
+      ).toEqual(new Set([
+        'transport:a',
+        'transport:b',
+        'transport:c',
+        'transport:d',
+      ]));
     } finally {
       await composition.destroy();
     }
