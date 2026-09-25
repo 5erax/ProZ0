@@ -243,7 +243,7 @@ describe('Phase 0 browser runtime', () => {
       persistence: { databaseName },
     } as const;
 
-    let first = await bootPersistedPhase1ProductReview(root, config);
+    const first = await bootPersistedPhase1ProductReview(root, config);
     let second: Awaited<
       ReturnType<typeof bootPersistedPhase1ProductReview>
     > | null = null;
