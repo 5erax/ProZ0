@@ -7,6 +7,16 @@ import type {
   GatherStartResult,
   GatherTickResult,
 } from '../../simulation';
+import {
+  savePhase1AuthorityBundle,
+} from '../../integration/Phase1SaveV2Composer';
+import type {
+  SaveRepositoryV2,
+  SaveResult,
+} from '../../persistence/repository/SaveRepositoryV2';
+import type {
+  WorldManifestV2,
+} from '../../persistence/schema/v2/WorldManifestV2';
 import { KeyboardInputAdapter } from '../input/KeyboardInputAdapter';
 import {
   isMovementInputCode,
@@ -29,6 +39,11 @@ export interface Phase1ProductReviewRuntimeConfig
 }
 
 export interface Phase1ProductReviewRuntime {
+  save(
+    repository: SaveRepositoryV2,
+    nowUtc: string,
+  ): Promise<SaveResult<WorldManifestV2>>;
+  getAuthorityTick(): number;
   destroy(): void;
 }
 
@@ -355,6 +370,25 @@ export async function createPhase1ProductReviewRuntime(
   }));
 
   return Object.freeze({
+    async save(
+      repository: SaveRepositoryV2,
+      nowUtc: string,
+    ): Promise<SaveResult<WorldManifestV2>> {
+      await stepQueue;
+      if (destroyed) {
+        throw new Error(
+          'Cannot save a destroyed Phase 1 Product Review runtime.',
+        );
+      }
+      return savePhase1AuthorityBundle(
+        bundle,
+        repository,
+        { nowUtc },
+      );
+    },
+    getAuthorityTick(): number {
+      return bundle.authorityTick;
+    },
     destroy(): void {
       destroyed = true;
       host.stop();

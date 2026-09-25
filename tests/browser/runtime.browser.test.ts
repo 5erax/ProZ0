@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { bootProZ0, type RuntimeHandle } from '../../src/client/main';
 import { resolvePhase1PresentationQaFixture } from '../../src/client/qa/Phase1PresentationFixture';
 import type { Phase1PresentationSource } from '../../src/client/runtime/Phase1PresentationBinding';
+import {
+  bootPersistedPhase1ProductReview,
+} from '../../src/client/runtime/Phase1ProductReviewPersistence';
+import {
+  deleteIndexedDbSaveDatabase,
+} from '../../src/persistence/browser/IndexedDbSaveRepository';
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -215,6 +221,94 @@ describe('Phase 0 browser runtime', () => {
     expect(
       root.querySelector('[data-panel-kind="inventory"]'),
     ).not.toBeNull();
+  });
+
+  it('checkpoints canonical Product Review state to IndexedDB and reopens it before publish', async () => {
+    const databaseName = 'proz0-test-product-review-reopen';
+    await deleteIndexedDbSaveDatabase(databaseName);
+
+    root = document.createElement('div');
+    document.body.append(root);
+
+    const config = {
+      worldId: 'world:browser-product-review-reopen',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['browser-player'],
+      localPlayerId: 'browser-player',
+      // Integration-test values only; production still waits for owner-approved
+      // ordinary interaction / placement-clearance tuning.
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: { databaseName },
+    } as const;
+
+    let first = await bootPersistedPhase1ProductReview(root, config);
+    let second: Awaited<
+      ReturnType<typeof bootPersistedPhase1ProductReview>
+    > | null = null;
+
+    try {
+      expect(first.reopened).toBe(false);
+      const firstCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      expect(firstCanvas).not.toBeNull();
+      const initialX = Number(firstCanvas?.dataset.playerX);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(180);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(50);
+
+      const savedX = Number(firstCanvas?.dataset.playerX);
+      expect(savedX).toBeGreaterThan(initialX);
+      const savedTick = first.runtime.getAuthorityTick();
+      const firstSave = await first.checkpoint(
+        '2026-09-25T18:00:00.000Z',
+      );
+      expect(firstSave).toMatchObject({
+        ok: true,
+        value: {
+          worldId: config.worldId,
+          worldRevision: 0,
+          authorityTick: savedTick,
+        },
+      });
+
+      first.destroy();
+      second = await bootPersistedPhase1ProductReview(root, config);
+      expect(second.reopened).toBe(true);
+
+      const reopenedCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      expect(Number(reopenedCanvas?.dataset.playerX))
+        .toBeCloseTo(savedX, 6);
+      expect(second.runtime.getAuthorityTick())
+        .toBeGreaterThanOrEqual(savedTick);
+
+      const secondSave = await second.checkpoint(
+        '2026-09-25T18:01:00.000Z',
+      );
+      expect(secondSave).toMatchObject({
+        ok: true,
+        value: {
+          worldId: config.worldId,
+          worldRevision: 1,
+        },
+      });
+    } finally {
+      second?.destroy();
+      if (second === null) {
+        first.destroy();
+      }
+      await deleteIndexedDbSaveDatabase(databaseName);
+    }
   });
 
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
