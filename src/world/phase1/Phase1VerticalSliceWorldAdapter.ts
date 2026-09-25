@@ -44,11 +44,11 @@ import {
   DeathCacheWorldState,
   type DeathCacheWorldSnapshot,
 } from './DeathCacheWorldState';
-import type {
-  Phase1GeneratedWorldEntity,
-  Phase1WorldChunkView,
+import type { Phase1GeneratedWorldEntity } from './Phase1WorldTypes';
+import {
+  Phase1WorldStore,
+  type Phase1WorldChunkView,
 } from './Phase1WorldStore';
-import { Phase1WorldStore } from './Phase1WorldStore';
 
 interface MutableWorldDrop {
   readonly worldDropId: string;
