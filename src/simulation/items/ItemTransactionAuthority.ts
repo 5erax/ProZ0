@@ -1159,6 +1159,13 @@ export class Phase1ItemAuthority {
     });
   }
 
+  public getActiveGatherOperationId(
+    playerId: PlayerId,
+  ): OperationId | null {
+    return this.activeGathersByPlayer.get(playerId)?.request.operationId
+      ?? null;
+  }
+
   public cancelGather(playerId: PlayerId): boolean {
     const channel = this.activeGathersByPlayer.get(playerId);
     if (channel === undefined) {
@@ -1166,6 +1173,24 @@ export class Phase1ItemAuthority {
     }
     this.clearGather(channel);
     return true;
+  }
+
+  public cancelAllGathers(): readonly Readonly<{
+    playerId: PlayerId;
+    operationId: OperationId;
+  }>[] {
+    const active = [...this.activeGathersByPlayer.entries()]
+      .map(([playerId, channel]) => Object.freeze({
+        playerId,
+        operationId: channel.request.operationId,
+      }))
+      .sort((left, right) =>
+        left.operationId.localeCompare(right.operationId),
+      );
+    for (const { playerId } of active) {
+      this.cancelGather(playerId);
+    }
+    return Object.freeze(active);
   }
 
   private executeUncached(command: ItemCommand): ItemTransactionResult {
