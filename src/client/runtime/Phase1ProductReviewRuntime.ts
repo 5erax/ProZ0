@@ -1,4 +1,5 @@
 import type { PlayerId } from '../../foundation';
+import type { Phase1StructureDefinitionId } from '../../world';
 import {
   Phase1AuthorityBundle,
   type Phase1AuthorityBundleConfig,
@@ -29,6 +30,7 @@ import {
   Phase1ProductReviewPresentationSource,
 } from './Phase1ProductReviewPresentationSource';
 import type {
+  Phase1BuildPanelPresentation,
   Phase1CraftPanelPresentation,
 } from '../presentation/Phase1PresentationModel';
 import {
@@ -57,6 +59,26 @@ interface GatherInteractionState {
 }
 
 const CRAFT_PAGE_SIZE = 6;
+
+type PlaceableStructureDefinitionId = Exclude<
+  Phase1StructureDefinitionId,
+  'structure:landing-module'
+>;
+
+function placeableStructureDefinitionId(
+  id: string,
+): PlaceableStructureDefinitionId {
+  switch (id) {
+    case 'structure:storage-crate':
+    case 'structure:workbench':
+    case 'structure:habitat-room':
+    case 'structure:compact-power-unit':
+    case 'structure:atmospheric-water-condenser':
+      return id;
+    default:
+      throw new Error('Unsupported player-placeable structure: ' + id);
+  }
+}
 
 function squaredDistance(
   ax: number,
@@ -128,8 +150,11 @@ export async function createPhase1ProductReviewRuntime(
 
   let operationOrdinal = 0;
   let activeGather: GatherInteractionState | null = null;
-  let actionPanel: 'craft' | null = null;
+  let actionPanel: 'craft' | 'build' | null = null;
   let craftPage = 0;
+  let buildIndex = 0;
+  let buildConnectorIndex = 0;
+  let buildOrientation: 0 | 1 | 2 | 3 = 0;
   let destroyed = false;
   let stepQueue = Promise.resolve();
 
@@ -380,6 +405,193 @@ export async function createPhase1ProductReviewRuntime(
       verb: 'CRAFT',
       target: recipe.displayName,
       panelTargetId: recipe.id,
+    });
+  };
+
+  const buildDefinitions = () =>
+    Object.freeze(
+      bundle.catalog
+        .list('structure')
+        .filter((definition) => definition.placeableByPlayer)
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    );
+
+  const landingConnectors = () =>
+    bundle.buildings
+      .exportSnapshot()
+      .foothold.connectors
+      .filter(
+        (connector) =>
+          connector.structureId === 'structure-instance:landing-module',
+      );
+
+  const selectedBuildDefinition = () => {
+    const definitions = buildDefinitions();
+    if (definitions.length === 0) {
+      throw new Error('Phase 1 content has no player-placeable structure.');
+    }
+    buildIndex =
+      (buildIndex % definitions.length + definitions.length)
+      % definitions.length;
+    return definitions[buildIndex]!;
+  };
+
+  const buildPanel = (): Phase1BuildPanelPresentation => {
+    const definition = selectedBuildDefinition();
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const kitId = definition.sourceKitItemId;
+    if (kitId === null) {
+      throw new Error('Player-placeable structure is missing its source Kit.');
+    }
+    const kit = inventory.stacks.find(
+      (stack) => stack.itemDefinitionId === kitId,
+    );
+    const connectors = landingConnectors();
+    if (connectors.length > 0) {
+      buildConnectorIndex =
+        (buildConnectorIndex % connectors.length + connectors.length)
+        % connectors.length;
+    }
+    const connector = connectors[buildConnectorIndex];
+    const connectorRequired =
+      definition.id === 'structure:habitat-room';
+    const reason = kit === undefined
+      ? 'KIT UNAVAILABLE'
+      : connectorRequired && connector === undefined
+        ? 'NO LANDING CONNECTOR'
+        : null;
+
+    return Object.freeze({
+      kind: 'build',
+      title:
+        'BUILD · TAB STRUCTURE · [ / ] CONNECTOR · R ROTATE · ENTER PLACE',
+      selectedStructure: definition.displayName,
+      sourceKitLabel:
+        bundle.catalog.get(kitId).displayName
+        + ' ×'
+        + String(kit?.quantity ?? 0)
+        + (connectorRequired
+          ? ' · '
+            + (connector?.connectorId ?? 'NO CONNECTOR')
+          : ' · AT PLAYER · '
+            + String(buildOrientation * 90)
+            + '°'),
+      placementState: reason !== null
+        ? 'INVALID'
+        : connectorRequired
+          ? 'CONNECTOR'
+          : 'VALID',
+      reason,
+    });
+  };
+
+  const refreshBuildPanel = (): void => {
+    if (actionPanel !== 'build') return;
+    source.setPresentationPanel(buildPanel());
+  };
+
+  const toggleBuildPanel = (): void => {
+    if (actionPanel === 'build') {
+      actionPanel = null;
+      source.setPresentationPanel(null);
+      return;
+    }
+    actionPanel = 'build';
+    buildIndex = 0;
+    buildConnectorIndex = 0;
+    buildOrientation = 0;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(buildPanel());
+  };
+
+  const cycleBuildDefinition = (delta: number): void => {
+    if (actionPanel !== 'build') return;
+    const definitions = buildDefinitions();
+    if (definitions.length === 0) return;
+    buildIndex =
+      (buildIndex + delta + definitions.length) % definitions.length;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(buildPanel());
+  };
+
+  const cycleBuildConnector = (delta: number): void => {
+    if (actionPanel !== 'build') return;
+    const connectors = landingConnectors();
+    if (connectors.length === 0) return;
+    buildConnectorIndex =
+      (buildConnectorIndex + delta + connectors.length) % connectors.length;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(buildPanel());
+  };
+
+  const rotateBuild = (): void => {
+    if (actionPanel !== 'build') return;
+    buildOrientation = ((buildOrientation + 1) % 4) as 0 | 1 | 2 | 3;
+    source.clearCommandFeedback();
+    source.setPresentationPanel(buildPanel());
+  };
+
+  const placeSelectedStructure = (): void => {
+    if (actionPanel !== 'build') return;
+    const definition = selectedBuildDefinition();
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const kitId = definition.sourceKitItemId;
+    if (kitId === null) return;
+    const kit = inventory.stacks.find(
+      (stack) => stack.itemDefinitionId === kitId,
+    );
+    const operationId = nextOperationId('build');
+    const connectorRequired =
+      definition.id === 'structure:habitat-room';
+    const connectors = landingConnectors();
+    const connector = connectors[buildConnectorIndex];
+    const position = playerPosition();
+    const result = bundle.buildingAuthority.place({
+      operationId,
+      actorPlayerId: config.localPlayerId,
+      structureDefinitionId:
+        placeableStructureDefinitionId(definition.id),
+      sourceKitStackId:
+        kit?.stackId ?? 'missing-kit:' + definition.id,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      expectedBuildRevision: bundle.buildings.getBuildRevision(),
+      placement: connectorRequired
+        ? {
+            mode: 'connector',
+            targetConnectorId:
+              connector?.connectorId ?? 'connector:landing:east',
+            requestedOrientationQuarterTurns: buildOrientation,
+          }
+        : {
+            mode: 'free',
+            anchor: position,
+            orientationQuarterTurns: buildOrientation,
+          },
+    });
+
+    if (result.status === 'committed') {
+      bundle.progression.applyEvent(Object.freeze({
+        type: 'structure-placed',
+        eventId: 'structure-placed:' + result.operationId,
+        playerId: config.localPlayerId,
+        structureId: definition.id,
+      }));
+    }
+
+    source.setPresentationPanel(buildPanel());
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'BUILD',
+      target: definition.displayName,
     });
   };
 
@@ -672,13 +884,43 @@ export async function createPhase1ProductReviewRuntime(
         event.preventDefault();
         toggleCraftPanel();
         break;
+      case 'KeyB':
+        event.preventDefault();
+        toggleBuildPanel();
+        break;
+      case 'Tab':
+        if (actionPanel === 'build') {
+          event.preventDefault();
+          cycleBuildDefinition(event.shiftKey ? -1 : 1);
+        }
+        break;
+      case 'KeyR':
+        if (actionPanel === 'build') {
+          event.preventDefault();
+          rotateBuild();
+        }
+        break;
+      case 'Enter':
+        if (actionPanel === 'build') {
+          event.preventDefault();
+          placeSelectedStructure();
+        }
+        break;
       case 'BracketLeft':
         event.preventDefault();
-        changeCraftPage(-1);
+        if (actionPanel === 'build') {
+          cycleBuildConnector(-1);
+        } else {
+          changeCraftPage(-1);
+        }
         break;
       case 'BracketRight':
         event.preventDefault();
-        changeCraftPage(1);
+        if (actionPanel === 'build') {
+          cycleBuildConnector(1);
+        } else {
+          changeCraftPage(1);
+        }
         break;
       case 'Digit1':
       case 'Digit2':
@@ -727,6 +969,7 @@ export async function createPhase1ProductReviewRuntime(
         );
         source.refresh();
         refreshCraftPanel();
+        refreshBuildPanel();
         refreshContextInteraction();
         worldRenderer.render();
       }).catch((error: unknown) => {

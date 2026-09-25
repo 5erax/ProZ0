@@ -391,6 +391,49 @@ describe('Phase 0 browser runtime', () => {
     ).not.toBeNull();
   });
 
+  it('routes Product Review build placement through canonical building authority', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-build',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyB',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    const panel =
+      root.querySelector<HTMLElement>('[data-panel-kind="build"]');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain('TAB STRUCTURE');
+    expect(panel?.textContent).toContain('KIT UNAVAILABLE');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'Enter',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    expect(
+      root.querySelector<HTMLElement>('.p1-toast[data-toast-kind="warning"]'),
+    ).not.toBeNull();
+    expect(
+      root.querySelector<HTMLElement>('[data-panel-kind="build"]'),
+    ).not.toBeNull();
+  });
+
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
     root = document.createElement('div');
     document.body.append(root);
