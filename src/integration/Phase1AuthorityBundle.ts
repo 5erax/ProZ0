@@ -634,6 +634,21 @@ export class Phase1AuthorityBundle {
     this.createPlayerRuntime(playerId).submitInput(playerId, input);
   }
 
+  public placeStructure(
+    command: Parameters<Phase1BuildingAuthority['place']>[0],
+  ): ReturnType<Phase1BuildingAuthority['place']> {
+    const result = this.buildingAuthority.place(command);
+    if (result.status === 'committed') {
+      this.progression.applyEvent(Object.freeze({
+        type: 'structure-placed',
+        eventId: 'structure-placed:' + result.operationId,
+        playerId: command.actorPlayerId,
+        structureId: command.structureDefinitionId,
+      }));
+    }
+    return result;
+  }
+
   public async stepSolo(): Promise<void> {
     const nextAuthorityTick = this.authorityTickRef.value + 1;
     await this.prepareAuthorityTick(nextAuthorityTick);

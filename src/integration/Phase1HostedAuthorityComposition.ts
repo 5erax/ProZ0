@@ -196,7 +196,14 @@ export class Phase1HostedAuthorityComposition {
 
     const dispatcher = new Phase1HostedCommandDispatcher({
       items: bundle.items,
-      buildings: bundle.buildingAuthority,
+      buildings: Object.freeze({
+        place(command) {
+          return bundle.placeStructure(command);
+        },
+        dismantle(command) {
+          return bundle.buildingAuthority.dismantle(command);
+        },
+      }),
       machines: bundle.machines,
       death: bundle.death,
       combat: bundle.combat,

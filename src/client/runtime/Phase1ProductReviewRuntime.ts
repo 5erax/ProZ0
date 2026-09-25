@@ -637,7 +637,7 @@ export async function createPhase1ProductReviewRuntime(
     const connectors = landingConnectors();
     const connector = connectors[buildConnectorIndex];
     const position = playerPosition();
-    const result = bundle.buildingAuthority.place({
+    const result = bundle.placeStructure({
       operationId,
       actorPlayerId: config.localPlayerId,
       structureDefinitionId:
@@ -660,15 +660,6 @@ export async function createPhase1ProductReviewRuntime(
             orientationQuarterTurns: buildOrientation,
           },
     });
-
-    if (result.status === 'committed') {
-      bundle.progression.applyEvent(Object.freeze({
-        type: 'structure-placed',
-        eventId: 'structure-placed:' + result.operationId,
-        playerId: config.localPlayerId,
-        structureId: definition.id,
-      }));
-    }
 
     source.setPresentationPanel(buildPanel());
     source.setLocalCommandFeedback({

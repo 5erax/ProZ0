@@ -53,7 +53,10 @@ export interface Phase1HostedRuinAuthority {
 
 export interface Phase1HostedCommandDispatcherOptions {
   readonly items: Phase1ItemAuthority;
-  readonly buildings: Phase1BuildingAuthority;
+  readonly buildings: Pick<
+    Phase1BuildingAuthority,
+    'place' | 'dismantle'
+  >;
   readonly machines: Phase1CondenserAuthority;
   readonly death: Phase1DeathAuthority;
   readonly combat?: Phase1CombatAuthority;
