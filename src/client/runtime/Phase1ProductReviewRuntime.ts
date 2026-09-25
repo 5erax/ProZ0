@@ -270,7 +270,11 @@ export async function createPhase1ProductReviewRuntime(
     const state = bundle.worldStore.getRuinState(entity.entityId);
     if (
       state === undefined
-      || state.discoveryState !== 'located'
+      || state.discoveryState === 'unknown'
+      || (
+        state.discoveryState === 'investigated'
+        && state.physicalRewardState === 'claimed'
+      )
     ) {
       return null;
     }
@@ -1055,9 +1059,37 @@ export async function createPhase1ProductReviewRuntime(
     }
   };
 
-  const inspectRuin = (): boolean => {
+  const interactWithRuin = (): boolean => {
     const target = ruinTarget();
     if (target === null) return false;
+
+    if (
+      target.state.discoveryState === 'investigated'
+      && target.state.physicalRewardState === 'claimable'
+    ) {
+      const inventory = bundle.items.getContainerView(
+        'inventory:' + config.localPlayerId,
+      );
+      const result = bundle.claimRuinReward({
+        operationId: nextOperationId('ruin-reward-claim'),
+        playerId: config.localPlayerId,
+        ruinEntityId: target.entity.entityId,
+        expectedRuinRevision: target.state.revision,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision,
+      });
+      source.setLocalCommandFeedback({
+        operationId: result.operationId,
+        status: result.status,
+        ...(result.status === 'rejected'
+          ? { reason: result.reason }
+          : {}),
+        verb: 'CLAIM',
+        target: 'Ancient Alloy Shard',
+      });
+      return true;
+    }
+
     const result = bundle.inspectRuin({
       operationId: nextOperationId('ruin-inspect'),
       playerId: config.localPlayerId,
@@ -1094,10 +1126,15 @@ export async function createPhase1ProductReviewRuntime(
 
     const ruin = ruinTarget();
     if (ruin !== null) {
+      const claiming =
+        ruin.state.discoveryState === 'investigated'
+        && ruin.state.physicalRewardState === 'claimable';
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: 'INSPECT',
-        target: 'Previous-Civilization Ruin',
+        verb: claiming ? 'CLAIM' : 'INSPECT',
+        target: claiming
+          ? 'Ancient Alloy Shard'
+          : 'Previous-Civilization Ruin',
         state: 'AVAILABLE',
         reason: null,
         progress: null,
@@ -1183,7 +1220,7 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     if (recoverDeathCache()) return;
-    if (inspectRuin()) return;
+    if (interactWithRuin()) return;
     if (interactWithMachine()) return;
     if (interactWithWorkbench()) return;
     beginGather();
