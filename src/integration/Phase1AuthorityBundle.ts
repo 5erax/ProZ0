@@ -316,6 +316,12 @@ export interface Phase1AuthorityBundleConfig {
   readonly requiredAccessRadiusWorldUnits: number;
   readonly reopen?: Phase1ReopenState;
   readonly catalog?: ContentCatalogV1;
+  /**
+   * Solo/browser compositions activate configured players immediately.
+   * Hosted composition may disable this so only admitted session players
+   * materialize runtime/survival/progression state.
+   */
+  readonly activatePlayersOnCreate?: boolean;
 }
 
 export class Phase1AuthorityBundle {
@@ -522,8 +528,10 @@ export class Phase1AuthorityBundle {
       death,
     );
 
-    for (const playerId of playerIds) {
-      bundle.createPlayerRuntime(playerId);
+    if (config.activatePlayersOnCreate !== false) {
+      for (const playerId of playerIds) {
+        bundle.createPlayerRuntime(playerId);
+      }
     }
 
     return bundle;
@@ -531,6 +539,14 @@ export class Phase1AuthorityBundle {
 
   public get authorityTick(): number {
     return this.authorityTickRef.value;
+  }
+
+  public getActivePlayerIds(): readonly PlayerId[] {
+    return Object.freeze(
+      [...this.registeredSurvival].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    );
   }
 
   public createPlayerRuntime(playerId: PlayerId): AuthorityRuntime {
@@ -557,6 +573,9 @@ export class Phase1AuthorityBundle {
       this.survival.registerPlayer(playerId);
       this.registeredSurvival.add(playerId);
     }
+    // Progression is intentionally lazy internally, but an admitted gameplay
+    // player needs a canonical zero-state record for coherent Save V2 output.
+    this.progression.getPlayerView(playerId);
     return runtime;
   }
 
@@ -568,7 +587,7 @@ export class Phase1AuthorityBundle {
     const nextAuthorityTick = this.authorityTickRef.value + 1;
     await this.prepareAuthorityTick(nextAuthorityTick);
 
-    for (const playerId of this.config.playerIds) {
+    for (const playerId of this.getActivePlayerIds()) {
       const runtime = this.createPlayerRuntime(playerId);
       const localTick = Number(runtime.getSnapshot().tick) + 1;
       runtime.step(createSimulationStep(toSimulationTick(localTick)));
@@ -598,8 +617,7 @@ export class Phase1AuthorityBundle {
       );
     }
 
-    for (const playerId of this.config.playerIds) {
-      if (!this.registeredSurvival.has(playerId)) continue;
+    for (const playerId of this.getActivePlayerIds()) {
       const inventory = this.items.getContainerView('inventory:' + playerId);
       const exposure = this.world.getEnvironmentExposure(playerId);
       const thermalWrapActive = inventory.stacks.some((stack) =>
@@ -634,9 +652,7 @@ export class Phase1AuthorityBundle {
     if (predator !== null) {
       this.combat.tickPredator(
         predator.entityId,
-        this.config.playerIds.filter(
-          (id) => this.registeredSurvival.has(id),
-        ),
+        this.getActivePlayerIds(),
       );
     }
   }

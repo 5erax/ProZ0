@@ -160,7 +160,7 @@ export function composePhase1SaveV2(
   }
 
   const progression = bundle.progression.exportSnapshot();
-  const players = bundle.config.playerIds.map((playerId) => {
+  const players = bundle.getActivePlayerIds().map((playerId) => {
     const runtime = bundle.getRuntime(playerId);
     const movement = runtime.getSnapshot().player;
     if (movement.facing === null) {
