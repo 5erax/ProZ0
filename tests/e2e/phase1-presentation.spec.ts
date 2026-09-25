@@ -140,17 +140,14 @@ test('viewport below 640x360 shows explicit no-fractional-scale guard', async ({
 test('direct Product Review URL boots canonical persisted slice without console setup', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  // Explicit integration-test tuning only. Production remains fail-closed
-  // until the owner-approved values replace these launch parameters.
+  // Production launch inputs only: gameplay/clearance tuning is canonical
+  // and no longer supplied through debug/deployment query parameters.
   const query = new URLSearchParams({
     proz0Mode: 'phase1-product-review',
     proz0WorldId: 'world:e2e-product-review-direct',
     proz0WorldSeed: 'p1-world-golden',
     proz0Players: 'e2e-player',
     proz0Player: 'e2e-player',
-    proz0InteractionRange: '21',
-    proz0SpawnClearance: '0',
-    proz0AccessClearance: '0',
     proz0SaveDb: 'proz0-e2e-product-review-direct',
   });
   await page.goto('/?' + query.toString());
@@ -195,13 +192,27 @@ test('direct Product Review URL boots canonical persisted slice without console 
   await expect(controls).toContainText('SPACE · ATTACK');
   await page.keyboard.press('h');
 
-  const initialX = Number(await canvas.getAttribute('data-player-x'));
+  await page.keyboard.press('i');
+  const starterInventory = page.locator('[data-panel-kind="inventory"]');
+  await expect(starterInventory).toContainText('Stone Field Tool');
+  await page.keyboard.press('Escape');
+
+  // Reach the canonical local Fiber Plant at (18, 10) using only normal
+  // player movement. The 1.25 WU interaction range is intentionally close.
   await page.keyboard.down('d');
-  await page.waitForTimeout(180);
+  await expect.poll(
+    async () => Number(await canvas.getAttribute('data-player-x')),
+    { timeout: 10_000 },
+  ).toBeGreaterThan(17.4);
   await page.keyboard.up('d');
-  await page.waitForTimeout(50);
-  expect(Number(await canvas.getAttribute('data-player-x')))
-    .toBeGreaterThan(initialX);
+
+  await page.keyboard.down('s');
+  await expect.poll(
+    async () => Number(await canvas.getAttribute('data-player-y')),
+    { timeout: 10_000 },
+  ).toBeGreaterThan(9.4);
+  await page.keyboard.up('s');
+  await page.waitForTimeout(100);
 
   await expect(interaction).toContainText('GATHER');
 
