@@ -197,7 +197,9 @@ export class Phase1ProductReviewPresentationSource
       commandFeedback: this.commandFeedback,
       deathResult: this.bundle.getLastDeathResult(this.playerId),
       panel,
-      presentationPanel: this.presentationPanelOverride,
+      ...(this.presentationPanelOverride === null
+        ? {}
+        : { presentationPanel: this.presentationPanelOverride }),
     });
 
     if (this.interactionOverride === null) {
