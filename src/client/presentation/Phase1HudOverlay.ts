@@ -6,6 +6,19 @@ import {
   type Phase1PresentationState,
   type Phase1TeammatePresentation,
 } from './Phase1PresentationModel';
+import {
+  applyProductionSprite,
+  buildPreviewPatternSprite,
+  hudStatusSprite,
+  interactionSprite,
+  itemIconSprite,
+  mapMarkerSprite,
+  panelSkinCornerSprite,
+  PHASE1_PRODUCTION_WORLD_SPRITES,
+  progressionSprite,
+  teammateIdentitySprite,
+  type Phase1ProductionSprite,
+} from './Phase1ProductionAssets';
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
   document: Document,
@@ -25,6 +38,75 @@ function percent(value: number, max: number): number {
   return Math.round((value / max) * 100);
 }
 
+function assetSprite(
+  document: Document,
+  className: string,
+  spriteDefinition: Phase1ProductionSprite | null,
+  scale = 1,
+): HTMLSpanElement | null {
+  if (spriteDefinition === null) {
+    return null;
+  }
+
+  const element = createElement(document, 'span', className);
+  applyProductionSprite(element, spriteDefinition, scale);
+  element.setAttribute('aria-hidden', 'true');
+  return element;
+}
+
+function createProductionWorldPreview(document: Document): HTMLElement {
+  const preview = createElement(
+    document,
+    'div',
+    'p1-production-world-preview',
+  );
+  preview.dataset.productionWorldPreview = 'accepted-raster';
+
+  for (let row = 0; row < 12; row += 1) {
+    for (let column = 0; column < 20; column += 1) {
+      const tile = assetSprite(
+        document,
+        'p1-production-world-tile',
+        PHASE1_PRODUCTION_WORLD_SPRITES.ground,
+      );
+      if (tile !== null) {
+        tile.style.left = String(column * 32) + 'px';
+        tile.style.top = String(row * 32) + 'px';
+        preview.append(tile);
+      }
+    }
+  }
+
+  const placements = [
+    ['ruin', PHASE1_PRODUCTION_WORLD_SPRITES.ruin, 22, 138, 160],
+    ['metal-ore', PHASE1_PRODUCTION_WORLD_SPRITES.metalOre, 190, 238, 278],
+    ['potable-water', PHASE1_PRODUCTION_WORLD_SPRITES.potableWater, 252, 244, 276],
+    ['player', PHASE1_PRODUCTION_WORLD_SPRITES.player, 300, 182, 230],
+    ['predator', PHASE1_PRODUCTION_WORLD_SPRITES.predator, 372, 174, 222],
+    ['habitat', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 478, 158, 254],
+    ['death-cache', PHASE1_PRODUCTION_WORLD_SPRITES.deathCache, 344, 276, 300],
+    ['condenser', PHASE1_PRODUCTION_WORLD_SPRITES.condenser, 518, 272, 336],
+  ] as const;
+
+  for (const [id, definition, left, top, zIndex] of placements) {
+    const visual = assetSprite(
+      document,
+      'p1-production-world-sprite',
+      definition,
+    );
+    if (visual === null) {
+      continue;
+    }
+    visual.dataset.productionWorldAsset = id;
+    visual.style.left = String(left) + 'px';
+    visual.style.top = String(top) + 'px';
+    visual.style.zIndex = String(zIndex);
+    preview.append(visual);
+  }
+
+  return preview;
+}
+
 function meter(
   document: Document,
   presentation: Phase1MeterPresentation,
@@ -35,12 +117,16 @@ function meter(
   row.dataset.value = String(presentation.value);
   row.dataset.max = String(presentation.max);
 
-  const label = createElement(
+  const label = createElement(document, 'div', 'p1-meter-label');
+  const icon = assetSprite(
     document,
-    'div',
-    'p1-meter-label',
-    presentation.label + ' · ' + presentation.stateLabel,
+    'p1-asset-icon p1-meter-icon',
+    hudStatusSprite(presentation.label),
   );
+  if (icon !== null) {
+    label.append(icon);
+  }
+  label.append(presentation.label + ' · ' + presentation.stateLabel);
   const track = createElement(document, 'div', 'p1-meter-track');
   const fill = createElement(document, 'div', 'p1-meter-fill');
   fill.style.width = String(percent(presentation.value, presentation.max)) + '%';
@@ -58,6 +144,11 @@ function itemRow(
   row.dataset.itemId = item.id;
   row.dataset.selected = String(selected);
 
+  const icon = assetSprite(
+    document,
+    'p1-asset-icon p1-item-icon',
+    itemIconSprite(item.name),
+  );
   const identity = createElement(
     document,
     'span',
@@ -73,6 +164,9 @@ function itemRow(
       : 'COND ' + String(item.condition) + (item.stateLabel === null ? '' : ' · ' + item.stateLabel),
   );
 
+  if (icon !== null) {
+    row.append(icon);
+  }
   row.append(identity, state);
   return row;
 }
@@ -87,6 +181,7 @@ function teammate(
 
   const marker = createElement(document, 'span', 'p1-teammate-marker');
   marker.dataset.shape = entry.markerShape;
+  applyProductionSprite(marker, teammateIdentitySprite(entry.markerShape));
   const label = createElement(
     document,
     'span',
@@ -108,6 +203,14 @@ function renderPanel(
 ): HTMLElement {
   const root = createElement(document, 'section', 'p1-panel');
   root.dataset.panelKind = panel.kind;
+  const skinCorner = assetSprite(
+    document,
+    'p1-panel-skin-corner',
+    panelSkinCornerSprite(),
+  );
+  if (skinCorner !== null) {
+    root.append(skinCorner);
+  }
   root.append(panelTitle(document, panel.title));
 
   switch (panel.kind) {
@@ -169,7 +272,22 @@ function renderPanel(
     case 'build': {
       const preview = createElement(document, 'div', 'p1-build-preview');
       preview.dataset.placementState = panel.placementState;
-      preview.textContent = panel.placementState;
+      const pattern = assetSprite(
+        document,
+        'p1-build-preview-pattern',
+        buildPreviewPatternSprite(panel.placementState),
+        6,
+      );
+      if (pattern !== null) {
+        pattern.dataset.productionPatternState = panel.placementState;
+        preview.append(pattern);
+      }
+      preview.append(createElement(
+        document,
+        'span',
+        'p1-build-preview-label',
+        panel.placementState,
+      ));
       root.append(
         createElement(document, 'div', 'p1-build-name', panel.selectedStructure),
         createElement(document, 'div', 'p1-build-kit', panel.sourceKitLabel),
@@ -205,7 +323,19 @@ function renderPanel(
     }
 
     case 'progression': {
+      const iconRow = createElement(document, 'div', 'p1-progress-icons');
+      for (const index of [0, 1, 2, 3]) {
+        const icon = assetSprite(
+          document,
+          'p1-progression-icon',
+          progressionSprite(index),
+        );
+        if (icon !== null) {
+          iconRow.append(icon);
+        }
+      }
       root.append(
+        iconRow,
         createElement(document, 'div', 'p1-progress-level', panel.levelLabel),
         createElement(document, 'div', 'p1-progress-xp', panel.xpLabel),
         createElement(document, 'div', 'p1-subtitle', 'SKILLS'),
@@ -219,7 +349,19 @@ function renderPanel(
     }
 
     case 'map': {
+      const mapMarkers = createElement(document, 'div', 'p1-map-markers');
+      for (const index of [0, 4, 5, 6]) {
+        const icon = assetSprite(
+          document,
+          'p1-map-marker',
+          mapMarkerSprite(index),
+        );
+        if (icon !== null) {
+          mapMarkers.append(icon);
+        }
+      }
       root.append(
+        mapMarkers,
         createElement(document, 'div', 'p1-map-fog', panel.fogLabel),
         createElement(document, 'div', 'p1-map-ruin', panel.ruinLabel),
       );
@@ -237,13 +379,18 @@ function renderPanel(
 function styles(document: Document): HTMLStyleElement {
   const style = document.createElement('style');
   style.textContent = [
-    '.p1-ui{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center center;pointer-events:none;font-family:monospace;font-size:8px;line-height:1.15;color:#f4f6ef;text-shadow:1px 1px 0 #10141b;z-index:20;}',
+    '.p1-ui{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center center;pointer-events:none;font-family:monospace;font-size:8px;line-height:1.15;color:#f4f6ef;text-shadow:1px 1px 0 #10141b;z-index:20;overflow:hidden;}',
+    '.p1-production-world-preview{position:absolute;inset:0;overflow:hidden;z-index:0;background:#172033;}',
+    '.p1-production-world-tile,.p1-production-world-sprite{position:absolute;display:block;image-rendering:pixelated;}',
+    '.p1-survival,.p1-world,.p1-equipment,.p1-interaction,.p1-carry,.p1-toasts,.p1-team,.p1-panel{z-index:2;}',
+    '.p1-asset-icon,.p1-progression-icon,.p1-map-marker,.p1-panel-skin-corner,.p1-build-preview-pattern{display:inline-block;image-rendering:pixelated;flex:0 0 auto;}',
     '.p1-ui *{box-sizing:border-box;}',
     '.p1-box,.p1-panel{background:rgba(10,14,22,.90);border:1px solid #d6dccd;box-shadow:0 0 0 1px #111722 inset;}',
     '.p1-survival{position:absolute;left:8px;top:8px;width:156px;height:42px;padding:3px;display:grid;grid-template-columns:1fr 1fr;gap:2px;}',
     '.p1-meter:first-child{grid-column:1/3;}',
     '.p1-meter{min-width:0;}',
-    '.p1-meter-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+    '.p1-meter-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:2px;}',
+    '.p1-meter-icon{width:12px!important;height:12px!important;}',
     '.p1-meter-track{height:3px;background:#263040;border:1px solid #0a0d12;}',
     '.p1-meter-fill{height:100%;background:#e8edf2;}',
     '.p1-meter[data-severity="warning"] .p1-meter-track{outline:1px dashed #f1d67d;}',
@@ -261,25 +408,28 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-toast{padding:3px 5px;background:rgba(10,14,22,.92);border-left:3px double #f4f6ef;}',
     '.p1-team{position:absolute;right:8px;top:50px;width:132px;display:grid;gap:2px;}',
     '.p1-teammate{display:flex;gap:4px;align-items:center;background:rgba(10,14,22,.84);padding:2px 4px;}',
-    '.p1-teammate-marker{width:7px;height:7px;border:1px solid #fff;display:inline-block;}',
-    '.p1-teammate-marker[data-shape="circle"]{border-radius:50%;}',
-    '.p1-teammate-marker[data-shape="diamond"]{transform:rotate(45deg);}',
-    '.p1-teammate-marker[data-shape="triangle"]{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-bottom:7px solid #fff;border-top:0;}',
+    '.p1-teammate-marker{width:12px!important;height:12px!important;display:inline-block;image-rendering:pixelated;}',
     '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:hidden;}',
-    '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding-bottom:4px;margin-bottom:5px;}',
+    '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
+    '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
-    '.p1-item-row,.p1-craft-row{display:grid;grid-template-columns:2fr 1fr;gap:4px;padding:3px;border:1px solid #3b465a;}',
+    '.p1-item-row,.p1-craft-row{display:grid;gap:4px;padding:3px;border:1px solid #3b465a;}',
+    '.p1-item-row{grid-template-columns:24px 2fr 1fr;align-items:center;min-height:30px;}',
+    '.p1-item-icon{width:24px!important;height:24px!important;}',
     '.p1-item-row[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
     '.p1-container-panes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
     '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;}',
     '.p1-craft-row{grid-template-columns:1.2fr 1fr 1.3fr 1fr;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
-    '.p1-build-preview{width:96px;height:64px;margin:8px auto;border:2px dashed #fff;display:grid;place-items:center;background:repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,.13) 4px,rgba(255,255,255,.13) 8px);}',
+    '.p1-build-preview{width:96px;height:64px;margin:8px auto;border:2px dashed #fff;display:grid;place-items:center;position:relative;background:rgba(10,14,22,.62);}',
+    '.p1-build-preview-pattern{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);}',
+    '.p1-build-preview-label{position:relative;z-index:1;padding:2px 4px;background:rgba(10,14,22,.78);}',
     '.p1-build-preview[data-placement-state="VALID"]{border-style:solid;}',
     '.p1-build-preview[data-placement-state="CONNECTOR"]{outline:2px dotted #fff;}',
     '.p1-panel-detail,.p1-progress-list{margin-top:5px;padding:4px;background:#161e2a;}',
+    '.p1-progress-icons,.p1-map-markers{display:flex;align-items:center;gap:4px;margin:3px 0;}',
     '.p1-hidden{display:none!important;}',
   ].join('');
   return style;
@@ -308,6 +458,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.layer = createElement(this.document, 'div', 'p1-ui');
     this.layer.id = 'proz0-phase1-ui';
     this.layer.dataset.presentationAuthority = 'derived-read-only';
+    this.layer.dataset.productionAssetFoundation = 'p1-75-78';
     this.layer.append(styles(this.document));
     this.root.append(this.layer);
     this.root.ownerDocument.defaultView?.addEventListener('resize', this.applyScale);
@@ -341,6 +492,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       this.layer.append(style);
     }
 
+    if (this.root.dataset.phase1QaMode !== 'none') {
+      this.layer.append(createProductionWorldPreview(this.document));
+    }
+
     const survival = createElement(this.document, 'section', 'p1-survival p1-box');
     survival.dataset.region = 'survival';
     survival.append(
@@ -360,36 +515,91 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       createElement(this.document, 'span', '', state.world.dayPeriod),
     );
     const weatherLine = createElement(this.document, 'div', 'p1-world-line');
+    const weatherIdentity = createElement(this.document, 'span', 'p1-world-weather');
+    const weatherIcon = assetSprite(
+      this.document,
+      'p1-asset-icon',
+      hudStatusSprite('WEATHER'),
+    );
+    if (weatherIcon !== null) {
+      weatherIdentity.append(weatherIcon);
+    }
+    weatherIdentity.append(state.world.weatherLabel);
     weatherLine.append(
-      createElement(this.document, 'span', '', state.world.weatherLabel),
+      weatherIdentity,
       createElement(this.document, 'span', '', String(state.world.teammateCount) + ' TEAM'),
     );
     world.append(worldLine, weatherLine);
 
     const equipment = createElement(this.document, 'section', 'p1-equipment p1-box');
     equipment.dataset.region = 'equipment';
-    equipment.textContent = state.equipment === null
-      ? 'NO ACTIVE EQUIPMENT'
-      : state.equipment.name
+    if (state.equipment === null) {
+      equipment.textContent = 'NO ACTIVE EQUIPMENT';
+    } else {
+      const equipmentIcon = assetSprite(
+        this.document,
+        'p1-asset-icon p1-equipment-icon',
+        itemIconSprite(state.equipment.name),
+      );
+      if (equipmentIcon !== null) {
+        equipment.append(equipmentIcon);
+      }
+      equipment.append(
+        state.equipment.name
         + (state.equipment.condition === null
           ? ' · ' + state.equipment.stateLabel
           : ' · ' + String(state.equipment.condition) + '/' + String(state.equipment.conditionMax)
-            + ' · ' + state.equipment.stateLabel);
+            + ' · ' + state.equipment.stateLabel),
+      );
+    }
 
     const carry = createElement(this.document, 'section', 'p1-carry p1-box');
     carry.dataset.region = 'carry';
     carry.dataset.carryState = state.carry.stateLabel;
-    carry.textContent =
-      'LOAD ' + String(state.carry.weightCurrent) + '/' + String(state.carry.weightMax) + ' kg'
-      + ' · VOL ' + String(state.carry.volumeCurrent) + '/' + String(state.carry.volumeMax)
-      + ' · ' + state.carry.stateLabel;
+    const weightIcon = assetSprite(
+      this.document,
+      'p1-asset-icon',
+      hudStatusSprite('WEIGHT'),
+    );
+    const volumeIcon = assetSprite(
+      this.document,
+      'p1-asset-icon',
+      hudStatusSprite('VOLUME'),
+    );
+    if (weightIcon !== null) {
+      carry.append(weightIcon);
+    }
+    carry.append(
+      ' ' + String(state.carry.weightCurrent) + '/' + String(state.carry.weightMax) + ' kg ',
+    );
+    if (volumeIcon !== null) {
+      carry.append(volumeIcon);
+    }
+    carry.append(
+      ' ' + String(state.carry.volumeCurrent) + '/' + String(state.carry.volumeMax)
+      + ' · ' + state.carry.stateLabel,
+    );
 
     const toasts = createElement(this.document, 'section', 'p1-toasts');
     for (const toast of state.toasts) {
-      const entry = createElement(
+      const entry = createElement(this.document, 'div', 'p1-toast');
+      const toastIcon = assetSprite(
         this.document,
-        'div',
-        'p1-toast',
+        'p1-asset-icon',
+        hudStatusSprite(
+          toast.kind === 'progression'
+            ? 'XP'
+            : toast.kind === 'discovery'
+              ? 'DISCOVERY'
+              : toast.kind === 'warning'
+                ? 'COLD'
+                : 'LEVEL',
+        ),
+      );
+      if (toastIcon !== null) {
+        entry.append(toastIcon);
+      }
+      entry.append(
         toast.title + (toast.detail === null ? '' : ' · ' + toast.detail),
       );
       entry.dataset.toastKind = toast.kind;
@@ -408,13 +618,24 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       const interaction = createElement(this.document, 'section', 'p1-interaction p1-box');
       interaction.dataset.region = 'interaction';
       interaction.dataset.state = state.interaction.state;
-      interaction.append(createElement(
+      const interactionMain = createElement(
         this.document,
         'div',
         'p1-interaction-main',
+      );
+      const interactionIcon = assetSprite(
+        this.document,
+        'p1-asset-icon',
+        interactionSprite(state.interaction.verb),
+      );
+      if (interactionIcon !== null) {
+        interactionMain.append(interactionIcon);
+      }
+      interactionMain.append(
         '[' + state.interaction.inputLabel + '] '
-          + state.interaction.verb + ' · ' + state.interaction.target,
-      ));
+        + state.interaction.verb + ' · ' + state.interaction.target,
+      );
+      interaction.append(interactionMain);
 
       if (state.interaction.reason !== null) {
         interaction.append(createElement(
