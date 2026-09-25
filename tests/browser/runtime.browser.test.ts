@@ -9,7 +9,7 @@ import {
   PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
   PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
   PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
-} from '../../src/integration';
+} from '../../src/integration/Phase1AuthorityBundle';
 import { resolvePhase1PresentationQaFixture } from '../../src/client/qa/Phase1PresentationFixture';
 import type { Phase1PresentationSource } from '../../src/client/runtime/Phase1PresentationBinding';
 import {
