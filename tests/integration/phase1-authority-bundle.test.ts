@@ -416,6 +416,98 @@ describe('Phase 1 canonical authority bundle', () => {
   });
 
 
+  it('releases the ruin claim reservation on item-capacity rejection and allows a fresh later claim', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-ruin-reward-capacity',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+    });
+
+    try {
+      const landmarks = getPhase1WorldLandmarks('p1-world-golden');
+      const ruin = bundle.world.findGeneratedEntityByDefinition(
+        'ruin:previous-civilization-ruin',
+      );
+      if (ruin === null || ruin.type !== 'ruin') {
+        throw new Error('Expected canonical Phase 1 ruin.');
+      }
+      bundle.getRuntime('p1').relocatePlayer(landmarks.ruinPosition);
+      await bundle.stepSolo();
+      const located = bundle.worldStore.getRuinState(ruin.entityId);
+      if (located === undefined) {
+        throw new Error('Expected located ruin state.');
+      }
+      expect(bundle.inspectRuin({
+        operationId: 'op:ruin-capacity:inspect',
+        playerId: 'p1',
+        ruinEntityId: ruin.entityId,
+        expectedRevision: located.revision,
+      }).status).toBe('committed');
+
+      const claimable = bundle.worldStore.getRuinState(ruin.entityId)!;
+      const inventory = bundle.items.getContainerView('inventory:p1');
+      const itemCommit = vi.spyOn(
+        bundle.items,
+        'commitRuinRewardItems',
+      ).mockReturnValueOnce(Object.freeze({
+        status: 'rejected' as const,
+        operationId: 'op:ruin-capacity:full',
+        reason: 'TARGET_CAPACITY_VOLUME' as const,
+      }));
+
+      expect(bundle.claimRuinReward({
+        operationId: 'op:ruin-capacity:full',
+        playerId: 'p1',
+        ruinEntityId: ruin.entityId,
+        expectedRuinRevision: claimable.revision,
+        inventoryContainerId: inventory.containerId,
+        expectedInventoryRevision: inventory.revision,
+      })).toMatchObject({
+        status: 'rejected',
+        reason: 'TARGET_CAPACITY_VOLUME',
+      });
+      expect(bundle.worldStore.getRuinState(ruin.entityId)).toEqual(
+        claimable,
+      );
+      expect(
+        bundle.items.getContainerView(inventory.containerId).stacks,
+      ).not.toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:ancient-alloy-shard',
+      }));
+
+      itemCommit.mockRestore();
+      const freshInventory =
+        bundle.items.getContainerView('inventory:p1');
+      expect(bundle.claimRuinReward({
+        operationId: 'op:ruin-capacity:retry',
+        playerId: 'p1',
+        ruinEntityId: ruin.entityId,
+        expectedRuinRevision: claimable.revision,
+        inventoryContainerId: freshInventory.containerId,
+        expectedInventoryRevision: freshInventory.revision,
+      })).toMatchObject({
+        status: 'committed',
+        ruinRevision: claimable.revision + 1,
+        inventoryRevision: freshInventory.revision + 1,
+      });
+      expect(bundle.worldStore.getRuinState(ruin.entityId)).toMatchObject({
+        physicalRewardState: 'claimed',
+      });
+      expect(
+        bundle.items.getContainerView('inventory:p1').stacks,
+      ).toContainEqual(expect.objectContaining({
+        itemDefinitionId: 'item:ancient-alloy-shard',
+        quantity: 1,
+      }));
+    } finally {
+      vi.restoreAllMocks();
+      await bundle.destroy();
+    }
+  });
+
   it('orchestrates one stable death transition and canonical respawn after lethal authority damage', async () => {
     const bundle = await Phase1AuthorityBundle.create({
       worldId: 'world:p1-integration-death',
