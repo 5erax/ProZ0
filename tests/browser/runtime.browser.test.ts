@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { bootProZ0, type RuntimeHandle } from '../../src/client/main';
+import {
+  bootAutoProZ0,
+  bootProZ0,
+  resolveProductReviewAutoBootConfig,
+  type RuntimeHandle,
+} from '../../src/client/main';
 import { resolvePhase1PresentationQaFixture } from '../../src/client/qa/Phase1PresentationFixture';
 import type { Phase1PresentationSource } from '../../src/client/runtime/Phase1PresentationBinding';
 import {
@@ -160,6 +165,55 @@ describe('Phase 0 browser runtime', () => {
     ).toContain('DEHYDRATED');
   });
 
+
+  it('resolves Product Review autoboot from declarative deployment config and uses persisted Save V2', async () => {
+    const databaseName = 'proz0-test-product-review-autoboot';
+    await deleteIndexedDbSaveDatabase(databaseName);
+
+    root = document.createElement('div');
+    root.dataset.proz0Mode = 'phase1-product-review';
+    root.dataset.proz0WorldId = 'world:browser-product-review-autoboot';
+    root.dataset.proz0WorldSeed = 'p1-world-golden';
+    root.dataset.proz0PlayerIds = 'browser-player';
+    root.dataset.proz0LocalPlayerId = 'browser-player';
+    root.dataset.proz0InteractionRangeWorldUnits = '21';
+    root.dataset.proz0SpawnClearanceRadiusWorldUnits = '0';
+    root.dataset.proz0RequiredAccessRadiusWorldUnits = '0';
+    root.dataset.proz0SaveDatabase = databaseName;
+    document.body.append(root);
+
+    try {
+      handle = await bootAutoProZ0(root);
+
+      expect(root.dataset.runtimeMode).toBe('phase1-product-review');
+      expect(root.dataset.runtimeStatus).toBe('ready');
+      expect(root.dataset.productReviewAuthority).toBe('canonical');
+      expect(root.dataset.productReviewPersistence).toBe('indexeddb-save-v2');
+      expect(root.dataset.productReviewReopened).toBe('false');
+      expect(
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas')
+          ?.dataset.renderer,
+      ).toBe('phase1-production-raster');
+    } finally {
+      handle?.destroy();
+      handle = null;
+      await deleteIndexedDbSaveDatabase(databaseName);
+    }
+  });
+
+  it('fails Product Review autoboot closed when deployment tuning is incomplete', () => {
+    root = document.createElement('div');
+    root.dataset.proz0Mode = 'phase1-product-review';
+    root.dataset.proz0WorldId = 'world:browser-product-review-incomplete';
+    root.dataset.proz0WorldSeed = 'p1-world-golden';
+    root.dataset.proz0PlayerIds = 'browser-player';
+    root.dataset.proz0LocalPlayerId = 'browser-player';
+    document.body.append(root);
+
+    expect(() => resolveProductReviewAutoBootConfig(root!)).toThrow(
+      /data-proz0-interaction-range-world-units/,
+    );
+  });
 
   it('boots canonical Phase 1 Product Review runtime without QA fixtures', async () => {
     root = document.createElement('div');

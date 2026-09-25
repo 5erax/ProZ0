@@ -25,6 +25,10 @@ import {
 } from './runtime/Phase1PresentationMount';
 import type { Phase1PresentationSource } from './runtime/Phase1PresentationBinding';
 import {
+  bootPersistedPhase1ProductReview,
+  type PersistedPhase1ProductReviewConfig,
+} from './runtime/Phase1ProductReviewPersistence';
+import {
   createPhase1ProductReviewRuntime,
   type Phase1ProductReviewRuntimeConfig,
 } from './runtime/Phase1ProductReviewRuntime';
@@ -151,6 +155,120 @@ function bootExternalPhase1Presentation(
   };
 }
 
+function requiredAutoBootText(
+  root: HTMLElement,
+  key: keyof DOMStringMap,
+  attributeName: string,
+): string {
+  const value = root.dataset[key];
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(
+      'Product Review autoboot requires ' + attributeName + '.',
+    );
+  }
+  return value.trim();
+}
+
+function requiredAutoBootNumber(
+  root: HTMLElement,
+  key: keyof DOMStringMap,
+  attributeName: string,
+): number {
+  const raw = requiredAutoBootText(root, key, attributeName);
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      'Product Review autoboot requires finite ' + attributeName + '.',
+    );
+  }
+  return value;
+}
+
+export function resolveProductReviewAutoBootConfig(
+  root: HTMLElement,
+): PersistedPhase1ProductReviewConfig {
+  const playerIds = requiredAutoBootText(
+    root,
+    'proz0PlayerIds',
+    'data-proz0-player-ids',
+  )
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (playerIds.length === 0) {
+    throw new Error(
+      'Product Review autoboot requires at least one player identity.',
+    );
+  }
+
+  const databaseName = root.dataset.proz0SaveDatabase?.trim();
+
+  return Object.freeze({
+    worldId: requiredAutoBootText(
+      root,
+      'proz0WorldId',
+      'data-proz0-world-id',
+    ),
+    worldSeed: requiredAutoBootText(
+      root,
+      'proz0WorldSeed',
+      'data-proz0-world-seed',
+    ),
+    playerIds: Object.freeze(playerIds),
+    localPlayerId: requiredAutoBootText(
+      root,
+      'proz0LocalPlayerId',
+      'data-proz0-local-player-id',
+    ),
+    interactionRangeWorldUnits: requiredAutoBootNumber(
+      root,
+      'proz0InteractionRangeWorldUnits',
+      'data-proz0-interaction-range-world-units',
+    ),
+    spawnClearanceRadiusWorldUnits: requiredAutoBootNumber(
+      root,
+      'proz0SpawnClearanceRadiusWorldUnits',
+      'data-proz0-spawn-clearance-radius-world-units',
+    ),
+    requiredAccessRadiusWorldUnits: requiredAutoBootNumber(
+      root,
+      'proz0RequiredAccessRadiusWorldUnits',
+      'data-proz0-required-access-radius-world-units',
+    ),
+    ...(databaseName === undefined || databaseName.length === 0
+      ? {}
+      : { persistence: { databaseName } }),
+  });
+}
+
+export async function bootAutoProZ0(
+  root: HTMLElement,
+): Promise<RuntimeHandle> {
+  const mode = root.dataset.proz0Mode?.trim() || 'local-demo';
+
+  if (mode === 'local-demo') {
+    return bootProZ0(root, { mode: 'local-demo' });
+  }
+
+  if (mode !== 'phase1-product-review') {
+    throw new Error('Unsupported ProZ0 autoboot mode: ' + mode);
+  }
+
+  const persisted = await bootPersistedPhase1ProductReview(
+    root,
+    resolveProductReviewAutoBootConfig(root),
+  );
+  root.dataset.productReviewPersistence = 'indexeddb-save-v2';
+  root.dataset.productReviewReopened = String(persisted.reopened);
+
+  return Object.freeze({
+    destroy(): void {
+      persisted.destroy();
+    },
+  });
+}
+
 export async function bootProZ0(
   root: HTMLElement,
   options: BootProZ0Options,
@@ -171,7 +289,7 @@ export async function bootProZ0(
 const autoBootRoot = document.querySelector<HTMLElement>('[data-proz0-autoboot]');
 
 if (autoBootRoot !== null) {
-  void bootProZ0(autoBootRoot, { mode: 'local-demo' }).catch(
+  void bootAutoProZ0(autoBootRoot).catch(
     (error: unknown) => {
       autoBootRoot.dataset.runtimeStatus = 'failed';
       console.error('ProZ0 runtime failed to start.', error);
