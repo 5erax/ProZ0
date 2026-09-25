@@ -86,6 +86,36 @@ export interface Phase1VerticalSlicePlayerPositionPort {
   set(playerId: PlayerId, position: WorldPosition): void;
 }
 
+export type Phase1RuinRewardClaimRejectionReason =
+  | 'SOURCE_MISSING'
+  | 'OUT_OF_RANGE'
+  | 'STALE_REVISION'
+  | 'RUIN_NOT_INVESTIGATED'
+  | 'REWARD_NOT_CLAIMABLE'
+  | 'OPERATION_ID_CONFLICT';
+
+export interface Phase1RuinRewardClaimReservation {
+  readonly token: string;
+  readonly operationId: string;
+  readonly commandFingerprint: string;
+  readonly actorPlayerId: PlayerId;
+  readonly ruinEntityId: string;
+  readonly expectedRevision: number;
+  readonly rewardSourceId: string;
+  readonly itemDefinitionId: 'item:ancient-alloy-shard';
+  readonly quantity: 1;
+}
+
+export type Phase1RuinRewardClaimReservationResult =
+  | {
+      readonly status: 'reserved';
+      readonly reservation: Readonly<Phase1RuinRewardClaimReservation>;
+    }
+  | {
+      readonly status: 'rejected';
+      readonly reason: Phase1RuinRewardClaimRejectionReason;
+    };
+
 export interface Phase1VerticalSliceWorldAdapterOptions {
   readonly catalog: ContentCatalogV1;
   readonly store: Phase1WorldStore;
@@ -164,6 +194,8 @@ export class Phase1VerticalSliceWorldAdapter
   private readonly drops = new Map<string, MutableWorldDrop>();
   private readonly predators = new Map<string, MutablePredator>();
   private readonly dropReservations = new Map<string, WorldPosition>();
+  private readonly ruinRewardReservations =
+    new Map<string, Phase1RuinRewardClaimReservation>();
   private readonly deathCaches: DeathCacheWorldState;
 
   public constructor(
@@ -517,6 +549,129 @@ export class Phase1VerticalSliceWorldAdapter
     structureInstanceId: string,
   ): boolean {
     return this.isPlayerInInteractionRange(playerId, structureInstanceId);
+  }
+
+  public reserveRuinRewardClaim(request: {
+    readonly operationId: string;
+    readonly commandFingerprint: string;
+    readonly actorPlayerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRevision: number;
+  }): Phase1RuinRewardClaimReservationResult {
+    const entity = this.getActiveGeneratedEntities().find(
+      (candidate) =>
+        candidate.type === 'ruin'
+        && candidate.entityId === request.ruinEntityId,
+    );
+    if (entity === undefined) {
+      return Object.freeze({ status: 'rejected', reason: 'SOURCE_MISSING' });
+    }
+    if (
+      !this.isGeneratedEntityInInteractionRange(
+        request.actorPlayerId,
+        request.ruinEntityId,
+      )
+    ) {
+      return Object.freeze({ status: 'rejected', reason: 'OUT_OF_RANGE' });
+    }
+
+    const state = this.options.store.getRuinState(request.ruinEntityId);
+    if (state === undefined) {
+      return Object.freeze({ status: 'rejected', reason: 'SOURCE_MISSING' });
+    }
+    if (state.revision !== request.expectedRevision) {
+      return Object.freeze({ status: 'rejected', reason: 'STALE_REVISION' });
+    }
+    if (state.discoveryState !== 'investigated') {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'RUIN_NOT_INVESTIGATED',
+      });
+    }
+    if (state.physicalRewardState !== 'claimable') {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'REWARD_NOT_CLAIMABLE',
+      });
+    }
+
+    const existing = this.ruinRewardReservations.get(request.ruinEntityId);
+    if (existing !== undefined) {
+      if (
+        existing.operationId === request.operationId
+        && existing.commandFingerprint === request.commandFingerprint
+        && existing.actorPlayerId === request.actorPlayerId
+        && existing.expectedRevision === request.expectedRevision
+      ) {
+        return Object.freeze({
+          status: 'reserved',
+          reservation: existing,
+        });
+      }
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'OPERATION_ID_CONFLICT',
+      });
+    }
+
+    const definition = this.options.catalog.getAs(
+      entity.definitionId,
+      'ruin',
+    );
+    if (
+      definition.oneTimePhysicalReward.itemId
+        !== 'item:ancient-alloy-shard'
+      || definition.oneTimePhysicalReward.quantity !== 1
+    ) {
+      throw new Error('Phase 1 ruin reward definition violates approved gate.');
+    }
+
+    const reservation = Object.freeze({
+      token: 'ruin-reward:' + request.ruinEntityId + ':' + request.operationId,
+      operationId: request.operationId,
+      commandFingerprint: request.commandFingerprint,
+      actorPlayerId: request.actorPlayerId,
+      ruinEntityId: request.ruinEntityId,
+      expectedRevision: request.expectedRevision,
+      rewardSourceId: 'ruin-reward:' + request.ruinEntityId,
+      itemDefinitionId: 'item:ancient-alloy-shard' as const,
+      quantity: 1 as const,
+    });
+    this.ruinRewardReservations.set(request.ruinEntityId, reservation);
+    return Object.freeze({ status: 'reserved', reservation });
+  }
+
+  public releaseRuinRewardClaimReservation(
+    reservation: Readonly<Phase1RuinRewardClaimReservation>,
+  ): void {
+    const current = this.ruinRewardReservations.get(
+      reservation.ruinEntityId,
+    );
+    if (current?.token === reservation.token) {
+      this.ruinRewardReservations.delete(reservation.ruinEntityId);
+    }
+  }
+
+  public commitReservedRuinRewardClaim(
+    reservation: Readonly<Phase1RuinRewardClaimReservation>,
+  ) {
+    const current = this.ruinRewardReservations.get(
+      reservation.ruinEntityId,
+    );
+    if (
+      current === undefined
+      || current.token !== reservation.token
+      || current.commandFingerprint !== reservation.commandFingerprint
+    ) {
+      throw new Error('Ruin reward claim reservation is no longer valid.');
+    }
+
+    const next = this.options.store.markRuinRewardClaimed(
+      reservation.ruinEntityId,
+      reservation.expectedRevision,
+    );
+    this.ruinRewardReservations.delete(reservation.ruinEntityId);
+    return next;
   }
 
   public reservePlayerRespawn(
