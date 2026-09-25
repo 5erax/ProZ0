@@ -343,6 +343,20 @@ export type Phase1RuinInspectResult =
         | 'RUIN_NOT_LOCATED';
     };
 
+export type Phase1RuinRewardClaimResult =
+  | {
+      readonly status: 'committed';
+      readonly operationId: string;
+      readonly ruinRevision: number;
+      readonly inventoryRevision: number;
+      readonly createdStackIds: readonly string[];
+    }
+  | {
+      readonly status: 'rejected';
+      readonly operationId: string;
+      readonly reason: string;
+    };
+
 export interface Phase1AuthorityBundleConfig {
   readonly worldId: string;
   readonly worldSeed: string;
@@ -383,6 +397,13 @@ export class Phase1AuthorityBundle {
     new Map<PlayerId, DeathTransitionResult>();
   private readonly lastRespawnResults =
     new Map<PlayerId, RespawnResult>();
+  private readonly ruinRewardClaims = new Map<
+    string,
+    {
+      readonly signature: string;
+      readonly result: Phase1RuinRewardClaimResult;
+    }
+  >();
 
   private constructor(
     public readonly config: Phase1AuthorityBundleConfig,
@@ -941,6 +962,93 @@ export class Phase1AuthorityBundle {
       rewardItemId: result.rewardItemId,
       rewardQuantity: result.rewardQuantity,
     });
+  }
+
+  public claimRuinReward(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRuinRevision: number;
+    readonly inventoryContainerId: string;
+    readonly expectedInventoryRevision: number;
+  }): Phase1RuinRewardClaimResult {
+    const signature = JSON.stringify([
+      request.playerId,
+      request.ruinEntityId,
+      request.expectedRuinRevision,
+      request.inventoryContainerId,
+      request.expectedInventoryRevision,
+    ]);
+    const cached = this.ruinRewardClaims.get(request.operationId);
+    if (cached !== undefined) {
+      if (cached.signature === signature) {
+        return cached.result;
+      }
+      return Object.freeze({
+        status: 'rejected',
+        operationId: request.operationId,
+        reason: 'OPERATION_ID_CONFLICT',
+      });
+    }
+
+    const reserved = this.world.reserveRuinRewardClaim({
+      operationId: request.operationId,
+      commandFingerprint: signature,
+      actorPlayerId: request.playerId,
+      ruinEntityId: request.ruinEntityId,
+      expectedRevision: request.expectedRuinRevision,
+    });
+    if (reserved.status === 'rejected') {
+      const result = Object.freeze({
+        status: 'rejected' as const,
+        operationId: request.operationId,
+        reason: reserved.reason,
+      });
+      this.ruinRewardClaims.set(request.operationId, { signature, result });
+      return result;
+    }
+
+    const reward = this.items.commitRuinRewardItems({
+      operationId: request.operationId,
+      playerId: request.playerId,
+      inventoryContainerId: request.inventoryContainerId,
+      expectedInventoryRevision: request.expectedInventoryRevision,
+      rewardSourceId: reserved.reservation.rewardSourceId,
+      itemDefinitionId: reserved.reservation.itemDefinitionId,
+      quantity: reserved.reservation.quantity,
+    });
+    if (reward.status === 'rejected') {
+      this.world.releaseRuinRewardClaimReservation(
+        reserved.reservation,
+      );
+      const result = Object.freeze({
+        status: 'rejected' as const,
+        operationId: request.operationId,
+        reason: reward.reason,
+      });
+      this.ruinRewardClaims.set(request.operationId, { signature, result });
+      return result;
+    }
+
+    const inventoryRevision = reward.resultingRevisions.find(
+      (entry) =>
+        entry.containerId === request.inventoryContainerId,
+    )?.revision;
+    if (inventoryRevision === undefined) {
+      throw new Error('Ruin reward commit omitted inventory revision.');
+    }
+    const ruin = this.world.commitReservedRuinRewardClaim(
+      reserved.reservation,
+    );
+    const result = Object.freeze({
+      status: 'committed' as const,
+      operationId: request.operationId,
+      ruinRevision: ruin.revision,
+      inventoryRevision,
+      createdStackIds: reward.createdStackIds,
+    });
+    this.ruinRewardClaims.set(request.operationId, { signature, result });
+    return result;
   }
 
   private processPendingDeaths(authorityTick: number): void {
