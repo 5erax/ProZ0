@@ -11,7 +11,7 @@ import {
   NEUTRAL_PLAYER_INPUT,
   type PlayerInput,
 } from '../api/PlayerInput';
-import type { SimulationRuntime } from '../api/SimulationRuntime';
+import type { AuthorityRuntime } from '../api/AuthorityRuntime';
 import type { PlayerPersistenceState } from '../api/PlayerPersistenceState';
 import type {
   FacingDirection,
@@ -28,7 +28,7 @@ function copyInput(input: PlayerInput): PlayerInput {
   });
 }
 
-export class FixedStepRuntime implements SimulationRuntime {
+export class FixedStepRuntime implements AuthorityRuntime {
   private tick: SimulationTick = toSimulationTick(0);
   private currentInput: PlayerInput = NEUTRAL_PLAYER_INPUT;
   private readonly movement: PlayerMovementSystem;
@@ -63,6 +63,13 @@ export class FixedStepRuntime implements SimulationRuntime {
 
     this.movement.step(this.currentInput, step.dtSeconds);
     this.tick = step.tick;
+  }
+
+  public relocatePlayer(
+    position: WorldPosition,
+    facing?: FacingDirection | null,
+  ): void {
+    this.movement.relocate(position, facing);
   }
 
   public getSnapshot(): Readonly<SimulationSnapshot> {

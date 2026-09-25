@@ -154,6 +154,22 @@ export class PlayerMovementSystem {
       : 'MOVING';
   }
 
+  public relocate(
+    position: WorldPosition,
+    facing: FacingDirection | null = this.facing,
+  ): void {
+    this.position = createWorldPosition(position.x, position.y);
+    this.facing = facing;
+    this.locomotionState = 'IDLE';
+    this.intendedDirection = createWorldVector(0, 0);
+    this.intendedVelocity = createWorldVector(0, 0);
+    this.resolvedVelocity = createWorldVector(0, 0);
+    this.blockedX = false;
+    this.blockedY = false;
+    this.hitSolidX = undefined;
+    this.hitSolidY = undefined;
+  }
+
   public getSnapshot(): Readonly<PlayerMovementSnapshot> {
     return Object.freeze({
       position: this.position,
