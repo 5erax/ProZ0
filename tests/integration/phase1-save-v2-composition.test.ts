@@ -43,7 +43,11 @@ describe('Phase 1 Save V2 integration composition', () => {
       const fiber = original.world.getActiveGeneratedEntities().find(
         (entity) =>
           entity.type === 'resource'
-          && entity.definitionId === 'resource:fiber-plant',
+          && entity.definitionId === 'resource:fiber-plant'
+          && original.world.isResourceInInteractionRange(
+            'p1',
+            entity.entityId,
+          ),
       );
       if (fiber === undefined || fiber.type !== 'resource') {
         throw new Error('Expected canonical nearby Fiber Plant.');
