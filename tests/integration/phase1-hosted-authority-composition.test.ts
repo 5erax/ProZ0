@@ -10,6 +10,7 @@ import {
   type SessionAcceptedV1,
 } from '../../src/protocol';
 import type {
+  HostedOutboundMessage,
   HostedPersistencePort,
   ServerAuthorityHost,
 } from '../../src/server';
