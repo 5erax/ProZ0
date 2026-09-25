@@ -31,8 +31,20 @@ test('Phase 1 presentation shell preserves logical layout and semantic states', 
     'assets/phase1/world/structures/habitat_room.png',
   );
   await expect(
-    ui.locator('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]'),
-  ).toHaveCount(8);
+    ui.locator(
+      '[data-region="survival"] [data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]',
+    ),
+  ).toHaveCount(5);
+  await expect(
+    ui.locator(
+      '[data-region="carry"] [data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]',
+    ),
+  ).toHaveCount(2);
+  await expect(
+    ui.locator(
+      '.p1-world [data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]',
+    ),
+  ).toHaveCount(1);
 
   await expect(ui.locator('[data-region="survival"]')).toContainText('DEHYDRATED');
   await expect(ui.locator('[data-region="carry"]')).toHaveAttribute('data-carry-state', 'HEAVY');
@@ -106,7 +118,7 @@ test('runtime binding route renders authoritative derived state and stale reject
   );
   await expect(
     ui.locator('[data-asset-path="assets/phase1/items/item_icon_atlas.png"]'),
-  ).toHaveCount(4);
+  ).toHaveCount(3);
   await expect(ui.locator('[data-marker-shape="circle"]')).toHaveCount(1);
 });
 
