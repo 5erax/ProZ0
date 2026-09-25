@@ -395,32 +395,47 @@ describe('Phase 1 Save V2 integration composition', () => {
         }
         reopened.getRuntime('p1').relocatePlayer(cache.position);
 
-        const cacheContainer =
-          reopened.items.getContainerView(death.cacheContainerId);
-        const stack = cacheContainer.stacks[0];
-        if (stack === undefined) {
-          throw new Error('Expected reopened Death Cache item.');
+        let recoveryOrdinal = 0;
+        while (
+          reopened.items.getContainerView(
+            death.cacheContainerId,
+          ).stacks.length > 0
+        ) {
+          const cacheContainer =
+            reopened.items.getContainerView(death.cacheContainerId);
+          const stack = cacheContainer.stacks[0];
+          if (stack === undefined) {
+            throw new Error('Expected reopened Death Cache item.');
+          }
+          const target =
+            reopened.items.getContainerView('inventory:p1');
+          const recovered = reopened.death.recoverFromDeathCache({
+            type: 'transfer',
+            operationId:
+              'save-death:recover:' + String(++recoveryOrdinal),
+            playerId: 'p1',
+            sourceContainerId: cacheContainer.containerId,
+            sourceExpectedRevision: cacheContainer.revision,
+            targetContainerId: target.containerId,
+            targetExpectedRevision: target.revision,
+            sourceStackId: stack.stackId,
+            quantity: stack.quantity,
+          });
+          expect(recovered.status).toBe('committed');
         }
-        const target =
-          reopened.items.getContainerView('inventory:p1');
-        const recovered = reopened.death.recoverFromDeathCache({
-          type: 'transfer',
-          operationId: 'save-death:recover',
-          playerId: 'p1',
-          sourceContainerId: cacheContainer.containerId,
-          sourceExpectedRevision: cacheContainer.revision,
-          targetContainerId: target.containerId,
-          targetExpectedRevision: target.revision,
-          sourceStackId: stack.stackId,
-          quantity: stack.quantity,
-        });
-        expect(recovered.status).toBe('committed');
         expect(
           reopened.items.getContainerView('inventory:p1').stacks,
-        ).toContainEqual(expect.objectContaining({
-          itemDefinitionId: 'item:plant-fiber',
-          quantity: 2,
-        }));
+        ).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            itemDefinitionId: 'item:plant-fiber',
+            quantity: 2,
+          }),
+          expect.objectContaining({
+            itemDefinitionId: 'item:stone-field-tool',
+            quantity: 1,
+            condition: 100,
+          }),
+        ]));
         expect(
           reopened.world.getDeathCacheByContainer(
             death.cacheContainerId,
