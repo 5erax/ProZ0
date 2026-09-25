@@ -1,0 +1,310 @@
+import { describe, expect, it } from 'vitest';
+import {
+  Phase1HostedAuthorityComposition,
+} from '../../src/integration';
+import {
+  HOSTED_PROTOCOL_VERSION,
+  type ClientEnvelopeV1,
+  type GameplayCommandEnvelopeV1,
+  type JsonValue,
+  type SessionAcceptedV1,
+} from '../../src/protocol';
+import type {
+  HostedPersistencePort,
+  ServerAuthorityHost,
+} from '../../src/server';
+import {
+  getPhase1WorldLandmarks,
+} from '../../src/world/phase1/Phase1ChunkGenerator';
+
+interface HostedClientHarness {
+  readonly transportId: string;
+  readonly playerId: string;
+  readonly connectionId: string;
+  nextSeq: number;
+}
+
+class NoopHostedPersistence implements HostedPersistencePort {
+  public async save(authorityTick: number) {
+    return Object.freeze({
+      authorityTick,
+      durableSaveRevision: 0,
+    });
+  }
+}
+
+function helloPayload(
+  composition: Phase1HostedAuthorityComposition,
+) {
+  return Object.freeze({
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    contentCompatibility:
+      composition.bundle.getContentCompatibility(),
+    worldCompatibility:
+      composition.bundle.getWorldCompatibility(),
+  });
+}
+
+function join(
+  composition: Phase1HostedAuthorityComposition,
+  transportId: string,
+): HostedClientHarness {
+  const host = composition.host;
+  const joined = host.receiveText(transportId, JSON.stringify({
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    messageType: 'CLIENT_HELLO',
+    clientMessageSeq: 0,
+    payload: helloPayload(composition),
+  }));
+  const accepted = joined.find(
+    (entry) => entry.envelope.messageType === 'SESSION_ACCEPTED',
+  );
+  const baseline = joined.find(
+    (entry) => entry.envelope.messageType === 'BASELINE_SNAPSHOT',
+  );
+  if (accepted === undefined || baseline === undefined) {
+    throw new Error('Expected hosted Phase 1 client acceptance.');
+  }
+
+  const metadata =
+    accepted.envelope.payload as unknown as SessionAcceptedV1;
+  const client: HostedClientHarness = {
+    transportId,
+    playerId: metadata.playerId,
+    connectionId: metadata.connectionId,
+    nextSeq: 1,
+  };
+  host.receiveText(transportId, JSON.stringify({
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    messageType: 'BASELINE_APPLIED',
+    clientMessageSeq: client.nextSeq++,
+    sessionId: host.getSessionId(),
+    connectionId: client.connectionId,
+    payload: { snapshotId: metadata.snapshotId },
+  }));
+  return client;
+}
+
+function sendMovement(
+  host: ServerAuthorityHost,
+  client: HostedClientHarness,
+  inputSeq: number,
+  direction: {
+    readonly up: boolean;
+    readonly down: boolean;
+    readonly left: boolean;
+    readonly right: boolean;
+  },
+): void {
+  const envelope: ClientEnvelopeV1 = {
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    messageType: 'MOVEMENT_INPUT',
+    clientMessageSeq: client.nextSeq++,
+    sessionId: host.getSessionId(),
+    connectionId: client.connectionId,
+    payload: {
+      inputSeq,
+      ...direction,
+    },
+  };
+  expect(
+    host.receiveText(
+      client.transportId,
+      JSON.stringify(envelope),
+    ),
+  ).toEqual([]);
+}
+
+function sendCommand(
+  host: ServerAuthorityHost,
+  client: HostedClientHarness,
+  command: GameplayCommandEnvelopeV1,
+): void {
+  const envelope: ClientEnvelopeV1 = {
+    protocolVersion: HOSTED_PROTOCOL_VERSION,
+    messageType: 'GAMEPLAY_COMMAND',
+    clientMessageSeq: client.nextSeq++,
+    sessionId: host.getSessionId(),
+    connectionId: client.connectionId,
+    payload: command as unknown as JsonValue,
+  };
+  host.receiveText(
+    client.transportId,
+    JSON.stringify(envelope),
+  );
+}
+
+describe('Phase 1 hosted vertical-slice composition', () => {
+  it('integrates 4 admitted players, stable co-op identity, shared discovery and authoritative ruin inspect', async () => {
+    const composition = await Phase1HostedAuthorityComposition.create({
+      worldId: 'world:p1-hosted-integration',
+      worldSeed: 'p1-world-golden',
+      maxPlayers: 4,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: new NoopHostedPersistence(),
+      sessionId: 'session:p1-hosted-integration',
+      sessionEpoch: 'epoch:p1-hosted-integration',
+    });
+
+    try {
+      const clients = [
+        join(composition, 'transport:a'),
+        join(composition, 'transport:b'),
+        join(composition, 'transport:c'),
+        join(composition, 'transport:d'),
+      ];
+      expect(clients.map((client) => client.playerId)).toEqual([
+        'player:1',
+        'player:2',
+        'player:3',
+        'player:4',
+      ]);
+      expect(composition.bundle.getActivePlayerIds()).toEqual([
+        'player:1',
+        'player:2',
+        'player:3',
+        'player:4',
+      ]);
+
+      const full = composition.host.receiveText(
+        'transport:e',
+        JSON.stringify({
+          protocolVersion: HOSTED_PROTOCOL_VERSION,
+          messageType: 'CLIENT_HELLO',
+          clientMessageSeq: 0,
+          payload: helloPayload(composition),
+        }),
+      );
+      expect(full).toHaveLength(1);
+      expect(full[0]?.envelope).toMatchObject({
+        messageType: 'SESSION_REJECTED',
+        payload: { reason: 'SESSION_FULL' },
+      });
+
+      sendMovement(
+        composition.host,
+        clients[0]!,
+        1,
+        { up: false, down: false, left: false, right: true },
+      );
+      const firstStep = await composition.step();
+      const viewerMotions = firstStep
+        .filter(
+          (entry) =>
+            entry.transportId === 'transport:a'
+            && entry.envelope.messageType === 'PLAYER_MOTION',
+        )
+        .map((entry) => entry.envelope.payload as unknown as {
+          readonly playerId: string;
+          readonly presentationIdentitySlot: string;
+        });
+      expect(viewerMotions).toHaveLength(4);
+      expect(
+        Object.fromEntries(
+          viewerMotions.map((entry) => [
+            entry.playerId,
+            entry.presentationIdentitySlot,
+          ]),
+        ),
+      ).toEqual({
+        'player:1': 'LOCAL',
+        'player:2': 'TEAM_A',
+        'player:3': 'TEAM_B',
+        'player:4': 'TEAM_C',
+      });
+      expect(
+        composition.bundle.getPlayerPosition('player:1').x,
+      ).toBeGreaterThan(0);
+
+      const landmarks = getPhase1WorldLandmarks('p1-world-golden');
+      const ruin = composition.bundle.world.findGeneratedEntityByDefinition(
+        'ruin:previous-civilization-ruin',
+      );
+      if (ruin === null) throw new Error('Expected canonical Phase 1 ruin.');
+
+      composition.bundle.getRuntime('player:1').relocatePlayer(
+        landmarks.ruinPosition,
+      );
+      const discoveryStep = await composition.step();
+      const ruinDiscoveryMessages = discoveryStep.filter(
+        (entry) =>
+          entry.envelope.messageType === 'AGGREGATE_UPDATE'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateType: string;
+              readonly aggregateId: string;
+            }
+          ).aggregateType === 'ruin'
+          && (
+            entry.envelope.payload as unknown as {
+              readonly aggregateId: string;
+            }
+          ).aggregateId === ruin.entityId,
+      );
+      expect(
+        new Set(
+          ruinDiscoveryMessages.map((entry) => entry.transportId),
+        ),
+      ).toEqual(new Set([
+        'transport:a',
+        'transport:b',
+        'transport:c',
+        'transport:d',
+      ]));
+
+      const located =
+        composition.bundle.worldStore.getRuinState(ruin.entityId);
+      expect(located?.discoveryState).toBe('located');
+      expect(
+        composition.bundle.progression
+          .getPlayerView('player:1').milestoneRuleIds,
+      ).toContain('first-ruin-locate:previous-civilization-ruin');
+      expect(
+        composition.bundle.progression
+          .getPlayerView('player:2').milestoneRuleIds,
+      ).not.toContain('first-ruin-locate:previous-civilization-ruin');
+
+      sendCommand(composition.host, clients[0]!, {
+        operationId: 'hosted:ruin-inspect:p1',
+        commandType: 'world.ruin-inspect',
+        expectedRevisions: Object.freeze([{
+          aggregateType: 'ruin',
+          aggregateId: ruin.entityId,
+          revision: located!.revision,
+        }]),
+        payload: {
+          ruinEntityId: ruin.entityId,
+        },
+      });
+      const inspectStep = await composition.step();
+      expect(
+        inspectStep.find(
+          (entry) =>
+            entry.transportId === 'transport:a'
+            && entry.envelope.messageType === 'COMMAND_RESULT',
+        )?.envelope.payload,
+      ).toMatchObject({
+        operationId: 'hosted:ruin-inspect:p1',
+        status: 'committed',
+      });
+      expect(
+        composition.bundle.worldStore.getRuinState(ruin.entityId),
+      ).toMatchObject({
+        discoveryState: 'investigated',
+        physicalRewardState: 'claimable',
+      });
+      expect(
+        composition.bundle.progression
+          .getPlayerView('player:1').milestoneRuleIds,
+      ).toContain('first-ruin-inspect:previous-civilization-ruin');
+      expect(
+        composition.bundle.progression
+          .getPlayerView('player:2').milestoneRuleIds,
+      ).not.toContain('first-ruin-inspect:previous-civilization-ruin');
+    } finally {
+      await composition.destroy();
+    }
+  });
+});
