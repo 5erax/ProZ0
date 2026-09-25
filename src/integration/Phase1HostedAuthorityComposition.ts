@@ -1,7 +1,11 @@
 import type {
   JsonValue,
+  RevisionRefV1,
   RevisionedAggregateViewV1,
 } from '../protocol';
+import type {
+  ItemTransactionResult,
+} from '../simulation';
 import {
   Phase1HostedCommandDispatcher,
   ServerAuthorityHost,
@@ -81,6 +85,26 @@ function aggregateViews(
       || left.aggregateId.localeCompare(right.aggregateId),
     ),
   );
+}
+
+function itemResultRevisions(
+  result: Readonly<ItemTransactionResult>,
+): readonly RevisionRefV1[] {
+  if (result.status !== 'committed') return Object.freeze([]);
+  return Object.freeze([
+    ...result.resultingRevisions.map((entry) => Object.freeze({
+      aggregateType: 'container',
+      aggregateId: entry.containerId,
+      revision: entry.revision,
+    })),
+    ...result.resultingWorldRevisions.map((entry) => Object.freeze({
+      aggregateType: entry.kind,
+      aggregateId: entry.kind === 'resource'
+        ? entry.resourceEntityId
+        : entry.worldDropId,
+      revision: entry.revision,
+    })),
+  ]);
 }
 
 function aggregateKey(view: {
@@ -199,6 +223,18 @@ export class Phase1HostedAuthorityComposition {
         execute(command) {
           return bundle.executeItemCommand(command);
         },
+        beginGather(request) {
+          return bundle.items.beginGather(request);
+        },
+        getActiveGatherOperationId(playerId) {
+          return bundle.items.getActiveGatherOperationId(playerId);
+        },
+        cancelGather(playerId) {
+          return bundle.items.cancelGather(playerId);
+        },
+        cancelAllGathers() {
+          return bundle.items.cancelAllGathers();
+        },
       }),
       buildings: Object.freeze({
         place(command) {
@@ -262,6 +298,41 @@ export class Phase1HostedAuthorityComposition {
     await this.bundle.prepareAuthorityTick(nextTick);
     const outbound: HostedOutboundMessage[] = [...this.host.step()];
     await this.bundle.completeAuthorityTick(nextTick);
+
+    for (const playerId of this.bundle.getActivePlayerIds()) {
+      const gather = this.bundle.getLastGatherResult(playerId);
+      if (gather === null || gather.status === 'idle'
+        || gather.status === 'channeling') {
+        continue;
+      }
+
+      if (gather.status === 'canceled') {
+        outbound.push(...this.host.resolvePendingDomainCommand(
+          gather.operationId,
+          Object.freeze({
+            status: 'rejected',
+            reason: gather.reason,
+          }),
+        ));
+        continue;
+      }
+
+      const result = gather.result;
+      outbound.push(...this.host.resolvePendingDomainCommand(
+        result.operationId,
+        result.status === 'committed'
+          ? Object.freeze({
+              status: 'committed',
+              resultingRevisions: itemResultRevisions(result),
+              aggregateUpdates: this.collectSharedViews(),
+            })
+          : Object.freeze({
+              status: 'rejected',
+              reason: result.reason,
+            }),
+      ));
+    }
+
     outbound.push(...this.publishSharedState());
     return Object.freeze(outbound);
   }
