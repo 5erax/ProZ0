@@ -129,29 +129,85 @@ export async function createPhase1ProductReviewRuntime(
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
 
+  const playerPosition = () =>
+    bundle.getPlayerPosition(config.localPlayerId);
+
+  const interactionRangeSquared =
+    config.interactionRangeWorldUnits
+    * config.interactionRangeWorldUnits;
+
+  const distanceFromPlayerSquared = (
+    x: number,
+    y: number,
+  ): number => {
+    const player = playerPosition();
+    return squaredDistance(player.x, player.y, x, y);
+  };
+
   const resourceTarget = () => {
-    const player = bundle.getPlayerPosition(config.localPlayerId);
-    const maxDistanceSquared =
-      config.interactionRangeWorldUnits
-      * config.interactionRangeWorldUnits;
     return bundle.world.getActiveGeneratedEntities()
       .filter((entity) => entity.type === 'resource')
       .map((entity) => ({
         entity,
-        distance: squaredDistance(
-          player.x,
-          player.y,
+        distance: distanceFromPlayerSquared(
           entity.position.x,
           entity.position.y,
         ),
       }))
       .filter((candidate) =>
-        candidate.distance <= maxDistanceSquared,
+        candidate.distance <= interactionRangeSquared,
       )
       .sort((left, right) =>
         left.distance - right.distance
         || left.entity.entityId.localeCompare(right.entity.entityId),
       )[0]?.entity ?? null;
+  };
+
+  const deathCacheTarget = () => {
+    return bundle.world.exportSnapshot().deathCaches.caches
+      .map((cache) => ({
+        cache,
+        distance: distanceFromPlayerSquared(
+          cache.position.x,
+          cache.position.y,
+        ),
+      }))
+      .filter((candidate) =>
+        candidate.distance <= interactionRangeSquared,
+      )
+      .sort((left, right) =>
+        left.distance - right.distance
+        || left.cache.entityId.localeCompare(right.cache.entityId),
+      )
+      .find((candidate) =>
+        bundle.items.getContainerView(
+          candidate.cache.containerId,
+        ).stacks.length > 0,
+      )?.cache ?? null;
+  };
+
+  const ruinTarget = () => {
+    const entity = bundle.world.findGeneratedEntityByDefinition(
+      'ruin:previous-civilization-ruin',
+    );
+    if (
+      entity === null
+      || entity.type !== 'ruin'
+      || !bundle.world.isGeneratedEntityInInteractionRange(
+        config.localPlayerId,
+        entity.entityId,
+      )
+    ) {
+      return null;
+    }
+    const state = bundle.worldStore.getRuinState(entity.entityId);
+    if (
+      state === undefined
+      || state.discoveryState !== 'located'
+    ) {
+      return null;
+    }
+    return Object.freeze({ entity, state });
   };
 
   const resolveGatherTool = (
@@ -272,6 +328,129 @@ export async function createPhase1ProductReviewRuntime(
     presentGatherStart(start, definition.displayName);
   };
 
+  const recoverDeathCache = (): boolean => {
+    const cache = deathCacheTarget();
+    if (cache === null) return false;
+
+    const sourceContainer =
+      bundle.items.getContainerView(cache.containerId);
+    const stack = sourceContainer.stacks[0];
+    if (stack === undefined) return false;
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const result = bundle.death.recoverFromDeathCache({
+      type: 'transfer',
+      operationId: nextOperationId('death-cache-recover'),
+      playerId: config.localPlayerId,
+      sourceContainerId: sourceContainer.containerId,
+      sourceExpectedRevision: sourceContainer.revision,
+      targetContainerId: inventory.containerId,
+      targetExpectedRevision: inventory.revision,
+      sourceStackId: stack.stackId,
+      quantity: stack.quantity,
+    });
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'RECOVER',
+      target: 'Death Cache',
+    });
+    return true;
+  };
+
+  const inspectRuin = (): boolean => {
+    const target = ruinTarget();
+    if (target === null) return false;
+    const result = bundle.inspectRuin({
+      operationId: nextOperationId('ruin-inspect'),
+      playerId: config.localPlayerId,
+      ruinEntityId: target.entity.entityId,
+      expectedRevision: target.state.revision,
+    });
+    source.setLocalCommandFeedback({
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'INSPECT',
+      target: 'Previous-Civilization Ruin',
+    });
+    return true;
+  };
+
+  const refreshContextInteraction = (): void => {
+    if (activeGather !== null) return;
+
+    const cache = deathCacheTarget();
+    if (cache !== null) {
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E',
+        verb: 'RECOVER',
+        target: 'Death Cache',
+        state: 'AVAILABLE',
+        reason: null,
+        progress: null,
+      }));
+      return;
+    }
+
+    const ruin = ruinTarget();
+    if (ruin !== null) {
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E',
+        verb: 'INSPECT',
+        target: 'Previous-Civilization Ruin',
+        state: 'AVAILABLE',
+        reason: null,
+        progress: null,
+      }));
+      return;
+    }
+
+    const resource = resourceTarget();
+    if (resource !== null && resource.type === 'resource') {
+      const definition = bundle.catalog.getAs(
+        resource.definitionId,
+        'resource',
+      );
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E',
+        verb: 'GATHER',
+        target: definition.displayName,
+        state: 'AVAILABLE',
+        reason: null,
+        progress: null,
+      }));
+      return;
+    }
+
+    source.setInteraction(Object.freeze({
+      inputLabel: 'E',
+      verb: 'INTERACT',
+      target: 'Move near an interactable',
+      state: 'UNAVAILABLE',
+      reason: null,
+      progress: null,
+    }));
+  };
+
+  const beginContextInteraction = (): void => {
+    if (activeGather !== null) {
+      bundle.items.cancelGather(config.localPlayerId);
+      activeGather = null;
+      refreshContextInteraction();
+      return;
+    }
+    if (recoverDeathCache()) return;
+    if (inspectRuin()) return;
+    beginGather();
+  };
+
   const updateGather = (
     result: Readonly<GatherTickResult> | null,
   ): void => {
@@ -314,7 +493,7 @@ export async function createPhase1ProductReviewRuntime(
     switch (event.code) {
       case 'KeyE':
         event.preventDefault();
-        beginGather();
+        beginContextInteraction();
         break;
       case 'KeyI':
         event.preventDefault();
@@ -342,6 +521,7 @@ export async function createPhase1ProductReviewRuntime(
           bundle.getLastGatherResult(config.localPlayerId),
         );
         source.refresh();
+        refreshContextInteraction();
         worldRenderer.render();
       }).catch((error: unknown) => {
         root.dataset.runtimeStatus = 'failed';
@@ -360,14 +540,7 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.runtimeStatus = 'ready';
   root.dataset.productReviewAuthority = 'canonical';
 
-  source.setInteraction(Object.freeze({
-    inputLabel: 'E',
-    verb: 'INTERACT',
-    target: 'Move near a resource',
-    state: 'UNAVAILABLE',
-    reason: null,
-    progress: null,
-  }));
+  refreshContextInteraction();
 
   return Object.freeze({
     async save(

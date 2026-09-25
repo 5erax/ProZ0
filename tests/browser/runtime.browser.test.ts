@@ -311,6 +311,43 @@ describe('Phase 0 browser runtime', () => {
     }
   });
 
+  it('exposes canonical context interaction without debug-console knowledge', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-context',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        // Test-only range reaches the canonical nearby Fiber Plant from
+        // landing; production still requires owner-approved tuning.
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    const interaction =
+      root.querySelector<HTMLElement>('[data-region="interaction"]');
+    expect(interaction?.dataset.state).toBe('AVAILABLE');
+    expect(interaction?.textContent).toContain('GATHER');
+    expect(interaction?.textContent).toContain('Fiber');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyE',
+      cancelable: true,
+    }));
+    await wait(20);
+
+    const channeling =
+      root.querySelector<HTMLElement>('[data-region="interaction"]');
+    expect(channeling?.dataset.state).toBe('CHANNELING');
+    expect(channeling?.textContent).toContain('GATHER');
+  });
+
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
     root = document.createElement('div');
     document.body.append(root);
