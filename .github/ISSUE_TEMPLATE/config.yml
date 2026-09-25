@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution workflow
+    url: https://github.com/5erax/ProZ0/blob/main/CONTRIBUTING.md
+    about: Read the project workflow before creating work.
+  - name: Security policy
+    url: https://github.com/5erax/ProZ0/blob/main/SECURITY.md
+    about: Do not disclose sensitive vulnerabilities in public Issues.

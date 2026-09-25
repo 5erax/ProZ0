@@ -1,0 +1,63 @@
+name: Proposal / discovery
+description: Record a product, design, technical or workflow idea for evaluation
+title: "[PROPOSAL] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Creating a proposal does not activate implementation. Approved work must still pass normal ownership, dependency and task-lock routing.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Product / gameplay
+        - Narrative / world
+        - Art / UX
+        - Technical / architecture
+        - World / level design
+        - Audio
+        - Build / tooling / DevOps
+        - QA / testing
+        - Team / workflow
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / opportunity
+      description: What is missing, weak, risky or worth exploring?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Describe the idea without presenting it as already approved.
+    validations:
+      required: true
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Expected benefit
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Scope / dependencies / risks
+      description: Known affected systems, roles, files, milestones or trade-offs
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / references
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I understand this is a proposal, not an activated implementation task.
+          required: true
+        - label: I checked for an existing duplicate or overlapping Issue.
+          required: true
