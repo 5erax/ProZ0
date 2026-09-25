@@ -5,6 +5,7 @@ import {
   type Phase1AuthorityBundleConfig,
 } from '../../integration/Phase1AuthorityBundle';
 import type {
+  FacingDirection,
   GatherStartResult,
   GatherTickResult,
 } from '../../simulation';
@@ -90,6 +91,22 @@ function squaredDistance(
   const dx = ax - bx;
   const dy = ay - by;
   return dx * dx + dy * dy;
+}
+
+function facingVector(
+  facing: FacingDirection | null,
+): { readonly x: number; readonly y: number } | null {
+  switch (facing) {
+    case 'N': return Object.freeze({ x: 0, y: -1 });
+    case 'NE': return Object.freeze({ x: 1, y: -1 });
+    case 'E': return Object.freeze({ x: 1, y: 0 });
+    case 'SE': return Object.freeze({ x: 1, y: 1 });
+    case 'S': return Object.freeze({ x: 0, y: 1 });
+    case 'SW': return Object.freeze({ x: -1, y: 1 });
+    case 'W': return Object.freeze({ x: -1, y: 0 });
+    case 'NW': return Object.freeze({ x: -1, y: -1 });
+    case null: return null;
+  }
 }
 
 function validateProductReviewConfig(
@@ -1112,12 +1129,131 @@ export async function createPhase1ProductReviewRuntime(
     }
   };
 
+  const toggleWeapon = (): void => {
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    const spear = inventory.stacks.find(
+      (stack) =>
+        stack.itemDefinitionId === 'item:basic-spear'
+        && stack.condition !== null
+        && stack.condition > 0,
+    );
+    const next = current.equippedWeaponStackId === null
+      ? spear?.stackId ?? null
+      : null;
+    const result = bundle.equipWeapon(config.localPlayerId, next);
+    source.setLocalCommandFeedback({
+      operationId: nextOperationId('equip-weapon'),
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: next === null ? 'UNEQUIP' : 'EQUIP',
+      target: 'Basic Spear',
+    });
+  };
+
+  const toggleThermalWrap = (): void => {
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    const wrap = inventory.stacks.find(
+      (stack) =>
+        stack.itemDefinitionId === 'item:thermal-wrap'
+        && stack.condition !== null
+        && stack.condition > 0,
+    );
+    const next = current.equippedThermalWrapStackId === null
+      ? wrap?.stackId ?? null
+      : null;
+    const result = bundle.equipThermalWrap(config.localPlayerId, next);
+    source.setLocalCommandFeedback({
+      operationId: nextOperationId('equip-thermal-wrap'),
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: next === null ? 'UNEQUIP' : 'EQUIP',
+      target: 'Thermal Wrap',
+    });
+  };
+
+  const attackPredator = (): void => {
+    const predator = bundle.world.findGeneratedEntityByDefinition(
+      'hostile:territorial-predator',
+    );
+    if (predator === null || predator.type !== 'hostile') {
+      source.setInteraction(Object.freeze({
+        inputLabel: 'SPACE',
+        verb: 'ATTACK',
+        target: 'Territorial Predator',
+        state: 'UNAVAILABLE',
+        reason: 'NO HOSTILE TARGET',
+        progress: null,
+      }));
+      return;
+    }
+
+    const runtime = bundle.getRuntime(config.localPlayerId);
+    const facing = facingVector(runtime.getSnapshot().player.facing);
+    if (facing === null) {
+      source.setInteraction(Object.freeze({
+        inputLabel: 'SPACE',
+        verb: 'ATTACK',
+        target: 'Territorial Predator',
+        state: 'BLOCKED',
+        reason: 'MOVE TO SET FACING',
+        progress: null,
+      }));
+      return;
+    }
+
+    const inventory = bundle.items.getContainerView(
+      'inventory:' + config.localPlayerId,
+    );
+    const result = bundle.combat.submitAttack({
+      attackId: nextOperationId('attack'),
+      playerId: config.localPlayerId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      facingX: facing.x,
+      facingY: facing.y,
+    }, predator.entityId);
+
+    source.setLocalCommandFeedback({
+      operationId: result.attackId,
+      status: result.status === 'rejected' ? 'rejected' : 'committed',
+      ...(result.status === 'rejected' && result.reason !== undefined
+        ? { reason: result.reason }
+        : {}),
+      verb: 'ATTACK',
+      target:
+        'Territorial Predator · '
+        + result.status.toUpperCase(),
+    });
+  };
+
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
     switch (event.code) {
       case 'KeyE':
         event.preventDefault();
         beginContextInteraction();
+        break;
+      case 'KeyQ':
+        event.preventDefault();
+        toggleWeapon();
+        break;
+      case 'KeyT':
+        event.preventDefault();
+        toggleThermalWrap();
+        break;
+      case 'Space':
+        event.preventDefault();
+        attackPredator();
         break;
       case 'KeyC':
         event.preventDefault();
