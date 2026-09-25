@@ -154,4 +154,85 @@ describe('Phase 0 browser runtime', () => {
     ).toContain('DEHYDRATED');
   });
 
+
+  it('boots canonical Phase 1 Product Review runtime without QA fixtures', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        // Test-only integration values. Production Product Review remains
+        // fail-closed until gameplay/clearance tuning is owner-approved.
+        interactionRangeWorldUnits: 2,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    const canvas = root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+    const ui = root.querySelector<HTMLElement>('#proz0-phase1-ui');
+    expect(root.dataset.runtimeMode).toBe('phase1-product-review');
+    expect(root.dataset.runtimeStatus).toBe('ready');
+    expect(root.dataset.phase1QaMode).toBe('none');
+    expect(root.dataset.productReviewAuthority).toBe('canonical');
+    expect(canvas?.dataset.renderer).toBe('phase1-production-raster');
+    expect(
+      root.querySelector<HTMLElement>('[data-product-review-world="canonical"]')
+        ?.dataset.productionAssetFoundation,
+    ).toBe('p1-75-78');
+    expect(
+      root.querySelector(
+        '[data-world-role="player"]'
+        + '[data-asset-path="assets/phase1/actors/player_pioneer.png"]',
+      ),
+    ).not.toBeNull();
+    expect(root.querySelector('[data-production-world-preview]')).toBeNull();
+    expect(ui?.dataset.presentationAuthority).toBe('derived-read-only');
+
+    const initialX = Number(canvas?.dataset.playerX);
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyD',
+      cancelable: true,
+    }));
+    await wait(180);
+    window.dispatchEvent(new KeyboardEvent('keyup', {
+      code: 'KeyD',
+      cancelable: true,
+    }));
+    await wait(40);
+    expect(Number(canvas?.dataset.playerX)).toBeGreaterThan(initialX);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyI',
+      cancelable: true,
+    }));
+    await wait(20);
+    expect(
+      root.querySelector('[data-panel-kind="inventory"]'),
+    ).not.toBeNull();
+  });
+
+  it('fails closed when Product Review gameplay tuning is not approved', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    await expect(bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-invalid',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 0,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    })).rejects.toThrow(/approved positive ordinary interaction range/);
+  });
+
 });
