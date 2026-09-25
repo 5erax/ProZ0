@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createWorldPosition } from '../../src/foundation';
 import {
   PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
   PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
@@ -75,6 +76,78 @@ describe('Phase 1 canonical authority bundle', () => {
       expect(bundle.getPlayerPosition('p1')).toMatchObject({ x: 0, y: 0 });
       expect(bundle.getRuntime('p1').getSnapshot().player.locomotionState)
         .toBe('IDLE');
+    } finally {
+      await bundle.destroy();
+    }
+  });
+
+  it('applies approved 1.25 WU interaction and Landing clearance boundaries inclusively', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-approved-spatial-tuning',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+      spawnClearanceRadiusWorldUnits:
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+      requiredAccessRadiusWorldUnits:
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+    });
+
+    try {
+      const resource = bundle.world.findGeneratedEntityByDefinition(
+        'resource:fiber-plant',
+      );
+      if (resource === null || resource.type !== 'resource') {
+        throw new Error('Expected canonical Fiber Plant.');
+      }
+      bundle.getRuntime('p1').relocatePlayer(createWorldPosition(
+        resource.position.x
+          + PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+        resource.position.y,
+      ));
+      expect(bundle.world.isResourceInInteractionRange(
+        'p1',
+        resource.entityId,
+      )).toBe(true);
+
+      bundle.getRuntime('p1').relocatePlayer(createWorldPosition(
+        resource.position.x
+          + PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS
+          + 0.0001,
+        resource.position.y,
+      ));
+      expect(bundle.world.isResourceInInteractionRange(
+        'p1',
+        resource.entityId,
+      )).toBe(false);
+
+      const habitat =
+        PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:habitat-room'];
+      const directEastConnectorCenter = createWorldPosition(2, 0);
+      expect(bundle.world.blocksSpawnClearance(
+        directEastConnectorCenter,
+        habitat,
+        0,
+      )).toBe(false);
+      expect(bundle.world.blocksRequiredAccess(
+        directEastConnectorCenter,
+        habitat,
+        0,
+      )).toBe(false);
+
+      const storage =
+        PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:storage-crate'];
+      expect(bundle.world.blocksSpawnClearance(
+        createWorldPosition(0, 0),
+        storage,
+        0,
+      )).toBe(true);
+      expect(bundle.world.blocksRequiredAccess(
+        createWorldPosition(0, 0),
+        storage,
+        0,
+      )).toBe(true);
     } finally {
       await bundle.destroy();
     }
