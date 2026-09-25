@@ -13,7 +13,26 @@ test('Phase 1 presentation shell preserves logical layout and semantic states', 
   await expect(root).toHaveAttribute('data-phase1-qa-mode', 'overview');
   await expect(ui).toBeVisible();
   await expect(ui).toHaveAttribute('data-presentation-authority', 'derived-read-only');
+  await expect(ui).toHaveAttribute('data-production-asset-foundation', 'p1-75-78');
   await expect(ui).toHaveAttribute('data-display-scale', '2');
+  await expect(
+    ui.locator('[data-production-world-preview="accepted-raster"]'),
+  ).toBeVisible();
+  await expect(
+    ui.locator('[data-production-world-asset="player"]'),
+  ).toHaveAttribute(
+    'data-asset-path',
+    'assets/phase1/actors/player_pioneer.png',
+  );
+  await expect(
+    ui.locator('[data-production-world-asset="habitat"]'),
+  ).toHaveAttribute(
+    'data-asset-path',
+    'assets/phase1/world/structures/habitat_room.png',
+  );
+  await expect(
+    ui.locator('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]'),
+  ).toHaveCount(8);
 
   await expect(ui.locator('[data-region="survival"]')).toContainText('DEHYDRATED');
   await expect(ui.locator('[data-region="carry"]')).toHaveAttribute('data-carry-state', 'HEAVY');
@@ -28,6 +47,16 @@ test('Phase 1 panels expose non-color failure and progression semantics', async 
   const buildPanel = page.locator('[data-panel-kind="build"]');
   await expect(buildPanel).toBeVisible();
   await expect(buildPanel.locator('[data-placement-state="INVALID"]')).toContainText('INVALID');
+  await expect(
+    buildPanel.locator('[data-production-pattern-state="INVALID"]'),
+  ).toHaveAttribute(
+    'data-asset-path',
+    'assets/phase1/ui/effects/build_preview_pattern.png',
+  );
+  await expect(buildPanel.locator('.p1-panel-skin-corner')).toHaveAttribute(
+    'data-asset-path',
+    'assets/phase1/ui/panels/ui_panel_skin.png',
+  );
   await expect(buildPanel).toContainText('OUT OF POWER RANGE');
 
   await page.goto('/?qaPhase1=progression&qaScale=2');
@@ -39,6 +68,11 @@ test('Phase 1 panels expose non-color failure and progression semantics', async 
   await expect(page.locator('[data-marker-shape="circle"]')).toHaveCount(1);
   await expect(page.locator('[data-marker-shape="diamond"]')).toHaveCount(1);
   await expect(page.locator('[data-marker-shape="triangle"]')).toHaveCount(1);
+  await expect(
+    page.locator(
+      '[data-asset-path="assets/phase1/ui/icons/coop_identity_markers.png"]',
+    ),
+  ).toHaveCount(3);
 });
 
 
@@ -70,6 +104,9 @@ test('runtime binding route renders authoritative derived state and stale reject
   await expect(ui.locator('[data-panel-kind="container"]')).toContainText(
     'STALE / WORLD STATE CHANGED',
   );
+  await expect(
+    ui.locator('[data-asset-path="assets/phase1/items/item_icon_atlas.png"]'),
+  ).toHaveCount(4);
   await expect(ui.locator('[data-marker-shape="circle"]')).toHaveCount(1);
 });
 
