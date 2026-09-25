@@ -264,7 +264,10 @@ describe('Phase 1 Save V2 integration composition', () => {
       if (ruin === null || ruin.type !== 'ruin') {
         throw new Error('Expected canonical Phase 1 ruin.');
       }
-      original.getRuntime('p1').relocatePlayer(landmarks.ruinPosition);
+      original.getRuntime('p1').relocatePlayer(
+        landmarks.ruinPosition,
+        'E',
+      );
       await original.stepSolo();
       expect(
         original.worldStore.getRuinState(ruin.entityId)?.discoveryState,
