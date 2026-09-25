@@ -758,6 +758,10 @@ export class ServerAuthorityHost {
     return this.finalizeCommand(queued, domain);
   }
 
+  public hasPendingDomainCommand(operationId: string): boolean {
+    return this.pendingDomainCommands.has(operationId);
+  }
+
   public resolvePendingDomainCommand(
     operationId: string,
     domain: HostedDomainCommandResult,
