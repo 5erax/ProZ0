@@ -100,7 +100,7 @@ Judge perceptual state separation.
 
 ### B — Survival-warning family/severity separation
 
-Load Gate B and compare survival-family HIGH/CRITICAL/warning material. Record whether family identity and urgency are distinct.
+Load Gate B and compare manifest survival events whose IDs identify warning/critical severity states. Record whether family identity and urgency are distinct.
 
 ### C — Cold Rain masking/readability
 
@@ -161,7 +161,7 @@ This removes only \`tools/audio-audition/.generated/\`.
 ## Self-tests
 
 \`\`\`bash
-python -m unittest tools/audio-audition/test_audition.py
+python -m unittest discover -s tools/audio-audition -p 'test_audition.py'
 \`\`\`
 
 The tests use a synthetic manifest/ZIP to verify manifest parsing, archive/path failure behavior, byte-preserving extraction/indexing, source immutability, path traversal rejection, and gate derivation.
