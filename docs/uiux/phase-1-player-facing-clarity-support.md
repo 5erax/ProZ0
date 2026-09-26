@@ -101,7 +101,7 @@ This document only proposes clearer labels/reasons/remedies **inside the existin
 
 ### 3.4 Ruin canon guard
 
-Never state or imply that the ruin builders are “not human,” “alien,” or otherwise identity-resolved.
+Builder species/origin and relationship to humanity remain unresolved; no player-facing copy may resolve or imply those answers.
 
 Approved boundary:
 
@@ -359,7 +359,7 @@ Canon wording must preserve unresolved builder identity and relationship to huma
 | Shard claim committed | **PROPOSAL —** “Ancient Alloy Shard claimed.” | CLAIM | The one Phase 1 Shard reward | Refresh inventory and ruin reward state; no duplicate reward. | YES | YES |
 | investigated + reward already claimed | **PROPOSAL —** map/status copy: “Investigated Ruin · Shard claimed” | NONE | Previous-Civilization Ruin | No claim action remains; sandbox/exploration continues. | YES | YES |
 
-**Canon guard:** do not use “alien,” “non-human,” or equivalent identity claims in any inspect/claim copy.
+**Canon guard:** use no identity-resolving species/origin label in inspect/claim copy; builder identity and relationship to humanity remain unresolved.
 
 ---
 
@@ -628,7 +628,7 @@ This task does not:
 | Water/Food correction | **PASS** — 80→79 Water; 70→69.4 Food after one simulated minute; no rebalance proposal. |
 | Combat correction | **PASS** — only feedback clarity; range/arc/miss untouched. |
 | Building correction | **PASS** — no replacement system. |
-| Ruin identity correction | **PASS** — no non-human/alien claim. |
+| Ruin identity correction | **PASS** — no builder species/origin or humanity-relationship claim. |
 | `src/**` modified | **NO** |
 
 **B-TD-01 result:** IMPLEMENTATION_COMPLETE — REVIEW_PENDING.  
