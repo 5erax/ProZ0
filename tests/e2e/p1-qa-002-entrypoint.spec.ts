@@ -12,22 +12,11 @@ test('bare production route launches canonical Phase 1 Product Review without qu
   mkdirSync(EVIDENCE_DIR, { recursive: true });
 
   const fatalErrors: string[] = [];
-  const localhostRequests: string[] = [];
 
   page.on('console', (message) => {
     if (message.type() === 'error') fatalErrors.push(message.text());
   });
   page.on('pageerror', (error) => fatalErrors.push(error.message));
-  page.on('request', (request) => {
-    const hostname = new URL(request.url()).hostname;
-    if (
-      hostname === 'localhost'
-      || hostname === '127.0.0.1'
-      || hostname === '0.0.0.0'
-    ) {
-      localhostRequests.push(request.url());
-    }
-  });
 
   await page.goto('/');
 
@@ -86,7 +75,17 @@ test('bare production route launches canonical Phase 1 Product Review without qu
     path: resolve(EVIDENCE_DIR, '02-phase1-review-started.png'),
   });
 
-  expect(localhostRequests).toEqual([]);
+  const hiddenLocalhostDependencies = await page.evaluate(() => {
+    const localHosts = new Set(['localhost', '127.0.0.1', '0.0.0.0']);
+    return performance.getEntriesByType('resource')
+      .map((entry) => new URL(entry.name))
+      .filter((url) =>
+        localHosts.has(url.hostname)
+        && url.origin !== window.location.origin,
+      )
+      .map((url) => url.toString());
+  });
+  expect(hiddenLocalhostDependencies).toEqual([]);
   expect(fatalErrors).toEqual([]);
 });
 
