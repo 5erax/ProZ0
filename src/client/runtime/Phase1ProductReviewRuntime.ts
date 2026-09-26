@@ -1,4 +1,8 @@
 import type { PlayerId } from '../../foundation';
+import type {
+  PlayerMotionViewV1,
+  PresentationIdentitySlotV1,
+} from '../../protocol';
 import {
   PHASE1_STRUCTURE_PLACEMENT_PROFILES,
   type Phase1StructureDefinitionId,
@@ -199,6 +203,45 @@ export async function createPhase1ProductReviewRuntime(
     isMovementInputCode,
   );
 
+  // Product Review owns a stable presentation-session identity map.
+  // Presentation consumers receive these explicit tokens and must never
+  // reconstruct TEAM identity from PlayerId sorting or render order.
+  const presentationIdentitySlots =
+    new Map<PlayerId, PresentationIdentitySlotV1>();
+  presentationIdentitySlots.set(config.localPlayerId, 'LOCAL');
+  const teamSlots = Object.freeze([
+    'TEAM_A',
+    'TEAM_B',
+    'TEAM_C',
+  ] as const);
+  let teamSlotIndex = 0;
+  for (const configuredPlayerId of config.playerIds) {
+    if (configuredPlayerId === config.localPlayerId) continue;
+    presentationIdentitySlots.set(
+      configuredPlayerId,
+      teamSlots[teamSlotIndex] ?? 'UNASSIGNED',
+    );
+    teamSlotIndex += 1;
+  }
+
+  const playerMotionViews = (): readonly Readonly<PlayerMotionViewV1>[] =>
+    Object.freeze(bundle.getActivePlayerIds().map((id) => {
+      const snapshot = bundle.getRuntime(id).getSnapshot().player;
+      return Object.freeze({
+        playerId: id,
+        presentationIdentitySlot:
+          presentationIdentitySlots.get(id) ?? 'UNASSIGNED',
+        authorityTick: bundle.authorityTick,
+        lastProcessedInputSeq: -1,
+        position: Object.freeze({
+          x: snapshot.position.x,
+          y: snapshot.position.y,
+        }),
+        facing: snapshot.facing,
+        locomotionState: snapshot.locomotionState,
+      });
+    }));
+
   let operationOrdinal = 0;
   let activeGather: GatherInteractionState | null = null;
   let activeConsume: ConsumeInteractionState | null = null;
@@ -228,10 +271,12 @@ export async function createPhase1ProductReviewRuntime(
     bundle,
     config.localPlayerId,
     () => worldPresentationContext,
+    playerMotionViews,
   );
   const source = new Phase1ProductReviewPresentationSource(
     bundle,
     config.localPlayerId,
+    playerMotionViews,
   );
   const presentation = mountPhase1Presentation(
     root,
