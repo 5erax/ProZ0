@@ -1028,7 +1028,7 @@ export function createPhase1ProductReviewWorldRenderer(
         cache.entityId,
         {
           className: 'p1-product-critical',
-          zIndex: 890000,
+          zIndex: state === 'ACTIVE' ? 890000 : 905000,
           data: Object.freeze({
             deathCacheState: state,
           }),
@@ -1048,7 +1048,7 @@ export function createPhase1ProductReviewWorldRenderer(
         recovered.entityId,
         {
           className: 'p1-product-critical',
-          zIndex: 890000,
+          zIndex: 905000,
           data: Object.freeze({
             deathCacheState: 'RECOVERED',
           }),
