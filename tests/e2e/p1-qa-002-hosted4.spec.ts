@@ -768,11 +768,16 @@ test('four real Chromium clients share canonical state, contend once, disconnect
     ).toBe(0);
     await server.step();
 
+    for (const page of pages) {
+      await expect.poll(
+        async () => (await latestMotionSet(page)).length,
+        { timeout: 5_000 },
+      ).toBe(4);
+    }
     const motionSets = await Promise.all(
       pages.map((page) => latestMotionSet(page)),
     );
     for (const motions of motionSets) {
-      expect(motions).toHaveLength(4);
       expect(new Set(motions.map((motion) => motion.playerId)).size).toBe(4);
     }
     expect(
@@ -1039,8 +1044,11 @@ test('four real Chromium clients share canonical state, contend once, disconnect
     });
 
     await server.step();
+    await expect.poll(
+      async () => (await latestMotionSet(rejoinPage)).length,
+      { timeout: 5_000 },
+    ).toBe(4);
     const resumedMotions = await latestMotionSet(rejoinPage);
-    expect(resumedMotions).toHaveLength(4);
     expect(totalAncientAlloyShards(server.composition, playerIds)).toBe(1);
 
     await renderEvidencePanel(
