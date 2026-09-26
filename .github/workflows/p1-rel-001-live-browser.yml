@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - task/p1-rel-001-live-browser-verification
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/p1-rel-001-live-pages.spec.ts
+      - .github/workflows/p1-rel-001-live-browser.yml
 
 permissions:
   contents: read
