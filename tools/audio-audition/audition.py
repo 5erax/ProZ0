@@ -152,7 +152,7 @@ def gate_ids_for(row: dict) -> list[str]:
         "predator_attack_release", "predator_recovery",
     }:
         gates.append("A")
-    if family == "survival" and (priority in {"HIGH", "CRITICAL"} or "warning" in event_id):
+    if family == "survival" and ("warning" in event_id or "critical" in event_id):
         gates.append("B")
     if "cold_rain" in event_id:
         gates.append("C")
