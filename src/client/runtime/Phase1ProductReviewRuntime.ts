@@ -1,5 +1,8 @@
 import type { PlayerId } from '../../foundation';
-import type { Phase1StructureDefinitionId } from '../../world';
+import {
+  PHASE1_STRUCTURE_PLACEMENT_PROFILES,
+  type Phase1StructureDefinitionId,
+} from '../../world';
 import {
   Phase1AuthorityBundle,
   type Phase1AuthorityBundleConfig,
@@ -31,6 +34,9 @@ import {
 } from './Phase1ProductReviewControls';
 import {
   createPhase1ProductReviewWorldRenderer,
+  type Phase1ProductReviewBuildPreview,
+  type Phase1ProductReviewRecoveredDeathCache,
+  type Phase1ProductReviewWorldPresentationContext,
 } from './Phase1ProductReviewWorldRenderer';
 import {
   Phase1ProductReviewPresentationSource,
@@ -63,12 +69,20 @@ interface GatherInteractionState {
   readonly operationId: string;
   readonly targetName: string;
   readonly requiredTicks: number;
+  readonly startedTick: number;
 }
 
 interface ConsumeInteractionState {
   readonly operationId: string;
   readonly targetName: string;
   readonly requiredTicks: number;
+  readonly startedTick: number;
+}
+
+interface AttackPresentationState {
+  readonly action: 'UNARMED_ATTACK' | 'SPEAR_ATTACK';
+  readonly startedTick: number;
+  readonly untilTick: number;
 }
 
 const CRAFT_PAGE_SIZE = 6;
@@ -120,6 +134,28 @@ function facingVector(
   }
 }
 
+function connectorVector(
+  key: string,
+): { readonly x: number; readonly y: number } {
+  switch (key) {
+    case 'east': return Object.freeze({ x: 1, y: 0 });
+    case 'south': return Object.freeze({ x: 0, y: 1 });
+    case 'west': return Object.freeze({ x: -1, y: 0 });
+    default: return Object.freeze({ x: 0, y: -1 });
+  }
+}
+
+function connectorQuarterTurn(
+  key: string,
+): 0 | 1 | 2 | 3 {
+  switch (key) {
+    case 'east': return 0;
+    case 'south': return 1;
+    case 'west': return 2;
+    default: return 3;
+  }
+}
+
 function validateProductReviewConfig(
   config: Phase1ProductReviewRuntimeConfig,
 ): void {
@@ -162,10 +198,36 @@ export async function createPhase1ProductReviewRuntime(
     mapMovementInput,
     isMovementInputCode,
   );
+
+  let operationOrdinal = 0;
+  let activeGather: GatherInteractionState | null = null;
+  let activeConsume: ConsumeInteractionState | null = null;
+  let attackPresentation: AttackPresentationState | null = null;
+  let recoveredDeathCache:
+    Phase1ProductReviewRecoveredDeathCache | null = null;
+  let actionPanel: 'craft' | 'build' | 'machine' | null = null;
+  let machineStructureId: string | null = null;
+  let craftPage = 0;
+  let buildIndex = 0;
+  let buildConnectorIndex = 0;
+  let buildOrientation: 0 | 1 | 2 | 3 = 0;
+  let destroyed = false;
+  let stepQueue = Promise.resolve();
+  let worldPresentationContext:
+    Readonly<Phase1ProductReviewWorldPresentationContext> =
+      Object.freeze({
+        localAction: null,
+        localActionStartedTick: null,
+        targetedDeathCacheId: null,
+        recoveredDeathCache: null,
+        buildPreview: null,
+      });
+
   const worldRenderer = createPhase1ProductReviewWorldRenderer(
     root,
     bundle,
     config.localPlayerId,
+    () => worldPresentationContext,
   );
   const source = new Phase1ProductReviewPresentationSource(
     bundle,
@@ -180,18 +242,6 @@ export async function createPhase1ProductReviewRuntime(
     root,
     worldRenderer.canvas,
   );
-
-  let operationOrdinal = 0;
-  let activeGather: GatherInteractionState | null = null;
-  let activeConsume: ConsumeInteractionState | null = null;
-  let actionPanel: 'craft' | 'build' | 'machine' | null = null;
-  let machineStructureId: string | null = null;
-  let craftPage = 0;
-  let buildIndex = 0;
-  let buildConnectorIndex = 0;
-  let buildOrientation: 0 | 1 | 2 | 3 = 0;
-  let destroyed = false;
-  let stepQueue = Promise.resolve();
 
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
@@ -704,6 +754,7 @@ export async function createPhase1ProductReviewRuntime(
         operationId: start.operationId,
         targetName,
         requiredTicks: start.requiredTicks,
+        startedTick: bundle.authorityTick,
       });
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
@@ -817,6 +868,16 @@ export async function createPhase1ProductReviewRuntime(
       sourceStackId: stack.stackId,
       quantity: stack.quantity,
     });
+    if (
+      result.status === 'committed'
+      && bundle.world.getDeathCacheByContainer(cache.containerId) === null
+    ) {
+      recoveredDeathCache = Object.freeze({
+        entityId: cache.entityId,
+        position: Object.freeze({ ...cache.position }),
+        untilAuthorityTick: bundle.authorityTick + 45,
+      });
+    }
     source.setLocalCommandFeedback({
       operationId: result.operationId,
       status: result.status,
@@ -955,6 +1016,7 @@ export async function createPhase1ProductReviewRuntime(
         operationId: start.operationId,
         targetName,
         requiredTicks: start.requiredTicks,
+        startedTick: bundle.authorityTick,
       });
       source.setInteraction(Object.freeze({
         inputLabel: 'V',
@@ -1348,6 +1410,9 @@ export async function createPhase1ProductReviewRuntime(
     const inventory = bundle.items.getContainerView(
       'inventory:' + config.localPlayerId,
     );
+    const equipped =
+      bundle.equipment.getView(config.localPlayerId)
+        .equippedWeaponStackId !== null;
     const result = bundle.combat.submitAttack({
       attackId: nextOperationId('attack'),
       playerId: config.localPlayerId,
@@ -1356,6 +1421,13 @@ export async function createPhase1ProductReviewRuntime(
       facingX: facing.x,
       facingY: facing.y,
     }, predator.entityId);
+    if (result.status !== 'rejected') {
+      attackPresentation = Object.freeze({
+        action: equipped ? 'SPEAR_ATTACK' : 'UNARMED_ATTACK',
+        startedTick: bundle.authorityTick,
+        untilTick: bundle.authorityTick + (equipped ? 20 : 16),
+      });
+    }
 
     source.setLocalCommandFeedback({
       operationId: result.attackId,
@@ -1476,6 +1548,84 @@ export async function createPhase1ProductReviewRuntime(
     }
   };
 
+  const buildPreview = (): Phase1ProductReviewBuildPreview | null => {
+    if (actionPanel !== 'build') return null;
+    const definition = selectedBuildDefinition();
+    const panel = buildPanel();
+    const connectorRequired =
+      definition.id === 'structure:habitat-room';
+    const connectors = landingConnectors();
+    const connector = connectors[buildConnectorIndex];
+
+    let position = playerPosition();
+    let orientation = buildOrientation;
+    if (connectorRequired && connector !== undefined) {
+      const landing = bundle.buildings.getStructure(
+        'structure-instance:landing-module',
+      );
+      if (landing !== null) {
+        const vector = connectorVector(connector.localConnectorKey);
+        const landingOffset =
+          PHASE1_STRUCTURE_PLACEMENT_PROFILES[
+            'structure:landing-module'
+          ].connectorOffsetWorldUnits ?? 0;
+        const habitatOffset =
+          PHASE1_STRUCTURE_PLACEMENT_PROFILES[
+            'structure:habitat-room'
+          ].connectorOffsetWorldUnits ?? 0;
+        position = Object.freeze({
+          x: landing.position.x
+            + vector.x * (landingOffset + habitatOffset),
+          y: landing.position.y
+            + vector.y * (landingOffset + habitatOffset),
+        });
+        orientation = connectorQuarterTurn(
+          connector.localConnectorKey,
+        );
+      }
+    }
+
+    return Object.freeze({
+      definitionId: placeableStructureDefinitionId(definition.id),
+      position: Object.freeze({ ...position }),
+      orientationQuarterTurns: orientation,
+      state: panel.placementState,
+      reason: panel.reason,
+    });
+  };
+
+  const refreshWorldPresentationContext = (): void => {
+    if (
+      attackPresentation !== null
+      && attackPresentation.untilTick < bundle.authorityTick
+    ) {
+      attackPresentation = null;
+    }
+    if (
+      recoveredDeathCache !== null
+      && recoveredDeathCache.untilAuthorityTick < bundle.authorityTick
+    ) {
+      recoveredDeathCache = null;
+    }
+
+    const localAction = activeGather !== null
+      ? 'GATHER' as const
+      : activeConsume !== null
+        ? 'CONSUME' as const
+        : attackPresentation?.action ?? null;
+    const localActionStartedTick = activeGather?.startedTick
+      ?? activeConsume?.startedTick
+      ?? attackPresentation?.startedTick
+      ?? null;
+    worldPresentationContext = Object.freeze({
+      localAction,
+      localActionStartedTick,
+      targetedDeathCacheId: deathCacheTarget()?.entityId ?? null,
+      recoveredDeathCache,
+      buildPreview: buildPreview(),
+    });
+  };
+
   const host = new FixedStepHost({
     onStep: () => {
       const sampled = input.sample();
@@ -1494,6 +1644,7 @@ export async function createPhase1ProductReviewRuntime(
         refreshBuildPanel();
         refreshMachinePanel();
         refreshContextInteraction();
+        refreshWorldPresentationContext();
         worldRenderer.render();
       }).catch((error: unknown) => {
         root.dataset.runtimeStatus = 'failed';
@@ -1513,6 +1664,8 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.productReviewAuthority = 'canonical';
 
   refreshContextInteraction();
+  refreshWorldPresentationContext();
+  worldRenderer.render();
 
   return Object.freeze({
     async save(
