@@ -589,16 +589,12 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     '[data-world-role="terrain"]',
   ).evaluateAll((nodes) => {
     const boxes = nodes.map((node) => {
-      const rect = (node as HTMLElement).getBoundingClientRect();
-      const scale = Number(
-        document.querySelector('#proz0-canvas')
-          ?.getAttribute('data-display-scale') ?? '1',
-      );
+      const element = node as HTMLElement;
       return {
-        left: rect.left / scale,
-        top: rect.top / scale,
-        width: rect.width / scale,
-        height: rect.height / scale,
+        left: Number.parseFloat(element.style.left),
+        top: Number.parseFloat(element.style.top),
+        width: Number.parseFloat(element.style.width),
+        height: Number.parseFloat(element.style.height),
       };
     });
     const widths = [...new Set(boxes.map((box) => box.width))];
