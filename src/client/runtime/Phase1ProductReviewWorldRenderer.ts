@@ -3,6 +3,10 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
+import type {
+  PlayerMotionViewV1,
+  PresentationIdentitySlotV1,
+} from '../../protocol';
 import {
   fromWorldPosition,
   toChunkLocalPosition,
@@ -48,6 +52,10 @@ const WORLD_HALF_WIDTH =
   HALF_WIDTH / WORLD_PIXELS_PER_UNIT;
 const WORLD_HALF_HEIGHT =
   HALF_HEIGHT / WORLD_PIXELS_PER_UNIT;
+const EXPLORATION_CELL_LOGICAL_PIXELS =
+  PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS * WORLD_PIXELS_PER_UNIT;
+const EXPLORATION_CELL_RASTER_SCALE =
+  EXPLORATION_CELL_LOGICAL_PIXELS / 32;
 
 const EMPTY_CONTEXT: Phase1ProductReviewWorldPresentationContext =
   Object.freeze({
@@ -467,6 +475,8 @@ export function createPhase1ProductReviewWorldRenderer(
   getPresentationContext: () =>
     Readonly<Phase1ProductReviewWorldPresentationContext> =
       () => EMPTY_CONTEXT,
+  getPlayerMotions: () => readonly Readonly<PlayerMotionViewV1>[] =
+    () => Object.freeze([]),
 ): Phase1ProductReviewWorldRenderer {
   const document = root.ownerDocument;
   const targetWindow = document.defaultView ?? window;
@@ -592,6 +602,7 @@ export function createPhase1ProductReviewWorldRenderer(
         applyProductionSprite(
           tile,
           terrainCellSprite(terrain, variant),
+          EXPLORATION_CELL_RASTER_SCALE,
         );
         if (night) {
           tile.style.filter = 'brightness(.62) saturate(.72)';
@@ -601,8 +612,8 @@ export function createPhase1ProductReviewWorldRenderer(
             tile,
             position,
             camera,
-            32,
-            32,
+            EXPLORATION_CELL_LOGICAL_PIXELS,
+            EXPLORATION_CELL_LOGICAL_PIXELS,
             -100000,
           )
         ) {
@@ -616,14 +627,18 @@ export function createPhase1ProductReviewWorldRenderer(
           fog.dataset.fogState = 'UNEXPLORED';
           const mask = fogAdjacencyMask(bundle, gx, gy);
           fog.dataset.fogMask = String(mask);
-          applyProductionSprite(fog, fogMaskSprite(mask));
+          applyProductionSprite(
+            fog,
+            fogMaskSprite(mask),
+            EXPLORATION_CELL_RASTER_SCALE,
+          );
           if (
             setWorldCenter(
               fog,
               position,
               camera,
-              32,
-              32,
+              EXPLORATION_CELL_LOGICAL_PIXELS,
+              EXPLORATION_CELL_LOGICAL_PIXELS,
               700000,
             )
           ) {
@@ -639,7 +654,7 @@ export function createPhase1ProductReviewWorldRenderer(
     camera: WorldPosition,
     context: Readonly<Phase1ProductReviewWorldPresentationContext>,
     local: boolean,
-    teammateOrdinal: number,
+    presentationIdentitySlot: PresentationIdentitySlotV1,
   ): void => {
     const runtime = bundle.getRuntime(id);
     const movement = runtime.getSnapshot().player;
@@ -750,16 +765,14 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     if (!local) {
-      const shape = teammateOrdinal === 0
+      const shape = presentationIdentitySlot === 'TEAM_A'
         ? 'circle'
-        : teammateOrdinal === 1
+        : presentationIdentitySlot === 'TEAM_B'
           ? 'diamond'
-          : 'triangle';
-      const slot = teammateOrdinal === 0
-        ? 'TEAM_A'
-        : teammateOrdinal === 1
-          ? 'TEAM_B'
-          : 'TEAM_C';
+          : presentationIdentitySlot === 'TEAM_C'
+            ? 'triangle'
+            : null;
+      if (shape === null) return;
       const markerPosition = Object.freeze({
         x: movement.position.x,
         y: movement.position.y - 3.15,
@@ -774,13 +787,14 @@ export function createPhase1ProductReviewWorldRenderer(
           className: 'p1-product-identity',
           zIndex: 930000,
           data: Object.freeze({
-            identitySlot: slot,
+            identitySlot: presentationIdentitySlot,
             markerShape: shape,
           }),
         },
       );
       if (marker !== null) {
-        marker.dataset.presentationIdentitySlot = slot;
+        marker.dataset.presentationIdentitySlot =
+          presentationIdentitySlot;
       }
     }
   };
@@ -1107,15 +1121,38 @@ export function createPhase1ProductReviewWorldRenderer(
       renderBuildPreview(context.buildPreview, camera);
     }
 
-    const activePlayerIds = bundle.getActivePlayerIds();
-    const teammates = activePlayerIds
-      .filter((id) => id !== playerId)
-      .sort((left, right) => left.localeCompare(right))
-      .slice(0, 3);
-    for (const [index, id] of teammates.entries()) {
-      renderPlayer(id, camera, context, false, index);
+    const playerMotions = getPlayerMotions();
+    const slotOrder: Readonly<Record<string, number>> = Object.freeze({
+      TEAM_A: 0,
+      TEAM_B: 1,
+      TEAM_C: 2,
+      LOCAL: 3,
+      UNASSIGNED: 4,
+    });
+    const teammates = playerMotions
+      .filter((motion) =>
+        motion.playerId !== playerId
+        && (
+          motion.presentationIdentitySlot === 'TEAM_A'
+          || motion.presentationIdentitySlot === 'TEAM_B'
+          || motion.presentationIdentitySlot === 'TEAM_C'
+        ),
+      )
+      .sort(
+        (left, right) =>
+          slotOrder[left.presentationIdentitySlot]!
+          - slotOrder[right.presentationIdentitySlot]!,
+      );
+    for (const motion of teammates) {
+      renderPlayer(
+        motion.playerId,
+        camera,
+        context,
+        false,
+        motion.presentationIdentitySlot,
+      );
     }
-    renderPlayer(playerId, camera, context, true, -1);
+    renderPlayer(playerId, camera, context, true, 'LOCAL');
 
     if (environment.coldRainStatus === 'active') {
       const weather = document.createElement('div');
