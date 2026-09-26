@@ -314,7 +314,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-open", action="store_true")
-    parser.add_argument("--allow-non-pr95", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     if args.clean:
@@ -326,7 +325,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{EXPECTED_AUDIO_HEAD}; current main is never used implicitly."
         )
     try:
-        index = prepare(args.audio_root, DEFAULT_GENERATED, exact=not args.allow_non_pr95)
+        index = prepare(args.audio_root, DEFAULT_GENERATED, exact=True)
     except (HarnessError, OSError, zipfile.BadZipFile) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
