@@ -329,7 +329,7 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
 }) => {
   test.setTimeout(30_000);
 
-  await page.goto('/');
+  await page.goto('/?proz0Mode=local-demo');
 
   const root = page.locator('[data-proz0-autoboot]');
   const canvas = page.locator('#proz0-canvas');
