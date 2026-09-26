@@ -1,3 +1,4 @@
+/* global document, localStorage, Blob, URL, fetch */
 "use strict";
 
 const GATES = [
