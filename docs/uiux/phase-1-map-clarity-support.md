@@ -101,7 +101,7 @@ Current evidence relevant to #110:
    - `Phase1WorldLandmarks.landingPosition`;
    - generated resource entity positions;
    - resource runtime state;
-   - terrain grid `ground | water`;
+   - terrain grid `ground` / `water`;
    - ruin positions/state;
    - Death Cache positions.
 
@@ -225,7 +225,7 @@ These are not new #110 gameplay systems. They are already accepted map/recovery 
 
 ## 9.1 Current boundary
 
-Accepted Phase 1 gameplay requires one coherent region. Current terrain authority exposes `ground | water`, and current Art Production defines:
+Accepted Phase 1 gameplay requires one coherent region. Current terrain authority exposes `ground` / `water`, and current Art Production defines:
 
 - ground variants;
 - water/shoreline;
@@ -240,7 +240,7 @@ This support task treats that as a **presentation identity direction**, not a ne
 
 | PLAYER NEED | CURRENT GAP | PROPOSED MINIMUM PHASE-1 SOLUTION | REQUIRED STATE / DATA | REVEAL / VISIBILITY RULE | PLAYER-FACING COPY / LEGEND | A-GD REVIEW? | A-ART REVIEW? | ENGINEERING DEPENDENCY |
 |---|---|---|---|---|---|---|---|---|
-| Understand what kind of natural place the first region is when reading the map. | Current map has no actual terrain surface; current terrain semantics are only generic ground/water. | **PROPOSAL —** render EXPLORED ground using a grass-dominant region map treatment with restrained non-interactive flora/flower motifs so the first region reads as a living field/vegetated landscape rather than blank generic ground. | Existing `ground | water` terrain cells + explored mask. No new biome authority is required for the single Phase 1 region. | **PROPOSAL —** environmental texture appears only in EXPLORED terrain. UNKNOWN remains masked and must not reveal ground character. | **PROPOSAL —** no new biome name is required. If a region label is desired, it is a separate A-GD/A-ART decision. | YES — confirm the visual language does not create biome/resource gameplay semantics. | **YES — REQUIRED.** | Map renderer/terrain presentation. Existing terrain data can be reused; no world-generation change. |
+| Understand what kind of natural place the first region is when reading the map. | Current map has no actual terrain surface; current terrain semantics are only generic ground/water. | **PROPOSAL —** render EXPLORED ground using a grass-dominant region map treatment with restrained non-interactive flora/flower motifs so the first region reads as a living field/vegetated landscape rather than blank generic ground. | Existing `ground` / `water` terrain cells + explored mask. No new biome authority is required for the single Phase 1 region. | **PROPOSAL —** environmental texture appears only in EXPLORED terrain. UNKNOWN remains masked and must not reveal ground character. | **PROPOSAL —** no new biome name is required. If a region label is desired, it is a separate A-GD/A-ART decision. | YES — confirm the visual language does not create biome/resource gameplay semantics. | **YES — REQUIRED.** | Map renderer/terrain presentation. Existing terrain data can be reused; no world-generation change. |
 | Distinguish decorative vegetation from gatherable resources. | Grass/flora/flower presentation could look like resource icons. | **PROPOSAL —** grass/flora/flower motifs remain low-priority terrain texture; approved resource markers, if any, use a distinct icon/shape layer. | Visual layers; optional approved resource marker data. | **PROPOSAL —** decorative flora never independently reveals a gatherable resource. | **PROPOSAL —** no legend entry for generic decorative flora. | YES. | **YES — REQUIRED.** | Presentation layering only. |
 | Keep water readable against a greener ground identity. | Current map does not show broad terrain/water shape. | **PROPOSAL —** water remains a strong second terrain family with edge/shore contrast distinct from grass-dominant ground. | Existing terrain grid. | **PROPOSAL —** water shape only renders where terrain has been explored. | **PROPOSAL —** optional legend `WATER` only if A-ART determines needed. | NO if presentation-only. | YES. | Terrain map projection. |
 
@@ -391,7 +391,7 @@ This section is not an API/schema design. It identifies what Company A needs ava
 | Local player marker | Authoritative/local player position already exists | Map presentation field + world→map transform |
 | Landing/Base marker | `landingPosition` / Landing Module exists | Map projection |
 | Explored/unknown terrain | Shared `Phase1ExplorationFragment.words` per region | Multi-region map projection + bitset decode + boundary rendering |
-| Broad terrain/water | Per-chunk `Phase1TerrainGrid` `ground | water` | Project explored terrain into map geometry |
+| Broad terrain/water | Per-chunk `Phase1TerrainGrid` `ground` / `water` | Project explored terrain into map geometry |
 | First-region grass/flora/flower identity | One-region terrain + decorative flora visual category | A-ART-approved map surface treatment; no worldgen change |
 | Ruin marker | Ruin position/state exists | Spatial projection |
 | Death Cache marker | Cache position/state exists | Spatial list projection; most-recent treatment |
