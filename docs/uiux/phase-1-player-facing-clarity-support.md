@@ -123,7 +123,7 @@ Any final lore wording remains subject to Narrative canon authority in addition 
 | `TOOL_BROKEN` / `ITEM BROKEN` | **PROPOSAL —** “{tool} is broken — repair it at a Workbench.” | current verb | Current resolved target | Repair the tool or use another valid usable tool if accepted behavior permits. | YES | YES |
 | `TARGET_CAPACITY_WEIGHT` | **PROPOSAL —** “Too heavy — free inventory weight.” | current verb | Current resolved target/output | Drop/store/consume/transfer items until the transaction fits. | YES | YES |
 | `TARGET_CAPACITY_VOLUME` | **PROPOSAL —** “Not enough inventory space.” | current verb | Current resolved target/output | Free inventory volume, then retry. | YES | YES |
-| `STACK_LIMIT` | **PROPOSAL —** “Stack full — free a slot or move items.” | current verb | Current resolved target/output | Make valid inventory capacity available. | YES | YES |
+| `STACK_LIMIT` | **PROPOSAL —** “Stack limit reached — move or split items.” | current verb | Current resolved target/output | Make valid inventory capacity available. | YES | YES |
 | `QUANTITY_UNAVAILABLE` / `INSUFFICIENT MATERIAL` | **PROPOSAL —** “Missing required material: {item} {have}/{need}.” | current verb | Current recipe/repair target | Acquire the missing quantity; preserve all other inputs on failure. | YES | YES |
 | `STALE_REVISION` / `WORLD_STATE_CHANGED` / `POSITION_TAKEN` / `TARGET_ALREADY_TAKEN` | **PROPOSAL —** “World state changed — target refreshed. Try again.” | current verb | Original target, then refreshed current target | Refresh presentation from authority; require a new commit if the original target is no longer valid. | YES | YES |
 | authoritative command `committed` | **PROPOSAL —** short success acknowledgement specific to the action, e.g. “Gathered {output}” / “Crafted {item}” / “Built {structure}.” | committed verb | Committed target | No remedy; refresh target/state immediately from authority. | YES | YES |
@@ -384,14 +384,14 @@ Rules for this cue:
 
 Expose one early dependency in the crafting/base UI, not as a mandatory quest:
 
-> **PROPOSAL:** “WORKBENCH · unlocks Tier 1 crafting + repair. Craft a Workbench Kit, then place the Workbench.”
+> **PROPOSAL:** “WORKBENCH · enables Tier 1 crafting + repair. Craft a Workbench Kit, then place the Workbench.”
 
 This is a readability statement for an already accepted dependency. It does not lock task order.
 
 | CURRENT INTERNAL STATE/REASON | PLAYER-FACING COPY | VERB | EXACT TARGET | NEXT ACTION/REMEDY | A-GD REVIEW? | A-ART REVIEW? |
 |---|---|---|---|---|---|---|
 | fresh world; no first successful gather yet | **PROPOSAL —** “FIRST STEP · Move near a resource. [E] GATHER · {focused target}.” | GATHER | Current exact focused resource when available; NONE until one is focused | Move/orient and gather one reachable resource. | YES | YES |
-| early player viewing craft/base capability; Workbench absent | **PROPOSAL —** “WORKBENCH · unlocks Tier 1 crafting + repair.” | CRAFT / BUILD | Workbench Kit → Workbench | Craft Workbench Kit, then place Workbench; no fixed quest chain. | YES | YES |
+| early player viewing craft/base capability; Workbench absent | **PROPOSAL —** “WORKBENCH · enables Tier 1 crafting + repair.” | CRAFT / BUILD | Workbench Kit → Workbench | Craft Workbench Kit, then place Workbench; no fixed quest chain. | YES | YES |
 | first gather succeeds | **PROPOSAL —** “First gather complete.” then remove the first-action cue | GATHER | Committed resource | Continue sandbox play; normal contextual prompts take over. | YES | YES |
 
 ---
@@ -409,9 +409,9 @@ Current progression panel shows current Level/XP plus unlocked skills/profession
 | Maintenance Basics locked; Level < 2 or no successful Workbench repair | **PROPOSAL —** “Maintenance Basics · Requires Level 2 + successful Workbench repair.” | PROGRESS | Maintenance Basics | Reach Level 2 and complete a condition-increasing Workbench repair. | YES | YES |
 | Level >=2; Maintenance repair condition missing | **PROPOSAL —** “Maintenance Basics · Level 2 ✓ · Repair damaged equipment at Workbench ☐” | REPAIR | Maintenance Basics prerequisite via exact repair target | Perform one successful Workbench repair that increases condition. | YES | YES |
 | Explorer quest locked | **PROPOSAL —** “Chart the Unknown · Requires Level 3 + Fieldcraft Basics.” | PROGRESS | Explorer — Prototype eligibility | Satisfy the accepted two eligibility conditions. | YES | YES |
-| Explorer quest active | **PROPOSAL —** “Chart the Unknown · Locate Ruin → Inspect → Return to base.” | INSPECT / RETURN | Personal Explorer quest state | Complete remaining accepted personal objective(s). | YES | YES |
+| Explorer quest active | **PROPOSAL —** “Chart the Unknown · Locate Ruin → Inspect → Return alive to Landing Module or Habitat Room.” | INSPECT / RETURN | Personal Explorer quest state | Complete remaining accepted personal objective(s). | YES | YES |
 | Engineer quest locked | **PROPOSAL —** “Bring Water Online · Requires Level 3 + Maintenance Basics.” | PROGRESS | Engineer — Prototype eligibility | Satisfy the accepted two eligibility conditions. | YES | YES |
-| Engineer quest active | **PROPOSAL —** “Bring Water Online · powered Condenser context → interact/enable → collect 1 Clean Water.” | USE MACHINE / COLLECT | Personal Engineer quest state + exact Condenser | Complete remaining accepted personal objective(s). | YES | YES |
+| Engineer quest active | **PROPOSAL —** “Bring Water Online · Power Unit + Condenser present → enable/interact while powered → collect 1 Clean Water.” | USE MACHINE / COLLECT | Personal Engineer quest state + exact Condenser | Complete remaining accepted personal objective(s). | YES | YES |
 | skill/profession unlock committed | **PROPOSAL —** existing non-blocking toast lane: “Unlocked · {skill/profession}” | UNLOCK | Exact unlocked record | Continue sandbox play; no permanent class lock is implied. | YES | YES |
 
 ---
