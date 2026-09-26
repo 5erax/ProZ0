@@ -452,11 +452,32 @@ async function openProductReview(
     proz0Player: localPlayerId,
     proz0SaveDb: databaseName,
   });
+  const diagnostics: string[] = [];
+  const onConsole = (message: { type(): string; text(): string }): void => {
+    if (message.type() === 'error') diagnostics.push(message.text());
+  };
+  const onPageError = (error: Error): void => {
+    diagnostics.push(error.message);
+  };
+  page.on('console', onConsole);
+  page.on('pageerror', onPageError);
   await page.goto('/?' + query.toString());
 
   const root = page.locator('[data-proz0-autoboot]');
   const world = page.locator('[data-product-review-world="canonical"]');
-  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  await expect.poll(
+    async () => root.getAttribute('data-runtime-status'),
+    { timeout: 5_000 },
+  ).not.toBe('booting');
+  const runtimeStatus = await root.getAttribute('data-runtime-status');
+  page.off('console', onConsole);
+  page.off('pageerror', onPageError);
+  if (runtimeStatus !== 'ready') {
+    throw new Error(
+      'Product Review evidence boot failed: '
+        + (diagnostics.join(' | ') || 'no browser diagnostic'),
+    );
+  }
   await expect(root).toHaveAttribute(
     'data-runtime-mode',
     'phase1-product-review',
