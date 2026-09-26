@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('production browser build boots and moves without fatal console errors', async ({ page }) => {
+test('explicit local-demo still boots and moves without fatal console errors', async ({ page }) => {
   const fatalErrors: string[] = [];
 
   page.on('console', (message) => {
@@ -13,7 +13,7 @@ test('production browser build boots and moves without fatal console errors', as
     fatalErrors.push(error.message);
   });
 
-  await page.goto('/');
+  await page.goto('/?proz0Mode=local-demo');
 
   const root = page.locator('[data-proz0-autoboot]');
   const canvas = page.locator('#proz0-canvas');
