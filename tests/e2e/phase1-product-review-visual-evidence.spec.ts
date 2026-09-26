@@ -547,15 +547,21 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     'world:p1-int-001-visual-normal',
     players,
   );
-  const normal = withLocalLoadout(
+  const normal = normalBase;
+  const thermal = withLocalLoadout(
     normalBase,
     'visual-local',
-    {
-      thermalWrap: true,
-      spear: true,
-      habitatKit: true,
-      machineKit: true,
-    },
+    { thermalWrap: true },
+  );
+  const buildValid = withLocalLoadout(
+    normalBase,
+    'visual-local',
+    { machineKit: true },
+  );
+  const buildConnector = withLocalLoadout(
+    normalBase,
+    'visual-local',
+    { habitatKit: true },
   );
 
   const files: string[] = [];
@@ -570,9 +576,6 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-world-role="terrain"][data-exploration-state="EXPLORED"]'),
   ).not.toHaveCount(0);
   await expect(page.locator('[data-world-role="fog"]')).not.toHaveCount(0);
-  await expect(
-    page.locator('[data-world-role="thermal-wrap-overlay"]'),
-  ).toHaveCount(1);
   await expect(
     page.locator('[data-world-role="teammate-identity"]'),
   ).toHaveCount(3);
@@ -597,6 +600,24 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'normal-3x.png');
   files.push('normal-3x.png');
 
+  await openProductReview(
+    page,
+    thermal,
+    'proz0-p1-int-001-thermal-wrap',
+    2,
+  );
+  await expect(
+    page.locator('[data-world-role="thermal-wrap-overlay"]'),
+  ).toHaveCount(1);
+  await captureViewport(page, 'thermal-wrap-2x.png');
+  files.push('thermal-wrap-2x.png');
+
+  await openProductReview(
+    page,
+    buildValid,
+    'proz0-p1-int-001-build-valid',
+    3,
+  );
   await page.keyboard.press('b');
   await expect(
     page.locator('[data-world-role="build-preview"]'),
@@ -604,6 +625,13 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'build-valid-3x.png');
   files.push('build-valid-3x.png');
 
+  await openProductReview(
+    page,
+    buildConnector,
+    'proz0-p1-int-001-build-connector',
+    3,
+  );
+  await page.keyboard.press('b');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await expect(
@@ -615,9 +643,13 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'build-connector-3x.png');
   files.push('build-connector-3x.png');
 
-  await page.keyboard.press('Escape');
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-int-001-build-invalid',
+    3,
+  );
   await page.keyboard.press('b');
-  await page.keyboard.press('Tab');
   await expect(
     page.locator('[data-world-role="build-preview"]'),
   ).toHaveAttribute('data-placement-state', 'INVALID');
@@ -660,7 +692,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   windup = withLocalLoadout(
     windup,
     'visual-local',
-    { thermalWrap: true, spear: true },
+    { spear: true },
   );
   await openProductReview(
     page,
@@ -765,6 +797,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     cases: {
       normalFogCoop2x: 'normal-fog-coop-2x.png',
       normal3x: 'normal-3x.png',
+      thermalWrap2x: 'thermal-wrap-2x.png',
       buildValid3x: 'build-valid-3x.png',
       buildConnector3x: 'build-connector-3x.png',
       buildInvalid3x: 'build-invalid-3x.png',
