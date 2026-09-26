@@ -749,14 +749,14 @@ export function playerActorSprite(
     Phase1PlayerVisualState,
     readonly [number, number]
   >> = Object.freeze({
-    IDLE: Object.freeze([0, 2]),
-    MOVE: Object.freeze([2, 6]),
-    GATHER: Object.freeze([8, 4]),
-    UNARMED_ATTACK: Object.freeze([12, 4]),
-    SPEAR_ATTACK: Object.freeze([16, 5]),
-    CONSUME: Object.freeze([21, 4]),
-    HURT: Object.freeze([25, 2]),
-    DEATH: Object.freeze([27, 6]),
+    IDLE: Object.freeze([0, 2] as const),
+    MOVE: Object.freeze([2, 6] as const),
+    GATHER: Object.freeze([8, 4] as const),
+    UNARMED_ATTACK: Object.freeze([12, 4] as const),
+    SPEAR_ATTACK: Object.freeze([16, 5] as const),
+    CONSUME: Object.freeze([21, 4] as const),
+    HURT: Object.freeze([25, 2] as const),
+    DEATH: Object.freeze([27, 6] as const),
   });
   const [start, count] = frames[state];
   return orientedActorFrame(
@@ -777,14 +777,14 @@ export function thermalWrapActorSprite(
     Phase1PlayerVisualState,
     readonly [number, number]
   >> = Object.freeze({
-    IDLE: Object.freeze([0, 2]),
-    MOVE: Object.freeze([2, 6]),
-    GATHER: Object.freeze([8, 4]),
-    UNARMED_ATTACK: Object.freeze([12, 4]),
-    SPEAR_ATTACK: Object.freeze([16, 5]),
-    CONSUME: Object.freeze([21, 4]),
-    HURT: Object.freeze([25, 2]),
-    DEATH: Object.freeze([27, 6]),
+    IDLE: Object.freeze([0, 2] as const),
+    MOVE: Object.freeze([2, 6] as const),
+    GATHER: Object.freeze([8, 4] as const),
+    UNARMED_ATTACK: Object.freeze([12, 4] as const),
+    SPEAR_ATTACK: Object.freeze([16, 5] as const),
+    CONSUME: Object.freeze([21, 4] as const),
+    HURT: Object.freeze([25, 2] as const),
+    DEATH: Object.freeze([27, 6] as const),
   });
   const [start, count] = frames[state];
   return orientedActorFrame(
@@ -816,15 +816,15 @@ export function predatorActorSprite(
     Phase1PredatorVisualState,
     readonly [number, number]
   >> = Object.freeze({
-    IDLE_PATROL: Object.freeze([0, 4]),
-    ALERT: Object.freeze([4, 2]),
-    CHASE: Object.freeze([6, 6]),
-    ATTACK_WINDUP: Object.freeze([12, 4]),
-    ATTACK_RELEASE: Object.freeze([16, 2]),
-    RECOVERY: Object.freeze([18, 2]),
-    RETURN: Object.freeze([6, 6]),
-    HURT: Object.freeze([20, 2]),
-    DEAD: Object.freeze([22, 6]),
+    IDLE_PATROL: Object.freeze([0, 4] as const),
+    ALERT: Object.freeze([4, 2] as const),
+    CHASE: Object.freeze([6, 6] as const),
+    ATTACK_WINDUP: Object.freeze([12, 4] as const),
+    ATTACK_RELEASE: Object.freeze([16, 2] as const),
+    RECOVERY: Object.freeze([18, 2] as const),
+    RETURN: Object.freeze([6, 6] as const),
+    HURT: Object.freeze([20, 2] as const),
+    DEAD: Object.freeze([22, 6] as const),
   });
   const [start, count] = frames[state];
   return orientedActorFrame(
