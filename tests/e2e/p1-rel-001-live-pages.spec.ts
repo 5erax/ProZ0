@@ -490,10 +490,8 @@ test('P1-REL-001 live Pages browser startup, slice smoke, reopen and reset evide
     path: resolve(EVIDENCE_DIR, '06-reset-recreate.png'),
   });
 
-  const finalRootStatus = await root.count() === 0
-    ? await page.locator('[data-proz0-autoboot]')
-      .getAttribute('data-runtime-status')
-    : await root.getAttribute('data-runtime-status');
+  const finalRootStatus = await page.locator('[data-proz0-autoboot]')
+    .getAttribute('data-runtime-status');
 
   expect(localhostRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
