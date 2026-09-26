@@ -39,7 +39,7 @@ import {
 } from './runtime/Phase1ProductReviewRuntime';
 import {
   createPhase1ProductReviewEntrypoint,
-  hasExplicitProZ0Mode,
+  shouldShowPhase1ProductReviewEntrypoint,
 } from './runtime/Phase1ProductReviewEntrypoint';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
@@ -314,7 +314,10 @@ export async function bootProZ0(
 const autoBootRoot = document.querySelector<HTMLElement>('[data-proz0-autoboot]');
 
 if (autoBootRoot !== null) {
-  if (!hasExplicitProZ0Mode(autoBootRoot, window.location.search)) {
+  if (shouldShowPhase1ProductReviewEntrypoint(
+    autoBootRoot,
+    window.location.search,
+  )) {
     createPhase1ProductReviewEntrypoint(autoBootRoot);
   } else {
     void bootAutoProZ0(autoBootRoot).catch(
