@@ -410,6 +410,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-teammate{display:flex;gap:4px;align-items:center;background:rgba(10,14,22,.84);padding:2px 4px;}',
     '.p1-teammate-marker{width:12px!important;height:12px!important;display:inline-block;image-rendering:pixelated;}',
     '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:hidden;}',
+    '.p1-panel[data-panel-kind="build"]{left:8px;top:60px;width:252px;max-height:250px;transform:none;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
