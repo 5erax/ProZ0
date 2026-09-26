@@ -451,7 +451,8 @@ async function sendGameplayCommand(
   page: Page,
   command: GameplayCommandEnvelopeV1,
 ): Promise<void> {
-  await page.evaluate((gameplayCommand) => {
+  const serializedCommand = JSON.stringify(command);
+  await page.evaluate((gameplayCommandJson) => {
     const state = (
       globalThis as unknown as {
         __proz0Hosted4?: {
@@ -476,9 +477,9 @@ async function sendGameplayCommand(
       clientMessageSeq: state.nextClientSeq++,
       sessionId: state.sessionId,
       connectionId: state.connectionId,
-      payload: gameplayCommand,
+      payload: JSON.parse(gameplayCommandJson) as Record<string, unknown>,
     }));
-  }, command);
+  }, serializedCommand);
 }
 
 async function closeHostedSocket(page: Page): Promise<void> {
