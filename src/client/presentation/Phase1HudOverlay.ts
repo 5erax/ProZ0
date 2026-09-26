@@ -177,6 +177,7 @@ function teammate(
 ): HTMLElement {
   const row = createElement(document, 'div', 'p1-teammate');
   row.dataset.playerId = entry.playerId;
+  row.dataset.presentationIdentitySlot = entry.presentationIdentitySlot;
   row.dataset.markerShape = entry.markerShape;
 
   const marker = createElement(document, 'span', 'p1-teammate-marker');
