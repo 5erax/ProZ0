@@ -85,3 +85,12 @@ jobs:
           path: test-results/p1-ui-001/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload P1-INT-001 direct Product Review visual evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p1-int-001-product-review-visual-evidence-${{ github.sha }}
+          path: test-results/p1-int-001-product-review/
+          if-no-files-found: ignore
+          retention-days: 30
