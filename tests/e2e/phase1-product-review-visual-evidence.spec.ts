@@ -139,6 +139,7 @@ function withLocalLoadout(
     readonly thermalWrap?: boolean;
     readonly spear?: boolean;
     readonly habitatKit?: boolean;
+    readonly machineKit?: boolean;
   },
 ): PortableSaveBundleV2 {
   const inventoryId = 'inventory:' + playerId;
@@ -163,6 +164,14 @@ function withLocalLoadout(
       ? [Object.freeze({
           stackId: 'evidence:habitat-kit:' + playerId,
           itemDefinitionId: 'item:habitat-kit',
+          quantity: 1,
+          condition: null,
+        })]
+      : []),
+    ...(options.machineKit
+      ? [Object.freeze({
+          stackId: 'evidence:machine-kit:' + playerId,
+          itemDefinitionId: 'item:machine-kit',
           quantity: 1,
           condition: null,
         })]
@@ -524,6 +533,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       thermalWrap: true,
       spear: true,
       habitatKit: true,
+      machineKit: true,
     },
   );
 
