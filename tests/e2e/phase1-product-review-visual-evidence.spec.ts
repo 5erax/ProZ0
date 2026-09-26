@@ -436,6 +436,7 @@ async function openProductReview(
   databaseName: string,
   scale: 2 | 3,
   localPlayerId = 'visual-local',
+  sessionPlayerIds?: readonly string[],
 ): Promise<void> {
   await page.setViewportSize({
     width: 640 * scale,
@@ -446,9 +447,10 @@ async function openProductReview(
     proz0Mode: 'phase1-product-review',
     proz0WorldId: bundle.world.worldId,
     proz0WorldSeed: bundle.world.worldSeed,
-    proz0Players: bundle.players
-      .map((player) => player.playerId)
-      .join(','),
+    proz0Players: (
+      sessionPlayerIds
+      ?? bundle.players.map((player) => player.playerId)
+    ).join(','),
     proz0Player: localPlayerId,
     proz0SaveDb: databaseName,
   });
@@ -580,6 +582,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     normal,
     'proz0-p1-int-001-normal-2x',
     2,
+    'visual-local',
+    players.map((player) => player.playerId),
   );
   await expect(
     page.locator('[data-world-role="terrain"][data-exploration-state="EXPLORED"]'),
