@@ -511,6 +511,15 @@ async function captureViewport(
   });
 }
 
+async function captureProductWorld(
+  page: Page,
+  fileName: string,
+): Promise<void> {
+  await page.locator('[data-product-review-world="canonical"]').screenshot({
+    path: resolve(EVIDENCE_DIR, fileName),
+  });
+}
+
 test.use({ deviceScaleFactor: 1 });
 
 test('P1-INT-001 captures direct Product Review visual correction evidence', async ({ page }) => {
@@ -623,7 +632,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-world-role="build-preview"]'),
   ).toHaveAttribute('data-placement-state', 'VALID');
   await captureViewport(page, 'build-valid-3x.png');
-  files.push('build-valid-3x.png');
+  await captureProductWorld(page, 'build-valid-world-3x.png');
+  files.push('build-valid-3x.png', 'build-valid-world-3x.png');
 
   await openProductReview(
     page,
@@ -641,7 +651,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-world-role="build-preview-pattern"]'),
   ).toHaveAttribute('data-production-pattern-state', 'CONNECTOR');
   await captureViewport(page, 'build-connector-3x.png');
-  files.push('build-connector-3x.png');
+  await captureProductWorld(page, 'build-connector-world-3x.png');
+  files.push('build-connector-3x.png', 'build-connector-world-3x.png');
 
   await openProductReview(
     page,
@@ -657,7 +668,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-panel-kind="build"]'),
   ).toContainText('KIT UNAVAILABLE');
   await captureViewport(page, 'build-invalid-3x.png');
-  files.push('build-invalid-3x.png');
+  await captureProductWorld(page, 'build-invalid-world-3x.png');
+  files.push('build-invalid-3x.png', 'build-invalid-world-3x.png');
 
   const nightRain = withAuthorityTick(
     normal,
@@ -799,8 +811,11 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       normal3x: 'normal-3x.png',
       thermalWrap2x: 'thermal-wrap-2x.png',
       buildValid3x: 'build-valid-3x.png',
+      buildValidWorld3x: 'build-valid-world-3x.png',
       buildConnector3x: 'build-connector-3x.png',
+      buildConnectorWorld3x: 'build-connector-world-3x.png',
       buildInvalid3x: 'build-invalid-3x.png',
+      buildInvalidWorld3x: 'build-invalid-world-3x.png',
       coldRainNight2x: 'cold-rain-night-2x.png',
       predatorWindup2x: 'predator-windup-2x.png',
       playerSpearAttack2x: 'player-spear-attack-2x.png',
