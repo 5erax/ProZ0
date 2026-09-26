@@ -679,6 +679,174 @@ export function productionSpriteFrame(
   return Object.freeze({ ...definition, index });
 }
 
+export type Phase1ActorFacing =
+  | 'N'
+  | 'NE'
+  | 'E'
+  | 'SE'
+  | 'S'
+  | 'SW'
+  | 'W'
+  | 'NW'
+  | null;
+
+export interface Phase1OrientedSpriteFrame {
+  readonly sprite: Phase1ProductionSprite;
+  readonly flipX: boolean;
+}
+
+function actorFacingRow(
+  facing: Phase1ActorFacing,
+): { readonly row: number; readonly flipX: boolean } {
+  switch (facing) {
+    case 'N': return Object.freeze({ row: 4, flipX: false });
+    case 'NE': return Object.freeze({ row: 3, flipX: false });
+    case 'E': return Object.freeze({ row: 2, flipX: false });
+    case 'SE': return Object.freeze({ row: 1, flipX: false });
+    case 'S':
+    case null:
+      return Object.freeze({ row: 0, flipX: false });
+    case 'SW': return Object.freeze({ row: 1, flipX: true });
+    case 'W': return Object.freeze({ row: 2, flipX: true });
+    case 'NW': return Object.freeze({ row: 3, flipX: true });
+  }
+}
+
+function orientedActorFrame(
+  sheet: Phase1ProductionSprite,
+  facing: Phase1ActorFacing,
+  stateStartColumn: number,
+  frameCount: number,
+  frameOrdinal: number,
+): Phase1OrientedSpriteFrame {
+  const orientation = actorFacingRow(facing);
+  const frame = ((frameOrdinal % frameCount) + frameCount) % frameCount;
+  return Object.freeze({
+    sprite: productionSpriteFrame(
+      sheet,
+      orientation.row * sheet.columns + stateStartColumn + frame,
+    ),
+    flipX: orientation.flipX,
+  });
+}
+
+export type Phase1PlayerVisualState =
+  | 'IDLE'
+  | 'MOVE'
+  | 'GATHER'
+  | 'UNARMED_ATTACK'
+  | 'SPEAR_ATTACK'
+  | 'CONSUME'
+  | 'HURT'
+  | 'DEATH';
+
+export function playerActorSprite(
+  facing: Phase1ActorFacing,
+  state: Phase1PlayerVisualState,
+  frameOrdinal: number,
+): Phase1OrientedSpriteFrame {
+  const frames: Readonly<Record<
+    Phase1PlayerVisualState,
+    readonly [number, number]
+  >> = Object.freeze({
+    IDLE: Object.freeze([0, 2]),
+    MOVE: Object.freeze([2, 6]),
+    GATHER: Object.freeze([8, 4]),
+    UNARMED_ATTACK: Object.freeze([12, 4]),
+    SPEAR_ATTACK: Object.freeze([16, 5]),
+    CONSUME: Object.freeze([21, 4]),
+    HURT: Object.freeze([25, 2]),
+    DEATH: Object.freeze([27, 6]),
+  });
+  const [start, count] = frames[state];
+  return orientedActorFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.player,
+    facing,
+    start,
+    count,
+    frameOrdinal,
+  );
+}
+
+export function thermalWrapActorSprite(
+  facing: Phase1ActorFacing,
+  state: Phase1PlayerVisualState,
+  frameOrdinal: number,
+): Phase1OrientedSpriteFrame {
+  const frames: Readonly<Record<
+    Phase1PlayerVisualState,
+    readonly [number, number]
+  >> = Object.freeze({
+    IDLE: Object.freeze([0, 2]),
+    MOVE: Object.freeze([2, 6]),
+    GATHER: Object.freeze([8, 4]),
+    UNARMED_ATTACK: Object.freeze([12, 4]),
+    SPEAR_ATTACK: Object.freeze([16, 5]),
+    CONSUME: Object.freeze([21, 4]),
+    HURT: Object.freeze([25, 2]),
+    DEATH: Object.freeze([27, 6]),
+  });
+  const [start, count] = frames[state];
+  return orientedActorFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.thermalWrap,
+    facing,
+    start,
+    count,
+    frameOrdinal,
+  );
+}
+
+export type Phase1PredatorVisualState =
+  | 'IDLE_PATROL'
+  | 'ALERT'
+  | 'CHASE'
+  | 'ATTACK_WINDUP'
+  | 'ATTACK_RELEASE'
+  | 'RECOVERY'
+  | 'RETURN'
+  | 'HURT'
+  | 'DEAD';
+
+export function predatorActorSprite(
+  facing: Phase1ActorFacing,
+  state: Phase1PredatorVisualState,
+  frameOrdinal: number,
+): Phase1OrientedSpriteFrame {
+  const frames: Readonly<Record<
+    Phase1PredatorVisualState,
+    readonly [number, number]
+  >> = Object.freeze({
+    IDLE_PATROL: Object.freeze([0, 4]),
+    ALERT: Object.freeze([4, 2]),
+    CHASE: Object.freeze([6, 6]),
+    ATTACK_WINDUP: Object.freeze([12, 4]),
+    ATTACK_RELEASE: Object.freeze([16, 2]),
+    RECOVERY: Object.freeze([18, 2]),
+    RETURN: Object.freeze([6, 6]),
+    HURT: Object.freeze([20, 2]),
+    DEAD: Object.freeze([22, 6]),
+  });
+  const [start, count] = frames[state];
+  return orientedActorFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.predator,
+    facing,
+    start,
+    count,
+    frameOrdinal,
+  );
+}
+
+export function terrainCellSprite(
+  terrain: 'ground' | 'water',
+  variantOrFrame: number,
+): Phase1ProductionSprite {
+  const normalized = ((variantOrFrame % 4) + 4) % 4;
+  return productionSpriteFrame(
+    PHASE1_PRODUCTION_WORLD_SPRITES.ground,
+    terrain === 'ground' ? normalized : 4 + normalized,
+  );
+}
+
 export type Phase1ResourceVisualKind =
   | 'fiberPlant'
   | 'foodPlant'
@@ -808,6 +976,7 @@ export function applyProductionSprite(
   element: HTMLElement,
   spriteDefinition: Phase1ProductionSprite,
   scale = 1,
+  flipX = false,
 ): void {
   const column = spriteDefinition.index % spriteDefinition.columns;
   const row = Math.floor(spriteDefinition.index / spriteDefinition.columns);
@@ -829,4 +998,6 @@ export function applyProductionSprite(
     + String(-row * spriteDefinition.cellHeight * scale)
     + 'px';
   element.style.imageRendering = 'pixelated';
+  element.style.transform = flipX ? 'scaleX(-1)' : '';
+  element.style.transformOrigin = 'center bottom';
 }
