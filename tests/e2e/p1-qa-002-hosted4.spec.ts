@@ -780,19 +780,20 @@ test('four real Chromium clients share canonical state, contend once, disconnect
     for (const motions of motionSets) {
       expect(new Set(motions.map((motion) => motion.playerId)).size).toBe(4);
     }
-    expect(
-      Object.fromEntries(
-        motionSets[0]!.map((motion) => [
-          motion.playerId,
-          motion.presentationIdentitySlot,
-        ]),
-      ),
-    ).toEqual({
-      'player:1': 'LOCAL',
-      'player:2': 'TEAM_A',
-      'player:3': 'TEAM_B',
-      'player:4': 'TEAM_C',
-    });
+    for (let viewerIndex = 0; viewerIndex < motionSets.length; viewerIndex += 1) {
+      const motions = motionSets[viewerIndex]!;
+      const viewer = clients[viewerIndex]!;
+      expect(
+        motions.find((motion) => motion.playerId === viewer.playerId)
+          ?.presentationIdentitySlot,
+      ).toBe('LOCAL');
+      expect(
+        motions
+          .filter((motion) => motion.playerId !== viewer.playerId)
+          .map((motion) => motion.presentationIdentitySlot)
+          .sort(),
+      ).toEqual(['TEAM_A', 'TEAM_B', 'TEAM_C']);
+    }
     expect(
       motionSets[1]!.find(
         (motion) => motion.playerId === clients[0]!.playerId,
