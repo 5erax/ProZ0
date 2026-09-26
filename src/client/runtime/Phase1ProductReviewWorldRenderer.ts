@@ -4,7 +4,6 @@ import {
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
 import {
-  CHUNK_SPAN_WORLD_UNITS,
   fromWorldPosition,
   toChunkLocalPosition,
   type Phase1StructureDefinitionId,
@@ -863,10 +862,12 @@ export function createPhase1ProductReviewWorldRenderer(
       predator.entityId,
       {
         flipX: frame.flipX,
-        className: telegraph
-          ? 'p1-product-predator-telegraph'
-          : undefined,
-        zIndex: telegraph ? 910000 : undefined,
+        ...(telegraph
+          ? {
+              className: 'p1-product-predator-telegraph',
+              zIndex: 910000,
+            }
+          : {}),
         data: Object.freeze({
           predatorState: predator.state,
           predatorVisualState: visualState,
