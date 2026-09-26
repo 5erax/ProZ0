@@ -1,0 +1,72 @@
+name: p1-qa-002-hosted4-evidence
+
+on:
+  push:
+    branches:
+      - evidence/p1-qa-002-hosted4
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tests/e2e/p1-qa-002-hosted4.spec.ts
+      - .github/workflows/p1-qa-002-hosted4.yml
+
+permissions:
+  contents: read
+
+jobs:
+  hosted4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      P1_QA_HOSTED4_EXPECTED_MAIN_SHA: 4c1e6a2732d096783f8ec8c354479fdda03d5e7d
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Guard evidence-only delta from re-pinned candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "$P1_QA_HOSTED4_EXPECTED_MAIN_SHA"..HEAD > changed.txt
+          cat changed.txt
+          unexpected="$(grep -Ev '^(tests/e2e/p1-qa-002-hosted4\.spec\.ts|\.github/workflows/p1-qa-002-hosted4\.yml)$' changed.txt || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Unexpected application/content delta:"
+            echo "$unexpected"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Typecheck evidence harness
+        run: npm run typecheck
+
+      - name: Build exact re-pinned application tree
+        run: npm run build
+
+      - name: Run Hosted-4 exact-candidate browser acceptance
+        run: npx playwright test tests/e2e/p1-qa-002-hosted4.spec.ts
+
+      - name: Upload Hosted-4 retained evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p1-qa-002-hosted4-evidence-${{ github.sha }}
+          path: |
+            test-results/p1-qa-002-hosted4/
+            test-results/p1-qa-002-hosted4-*/
+          if-no-files-found: warn
+          retention-days: 30
