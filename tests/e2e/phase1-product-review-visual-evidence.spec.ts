@@ -534,19 +534,19 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       facing: 'E' as const,
     }),
     Object.freeze({
-      playerId: 'visual-b',
+      playerId: 'visual-zeta',
       x: 2.25,
       y: 0.25,
       facing: 'W' as const,
     }),
     Object.freeze({
-      playerId: 'visual-c',
+      playerId: 'visual-alpha',
       x: -2.25,
       y: 0.25,
       facing: 'E' as const,
     }),
     Object.freeze({
-      playerId: 'visual-d',
+      playerId: 'visual-mu',
       x: 0.25,
       y: -2.25,
       facing: 'S' as const,
@@ -585,18 +585,91 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-world-role="terrain"][data-exploration-state="EXPLORED"]'),
   ).not.toHaveCount(0);
   await expect(page.locator('[data-world-role="fog"]')).not.toHaveCount(0);
+  const terrainCoverage = await page.locator(
+    '[data-world-role="terrain"]',
+  ).evaluateAll((nodes) => {
+    const boxes = nodes.map((node) => {
+      const rect = (node as HTMLElement).getBoundingClientRect();
+      const scale = Number(
+        document.querySelector('#proz0-canvas')
+          ?.getAttribute('data-display-scale') ?? '1',
+      );
+      return {
+        left: rect.left / scale,
+        top: rect.top / scale,
+        width: rect.width / scale,
+        height: rect.height / scale,
+      };
+    });
+    const widths = [...new Set(boxes.map((box) => box.width))];
+    const heights = [...new Set(boxes.map((box) => box.height))];
+    const xs = [...new Set(boxes.map((box) => box.left))]
+      .sort((left, right) => left - right);
+    const ys = [...new Set(boxes.map((box) => box.top))]
+      .sort((left, right) => left - right);
+    return {
+      widths,
+      heights,
+      maxXGap: Math.max(
+        0,
+        ...xs.slice(1).map((value, index) => value - xs[index]!),
+      ),
+      maxYGap: Math.max(
+        0,
+        ...ys.slice(1).map((value, index) => value - ys[index]!),
+      ),
+    };
+  });
+  expect(terrainCoverage.widths).toEqual([64]);
+  expect(terrainCoverage.heights).toEqual([64]);
+  expect(terrainCoverage.maxXGap).toBeLessThanOrEqual(64);
+  expect(terrainCoverage.maxYGap).toBeLessThanOrEqual(64);
+  await expect(page.locator('[data-world-role="fog"]').first())
+    .toHaveCSS('width', '128px');
+  await expect(page.locator('[data-world-role="fog"]').first())
+    .toHaveCSS('height', '128px');
+
   await expect(
     page.locator('[data-world-role="teammate-identity"]'),
   ).toHaveCount(3);
-  await expect(
-    page.locator('[data-presentation-identity-slot="TEAM_A"]'),
-  ).toHaveCount(1);
-  await expect(
-    page.locator('[data-presentation-identity-slot="TEAM_B"]'),
-  ).toHaveCount(1);
-  await expect(
-    page.locator('[data-presentation-identity-slot="TEAM_C"]'),
-  ).toHaveCount(1);
+
+  // Runtime admission order is deliberately non-lexicographic:
+  // zeta -> TEAM_A, alpha -> TEAM_B, mu -> TEAM_C. A renderer that sorts
+  // PlayerIds would produce a different assignment and fail this regression.
+  const expectedIdentity = [
+    ['visual-zeta', 'TEAM_A', 'circle'],
+    ['visual-alpha', 'TEAM_B', 'diamond'],
+    ['visual-mu', 'TEAM_C', 'triangle'],
+  ] as const;
+  for (const [playerId, slot, shape] of expectedIdentity) {
+    const worldMarker = page.locator(
+      '[data-world-role="teammate-identity"]'
+        + '[data-world-id="' + playerId + '"]',
+    );
+    await expect(worldMarker).toHaveAttribute(
+      'data-presentation-identity-slot',
+      slot,
+    );
+    await expect(worldMarker).toHaveAttribute(
+      'data-marker-shape',
+      shape,
+    );
+
+    const hudRow = page.locator(
+      '.p1-teammate[data-player-id="' + playerId + '"]',
+    );
+    await expect(hudRow).toHaveAttribute(
+      'data-presentation-identity-slot',
+      slot,
+    );
+    await expect(hudRow).toHaveAttribute(
+      'data-marker-shape',
+      shape,
+    );
+  }
+  await expect(page.locator('[data-region="world"]'))
+    .toContainText('4 TEAM');
+
   await captureViewport(page, 'normal-fog-coop-2x.png');
   files.push('normal-fog-coop-2x.png');
 
@@ -831,6 +904,9 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       noQaWorldPreview: true,
       integerScale2x3x: true,
       terrainAndFogFromCanonicalWorld: true,
+      continuousCanonicalCellCoverage: true,
+      runtimeOwnedCoopIdentitySlots: true,
+      nonLexicographicIdentityRegression: true,
       acceptedRasterStateProjection: true,
     },
     files,
