@@ -37,6 +37,10 @@ import {
   createPhase1ProductReviewRuntime,
   type Phase1ProductReviewRuntimeConfig,
 } from './runtime/Phase1ProductReviewRuntime';
+import {
+  createPhase1ProductReviewEntrypoint,
+  shouldShowPhase1ProductReviewEntrypoint,
+} from './runtime/Phase1ProductReviewEntrypoint';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -310,10 +314,17 @@ export async function bootProZ0(
 const autoBootRoot = document.querySelector<HTMLElement>('[data-proz0-autoboot]');
 
 if (autoBootRoot !== null) {
-  void bootAutoProZ0(autoBootRoot).catch(
-    (error: unknown) => {
-      autoBootRoot.dataset.runtimeStatus = 'failed';
-      console.error('ProZ0 runtime failed to start.', error);
-    },
-  );
+  if (shouldShowPhase1ProductReviewEntrypoint(
+    autoBootRoot,
+    window.location.search,
+  )) {
+    createPhase1ProductReviewEntrypoint(autoBootRoot);
+  } else {
+    void bootAutoProZ0(autoBootRoot).catch(
+      (error: unknown) => {
+        autoBootRoot.dataset.runtimeStatus = 'failed';
+        console.error('ProZ0 runtime failed to start.', error);
+      },
+    );
+  }
 }

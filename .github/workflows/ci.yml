@@ -94,3 +94,12 @@ jobs:
           path: test-results/p1-int-001-product-review/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload P1-QA-002 PO entrypoint evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p1-qa-002-entrypoint-evidence-${{ github.sha }}
+          path: test-results/p1-qa-002-entrypoint/
+          if-no-files-found: ignore
+          retention-days: 30
