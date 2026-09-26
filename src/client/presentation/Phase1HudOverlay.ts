@@ -509,6 +509,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     );
 
     const world = createElement(this.document, 'section', 'p1-world p1-box');
+    world.dataset.region = 'world';
     world.dataset.weatherState = state.world.weatherState;
     world.dataset.dayPeriod = state.world.dayPeriod;
     const worldLine = createElement(this.document, 'div', 'p1-world-line');
