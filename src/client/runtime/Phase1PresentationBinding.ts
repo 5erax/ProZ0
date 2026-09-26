@@ -332,6 +332,7 @@ function teammates(
       order: identity.order,
       presentation: Object.freeze({
         playerId: motion.playerId,
+        presentationIdentitySlot: motion.presentationIdentitySlot,
         label: identity.label,
         markerShape: identity.markerShape,
         stateLabel: motion.locomotionState.toUpperCase(),
