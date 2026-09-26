@@ -135,3 +135,111 @@ test('viewport below 640x360 shows explicit no-fractional-scale guard', async ({
   await expect(warning).toBeVisible();
   await expect(warning).toContainText('640×360');
 });
+
+
+test('direct Product Review URL boots canonical persisted slice without console setup', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  // Production launch inputs only: gameplay/clearance tuning is canonical
+  // and no longer supplied through debug/deployment query parameters.
+  const query = new URLSearchParams({
+    proz0Mode: 'phase1-product-review',
+    proz0WorldId: 'world:e2e-product-review-direct',
+    proz0WorldSeed: 'p1-world-golden',
+    proz0Players: 'e2e-player',
+    proz0Player: 'e2e-player',
+    proz0SaveDb: 'proz0-e2e-product-review-direct',
+  });
+  await page.goto('/?' + query.toString());
+
+  const root = page.locator('[data-proz0-autoboot]');
+  const canvas = page.locator('#proz0-canvas');
+  const controls = page.locator('[data-product-review-controls]');
+  const interaction = page.locator('[data-region="interaction"]');
+
+  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  await expect(root).toHaveAttribute(
+    'data-runtime-mode',
+    'phase1-product-review',
+  );
+  await expect(root).toHaveAttribute(
+    'data-product-review-authority',
+    'canonical',
+  );
+  await expect(root).toHaveAttribute(
+    'data-product-review-persistence',
+    'indexeddb-save-v2',
+  );
+  await expect(canvas).toHaveAttribute(
+    'data-renderer',
+    'phase1-production-raster',
+  );
+  await expect(
+    page.locator('[data-product-review-world="canonical"]'),
+  ).toHaveAttribute('data-production-asset-foundation', 'p1-75-78');
+  await expect(page.locator('[data-production-world-preview]')).toHaveCount(0);
+
+  await expect(controls).toHaveAttribute(
+    'data-product-review-controls',
+    'closed',
+  );
+  await page.keyboard.press('h');
+  await expect(controls).toHaveAttribute(
+    'data-product-review-controls',
+    'open',
+  );
+  await expect(controls).toContainText('WASD / ARROWS');
+  await expect(controls).toContainText('SPACE · ATTACK');
+  await page.keyboard.press('h');
+
+  await page.keyboard.press('i');
+  const starterInventory = page.locator('[data-panel-kind="inventory"]');
+  await expect(starterInventory).toContainText('Stone Field Tool');
+  await page.keyboard.press('Escape');
+
+  // Reach the canonical local Fiber Plant at (18, 10) using only normal
+  // player movement. Hold durations target the node center from the approved
+  // 2.8125 WU/s cardinal movement speed, avoiding poll-induced overshoot.
+  await page.keyboard.down('d');
+  await page.waitForTimeout(6_300);
+  await page.keyboard.up('d');
+
+  await page.keyboard.down('s');
+  await page.waitForTimeout(3_500);
+  await page.keyboard.up('s');
+  await page.waitForTimeout(100);
+
+  const gatherX = Number(await canvas.getAttribute('data-player-x'));
+  const gatherY = Number(await canvas.getAttribute('data-player-y'));
+  expect(Math.hypot(gatherX - 18, gatherY - 10)).toBeLessThanOrEqual(1.25);
+  await expect(interaction).toContainText('GATHER');
+
+  // Complete two canonical Fiber Plant gather channels using only the
+  // player-facing context control. Each gather yields 2 Plant Fiber.
+  await page.keyboard.press('e');
+  await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
+  await expect(interaction).toHaveAttribute('data-state', 'AVAILABLE', {
+    timeout: 2_000,
+  });
+
+  await page.keyboard.press('e');
+  await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
+  await expect(interaction).toHaveAttribute('data-state', 'AVAILABLE', {
+    timeout: 2_000,
+  });
+
+  // Cordage is the second recipe on the first canonical craft page and
+  // consumes 3 Plant Fiber. No test fixture mutates the item ledger.
+  await page.keyboard.press('c');
+  const craftPanel = page.locator('[data-panel-kind="craft"]');
+  await expect(craftPanel).toBeVisible();
+  await expect(craftPanel).toContainText('[2] Cordage');
+  await page.keyboard.press('2');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('i');
+  const inventory = page.locator('[data-panel-kind="inventory"]');
+  await expect(inventory).toBeVisible();
+  await expect(inventory).toContainText('Cordage');
+  await expect(inventory).toContainText('Plant Fiber');
+});

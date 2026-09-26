@@ -85,6 +85,16 @@ export interface Phase1ItemAuthorityOptions {
   readonly events?: ItemAuthorityEventSink;
 }
 
+export interface CommitRuinRewardItemsRequest {
+  readonly operationId: OperationId;
+  readonly playerId: PlayerId;
+  readonly inventoryContainerId: ContainerId;
+  readonly expectedInventoryRevision: number;
+  readonly rewardSourceId: string;
+  readonly itemDefinitionId: 'item:ancient-alloy-shard';
+  readonly quantity: 1;
+}
+
 function compareStrings(left: string, right: string): number {
   if (left < right) {
     return -1;
@@ -889,6 +899,96 @@ export class Phase1ItemAuthority {
     return result;
   }
 
+  public commitRuinRewardItems(
+    request: CommitRuinRewardItemsRequest,
+  ): ItemTransactionResult {
+    const signature = JSON.stringify([
+      'ruin-reward',
+      request.operationId,
+      request.playerId,
+      request.inventoryContainerId,
+      request.expectedInventoryRevision,
+      request.rewardSourceId,
+      request.itemDefinitionId,
+      request.quantity,
+    ]);
+    const cached = this.resolveCachedOperation(
+      request.operationId,
+      signature,
+    );
+    if (cached !== null) {
+      return cached;
+    }
+
+    if (
+      !operationIdValid(request.operationId)
+      || request.rewardSourceId.length === 0
+      || this.activeGatherOperationSignatures.has(request.operationId)
+    ) {
+      return rejected(request.operationId, 'OPERATION_ID_CONFLICT');
+    }
+    if (
+      request.itemDefinitionId !== 'item:ancient-alloy-shard'
+      || request.quantity !== 1
+    ) {
+      throw new Error('Ruin reward authority received an unapproved reward.');
+    }
+
+    const draft = this.ledger.createDraft();
+    const inventory = draft.getContainer(request.inventoryContainerId);
+    let result: ItemTransactionResult;
+    if (
+      inventory === null
+      || inventory.kind !== 'player-inventory'
+      || inventory.ownerPlayerId !== request.playerId
+    ) {
+      result = rejected(request.operationId, 'TARGET_UNAVAILABLE');
+    } else if (inventory.revision !== request.expectedInventoryRevision) {
+      result = rejected(request.operationId, 'STALE_REVISION');
+    } else {
+      const definition = this.options.catalog.getAs(
+        request.itemDefinitionId,
+        'item',
+      );
+      if (definition.conditionMax !== null) {
+        throw new Error('Ancient Alloy Shard unexpectedly has condition.');
+      }
+      const inserted = draft.insert({
+        containerId: request.inventoryContainerId,
+        itemDefinitionId: request.itemDefinitionId,
+        quantity: request.quantity,
+        condition: null,
+        operationId: request.operationId,
+        generatedOrdinal: 0,
+      });
+      if (typeof inserted === 'string') {
+        result = rejected(request.operationId, inserted);
+      } else {
+        const revision = draft.incrementRevision(
+          request.inventoryContainerId,
+        );
+        this.ledger.publish(draft);
+        result = committed(
+          request.operationId,
+          Object.freeze([{
+            containerId: request.inventoryContainerId,
+            revision,
+          }]),
+          Object.freeze([]),
+          inserted.createdStackIds,
+          inserted.removedStackIds,
+        );
+      }
+    }
+
+    this.processedOperations.set(request.operationId, {
+      signature,
+      result,
+    });
+    this.flushPendingAuthorityEvents();
+    return result;
+  }
+
   public execute(command: ItemCommand): ItemTransactionResult {
     const signature = itemCommandSignature(command);
     const cached = this.resolveCachedOperation(command.operationId, signature);
@@ -1059,6 +1159,13 @@ export class Phase1ItemAuthority {
     });
   }
 
+  public getActiveGatherOperationId(
+    playerId: PlayerId,
+  ): OperationId | null {
+    return this.activeGathersByPlayer.get(playerId)?.request.operationId
+      ?? null;
+  }
+
   public cancelGather(playerId: PlayerId): boolean {
     const channel = this.activeGathersByPlayer.get(playerId);
     if (channel === undefined) {
@@ -1066,6 +1173,24 @@ export class Phase1ItemAuthority {
     }
     this.clearGather(channel);
     return true;
+  }
+
+  public cancelAllGathers(): readonly Readonly<{
+    playerId: PlayerId;
+    operationId: OperationId;
+  }>[] {
+    const active = [...this.activeGathersByPlayer.entries()]
+      .map(([playerId, channel]) => Object.freeze({
+        playerId,
+        operationId: channel.request.operationId,
+      }))
+      .sort((left, right) =>
+        left.operationId.localeCompare(right.operationId),
+      );
+    for (const { playerId } of active) {
+      this.cancelGather(playerId);
+    }
+    return Object.freeze(active);
   }
 
   private executeUncached(command: ItemCommand): ItemTransactionResult {

@@ -175,3 +175,11 @@ export {
   recordsV2ToBuildingSnapshot,
   type BuildingPersistenceRecordsV2,
 } from './mappers/StructurePersistenceMapperV2';
+
+export {
+  loadPhase1ReopenState,
+  reconstructPhase1ReopenState,
+  type Phase1ReopenChunkState,
+  type Phase1ReopenPlayerState,
+  type Phase1ReopenState,
+} from './integration/Phase1ReopenState';

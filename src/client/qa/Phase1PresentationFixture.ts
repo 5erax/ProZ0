@@ -387,18 +387,21 @@ function fixtureState(mode: Phase1PresentationQaMode): Phase1PresentationState {
       ? Object.freeze([
           Object.freeze({
             playerId: 'teammate-a',
+            presentationIdentitySlot: 'TEAM_A',
             label: 'Ari',
             markerShape: 'circle',
             stateLabel: 'BASE',
           }),
           Object.freeze({
             playerId: 'teammate-b',
+            presentationIdentitySlot: 'TEAM_B',
             label: 'Bo',
             markerShape: 'diamond',
             stateLabel: 'EXPEDITION',
           }),
           Object.freeze({
             playerId: 'teammate-c',
+            presentationIdentitySlot: 'TEAM_C',
             label: 'Cy',
             markerShape: 'triangle',
             stateLabel: 'RECOVERY',

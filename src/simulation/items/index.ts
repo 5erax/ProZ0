@@ -1,5 +1,6 @@
 export {
   Phase1ItemAuthority,
+  type CommitRuinRewardItemsRequest,
   type Phase1ItemAuthorityOptions,
 } from './ItemTransactionAuthority';
 

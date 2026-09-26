@@ -29,12 +29,65 @@ export interface Phase1HostedReplicationAdapter {
   ): readonly RevisionedAggregateViewV1[];
 }
 
+export interface Phase1HostedRuinAuthority {
+  inspectRuin(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRevision: number;
+  }):
+    | {
+        readonly status: 'committed';
+        readonly operationId: string;
+        readonly revision: number;
+        readonly changed: boolean;
+        readonly rewardItemId: string | null;
+        readonly rewardQuantity: number;
+      }
+    | {
+        readonly status: 'rejected';
+        readonly operationId: string;
+        readonly reason: string;
+      };
+  claimRuinReward(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly ruinEntityId: string;
+    readonly expectedRuinRevision: number;
+    readonly inventoryContainerId: string;
+    readonly expectedInventoryRevision: number;
+  }):
+    | {
+        readonly status: 'committed';
+        readonly operationId: string;
+        readonly ruinRevision: number;
+        readonly inventoryRevision: number;
+        readonly createdStackIds: readonly string[];
+      }
+    | {
+        readonly status: 'rejected';
+        readonly operationId: string;
+        readonly reason: string;
+      };
+}
+
 export interface Phase1HostedCommandDispatcherOptions {
-  readonly items: Phase1ItemAuthority;
-  readonly buildings: Phase1BuildingAuthority;
-  readonly machines: Phase1CondenserAuthority;
+  readonly items: Pick<
+    Phase1ItemAuthority,
+    | 'execute'
+    | 'beginGather'
+    | 'getActiveGatherOperationId'
+    | 'cancelGather'
+    | 'cancelAllGathers'
+  >;
+  readonly buildings: Pick<
+    Phase1BuildingAuthority,
+    'place' | 'dismantle'
+  >;
+  readonly machines: Pick<Phase1CondenserAuthority, 'setEnabled'>;
   readonly death: Phase1DeathAuthority;
   readonly combat?: Phase1CombatAuthority;
+  readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
 }
 
@@ -153,6 +206,29 @@ implements HostedCommandDispatcher {
     private readonly options: Phase1HostedCommandDispatcherOptions,
   ) {}
 
+  public shouldInterruptOnDisconnect(
+    command: GameplayCommandEnvelopeV1,
+  ): boolean {
+    return command.commandType === 'item.gather';
+  }
+
+  public cancelPendingForPlayer(playerId: PlayerId): readonly string[] {
+    const operationId = this.options.items.getActiveGatherOperationId(
+      playerId,
+    );
+    if (operationId === null) return Object.freeze([]);
+    this.options.items.cancelGather(playerId);
+    return Object.freeze([operationId]);
+  }
+
+  public cancelAllPending(): readonly string[] {
+    return Object.freeze(
+      this.options.items.cancelAllGathers().map(
+        (entry) => entry.operationId,
+      ),
+    );
+  }
+
   public execute(
     context: HostedDomainCommandContext,
   ): HostedDomainCommandResult {
@@ -160,6 +236,9 @@ implements HostedCommandDispatcher {
     const payload = payloadObject(command);
 
     switch (command.commandType) {
+      case 'item.gather':
+        return this.beginGather(context.playerId, command, payload);
+
       case 'item.transfer':
         return this.executeItem(context.playerId, command, {
           type: 'transfer',
@@ -344,6 +423,12 @@ implements HostedCommandDispatcher {
       case 'death-cache.recover':
         return this.recoverDeathCache(context.playerId, command, payload);
 
+      case 'world.ruin-inspect':
+        return this.inspectRuin(context.playerId, command, payload);
+
+      case 'world.ruin-reward-claim':
+        return this.claimRuinReward(context.playerId, command, payload);
+
       case 'combat.attack':
         return this.attack(context.playerId, command, payload);
 
@@ -353,6 +438,75 @@ implements HostedCommandDispatcher {
           reason: 'INVALID_MESSAGE',
         });
     }
+  }
+
+  private beginGather(
+    playerId: PlayerId,
+    envelope: GameplayCommandEnvelopeV1,
+    payload: PayloadObject,
+  ): HostedDomainCommandResult {
+    if (envelope.expectedRevisions.length !== 2) {
+      return Object.freeze({ status: 'rejected', reason: 'INVALID_MESSAGE' });
+    }
+    const inventoryContainerId = textField(
+      payload,
+      'inventoryContainerId',
+    );
+    const resourceEntityId = textField(payload, 'resourceEntityId');
+    const rawToolStackId = payload.toolStackId;
+    if (
+      rawToolStackId !== undefined
+      && (
+        typeof rawToolStackId !== 'string'
+        || rawToolStackId.length === 0
+      )
+    ) {
+      return Object.freeze({ status: 'rejected', reason: 'INVALID_MESSAGE' });
+    }
+
+    const start = this.options.items.beginGather({
+      operationId: envelope.operationId,
+      playerId,
+      inventoryContainerId,
+      expectedInventoryRevision: expectedRevision(
+        envelope,
+        'container',
+        inventoryContainerId,
+      ),
+      resourceEntityId,
+      expectedResourceRevision: expectedRevision(
+        envelope,
+        'resource',
+        resourceEntityId,
+      ),
+      ...(rawToolStackId === undefined
+        ? {}
+        : { toolStackId: rawToolStackId }),
+    });
+
+    if (start.status === 'started') {
+      return Object.freeze({ status: 'pending' });
+    }
+    if (start.status === 'rejected') {
+      return Object.freeze({
+        status: 'rejected',
+        reason: start.reason,
+      });
+    }
+    return withReplication(
+      this.options,
+      envelope.commandType,
+      playerId,
+      start.result.status === 'committed'
+        ? {
+            status: 'committed',
+            resultingRevisions: itemResultRevisions(start.result),
+          }
+        : {
+            status: 'rejected',
+            reason: start.result.reason,
+          },
+    );
   }
 
   private executeItem(
@@ -596,6 +750,113 @@ implements HostedCommandDispatcher {
             resultingRevisions: itemResultRevisions(result),
           }
         : { status: 'rejected', reason: result.reason },
+    );
+  }
+
+  private inspectRuin(
+    playerId: PlayerId,
+    envelope: GameplayCommandEnvelopeV1,
+    payload: PayloadObject,
+  ): HostedDomainCommandResult {
+    if (this.options.ruins === undefined) {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'INVALID_MESSAGE',
+      });
+    }
+    const ruinEntityId = textField(payload, 'ruinEntityId');
+    const result = this.options.ruins.inspectRuin({
+      operationId: envelope.operationId,
+      playerId,
+      ruinEntityId,
+      expectedRevision: expectedRevision(
+        envelope,
+        'ruin',
+        ruinEntityId,
+      ),
+    });
+    return withReplication(
+      this.options,
+      envelope.commandType,
+      playerId,
+      result.status === 'committed'
+        ? {
+            status: 'committed',
+            resultingRevisions: Object.freeze([{
+              aggregateType: 'ruin',
+              aggregateId: ruinEntityId,
+              revision: result.revision,
+            }]),
+          }
+        : {
+            status: 'rejected',
+            reason: result.reason,
+          },
+    );
+  }
+
+  private claimRuinReward(
+    playerId: PlayerId,
+    envelope: GameplayCommandEnvelopeV1,
+    payload: PayloadObject,
+  ): HostedDomainCommandResult {
+    if (this.options.ruins === undefined) {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'INVALID_MESSAGE',
+      });
+    }
+    if (envelope.expectedRevisions.length !== 2) {
+      return Object.freeze({
+        status: 'rejected',
+        reason: 'INVALID_MESSAGE',
+      });
+    }
+    const ruinEntityId = textField(payload, 'ruinEntityId');
+    const inventoryContainerId = textField(
+      payload,
+      'inventoryContainerId',
+    );
+    const result = this.options.ruins.claimRuinReward({
+      operationId: envelope.operationId,
+      playerId,
+      ruinEntityId,
+      expectedRuinRevision: expectedRevision(
+        envelope,
+        'ruin',
+        ruinEntityId,
+      ),
+      inventoryContainerId,
+      expectedInventoryRevision: expectedRevision(
+        envelope,
+        'container',
+        inventoryContainerId,
+      ),
+    });
+    return withReplication(
+      this.options,
+      envelope.commandType,
+      playerId,
+      result.status === 'committed'
+        ? {
+            status: 'committed',
+            resultingRevisions: Object.freeze([
+              {
+                aggregateType: 'ruin',
+                aggregateId: ruinEntityId,
+                revision: result.ruinRevision,
+              },
+              {
+                aggregateType: 'container',
+                aggregateId: inventoryContainerId,
+                revision: result.inventoryRevision,
+              },
+            ]),
+          }
+        : {
+            status: 'rejected',
+            reason: result.reason,
+          },
     );
   }
 

@@ -286,16 +286,19 @@ function worldTimeLabel(environment: Readonly<Phase1EnvironmentView>): string {
 
 const TEAM_IDENTITY_PRESENTATION = Object.freeze({
   TEAM_A: Object.freeze({
+    slot: 'TEAM_A' as const,
     order: 0,
     label: 'TEAM A',
     markerShape: 'circle' as const,
   }),
   TEAM_B: Object.freeze({
+    slot: 'TEAM_B' as const,
     order: 1,
     label: 'TEAM B',
     markerShape: 'diamond' as const,
   }),
   TEAM_C: Object.freeze({
+    slot: 'TEAM_C' as const,
     order: 2,
     label: 'TEAM C',
     markerShape: 'triangle' as const,
@@ -332,6 +335,7 @@ function teammates(
       order: identity.order,
       presentation: Object.freeze({
         playerId: motion.playerId,
+        presentationIdentitySlot: identity.slot,
         label: identity.label,
         markerShape: identity.markerShape,
         stateLabel: motion.locomotionState.toUpperCase(),

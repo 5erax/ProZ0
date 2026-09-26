@@ -30,6 +30,7 @@ export interface DeathCacheWorldView {
 
 export type PredatorCombatState =
   | 'idle'
+  | 'patrol'
   | 'alert'
   | 'chase'
   | 'attack-windup'
