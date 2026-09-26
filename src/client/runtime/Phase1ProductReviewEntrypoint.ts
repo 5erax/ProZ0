@@ -42,6 +42,18 @@ export function hasExplicitProZ0Mode(
   );
 }
 
+export function shouldShowPhase1ProductReviewEntrypoint(
+  root: HTMLElement,
+  search = window.location.search,
+): boolean {
+  if (hasExplicitProZ0Mode(root, search)) return false;
+
+  // The PO-facing launcher owns only the truly bare published route.
+  // Existing QA fixture/reproduction queries intentionally retain the
+  // historical local-demo autoboot behavior unless they select a mode.
+  return new URLSearchParams(search).toString().length === 0;
+}
+
 export function createPhase1ProductReviewEntrypoint(
   root: HTMLElement,
 ): Phase1ProductReviewEntrypointHandle {
