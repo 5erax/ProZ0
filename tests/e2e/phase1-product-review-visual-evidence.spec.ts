@@ -625,9 +625,9 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   expect(terrainCoverage.maxXGap).toBeLessThanOrEqual(64);
   expect(terrainCoverage.maxYGap).toBeLessThanOrEqual(64);
   await expect(page.locator('[data-world-role="fog"]').first())
-    .toHaveCSS('width', '128px');
+    .toHaveCSS('width', '64px');
   await expect(page.locator('[data-world-role="fog"]').first())
-    .toHaveCSS('height', '128px');
+    .toHaveCSS('height', '64px');
 
   await expect(
     page.locator('[data-world-role="teammate-identity"]'),
