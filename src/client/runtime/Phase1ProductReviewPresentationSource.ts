@@ -1,4 +1,7 @@
-import type { CommandResultV1 } from '../../protocol';
+import type {
+  CommandResultV1,
+  PlayerMotionViewV1,
+} from '../../protocol';
 import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
@@ -55,6 +58,8 @@ export class Phase1ProductReviewPresentationSource
   public constructor(
     private readonly bundle: Phase1AuthorityBundle,
     private readonly playerId: string,
+    private readonly getPlayerMotions:
+      () => readonly Readonly<PlayerMotionViewV1>[],
   ) {
     this.current = this.project();
   }
@@ -194,6 +199,7 @@ export class Phase1ProductReviewPresentationSource
       equippedStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
       progression: this.bundle.progression.getPlayerView(this.playerId),
+      playerMotions: this.getPlayerMotions(),
       commandFeedback: this.commandFeedback,
       deathResult: this.bundle.getLastDeathResult(this.playerId),
       panel,
