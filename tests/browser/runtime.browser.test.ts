@@ -321,7 +321,7 @@ describe('Phase 0 browser runtime', () => {
     ).not.toBeNull();
   });
 
-  it('checkpoints canonical Product Review state to IndexedDB and reopens it before publish', async () => {
+  it('serializes repeated Product Review checkpoints and reopens the latest same-runtime state', async () => {
     const databaseName = 'proz0-test-product-review-reopen';
     await deleteIndexedDbSaveDatabase(databaseName);
 
@@ -333,8 +333,6 @@ describe('Phase 0 browser runtime', () => {
       worldSeed: 'p1-world-golden',
       playerIds: ['browser-player'],
       localPlayerId: 'browser-player',
-      // Integration-test values only; production still waits for owner-approved
-      // ordinary interaction / placement-clearance tuning.
       interactionRangeWorldUnits: 2,
       spawnClearanceRadiusWorldUnits: 0,
       requiredAccessRadiusWorldUnits: 0,
@@ -342,7 +340,12 @@ describe('Phase 0 browser runtime', () => {
     } as const;
 
     const first = await bootPersistedPhase1ProductReview(root, config);
+    let firstDestroyed = false;
     let second: Awaited<
+      ReturnType<typeof bootPersistedPhase1ProductReview>
+    > | null = null;
+    let secondDestroyed = false;
+    let third: Awaited<
       ReturnType<typeof bootPersistedPhase1ProductReview>
     > | null = null;
 
@@ -364,45 +367,108 @@ describe('Phase 0 browser runtime', () => {
       }));
       await wait(50);
 
-      const savedX = Number(firstCanvas?.dataset.playerX);
-      expect(savedX).toBeGreaterThan(initialX);
-      const savedTick = first.runtime.getAuthorityTick();
-      const firstSave = await first.checkpoint(
-        '2026-09-25T18:00:00.000Z',
-      );
-      expect(firstSave).toMatchObject({
+      const firstSavedX = Number(firstCanvas?.dataset.playerX);
+      expect(firstSavedX).toBeGreaterThan(initialX);
+      const firstSavedTick = first.runtime.getAuthorityTick();
+      expect(await first.checkpoint(
+        '2026-09-28T00:00:00.000Z',
+      )).toMatchObject({
         ok: true,
         value: {
           worldId: config.worldId,
           worldRevision: 0,
-          authorityTick: savedTick,
+          authorityTick: firstSavedTick,
         },
       });
 
-      first.destroy();
-      second = await bootPersistedPhase1ProductReview(root, config);
-      expect(second.reopened).toBe(true);
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(160);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(50);
 
-      const reopenedCanvas =
-        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
-      expect(Number(reopenedCanvas?.dataset.playerX))
-        .toBeCloseTo(savedX, 6);
-      expect(second.runtime.getAuthorityTick())
-        .toBeGreaterThanOrEqual(savedTick);
-
-      const secondSave = await second.checkpoint(
-        '2026-09-25T18:01:00.000Z',
-      );
-      expect(secondSave).toMatchObject({
+      const secondSavedX = Number(firstCanvas?.dataset.playerX);
+      expect(secondSavedX).toBeGreaterThan(firstSavedX);
+      const secondSavedTick = first.runtime.getAuthorityTick();
+      expect(await first.checkpoint(
+        '2026-09-28T00:01:00.000Z',
+      )).toMatchObject({
         ok: true,
         value: {
           worldId: config.worldId,
           worldRevision: 1,
+          authorityTick: secondSavedTick,
+          createdAtUtc: '2026-09-28T00:00:00.000Z',
         },
       });
+
+      first.destroy();
+      firstDestroyed = true;
+      second = await bootPersistedPhase1ProductReview(root, config);
+      expect(second.reopened).toBe(true);
+
+      const secondCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      expect(Number(secondCanvas?.dataset.playerX))
+        .toBeCloseTo(secondSavedX, 6);
+      expect(second.runtime.getAuthorityTick())
+        .toBeGreaterThanOrEqual(secondSavedTick);
+
+      expect(await second.checkpoint(
+        '2026-09-28T00:02:00.000Z',
+      )).toMatchObject({
+        ok: true,
+        value: {
+          worldId: config.worldId,
+          worldRevision: 2,
+          createdAtUtc: '2026-09-28T00:00:00.000Z',
+        },
+      });
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(140);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(50);
+
+      const reopenedLatestX = Number(secondCanvas?.dataset.playerX);
+      expect(reopenedLatestX).toBeGreaterThan(secondSavedX);
+      expect(await second.checkpoint(
+        '2026-09-28T00:03:00.000Z',
+      )).toMatchObject({
+        ok: true,
+        value: {
+          worldId: config.worldId,
+          worldRevision: 3,
+        },
+      });
+
+      second.destroy();
+      secondDestroyed = true;
+      third = await bootPersistedPhase1ProductReview(root, config);
+      expect(third.reopened).toBe(true);
+      expect(
+        Number(
+          root.querySelector<HTMLCanvasElement>('#proz0-canvas')
+            ?.dataset.playerX,
+        ),
+      ).toBeCloseTo(reopenedLatestX, 6);
     } finally {
-      second?.destroy();
-      if (second === null) {
+      third?.destroy();
+      if (second !== null && !secondDestroyed) {
+        second.destroy();
+      }
+      if (!firstDestroyed) {
         first.destroy();
       }
       await deleteIndexedDbSaveDatabase(databaseName);
