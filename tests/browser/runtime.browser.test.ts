@@ -553,6 +553,9 @@ describe('Phase 0 browser runtime', () => {
       code: 'KeyV',
       cancelable: true,
     }));
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toContain('[V] CONSUME · Consumable');
     await wait(20);
 
     const warning =
@@ -560,9 +563,6 @@ describe('Phase 0 browser runtime', () => {
     expect(warning).not.toBeNull();
     expect(warning?.textContent).toContain('SOURCE MISSING');
     expect(warning?.textContent).toContain('Consumable');
-    expect(
-      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
-    ).toContain('[V] CONSUME · Consumable');
   });
 
   it('keeps Product Review command feedback bound to its originating input', async () => {
@@ -586,7 +586,6 @@ describe('Phase 0 browser runtime', () => {
       code: 'KeyQ',
       cancelable: true,
     }));
-    await wait(20);
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
     ).toMatch(/^\[Q\] (EQUIP|UNEQUIP) · Basic Spear/);
@@ -595,7 +594,6 @@ describe('Phase 0 browser runtime', () => {
       code: 'KeyT',
       cancelable: true,
     }));
-    await wait(20);
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
     ).toMatch(/^\[T\] (EQUIP|UNEQUIP) · Thermal Wrap/);
@@ -604,7 +602,6 @@ describe('Phase 0 browser runtime', () => {
       code: 'KeyV',
       cancelable: true,
     }));
-    await wait(20);
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
     ).toContain('[V] CONSUME · Consumable');
