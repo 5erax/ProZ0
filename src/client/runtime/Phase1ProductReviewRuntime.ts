@@ -591,6 +591,7 @@ export async function createPhase1ProductReviewRuntime(
 
     source.setPresentationPanel(craftPanel());
     source.setLocalCommandFeedback({
+      inputLabel: String(slot + 1),
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
@@ -770,6 +771,7 @@ export async function createPhase1ProductReviewRuntime(
 
     source.setPresentationPanel(buildPanel());
     source.setLocalCommandFeedback({
+      inputLabel: 'ENTER',
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
@@ -1083,6 +1085,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     source.setLocalCommandFeedback({
+      inputLabel: 'V',
       operationId: start.operationId,
       status: 'rejected',
       reason: start.reason,
@@ -1145,6 +1148,7 @@ export async function createPhase1ProductReviewRuntime(
         const targetName = activeConsume.targetName;
         activeConsume = null;
         source.setLocalCommandFeedback({
+          inputLabel: 'V',
           operationId: result.operationId,
           status: 'rejected',
           reason: result.reason,
@@ -1157,6 +1161,7 @@ export async function createPhase1ProductReviewRuntime(
         const targetName = activeConsume.targetName;
         activeConsume = null;
         source.setLocalCommandFeedback({
+          inputLabel: 'V',
           operationId: result.operationId,
           status: result.committed ? 'committed' : 'rejected',
           ...(result.committed ? {} : { reason: 'SOURCE_MISSING' }),
@@ -1384,6 +1389,7 @@ export async function createPhase1ProductReviewRuntime(
       : null;
     const result = bundle.equipWeapon(config.localPlayerId, next);
     source.setLocalCommandFeedback({
+      inputLabel: 'Q',
       operationId: nextOperationId('equip-weapon'),
       status: result.status,
       ...(result.status === 'rejected'
@@ -1410,6 +1416,7 @@ export async function createPhase1ProductReviewRuntime(
       : null;
     const result = bundle.equipThermalWrap(config.localPlayerId, next);
     source.setLocalCommandFeedback({
+      inputLabel: 'T',
       operationId: nextOperationId('equip-thermal-wrap'),
       status: result.status,
       ...(result.status === 'rejected'
@@ -1473,6 +1480,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     source.setLocalCommandFeedback({
+      inputLabel: 'SPACE',
       operationId: result.attackId,
       status: result.status === 'rejected' ? 'rejected' : 'committed',
       ...(result.status === 'rejected' && result.reason !== undefined

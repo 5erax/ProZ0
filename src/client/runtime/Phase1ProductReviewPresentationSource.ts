@@ -109,6 +109,7 @@ export class Phase1ProductReviewPresentationSource
     readonly operationId: string;
     readonly status: 'committed' | 'rejected';
     readonly reason?: string;
+    readonly inputLabel?: string;
     readonly verb: string;
     readonly target: string;
     readonly panelTargetId?: string | null;
@@ -120,7 +121,7 @@ export class Phase1ProductReviewPresentationSource
         input.status,
         input.reason,
       ),
-      inputLabel: 'E',
+      inputLabel: input.inputLabel ?? 'E',
       verb: input.verb,
       target: input.target,
       ...(input.panelTargetId === undefined

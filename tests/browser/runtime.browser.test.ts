@@ -560,6 +560,54 @@ describe('Phase 0 browser runtime', () => {
     expect(warning).not.toBeNull();
     expect(warning?.textContent).toContain('SOURCE MISSING');
     expect(warning?.textContent).toContain('Consumable');
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toContain('[V] CONSUME · Consumable');
+  });
+
+  it('keeps Product Review command feedback bound to its originating input', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-input-feedback',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyQ',
+      cancelable: true,
+    }));
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toMatch(/^\[Q\] (EQUIP|UNEQUIP) · Basic Spear/);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyT',
+      cancelable: true,
+    }));
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toMatch(/^\[T\] (EQUIP|UNEQUIP) · Thermal Wrap/);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyV',
+      cancelable: true,
+    }));
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toContain('[V] CONSUME · Consumable');
   });
 
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
