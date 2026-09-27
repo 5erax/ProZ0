@@ -9,6 +9,7 @@ function styleElement(document: Document): HTMLStyleElement {
   style.textContent = [
     '.p1-product-controls{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center center;pointer-events:none;z-index:40;font-family:monospace;font-size:8px;line-height:1.25;color:#f4f6ef;text-shadow:1px 1px 0 #10141b;}',
     '.p1-product-controls-hint{position:absolute;left:8px;top:92px;padding:3px 5px;background:rgba(10,14,22,.86);border:1px dashed #778094;}',
+    '[data-product-review-panel-open="true"] .p1-product-controls-hint{display:none!important;}',
     '.p1-product-controls-panel{position:absolute;left:50%;top:50%;width:390px;transform:translate(-50%,-50%);padding:8px;background:rgba(10,14,22,.96);border:1px solid #d6dccd;box-shadow:0 0 0 1px #111722 inset;}',
     '.p1-product-controls-panel[hidden]{display:none;}',
     '.p1-product-controls-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding-bottom:4px;margin-bottom:5px;}',
@@ -79,6 +80,7 @@ export function createPhase1ProductReviewControls(
     panel.hidden = !open;
     hint.hidden = open;
     layer.dataset.productReviewControls = open ? 'open' : 'closed';
+    root.dataset.productReviewHelpOpen = String(open);
   };
 
   return Object.freeze({
@@ -90,6 +92,7 @@ export function createPhase1ProductReviewControls(
     },
     destroy(): void {
       targetWindow.removeEventListener('resize', applyScale);
+      delete root.dataset.productReviewHelpOpen;
       layer.remove();
     },
   });
