@@ -302,12 +302,16 @@ function commandToasts(
 ): readonly Phase1ToastPresentation[] {
   if (feedback === null || feedback === undefined) return Object.freeze([]);
   const result = feedback.result;
+  const actionLabel =
+    '[' + feedback.inputLabel + '] '
+    + feedback.verb + ' · ' + feedback.target;
+
   if (result.status === 'rejected') {
     return Object.freeze([Object.freeze({
       id: `command:${result.operationId}`,
       kind: 'warning' as const,
       title: phase1FailureReasonLabel(result.reason ?? 'COMMAND REJECTED'),
-      detail: feedback.target,
+      detail: actionLabel,
     })]);
   }
 
@@ -321,6 +325,10 @@ function commandToasts(
     'ENABLE',
     'DISABLE',
     'RECOVER',
+    'CONSUME',
+    'EQUIP',
+    'UNEQUIP',
+    'ATTACK',
   ]);
   if (!toastVerbs.has(feedback.verb)) return Object.freeze([]);
 
@@ -328,7 +336,7 @@ function commandToasts(
     id: `command:${result.operationId}`,
     kind: 'info' as const,
     title: feedback.verb + ' · COMPLETE',
-    detail: feedback.target,
+    detail: actionLabel,
   })]);
 }
 

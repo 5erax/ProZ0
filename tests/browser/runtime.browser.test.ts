@@ -562,7 +562,7 @@ describe('Phase 0 browser runtime', () => {
       root.querySelector<HTMLElement>('.p1-toast[data-toast-kind="warning"]');
     expect(warning).not.toBeNull();
     expect(warning?.textContent).toContain('SOURCE MISSING');
-    expect(warning?.textContent).toContain('Consumable');
+    expect(warning?.textContent).toContain('[V] CONSUME · Consumable');
   });
 
   it('keeps Product Review command feedback bound to its originating input', async () => {
@@ -589,6 +589,10 @@ describe('Phase 0 browser runtime', () => {
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
     ).toMatch(/^\[Q\] (EQUIP|UNEQUIP) · Basic Spear/);
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-toast')?.textContent,
+    ).toMatch(/\[Q\] (EQUIP|UNEQUIP) · Basic Spear/);
 
     document.dispatchEvent(new KeyboardEvent('keydown', {
       code: 'KeyT',
@@ -597,6 +601,10 @@ describe('Phase 0 browser runtime', () => {
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
     ).toMatch(/^\[T\] (EQUIP|UNEQUIP) · Thermal Wrap/);
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-toast')?.textContent,
+    ).toMatch(/\[T\] (EQUIP|UNEQUIP) · Thermal Wrap/);
 
     document.dispatchEvent(new KeyboardEvent('keydown', {
       code: 'KeyV',
@@ -604,6 +612,10 @@ describe('Phase 0 browser runtime', () => {
     }));
     expect(
       root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toContain('[V] CONSUME · Consumable');
+    await wait(20);
+    expect(
+      root.querySelector<HTMLElement>('.p1-toast')?.textContent,
     ).toContain('[V] CONSUME · Consumable');
   });
 
