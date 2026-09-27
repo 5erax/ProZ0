@@ -165,6 +165,43 @@ function setWorldCenter(
   return true;
 }
 
+export function phase1ResourcePresentationSprite(
+  definitionId: string,
+  depleted: boolean,
+): Phase1ProductionSprite {
+  switch (definitionId) {
+    case 'resource:fiber-plant':
+      return resourceNodeSprite(
+        'fiberPlant',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:food-plant':
+      return resourceNodeSprite(
+        'foodPlant',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:timber-source':
+      return resourceNodeSprite(
+        'treeTimber',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:stone-outcrop':
+      return resourceNodeSprite(
+        'stoneOutcrop',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:metal-ore-node':
+      return resourceNodeSprite(
+        'metalOre',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:potable-water-source':
+      return PHASE1_PRODUCTION_WORLD_SPRITES.potableWater;
+    default:
+      return PHASE1_PRODUCTION_WORLD_SPRITES.ground;
+  }
+}
+
 function entitySprite(
   bundle: Phase1AuthorityBundle,
   entity: Readonly<Phase1GeneratedWorldEntity>,
@@ -178,38 +215,10 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
-      const depleted = state?.depleted === true;
-      switch (entity.definitionId) {
-        case 'resource:fiber-plant':
-          return resourceNodeSprite(
-            'fiberPlant',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:food-plant':
-          return resourceNodeSprite(
-            'foodPlant',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:tree-timber':
-          return resourceNodeSprite(
-            'treeTimber',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:stone-outcrop':
-          return resourceNodeSprite(
-            'stoneOutcrop',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:metal-ore':
-          return resourceNodeSprite(
-            'metalOre',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:potable-water-source':
-          return PHASE1_PRODUCTION_WORLD_SPRITES.potableWater;
-        default:
-          return PHASE1_PRODUCTION_WORLD_SPRITES.ground;
-      }
+      return phase1ResourcePresentationSprite(
+        entity.definitionId,
+        state?.depleted === true,
+      );
     }
   }
 }
