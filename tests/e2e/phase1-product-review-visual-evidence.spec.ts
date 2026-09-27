@@ -330,6 +330,39 @@ async function createCriticalHealthSave(
   );
 }
 
+async function createResourceFocusSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  return createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+    (authority) => {
+      const resource = authority.world.getActiveGeneratedEntities().find(
+        (entity) =>
+          entity.type === 'resource'
+          && entity.definitionId === 'resource:fiber-plant',
+      );
+      if (resource === undefined) {
+        throw new Error('Evidence setup could not resolve canonical Fiber Plant.');
+      }
+      authority.getRuntime('visual-local').relocatePlayer(
+        Object.freeze({
+          x: resource.position.x - 0.5,
+          y: resource.position.y,
+        }),
+        'E',
+      );
+    },
+  );
+}
+
 async function createWorldDropSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -708,6 +741,22 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(
     page.locator('[data-first-action-cue="visible"]'),
   ).toContainText('FIRST STEP · Move near a resource.');
+  await expect(
+    page.locator('[data-world-role="player"][data-local-player="true"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator(
+      '[data-world-role="structure"]'
+        + '[data-world-id="structure-instance:landing-module"]',
+    ),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-world-role="player"][data-local-player="true"]'),
+  ).not.toHaveCSS('filter', 'none');
+  await expect(page.locator('.p1-product-controls-panel')).toBeHidden();
+
+  await captureViewport(page, 'polish-first-entry-2x.png');
+  files.push('polish-first-entry-2x.png');
 
   await expect(page.locator('.p1-product-controls-hint')).toBeVisible();
   const hudLaneBounds = await page.evaluate(() => {
@@ -744,6 +793,34 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'normal-fog-coop-2x.png');
   files.push('normal-fog-coop-2x.png');
 
+  const resourceFocus = await createResourceFocusSave(
+    'world:p1-polish-001-resource-focus',
+  );
+  await openProductReview(
+    page,
+    resourceFocus,
+    'proz0-p1-polish-001-resource-focus',
+    2,
+  );
+  await expect(page.locator('.p1-interaction-main')).toContainText(
+    '[E] GATHER · Fiber Plant',
+  );
+  await expect(
+    page.locator(
+      '[data-world-role="resource"][data-focused-target="true"]',
+    ),
+  ).toHaveCount(1);
+  await captureViewport(page, 'polish-exact-target-2x.png');
+  files.push('polish-exact-target-2x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-polish-001-inventory',
+    2,
+    'visual-local',
+    players.map((player) => player.playerId),
+  );
   await page.keyboard.press('i');
   await expect(page.locator('[data-panel-kind="inventory"]')).toBeVisible();
   await expect(
@@ -1078,6 +1155,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     },
     cases: {
       normalFogCoop2x: 'normal-fog-coop-2x.png',
+      polishFirstEntry2x: 'polish-first-entry-2x.png',
+      polishExactTarget2x: 'polish-exact-target-2x.png',
       polishNormal1x: 'polish-normal-1x.png',
       polish1363Centered2x: 'polish-1363x936-centered-2x.png',
       polishInventory2x: 'polish-inventory-2x.png',
@@ -1112,6 +1191,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       craftShowsAllHaveNeedAndStation: true,
       dualEquipmentVisible: true,
       firstActionCueBoundToProgression: true,
+      firstEntryBeforeControlsShowsPlayerBaseAndCue: true,
+      focusedTargetMatchesInteractionResolver: true,
       terrainAndFogFromCanonicalWorld: true,
       continuousCanonicalCellCoverage: true,
       runtimeOwnedCoopIdentitySlots: true,
