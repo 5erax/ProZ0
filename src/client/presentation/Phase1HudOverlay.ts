@@ -495,7 +495,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-world-line{display:flex;justify-content:space-between;gap:4px;}',
     '.p1-equipment{position:absolute;left:8px;bottom:8px;width:164px;min-height:48px;padding:4px;display:grid;gap:2px;}',
     '.p1-equipment-slot,.p1-quick-use{display:flex;align-items:center;gap:3px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
-    '.p1-equipment-slot-label{width:42px;color:#c5ccbd;flex:0 0 auto;}',
+    '.p1-equipment-slot-label{width:20px;color:#c5ccbd;flex:0 0 auto;font-weight:700;}',
     '.p1-interaction{position:absolute;left:180px;bottom:8px;width:280px;min-height:34px;padding:4px;text-align:center;}',
     '.p1-first-action{position:absolute;left:180px;bottom:48px;width:280px;padding:3px 5px;text-align:center;background:rgba(10,14,22,.86);border:1px dashed #d6dccd;z-index:2;}',
     '.p1-interaction-main{font-size:9px;font-weight:700;}',
@@ -670,7 +670,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       }
     } else {
       const appendSlot = (
-        slotLabel: string,
+        inputLabel: string,
+        emptyLabel: string,
         slot: typeof equipmentSlots.weapon,
         key: string,
       ): void => {
@@ -684,10 +685,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
           this.document,
           'span',
           'p1-equipment-slot-label',
-          slotLabel,
+          '[' + inputLabel + ']',
         ));
         if (slot === null) {
-          row.append('—');
+          row.append(emptyLabel + ' · —');
         } else {
           const icon = assetSprite(
             this.document,
@@ -700,7 +701,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
             || slot.conditionMax === null
             || slot.conditionMax <= 0
               ? ''
-              : ' · C' + String(slot.condition);
+              : ' C' + String(slot.condition);
           row.title = slot.name
             + (slot.condition === null || slot.conditionMax === null
               ? ''
@@ -712,8 +713,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         }
         equipment.append(row);
       };
-      appendSlot('WEAPON', equipmentSlots.weapon, 'weapon');
-      appendSlot('WRAP', equipmentSlots.protection, 'protection');
+      appendSlot('Q', 'WEAPON', equipmentSlots.weapon, 'weapon');
+      appendSlot('T', 'WRAP', equipmentSlots.protection, 'protection');
 
       const quickUse = createElement(
         this.document,
