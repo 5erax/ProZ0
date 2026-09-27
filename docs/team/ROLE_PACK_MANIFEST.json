@@ -1,0 +1,350 @@
+{
+  "version": "2.1.0",
+  "repository": "5erax/ProZ0",
+  "adoption": "approved main or explicit PO adoption at a pinned commit; see ROLE_PACK_RELEASE.md",
+  "shared_required": [
+    "docs/team/ROLE_PACK_RELEASE.md",
+    "docs/team/GAME_DEVELOPMENT_FOUNDATION.md",
+    "docs/team/ROLE_RUNTIME_PROTOCOL.md",
+    "docs/team/COMMUNICATION_PROTOCOL.md",
+    "docs/team/CAPABILITY_MATRIX.md",
+    ".github/PROZ0_AGENT_BOOTSTRAP.md",
+    "docs/team/TEAM_OPERATING_SYSTEM.md",
+    "docs/team/TASK_LOCK_PROTOCOL.md",
+    "docs/team/CROSS_COMPANY_PROTOCOL.md",
+    "docs/team/DEFINITION_OF_DONE.md",
+    "docs/team/SOURCE_OF_TRUTH.md",
+    "docs/team/ARTIFACT_PROTOCOL.md",
+    "docs/team/universal-github-first-autonomous-collaboration-protocol.md",
+    "docs/team/ROLE_REGISTRY.md",
+    "docs/team/SKILL_REGISTRY.md",
+    "docs/team/MEMBER_REGISTRY.md",
+    "docs/team/COMMON_EXECUTION_CONTRACT.md",
+    "docs/team/DEPENDENCY_PROTOCOL.md",
+    "docs/team/HANDOFF_REWORK_PROTOCOL.md",
+    "docs/team/ROLE_INTERFACE_MAP.md"
+  ],
+  "product_context": [
+    "docs/game-vision.md",
+    "docs/gameplay-pillars-and-loops.md",
+    "docs/mvp-scope.md",
+    "docs/phase-1-vertical-slice-plan.md"
+  ],
+  "roles": [
+    {
+      "role_id": "PROJECT_MANAGER",
+      "contract": "docs/team/roles/project-manager.md",
+      "skill": ".agents/skills/proz0-producer/SKILL.md",
+      "playbook": ".agents/skills/proz0-producer/references/playbook.md",
+      "context": [
+        "docs/phase-1-vertical-slice-plan.md",
+        "docs/roadmap-and-technical-requirements.md"
+      ]
+    },
+    {
+      "role_id": "GAME_DESIGNER",
+      "contract": "docs/team/roles/game-designer.md",
+      "skill": ".agents/skills/proz0-game-design/SKILL.md",
+      "playbook": ".agents/skills/proz0-game-design/references/playbook.md",
+      "context": [
+        "docs/design/phase-1-vertical-slice-master-gameplay.md",
+        "docs/progression-and-professions.md",
+        "docs/survival-and-exploration.md",
+        "docs/building-crafting-and-automation.md"
+      ]
+    },
+    {
+      "role_id": "TECHNICAL_LEAD",
+      "contract": "docs/team/roles/technical-lead.md",
+      "skill": ".agents/skills/proz0-game-architecture/SKILL.md",
+      "playbook": ".agents/skills/proz0-game-architecture/references/playbook.md",
+      "context": [
+        "docs/technical/phase-1-vertical-slice-architecture-plan.md",
+        "docs/adr/ADR-P0-TECH-002-runtime-architecture-module-boundaries.md",
+        "docs/adr/ADR-P0-TECH-003-determinism-simulation-strategy.md",
+        "docs/adr/ADR-P1-TECH-008-save-schema-v2.md"
+      ]
+    },
+    {
+      "role_id": "GAMEPLAY_ENGINEER",
+      "contract": "docs/team/roles/gameplay-engineer.md",
+      "skill": ".agents/skills/proz0-gameplay-engineering/SKILL.md",
+      "playbook": ".agents/skills/proz0-gameplay-engineering/references/playbook.md",
+      "context": [
+        "docs/development/phase-0-runtime.md",
+        "docs/technical/phase-1-vertical-slice-architecture-plan.md",
+        "docs/design/phase-1-vertical-slice-master-gameplay.md"
+      ]
+    },
+    {
+      "role_id": "WORLD_NETWORK_PERSISTENCE_ENGINEER",
+      "contract": "docs/team/roles/world-network-persistence-engineer.md",
+      "skill": ".agents/skills/proz0-world-network-persistence/SKILL.md",
+      "playbook": ".agents/skills/proz0-world-network-persistence/references/playbook.md",
+      "context": [
+        "docs/world-and-procedural-generation.md",
+        "docs/multiplayer-and-persistence.md",
+        "docs/adr/ADR-P1-TECH-004-world-content-fog-delta.md",
+        "docs/adr/ADR-P1-TECH-007-hosted-coop-protocol.md",
+        "docs/adr/ADR-P1-TECH-008-save-schema-v2.md"
+      ]
+    },
+    {
+      "role_id": "ART_DIRECTOR",
+      "contract": "docs/team/roles/art-director-uiux-technical-art.md",
+      "skill": ".agents/skills/proz0-art-direction-ux/SKILL.md",
+      "playbook": ".agents/skills/proz0-art-direction-ux/references/playbook.md",
+      "context": [
+        "docs/art/phase-1-visual-ui-readability-foundation.md",
+        "docs/art/phase-1-asset-ui-production-spec.md",
+        "docs/design/phase-1-vertical-slice-master-gameplay.md"
+      ]
+    },
+    {
+      "role_id": "QA_PLAYTEST_LEAD",
+      "contract": "docs/team/roles/qa-playtest-lead.md",
+      "skill": ".agents/skills/proz0-game-qa-playtest/SKILL.md",
+      "playbook": ".agents/skills/proz0-game-qa-playtest/references/playbook.md",
+      "context": [
+        "docs/qa/phase-0-test-plan.md",
+        "docs/phase-1-vertical-slice-plan.md",
+        "docs/adr/ADR-P1-TECH-009-performance-observability-ci.md"
+      ]
+    },
+    {
+      "role_id": "NARRATIVE_WORLD_DIRECTOR",
+      "contract": "docs/team/roles/narrative-world-design-director.md",
+      "skill": ".agents/skills/proz0-narrative-worldbuilding/SKILL.md",
+      "playbook": ".agents/skills/proz0-narrative-worldbuilding/references/playbook.md",
+      "context": [
+        "docs/narrative/proz0-world-bible-foundation.md",
+        "docs/narrative/phase-1-ruin-mystery-hook.md",
+        "docs/game-vision.md"
+      ]
+    },
+    {
+      "role_id": "WORLD_LEVEL_DESIGNER",
+      "contract": "docs/team/roles/world-level-gameplay-designer.md",
+      "skill": ".agents/skills/proz0-world-level-design/SKILL.md",
+      "playbook": ".agents/skills/proz0-world-level-design/references/playbook.md",
+      "context": [
+        "docs/world-design/phase-1-ruin-expedition-spatial-brief.md",
+        "docs/design/phase-1-exploration-fog-weather-ruin.md",
+        "docs/world-and-procedural-generation.md"
+      ]
+    },
+    {
+      "role_id": "TECHNICAL_DESIGNER",
+      "contract": "docs/team/roles/technical-designer-content-systems.md",
+      "skill": ".agents/skills/proz0-technical-content-design/SKILL.md",
+      "playbook": ".agents/skills/proz0-technical-content-design/references/playbook.md",
+      "context": [
+        "docs/technical/phase-1-content-authoring-traceability.md",
+        "docs/adr/ADR-P1-TECH-002-content-schema-registry.md",
+        "docs/design/phase-1-inventory-gathering-crafting-repair.md",
+        "docs/design/phase-1-early-progression-profession.md"
+      ]
+    },
+    {
+      "role_id": "PIXEL_ARTIST_ANIMATOR",
+      "contract": "docs/team/roles/pixel-artist-animator.md",
+      "skill": ".agents/skills/proz0-pixel-art-animation/SKILL.md",
+      "playbook": ".agents/skills/proz0-pixel-art-animation/references/playbook.md",
+      "context": [
+        "docs/art/phase-1-asset-ui-production-spec.md",
+        "docs/art/phase-1-visual-ui-readability-foundation.md",
+        "docs/design/phase-1-survival-combat-death-recovery.md"
+      ]
+    },
+    {
+      "role_id": "AUDIO_DESIGNER",
+      "contract": "docs/team/roles/audio-designer-composer.md",
+      "skill": ".agents/skills/proz0-game-audio/SKILL.md",
+      "playbook": ".agents/skills/proz0-game-audio/references/playbook.md",
+      "context": [
+        "docs/audio/phase-1-audio-direction-event-map.md",
+        "docs/narrative/proz0-world-bible-foundation.md",
+        "docs/design/phase-1-survival-combat-death-recovery.md"
+      ]
+    },
+    {
+      "role_id": "BUILD_TOOLS_DEVOPS",
+      "contract": "docs/team/roles/build-tools-devops-engineer.md",
+      "skill": ".agents/skills/proz0-game-build-release/SKILL.md",
+      "playbook": ".agents/skills/proz0-game-build-release/references/playbook.md",
+      "context": [
+        "docs/development/phase-0-runtime.md",
+        "docs/technical/phase-1-build-ci-reproducibility-audit.md",
+        "docs/adr/ADR-P1-TECH-009-performance-observability-ci.md"
+      ]
+    }
+  ],
+  "members": [
+    {
+      "member_id": "A-PM-01",
+      "role_id": "PROJECT_MANAGER",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-PM-01.md"
+    },
+    {
+      "member_id": "B-PM-01",
+      "role_id": "PROJECT_MANAGER",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-PM-01.md"
+    },
+    {
+      "member_id": "A-GD-01",
+      "role_id": "GAME_DESIGNER",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-GD-01.md"
+    },
+    {
+      "member_id": "A-TL-01",
+      "role_id": "TECHNICAL_LEAD",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-TL-01.md"
+    },
+    {
+      "member_id": "A-GE-01",
+      "role_id": "GAMEPLAY_ENGINEER",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-GE-01.md"
+    },
+    {
+      "member_id": "A-WNP-01",
+      "role_id": "WORLD_NETWORK_PERSISTENCE_ENGINEER",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-WNP-01.md"
+    },
+    {
+      "member_id": "A-ART-01",
+      "role_id": "ART_DIRECTOR",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-ART-01.md"
+    },
+    {
+      "member_id": "A-QA-01",
+      "role_id": "QA_PLAYTEST_LEAD",
+      "home_company": "COMPANY_A",
+      "activation": "docs/team/activation/A-QA-01.md"
+    },
+    {
+      "member_id": "B-NWD-01",
+      "role_id": "NARRATIVE_WORLD_DIRECTOR",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-NWD-01.md"
+    },
+    {
+      "member_id": "B-WLD-01",
+      "role_id": "WORLD_LEVEL_DESIGNER",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-WLD-01.md"
+    },
+    {
+      "member_id": "B-TD-01",
+      "role_id": "TECHNICAL_DESIGNER",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-TD-01.md"
+    },
+    {
+      "member_id": "B-PIX-01",
+      "role_id": "PIXEL_ARTIST_ANIMATOR",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-PIX-01.md"
+    },
+    {
+      "member_id": "B-AUD-01",
+      "role_id": "AUDIO_DESIGNER",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-AUD-01.md"
+    },
+    {
+      "member_id": "B-DEVOPS-01",
+      "role_id": "BUILD_TOOLS_DEVOPS",
+      "home_company": "COMPANY_B",
+      "activation": "docs/team/activation/B-DEVOPS-01.md"
+    }
+  ],
+  "files": {
+    ".agents/skills/proz0-art-direction-ux/SKILL.md": "5d0f788e89f51beb263b9d455957af90161396090a4b511e4493daf030718e0f",
+    ".agents/skills/proz0-art-direction-ux/references/playbook.md": "18b02eb010a2ccd799f372ce0acb474c2ffc5131873b77c0a43effd74e535257",
+    ".agents/skills/proz0-game-architecture/SKILL.md": "8ba6227727248f4102104fd73ba90844b1830dfbdcdbff64cc0e9af8215bac28",
+    ".agents/skills/proz0-game-architecture/references/playbook.md": "33dd157332299f040154914e94712e6c881d662f140eb294e2ca9470db0d3858",
+    ".agents/skills/proz0-game-audio/SKILL.md": "b3c2bcacdb07c11591a451587181cfb407cd0fda37e32d1d3799f2c1014abae4",
+    ".agents/skills/proz0-game-audio/references/playbook.md": "3cbcea87e9679225a5e95eb6fa45e0f12fc499a9427fc2391b1309d69c643416",
+    ".agents/skills/proz0-game-build-release/SKILL.md": "40e7d5be6a9df8c5b5e549a963ab5857e593e69493d4694e9fa124f72fb15287",
+    ".agents/skills/proz0-game-build-release/references/playbook.md": "515438743adfd72459478e09f3e14923ded2176927d1ebb3f2d1ed1d4a42d584",
+    ".agents/skills/proz0-game-design/SKILL.md": "fdf85120f3bb232618b49991008ebca426ea9121467e603565219a02fe633055",
+    ".agents/skills/proz0-game-design/references/playbook.md": "5a415eb1171105f6bb78edf8d37141b8efcebe5d1a3ecda13c7255f321519c63",
+    ".agents/skills/proz0-game-qa-playtest/SKILL.md": "0a10c47cd88cf6d644d89ae784546cd550c963ce7d01416c3d633893d8b91ca5",
+    ".agents/skills/proz0-game-qa-playtest/references/playbook.md": "e12af370883a7a3286c0e56e7c04e422149bd8d2615a661cdd3feeaccac229ef",
+    ".agents/skills/proz0-gameplay-engineering/SKILL.md": "deacb69582bb7502a780e201b4ef6e3790ffb7dd2c7535f9cfcf1a6b7de0809e",
+    ".agents/skills/proz0-gameplay-engineering/references/playbook.md": "d43eb3da52c4970cae986168976e4c9f838b82dec1d58cd5d10eb61a41425201",
+    ".agents/skills/proz0-narrative-worldbuilding/SKILL.md": "2a2e9f897a7bcef99a40c3f5f6efca4eaffb2c1a07ea927ca07bdefaffaa1868",
+    ".agents/skills/proz0-narrative-worldbuilding/references/playbook.md": "193547249d92a8e9de4483044355b2db2ec5629b7b69ac850627d65d7ad673d5",
+    ".agents/skills/proz0-pixel-art-animation/SKILL.md": "16d17c4d2fb631706c75103835bd9ccba3f7f0a64310522906da31c3e03258bb",
+    ".agents/skills/proz0-pixel-art-animation/references/playbook.md": "bb9be4761d6918b8256f9e6efd551daf5b9bee16c70455a560823bdbe563d94d",
+    ".agents/skills/proz0-producer/SKILL.md": "9a3230fa98a28e15ddbc4b7e350a087d04f55419e8468b2cb7ac8b69b88f35d4",
+    ".agents/skills/proz0-producer/references/playbook.md": "04f2eeef27808b880b175d0cbe11c30318629c0941b92a59e2987b635a514893",
+    ".agents/skills/proz0-technical-content-design/SKILL.md": "ec8f3b2cac777581e8d7eaa6e9b094d290dca72e5b9b3370ddb3c0b974631a92",
+    ".agents/skills/proz0-technical-content-design/references/playbook.md": "15bf2250605cf63b77bafa1bdd90cd9952ee7f874afd578bc2095c67c6d0178d",
+    ".agents/skills/proz0-world-level-design/SKILL.md": "141998918e2ba6e890d54b9fbabfc210b8127d4e231f5efd0ea5ac5e7f946e11",
+    ".agents/skills/proz0-world-level-design/references/playbook.md": "6bde3f2d74a0fbbe4557de4d6a1c3d56eb915e62754c6616ae936741d0042807",
+    ".agents/skills/proz0-world-network-persistence/SKILL.md": "ea8efaf0c95383455afad0009183e82a4be2224019d1c32601dc7cccbdf9c3d7",
+    ".agents/skills/proz0-world-network-persistence/references/playbook.md": "2a2b33c3e8668a566be2c049fc9725cb039ef2dbddbe83d48759265aa27d77dc",
+    ".github/ISSUE_TEMPLATE/proz0-task.md": "22fbfa80a1eb0880bf733cd7c4bc3b1fa3df019bac6bc3424c16b79debc86c80",
+    ".github/PROZ0_AGENT_BOOTSTRAP.md": "b37a2ce236bccc21b3de4a3fcf55bf85dd0e9f7e391f05ddceb965a1b5b0d01c",
+    "AGENTS.md": "6aa95c5d90a633c2fe1501fc69b3ec8e4b51f82935ab30615470785f711a2684",
+    "docs/team/ARTIFACT_PROTOCOL.md": "ce7d91eb46ad4c005816a65b1a1762438fd20de809e065f2556fa05e8fd63cdd",
+    "docs/team/CAPABILITY_MATRIX.md": "d947b0ff952f71cd6e1d35a0645ed4d3cf836946851df4fdbebf614678d6aca6",
+    "docs/team/COMMON_EXECUTION_CONTRACT.md": "7d9d6df2fd9dbdad2b053a8994cfac9679a646c07eb78d765a871a4215da49cb",
+    "docs/team/COMMUNICATION_PROTOCOL.md": "a1a8d12e4374323b79b97f0eb27132be26cb4a7a8aba340df1325b829cf78af7",
+    "docs/team/CONTRACT_UPGRADE_AUDIT.md": "47138d8348c59c7d157bc7ca1ed008e479769023b2e10646b571b5aaa47a0d22",
+    "docs/team/CONTRACT_UPGRADE_VALIDATION.md": "c175e409a0bb3efd25596a951fd917aa074302175e6fe48e106ccf687488f19c",
+    "docs/team/CROSS_COMPANY_PROTOCOL.md": "f20ac42e3c266ca7f900043159e7fb4b8dba6db287382ceaed13339eedec013f",
+    "docs/team/DEFINITION_OF_DONE.md": "9dbbd743a6c559215fd71c49bf10c8360417015829f8e6445e78fdad5c2c799d",
+    "docs/team/DEPENDENCY_PROTOCOL.md": "b5b6706b5b0cc671080748ce5e0fc273f896765e5f81baaec1c5930d7c598897",
+    "docs/team/GAME_DEVELOPMENT_FOUNDATION.md": "e10f1a0f1cbfebac51be7bab71767a8a37de8496602a15f3b3acb255fe5eef07",
+    "docs/team/HANDOFF_REWORK_PROTOCOL.md": "55ea265e7b9061730c160d9b9f165f3c3101095134f7b3fde86c7e1948222a8d",
+    "docs/team/MEMBER_REGISTRY.md": "f705d10daa955b55213d610957f2b5896a19fdecdac0f655e63c2980f0858d6b",
+    "docs/team/ROLE_CHAT_BOOTSTRAP_TEMPLATE.md": "532a1026f79caabbf716e286f7c61958c0253e0b18436eb33c2159fd5697fabe",
+    "docs/team/ROLE_INTERFACE_MAP.md": "2d26439f46ca455648dad1ce8fdb4f55e8a1c8e305107f2d928360bfd1b39365",
+    "docs/team/ROLE_PACK_EVALUATION.md": "f684032812f6f82a71f90e9c8768288c7de73b98691a53f75ed50df1fb43093b",
+    "docs/team/ROLE_PACK_RELEASE.md": "438301abf16dda942b2c1b2f676e7379244e49d9672199ff88edff893f84fa96",
+    "docs/team/ROLE_REGISTRY.md": "d53e24ad19e0d2d7851e628b667cbbb76233e32cb9b15efbedc98dfa0439debb",
+    "docs/team/ROLE_RUNTIME_PROTOCOL.md": "9c241a8ab9e0fbe32fad4b991f4e4af404de420f12ff6534183040e75d6955e3",
+    "docs/team/SKILL_REGISTRY.md": "827bcb9b9ebea14968c36314a61fbc9e0e35d0d894a1bd3c01a900881577a51f",
+    "docs/team/SOURCE_OF_TRUTH.md": "3b400bb32cc1f7937bad2ce45f9c16ebb7b94e249435e89dc35ba6365b6810e7",
+    "docs/team/TASK_LOCK_PROTOCOL.md": "5fcd112194064a8dee35dcf30e913e51c6f197a2cb64f7c0095bc7859928c4d7",
+    "docs/team/TEAM_OPERATING_SYSTEM.md": "d1a76696a8af7b71fef56b0e692175f991a1cef26eea9c72bc413e6d41384fd1",
+    "docs/team/activation/A-ART-01.md": "8ad502562ffc98292006d4c0f7dd1560082c7064770f1b9499ce332e70c12055",
+    "docs/team/activation/A-GD-01.md": "f3ca75cfb2baa4f8a2d62c6b1a07b4fffade58e5b4d816c6df22480d49051fb8",
+    "docs/team/activation/A-GE-01.md": "bf2f77c9fca1b5b6be8d36d7a7f7b5c15cb3ee2e91a3cba8a5adf87083134a00",
+    "docs/team/activation/A-PM-01.md": "09d2c2bba059a4266de0afc87413be6eb92006da49431b7e784436c8e9516fab",
+    "docs/team/activation/A-QA-01.md": "8048cbf17be063c9ac5f3684ecc096974141a4fc9e1dd24ac959ad9f24976233",
+    "docs/team/activation/A-TL-01.md": "bd119b236a9d66d395ac73d98b8c74e333ca2ee92521eda9dc70add796648d07",
+    "docs/team/activation/A-WNP-01.md": "53c39f982be1f2313579ed48ec3d381034ab0859323e4eeca28dba8b07cbd136",
+    "docs/team/activation/B-AUD-01.md": "67f9053a081a3114252f9f3e8ac2a04f2448a8c8cef6e0ebfae08f9323ce7d0d",
+    "docs/team/activation/B-DEVOPS-01.md": "df87178ad6490a2237d1cc3185b7c2fe33a6e232cac869162c12688b587ec7e2",
+    "docs/team/activation/B-NWD-01.md": "6b378a5440a46eb799e240a2ca32e02fd3ebaaf9553171d00da4e11dfb339964",
+    "docs/team/activation/B-PIX-01.md": "56bebe27502e50f849d6f2dfc86a21e827b65c977028e93c54f5120102d66d50",
+    "docs/team/activation/B-PM-01.md": "93abb2966d44f4ca11c60f51d940c2e7a828d465ac1996ff814616ad6317e566",
+    "docs/team/activation/B-TD-01.md": "b1725cc270364d1d4a278bee0dd189185cb672c44fdbde14a5ec9909288f565c",
+    "docs/team/activation/B-WLD-01.md": "1a9205df8c0871f61bdcd4737efc4a1e5da9d0d616ff73dd82ec75828daf0464",
+    "docs/team/roles/art-director-uiux-technical-art.md": "bebe0ef376c9ec4107cf984bf519459772b4d4cdf378e65bb9f79c3ffcdb911c",
+    "docs/team/roles/audio-designer-composer.md": "d183b38b8bacd573270ca6e55b6de4dddf4ed62d168d21d686eb631aff7d0a5c",
+    "docs/team/roles/build-tools-devops-engineer.md": "7b721fad6d8dfbb7857626a3ffbc29f498ac82cd71e5eeb1c3e6bbdd576bbe77",
+    "docs/team/roles/game-designer.md": "b50954817860cb47102df7d654bd0c828c11092343b0c2b31408e7a0b19e2e41",
+    "docs/team/roles/gameplay-engineer.md": "b093bf7a30412dc08db952333d28f10ef1cbe3d8ea269a1b35fd2deec5b804b3",
+    "docs/team/roles/narrative-world-design-director.md": "e70d4cf0ef71fba69a8028f8e2002abdf2cfc21aef74d51ea2570d37dcc83715",
+    "docs/team/roles/pixel-artist-animator.md": "2d4979c03024306df749d327b49b9fbd90a385d324dbe84ccaa87a39d35bb71d",
+    "docs/team/roles/project-manager.md": "f339a046d74b585d83e1c173dd0127b36cc32fc974686c364e61515f4e5379a3",
+    "docs/team/roles/qa-playtest-lead.md": "876df1851302c315c2542cd6fcd0db3d85792546ae4e71f7531cb8ba06484095",
+    "docs/team/roles/technical-designer-content-systems.md": "a01a0cddb6cca3e8ec86003508ef6547c81e07423f770fd9695adb78ba87df48",
+    "docs/team/roles/technical-lead.md": "11e04c7139902f3083dce8e08a8986f9529e2585703bc1e5b202488e38edcc5d",
+    "docs/team/roles/world-level-gameplay-designer.md": "e674a6f429c674d3e91e4ef90d5e6f74f773a3a4e5d9c57f0495eacafe49be5e",
+    "docs/team/roles/world-network-persistence-engineer.md": "0aecb2c3d4ecbc35dbac0cdb13f5ba8b492dcbf2aa9c0b5cc1adb2ba1b349af2",
+    "docs/team/universal-github-first-autonomous-collaboration-protocol.md": "98602e7fb897777dd47b8b0a5e4c5eadecaa25304d7ebd9f58eaaf263a74db37",
+    "scripts/validate_role_pack.py": "26536ffaae45af69aa5c7dd5f8de7d127b430d9279c485db8811ef3d7042dfc7"
+  }
+}
