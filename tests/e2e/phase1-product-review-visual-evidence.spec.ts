@@ -1045,26 +1045,33 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(
     page.locator('[data-panel-kind="craft"] .p1-craft-station').first(),
   ).toBeVisible();
-  const craftIcons2x = await page.locator(
-    '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
-  ).evaluateAll((icons) => icons.map((icon) => {
-    const element = icon as HTMLElement;
-    const rect = element.getBoundingClientRect();
-    return {
-      assetPath: element.dataset.assetPath ?? null,
-      inlineWidth: element.style.width,
-      inlineHeight: element.style.height,
-      backgroundSize: element.style.backgroundSize,
-      renderedWidth: rect.width,
-      renderedHeight: rect.height,
-    };
-  }));
+  const craftIcons2x = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(
+      '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
+    )].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        assetPath: element.dataset.assetPath ?? null,
+        inlineWidth: element.style.width,
+        inlineHeight: element.style.height,
+        backgroundSize: element.style.backgroundSize,
+        renderedWidth: rect.width,
+        renderedHeight: rect.height,
+        connected: element.isConnected,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+      };
+    }),
+  );
   expect(craftIcons2x.length).toBeGreaterThan(0);
   for (const icon of craftIcons2x) {
     expect(icon.assetPath).toBe('assets/phase1/items/item_icon_atlas.png');
     expect(icon.inlineWidth).toBe('24px');
     expect(icon.inlineHeight).toBe('24px');
     expect(icon.backgroundSize).toBe('144px 72px');
+    expect(icon.connected).toBe(true);
+    expect(icon.display).not.toBe('none');
+    expect(icon.visibility).not.toBe('hidden');
     expect(icon.renderedWidth).toBe(48);
     expect(icon.renderedHeight).toBe(48);
   }
@@ -1105,21 +1112,28 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   );
   await page.keyboard.press('c');
   await expect(page.locator('[data-panel-kind="craft"]')).toBeVisible();
-  const craftIcons1x = await page.locator(
-    '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
-  ).evaluateAll((icons) => icons.map((icon) => {
-    const element = icon as HTMLElement;
-    const rect = element.getBoundingClientRect();
-    return {
-      assetPath: element.dataset.assetPath ?? null,
-      renderedWidth: rect.width,
-      renderedHeight: rect.height,
-      backgroundImage: getComputedStyle(element).backgroundImage,
-    };
-  }));
+  const craftIcons1x = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(
+      '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
+    )].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        assetPath: element.dataset.assetPath ?? null,
+        renderedWidth: rect.width,
+        renderedHeight: rect.height,
+        backgroundImage: getComputedStyle(element).backgroundImage,
+        connected: element.isConnected,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+      };
+    }),
+  );
   expect(craftIcons1x.length).toBeGreaterThan(0);
   for (const icon of craftIcons1x) {
     expect(icon.assetPath).toBe('assets/phase1/items/item_icon_atlas.png');
+    expect(icon.connected).toBe(true);
+    expect(icon.display).not.toBe('none');
+    expect(icon.visibility).not.toBe('hidden');
     expect(icon.renderedWidth).toBe(24);
     expect(icon.renderedHeight).toBe(24);
     expect(icon.backgroundImage).not.toBe('none');
