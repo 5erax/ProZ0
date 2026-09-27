@@ -576,6 +576,15 @@ async function captureViewport(
   });
 }
 
+async function captureProductWorld(
+  page: Page,
+  fileName: string,
+): Promise<void> {
+  await page.locator('[data-product-review-world="canonical"]').screenshot({
+    path: resolve(EVIDENCE_DIR, fileName),
+  });
+}
+
 async function assertPanelCompositionIsolated(
   page: Page,
   activePanelSelector: string,
@@ -640,12 +649,13 @@ async function assertPanelCompositionIsolated(
       'Expected visible active panel: ' + activePanelSelector,
     );
   }
+  const activePanel = geometry.panel;
 
   const intersects = (
-    left: typeof geometry.panel,
-    right: typeof geometry.panel,
+    left: NonNullable<typeof geometry.panel>,
+    right: typeof geometry.controlsHint,
   ): boolean => {
-    if (left === null || right === null) return false;
+    if (right === null) return false;
     return !(
       left.right <= right.left
       || right.right <= left.left
@@ -655,23 +665,23 @@ async function assertPanelCompositionIsolated(
   };
 
   expect(
-    intersects(geometry.panel, geometry.controlsHint),
+    intersects(activePanel, geometry.controlsHint),
     'Controls hint must not intersect active panel',
   ).toBe(false);
   expect(
-    intersects(geometry.panel, geometry.firstAction),
+    intersects(activePanel, geometry.firstAction),
     'First-action cue must not intersect active panel',
   ).toBe(false);
   expect(geometry.controlsHint).toBeNull();
   expect(geometry.firstAction).toBeNull();
   expect(geometry.contextualHud).toEqual([]);
 
-  expect(geometry.panel.left).toBeGreaterThanOrEqual(0);
-  expect(geometry.panel.top).toBeGreaterThanOrEqual(0);
-  expect(geometry.panel.right).toBeLessThanOrEqual(
+  expect(activePanel.left).toBeGreaterThanOrEqual(0);
+  expect(activePanel.top).toBeGreaterThanOrEqual(0);
+  expect(activePanel.right).toBeLessThanOrEqual(
     geometry.viewport.width,
   );
-  expect(geometry.panel.bottom).toBeLessThanOrEqual(
+  expect(activePanel.bottom).toBeLessThanOrEqual(
     geometry.viewport.height,
   );
 }
