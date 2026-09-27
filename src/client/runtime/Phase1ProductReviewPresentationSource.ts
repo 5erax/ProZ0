@@ -231,8 +231,19 @@ export class Phase1ProductReviewPresentationSource
       return projected;
     }
 
+    const firstActionCue =
+      projected.firstActionCue === null
+      || projected.firstActionCue === undefined
+        ? projected.firstActionCue
+        : this.interactionOverride.state === 'AVAILABLE'
+          && this.interactionOverride.verb === 'GATHER'
+          ? 'FIRST STEP · [E] GATHER · '
+            + this.interactionOverride.target
+          : projected.firstActionCue;
+
     return Object.freeze({
       ...projected,
+      firstActionCue,
       interaction: this.interactionOverride,
     });
   }
