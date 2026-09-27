@@ -15,6 +15,7 @@ import type {
 } from '../presentation/Phase1PresentationModel';
 import {
   projectPhase1RuntimePresentation,
+  resolvePhase1QuickUseStackId,
   type Phase1AuthoritativeCommandFeedback,
   type Phase1PresentationPanelRequest,
   type Phase1PresentationSource,
@@ -135,6 +136,16 @@ export class Phase1ProductReviewPresentationSource
     this.refresh();
   }
 
+  public resolveQuickUseStackId(): string | null {
+    const inventory = this.bundle.items.getContainerView(
+      'inventory:' + this.playerId,
+    );
+    return resolvePhase1QuickUseStackId(
+      this.bundle.catalog,
+      inventory,
+    );
+  }
+
   public refresh(): void {
     this.current = this.project();
     for (const listener of this.listeners) {
@@ -168,7 +179,7 @@ export class Phase1ProductReviewPresentationSource
       case 'inventory':
         panel = Object.freeze({
           kind: 'inventory',
-          selectedStackId: null,
+          selectedStackId: inventory.stacks[0]?.stackId ?? null,
         });
         break;
       case 'progression':
@@ -191,12 +202,20 @@ export class Phase1ProductReviewPresentationSource
     const equippedStackId =
       equipment.equippedWeaponStackId
       ?? equipment.equippedThermalWrapStackId;
+    const quickUseStackId = resolvePhase1QuickUseStackId(
+      this.bundle.catalog,
+      inventory,
+    );
 
     const projected = projectPhase1RuntimePresentation({
       catalog: this.bundle.catalog,
       survival: this.bundle.survival.getPlayerView(this.playerId),
       inventory,
       equippedStackId,
+      equippedWeaponStackId: equipment.equippedWeaponStackId,
+      equippedThermalWrapStackId:
+        equipment.equippedThermalWrapStackId,
+      quickUseStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
       progression: this.bundle.progression.getPlayerView(this.playerId),
       playerMotions: this.getPlayerMotions(),
