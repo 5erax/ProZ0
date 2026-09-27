@@ -6,6 +6,8 @@ ProZ0 uses a GitHub-first, contract-driven workflow. This document is the reposi
 
 For core-team work:
 
+First resolve the effective role-pack adoption and follow [COMMON_EXECUTION_CONTRACT](docs/team/COMMON_EXECUTION_CONTRACT.md). Its role-specific readiness checks and explicit/conditional activation rules supplement the preflight below; an Issue's existence or READY label alone is not authorization.
+
 1. Read the source Issue and current comments.
 2. Confirm the Issue's `OWNER_COMPANY`, `OWNER_ROLE`, `OWNER_MEMBER_ID`, `COORDINATING_PM`, `LOCK_STATUS`, and `LOCK_SCOPE`.
 3. Read linked specs, ADRs and upstream artifacts.
