@@ -475,6 +475,8 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-production-world-preview{position:absolute;inset:0;overflow:hidden;z-index:0;background:#172033;}',
     '.p1-production-world-tile,.p1-production-world-sprite{position:absolute;display:block;image-rendering:pixelated;}',
     '.p1-survival,.p1-world,.p1-equipment,.p1-interaction,.p1-carry,.p1-toasts,.p1-team,.p1-panel{z-index:2;}',
+    '.p1-ui[data-panel-open="true"] .p1-context-hud{display:none!important;}',
+    '[data-product-review-help-open="true"] .p1-ui .p1-context-hud{display:none!important;}',
     '.p1-asset-icon,.p1-progression-icon,.p1-map-marker,.p1-panel-skin-corner,.p1-build-preview-pattern{display:inline-block;image-rendering:pixelated;flex:0 0 auto;}',
     '.p1-ui *{box-sizing:border-box;}',
     '.p1-visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}',
@@ -586,6 +588,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   public destroy(): void {
     this.root.ownerDocument.defaultView?.removeEventListener('resize', this.applyScale);
+    delete this.root.dataset.productReviewPanelOpen;
     this.layer.remove();
   }
 
@@ -598,6 +601,9 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   private render(): void {
     const state = this.currentState;
+    const panelOpen = state.panel !== null;
+    this.layer.dataset.panelOpen = String(panelOpen);
+    this.root.dataset.productReviewPanelOpen = String(panelOpen);
     const style = this.layer.querySelector('style');
     this.layer.replaceChildren();
     if (style !== null) {
@@ -608,7 +614,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       this.layer.append(createProductionWorldPreview(this.document));
     }
 
-    const survival = createElement(this.document, 'section', 'p1-survival p1-box');
+    const survival = createElement(this.document, 'section', 'p1-survival p1-box p1-context-hud');
     survival.dataset.region = 'survival';
     survival.append(
       meter(this.document, state.health),
@@ -618,7 +624,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       meter(this.document, state.temperature),
     );
 
-    const world = createElement(this.document, 'section', 'p1-world p1-box');
+    const world = createElement(this.document, 'section', 'p1-world p1-box p1-context-hud');
     world.dataset.region = 'world';
     world.dataset.weatherState = state.world.weatherState;
     world.dataset.dayPeriod = state.world.dayPeriod;
@@ -644,7 +650,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     );
     world.append(worldLine, weatherLine);
 
-    const equipment = createElement(this.document, 'section', 'p1-equipment p1-box');
+    const equipment = createElement(this.document, 'section', 'p1-equipment p1-box p1-context-hud');
     equipment.dataset.region = 'equipment';
 
     const equipmentSlots = state.equipmentSlots;
@@ -729,7 +735,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       equipment.append(quickUse);
     }
 
-    const carry = createElement(this.document, 'section', 'p1-carry p1-box');
+    const carry = createElement(this.document, 'section', 'p1-carry p1-box p1-context-hud');
     carry.dataset.region = 'carry';
     carry.dataset.carryState = state.carry.stateLabel;
     const weightIcon = assetSprite(
@@ -756,7 +762,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       + ' · ' + state.carry.stateLabel,
     );
 
-    const toasts = createElement(this.document, 'section', 'p1-toasts');
+    const toasts = createElement(this.document, 'section', 'p1-toasts p1-context-hud');
     for (const toast of state.toasts) {
       const entry = createElement(this.document, 'div', 'p1-toast');
       const toastIcon = assetSprite(
@@ -783,7 +789,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       toasts.append(entry);
     }
 
-    const team = createElement(this.document, 'section', 'p1-team');
+    const team = createElement(this.document, 'section', 'p1-team p1-context-hud');
     for (const entry of state.teammates) {
       team.append(teammate(this.document, entry));
     }
@@ -794,7 +800,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       const firstAction = createElement(
         this.document,
         'div',
-        'p1-first-action',
+        'p1-first-action p1-context-hud',
         state.firstActionCue,
       );
       firstAction.dataset.firstActionCue = 'visible';
@@ -802,7 +808,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     if (state.interaction !== null) {
-      const interaction = createElement(this.document, 'section', 'p1-interaction p1-box');
+      const interaction = createElement(this.document, 'section', 'p1-interaction p1-box p1-context-hud');
       interaction.dataset.region = 'interaction';
       interaction.dataset.state = state.interaction.state;
       const interactionMain = createElement(
