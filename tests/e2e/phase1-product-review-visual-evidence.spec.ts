@@ -709,13 +709,36 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     page.locator('[data-first-action-cue="visible"]'),
   ).toContainText('FIRST STEP · Move near a resource.');
 
-  const survivalBox = await page.locator('[data-region="survival"]').boundingBox();
-  const controlsHintBox = await page.locator('.p1-product-controls-hint').boundingBox();
-  if (survivalBox === null || controlsHintBox === null) {
-    throw new Error('Polish evidence requires survival and controls bounds.');
-  }
-  expect(survivalBox.y + survivalBox.height).toBeLessThanOrEqual(
-    controlsHintBox.y,
+  await expect(page.locator('.p1-product-controls-hint')).toBeVisible();
+  const hudLaneBounds = await page.evaluate(() => {
+    const survival = document.querySelector<HTMLElement>(
+      '[data-region="survival"]',
+    );
+    const controlsHint = document.querySelector<HTMLElement>(
+      '.p1-product-controls-hint',
+    );
+    if (survival === null || controlsHint === null) {
+      throw new Error(
+        'Polish evidence requires survival and controls elements.',
+      );
+    }
+    const survivalRect = survival.getBoundingClientRect();
+    const controlsRect = controlsHint.getBoundingClientRect();
+    return {
+      survivalBottom: survivalRect.bottom,
+      controlsTop: controlsRect.top,
+      survivalHeight: survivalRect.height,
+      controlsHeight: controlsRect.height,
+      controlsDisplay: getComputedStyle(controlsHint).display,
+      controlsVisibility: getComputedStyle(controlsHint).visibility,
+    };
+  });
+  expect(hudLaneBounds.survivalHeight).toBeGreaterThan(0);
+  expect(hudLaneBounds.controlsHeight).toBeGreaterThan(0);
+  expect(hudLaneBounds.controlsDisplay).not.toBe('none');
+  expect(hudLaneBounds.controlsVisibility).not.toBe('hidden');
+  expect(hudLaneBounds.survivalBottom).toBeLessThanOrEqual(
+    hudLaneBounds.controlsTop,
   );
 
   await captureViewport(page, 'normal-fog-coop-2x.png');
