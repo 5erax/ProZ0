@@ -8,6 +8,7 @@ export {
 
 export {
   composePhase1SaveV2,
+  Phase1SaveV2CheckpointCoordinator,
   savePhase1AuthorityBundle,
   type Phase1SaveV2ComposeOptions,
 } from './Phase1SaveV2Composer';
