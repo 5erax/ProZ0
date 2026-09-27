@@ -806,6 +806,9 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     '[E] GATHER · Fiber Plant',
   );
   await expect(
+    page.locator('[data-first-action-cue="visible"]'),
+  ).toContainText('[E] GATHER · Fiber Plant');
+  await expect(
     page.locator(
       '[data-world-role="resource"][data-focused-target="true"]',
     ),
