@@ -576,16 +576,207 @@ async function captureViewport(
   });
 }
 
-async function captureProductWorld(
+async function assertPanelCompositionIsolated(
   page: Page,
-  fileName: string,
+  activePanelSelector: string,
 ): Promise<void> {
-  await page.locator('[data-product-review-world="canonical"]').screenshot({
-    path: resolve(EVIDENCE_DIR, fileName),
-  });
+  const geometry = await page.evaluate((panelSelector) => {
+    type Rect = {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      width: number;
+      height: number;
+    };
+
+    const visibleRect = (element: Element | null): Rect | null => {
+      if (!(element instanceof HTMLElement)) return null;
+      const style = getComputedStyle(element);
+      if (
+        style.display === 'none'
+        || style.visibility === 'hidden'
+        || Number(style.opacity) === 0
+      ) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+
+    const panel = visibleRect(document.querySelector(panelSelector));
+    const controlsHint = visibleRect(
+      document.querySelector('.p1-product-controls-hint'),
+    );
+    const firstAction = visibleRect(
+      document.querySelector('[data-first-action-cue="visible"]'),
+    );
+    const contextualHud = [
+      ...document.querySelectorAll('.p1-context-hud'),
+    ].map(visibleRect).filter((rect): rect is Rect => rect !== null);
+
+    return {
+      panel,
+      controlsHint,
+      firstAction,
+      contextualHud,
+      viewport: {
+        width: innerWidth,
+        height: innerHeight,
+      },
+    };
+  }, activePanelSelector);
+
+  if (geometry.panel === null) {
+    throw new Error(
+      'Expected visible active panel: ' + activePanelSelector,
+    );
+  }
+
+  const intersects = (
+    left: typeof geometry.panel,
+    right: typeof geometry.panel,
+  ): boolean => {
+    if (left === null || right === null) return false;
+    return !(
+      left.right <= right.left
+      || right.right <= left.left
+      || left.bottom <= right.top
+      || right.bottom <= left.top
+    );
+  };
+
+  expect(
+    intersects(geometry.panel, geometry.controlsHint),
+    'Controls hint must not intersect active panel',
+  ).toBe(false);
+  expect(
+    intersects(geometry.panel, geometry.firstAction),
+    'First-action cue must not intersect active panel',
+  ).toBe(false);
+  expect(geometry.controlsHint).toBeNull();
+  expect(geometry.firstAction).toBeNull();
+  expect(geometry.contextualHud).toEqual([]);
+
+  expect(geometry.panel.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.top).toBeGreaterThanOrEqual(0);
+  expect(geometry.panel.right).toBeLessThanOrEqual(
+    geometry.viewport.width,
+  );
+  expect(geometry.panel.bottom).toBeLessThanOrEqual(
+    geometry.viewport.height,
+  );
 }
 
 test.use({ deviceScaleFactor: 1 });
+
+test('P1-POLISH-001 isolates primary panels from contextual HUD at required integer scales', async ({ page }) => {
+  const normal = await createBaseSave(
+    'world:p1-polish-001-panel-composition',
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
+
+  const layouts = [
+    Object.freeze({ label: '1x', scale: 1 as const, viewport: null }),
+    Object.freeze({ label: '2x', scale: 2 as const, viewport: null }),
+    Object.freeze({ label: '3x', scale: 3 as const, viewport: null }),
+    Object.freeze({
+      label: '1363x936',
+      scale: 2 as const,
+      viewport: Object.freeze({ width: 1363, height: 936 }),
+    }),
+  ] as const;
+
+  const panels = [
+    Object.freeze({
+      label: 'inventory',
+      key: 'i',
+      selector: '[data-panel-kind="inventory"]',
+    }),
+    Object.freeze({
+      label: 'craft',
+      key: 'c',
+      selector: '[data-panel-kind="craft"]',
+    }),
+    Object.freeze({
+      label: 'map',
+      key: 'm',
+      selector: '[data-panel-kind="map"]',
+    }),
+    Object.freeze({
+      label: 'build',
+      key: 'b',
+      selector: '[data-panel-kind="build"]',
+    }),
+    Object.freeze({
+      label: 'help',
+      key: 'h',
+      selector: '.p1-product-controls-panel',
+    }),
+  ] as const;
+
+  for (const layout of layouts) {
+    for (const panelCase of panels) {
+      const databaseName =
+        'proz0-p1-polish-001-panel-'
+        + layout.label
+        + '-'
+        + panelCase.label;
+      await openProductReview(
+        page,
+        normal,
+        databaseName,
+        layout.scale,
+      );
+
+      if (layout.viewport !== null) {
+        await page.setViewportSize(layout.viewport);
+        await expect(page.locator('#proz0-canvas')).toHaveAttribute(
+          'data-display-scale',
+          String(layout.scale),
+        );
+      }
+
+      await expect(page.locator('.p1-product-controls-hint')).toBeVisible();
+      await expect(
+        page.locator('[data-first-action-cue="visible"]'),
+      ).toBeVisible();
+
+      await page.keyboard.press(panelCase.key);
+      await expect(page.locator(panelCase.selector)).toBeVisible();
+
+      await assertPanelCompositionIsolated(
+        page,
+        panelCase.selector,
+      );
+
+      if (panelCase.label === 'help') {
+        await expect(
+          page.locator('[data-proz0-autoboot]'),
+        ).toHaveAttribute('data-product-review-help-open', 'true');
+      } else {
+        await expect(
+          page.locator('[data-proz0-autoboot]'),
+        ).toHaveAttribute('data-product-review-panel-open', 'true');
+      }
+    }
+  }
+});
 
 test('P1-INT-001 captures direct Product Review visual correction evidence', async ({ page }) => {
   test.setTimeout(120_000);
