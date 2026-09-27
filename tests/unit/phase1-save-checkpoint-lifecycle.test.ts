@@ -52,7 +52,7 @@ function createCasRepository(): CasRepositoryHarness {
 }
 
 async function createBundle() {
-  return Phase1AuthorityBundle.create({
+  const bundle = await Phase1AuthorityBundle.create({
     worldId: 'world:p1-polish-004',
     worldSeed: 'p1-world-golden',
     playerIds: ['p1'],
@@ -60,6 +60,20 @@ async function createBundle() {
     spawnClearanceRadiusWorldUnits: 0,
     requiredAccessRadiusWorldUnits: 0,
   });
+  bundle.submitInput('p1', {
+    moveUp: false,
+    moveDown: false,
+    moveLeft: false,
+    moveRight: true,
+  });
+  await bundle.stepSolo();
+  bundle.submitInput('p1', {
+    moveUp: false,
+    moveDown: false,
+    moveLeft: false,
+    moveRight: false,
+  });
+  return bundle;
 }
 
 describe('P1-POLISH-004 Save V2 checkpoint lifecycle', () => {
