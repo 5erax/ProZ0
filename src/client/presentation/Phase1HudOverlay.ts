@@ -116,6 +116,7 @@ function meter(
   row.dataset.stateLabel = presentation.stateLabel;
   row.dataset.value = String(presentation.value);
   row.dataset.max = String(presentation.max);
+  row.title = presentation.label + ' · ' + presentation.stateLabel;
 
   const label = createElement(document, 'div', 'p1-meter-label');
   const icon = assetSprite(
@@ -126,12 +127,37 @@ function meter(
   if (icon !== null) {
     label.append(icon);
   }
-  label.append(presentation.label + ' · ' + presentation.stateLabel);
+  label.append(presentation.label.toUpperCase());
+
   const track = createElement(document, 'div', 'p1-meter-track');
   const fill = createElement(document, 'div', 'p1-meter-fill');
   fill.style.width = String(percent(presentation.value, presentation.max)) + '%';
   track.append(fill);
-  row.append(label, track);
+
+  const value = createElement(
+    document,
+    'span',
+    'p1-meter-value',
+    String(Math.round(presentation.value)),
+  );
+  const alert = createElement(
+    document,
+    'span',
+    'p1-meter-alert',
+    presentation.severity === 'critical'
+      ? '!!'
+      : presentation.severity === 'warning'
+        ? '!'
+        : '',
+  );
+  const semanticState = createElement(
+    document,
+    'span',
+    'p1-meter-state p1-visually-hidden',
+    presentation.stateLabel,
+  );
+
+  row.append(label, track, value, alert, semanticState);
   return row;
 }
 
@@ -139,6 +165,7 @@ function itemRow(
   document: Document,
   item: Phase1InventoryItemPresentation,
   selected: boolean,
+  compact = false,
 ): HTMLElement {
   const row = createElement(document, 'div', 'p1-item-row');
   row.dataset.itemId = item.id;
@@ -153,7 +180,9 @@ function itemRow(
     document,
     'span',
     'p1-item-name',
-    item.name + ' ×' + String(item.quantity),
+    compact
+      ? '×' + String(item.quantity)
+      : item.name + ' ×' + String(item.quantity),
   );
   const state = createElement(
     document,
@@ -168,6 +197,14 @@ function itemRow(
     row.append(icon);
   }
   row.append(identity, state);
+  if (compact) {
+    row.append(createElement(
+      document,
+      'span',
+      'p1-visually-hidden',
+      item.name,
+    ));
+  }
   return row;
 }
 
@@ -218,7 +255,12 @@ function renderPanel(
     case 'inventory': {
       const list = createElement(document, 'div', 'p1-item-list');
       for (const item of panel.items) {
-        list.append(itemRow(document, item, item.id === panel.selectedItemId));
+        list.append(itemRow(
+          document,
+          item,
+          item.id === panel.selectedItemId,
+          true,
+        ));
       }
       root.append(list, createElement(document, 'div', 'p1-panel-detail', panel.detail));
       return root;
@@ -253,17 +295,66 @@ function renderPanel(
       for (const rowState of panel.rows) {
         const row = createElement(document, 'div', 'p1-craft-row');
         row.dataset.state = rowState.state;
-        row.append(
+
+        const heading = createElement(document, 'div', 'p1-craft-heading');
+        heading.append(
           createElement(document, 'span', 'p1-craft-name', rowState.name),
-          createElement(document, 'span', 'p1-craft-output', rowState.outputLabel),
-          createElement(document, 'span', 'p1-craft-requirement', rowState.requirementLabel),
-          createElement(
+          createElement(document, 'span', 'p1-craft-output', '→ ' + rowState.outputLabel),
+        );
+        row.append(heading);
+
+        const ingredients = createElement(
+          document,
+          'div',
+          'p1-craft-ingredients',
+        );
+        if ((rowState.ingredients?.length ?? 0) > 0) {
+          for (const ingredient of rowState.ingredients ?? []) {
+            const token = createElement(
+              document,
+              'span',
+              'p1-craft-ingredient',
+            );
+            const icon = assetSprite(
+              document,
+              'p1-asset-icon p1-craft-ingredient-icon',
+              itemIconSprite(ingredient.name),
+            );
+            if (icon !== null) token.append(icon);
+            token.append(
+              ingredient.name
+              + ' '
+              + String(ingredient.have)
+              + '/'
+              + String(ingredient.need),
+            );
+            token.dataset.sufficient = String(
+              ingredient.have >= ingredient.need,
+            );
+            ingredients.append(token);
+          }
+        } else {
+          ingredients.append(rowState.requirementLabel);
+        }
+        row.append(ingredients);
+
+        const footer = createElement(document, 'div', 'p1-craft-footer');
+        if (rowState.stationLabel !== undefined
+          && rowState.stationLabel !== null) {
+          footer.append(createElement(
             document,
             'span',
-            'p1-craft-state',
-            rowState.reason ?? rowState.state,
-          ),
-        );
+            'p1-craft-station',
+            rowState.stationLabel,
+          ));
+        }
+        footer.append(createElement(
+          document,
+          'span',
+          'p1-craft-state',
+          rowState.reason ?? rowState.state,
+        ));
+        row.append(footer);
         list.append(row);
       }
       root.append(list);
@@ -386,20 +477,27 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-survival,.p1-world,.p1-equipment,.p1-interaction,.p1-carry,.p1-toasts,.p1-team,.p1-panel{z-index:2;}',
     '.p1-asset-icon,.p1-progression-icon,.p1-map-marker,.p1-panel-skin-corner,.p1-build-preview-pattern{display:inline-block;image-rendering:pixelated;flex:0 0 auto;}',
     '.p1-ui *{box-sizing:border-box;}',
+    '.p1-visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}',
     '.p1-box,.p1-panel{background:rgba(10,14,22,.90);border:1px solid #d6dccd;box-shadow:0 0 0 1px #111722 inset;}',
-    '.p1-survival{position:absolute;left:8px;top:8px;width:156px;height:42px;padding:3px;display:grid;grid-template-columns:1fr 1fr;gap:2px;}',
-    '.p1-meter:first-child{grid-column:1/3;}',
-    '.p1-meter{min-width:0;}',
-    '.p1-meter-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:2px;}',
-    '.p1-meter-icon{width:12px!important;height:12px!important;}',
-    '.p1-meter-track{height:3px;background:#263040;border:1px solid #0a0d12;}',
+    '.p1-survival{position:absolute;left:8px;top:8px;width:156px;min-height:76px;padding:3px;display:grid;grid-template-columns:1fr;gap:1px;}',
+    '.p1-meter{min-width:0;display:grid;grid-template-columns:72px 1fr 20px 14px;align-items:center;gap:2px;min-height:12px;}',
+    '.p1-meter-label{white-space:nowrap;display:flex;align-items:center;gap:2px;font-weight:700;}',
+    '.p1-meter-icon{width:10px!important;height:10px!important;}',
+    '.p1-meter-value{text-align:right;font-variant-numeric:tabular-nums;}',
+    '.p1-meter-alert{text-align:center;font-weight:700;}',
+    '.p1-meter-track{height:4px;background:#263040;border:1px solid #0a0d12;}',
     '.p1-meter-fill{height:100%;background:#e8edf2;}',
+    '.p1-meter[data-severity="warning"]{border-right:1px dashed #fff;}',
+    '.p1-meter[data-severity="critical"]{outline:1px solid #fff;}',
     '.p1-meter[data-severity="warning"] .p1-meter-track{outline:1px dashed #f1d67d;}',
-    '.p1-meter[data-severity="critical"] .p1-meter-track{outline:1px solid #fff;}',
+    '.p1-meter[data-severity="critical"] .p1-meter-track{outline:1px double #fff;}',
     '.p1-world{position:absolute;right:8px;top:8px;width:132px;min-height:38px;padding:4px;}',
     '.p1-world-line{display:flex;justify-content:space-between;gap:4px;}',
-    '.p1-equipment{position:absolute;left:8px;bottom:8px;width:116px;height:32px;padding:4px;}',
+    '.p1-equipment{position:absolute;left:8px;bottom:8px;width:164px;min-height:48px;padding:4px;display:grid;gap:2px;}',
+    '.p1-equipment-slot,.p1-quick-use{display:flex;align-items:center;gap:3px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+    '.p1-equipment-slot-label{width:20px;color:#c5ccbd;flex:0 0 auto;font-weight:700;}',
     '.p1-interaction{position:absolute;left:180px;bottom:8px;width:280px;min-height:34px;padding:4px;text-align:center;}',
+    '.p1-first-action{position:absolute;left:180px;bottom:48px;width:280px;padding:3px 5px;text-align:center;background:rgba(10,14,22,.86);border:1px dashed #d6dccd;z-index:2;}',
     '.p1-interaction-main{font-size:9px;font-weight:700;}',
     '.p1-interaction[data-state="BLOCKED"],.p1-interaction[data-state="UNAVAILABLE"]{border-style:dashed;}',
     '.p1-progress-track{height:3px;margin-top:2px;background:#273041;}',
@@ -411,6 +509,9 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-teammate{display:flex;gap:4px;align-items:center;background:rgba(10,14,22,.84);padding:2px 4px;}',
     '.p1-teammate-marker{width:12px!important;height:12px!important;display:inline-block;image-rendering:pixelated;}',
     '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:hidden;}',
+    '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
+    '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
+    '.p1-panel[data-panel-kind="craft"] .p1-craft-list{gap:1px;}',
     '.p1-panel[data-panel-kind="build"]{left:8px;top:60px;width:252px;max-height:250px;transform:none;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
@@ -418,11 +519,20 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
     '.p1-item-row,.p1-craft-row{display:grid;gap:4px;padding:3px;border:1px solid #3b465a;}',
     '.p1-item-row{grid-template-columns:24px 2fr 1fr;align-items:center;min-height:30px;}',
+    '.p1-panel[data-panel-kind="inventory"] .p1-item-list{grid-template-columns:repeat(4,1fr);gap:4px;}',
+    '.p1-panel[data-panel-kind="inventory"] .p1-item-row{grid-template-columns:24px 1fr;grid-template-rows:24px auto;min-height:48px;}',
+    '.p1-panel[data-panel-kind="inventory"] .p1-item-state{grid-column:1/3;font-size:7px;}',
     '.p1-item-icon{width:24px!important;height:24px!important;}',
     '.p1-item-row[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
     '.p1-container-panes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
     '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;}',
-    '.p1-craft-row{grid-template-columns:1.2fr 1fr 1.3fr 1fr;}',
+    '.p1-craft-row{display:grid;grid-template-columns:1fr;gap:1px;padding:2px 3px;line-height:1.05;}',
+    '.p1-craft-heading,.p1-craft-footer{display:flex;justify-content:space-between;gap:6px;align-items:center;min-height:9px;}',
+    '.p1-craft-ingredients{display:flex;flex-wrap:wrap;gap:1px 4px;min-height:9px;}',
+    '.p1-craft-ingredient{display:inline-flex;align-items:center;gap:2px;border:1px solid #455066;padding:0 2px;}',
+    '.p1-craft-ingredient[data-sufficient="false"]{border-style:dashed;font-weight:700;}',
+    '.p1-craft-ingredient-icon{width:8px!important;height:8px!important;}',
+    '.p1-craft-station{border:1px solid #778094;padding:0 3px;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
     '.p1-build-preview{width:96px;height:64px;margin:8px auto;border:2px dashed #fff;display:grid;place-items:center;position:relative;background:rgba(10,14,22,.62);}',
@@ -536,24 +646,87 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
     const equipment = createElement(this.document, 'section', 'p1-equipment p1-box');
     equipment.dataset.region = 'equipment';
-    if (state.equipment === null) {
-      equipment.textContent = 'NO ACTIVE EQUIPMENT';
-    } else {
-      const equipmentIcon = assetSprite(
-        this.document,
-        'p1-asset-icon p1-equipment-icon',
-        itemIconSprite(state.equipment.name),
-      );
-      if (equipmentIcon !== null) {
-        equipment.append(equipmentIcon);
+
+    const equipmentSlots = state.equipmentSlots;
+    if (equipmentSlots === undefined) {
+      if (state.equipment === null) {
+        equipment.textContent = 'NO ACTIVE EQUIPMENT';
+      } else {
+        const equipmentIcon = assetSprite(
+          this.document,
+          'p1-asset-icon p1-equipment-icon',
+          itemIconSprite(state.equipment.name),
+        );
+        if (equipmentIcon !== null) {
+          equipment.append(equipmentIcon);
+        }
+        equipment.append(
+          state.equipment.name
+          + (state.equipment.condition === null
+            ? ' · ' + state.equipment.stateLabel
+            : ' · ' + String(state.equipment.condition) + '/' + String(state.equipment.conditionMax)
+              + ' · ' + state.equipment.stateLabel),
+        );
       }
-      equipment.append(
-        state.equipment.name
-        + (state.equipment.condition === null
-          ? ' · ' + state.equipment.stateLabel
-          : ' · ' + String(state.equipment.condition) + '/' + String(state.equipment.conditionMax)
-            + ' · ' + state.equipment.stateLabel),
+    } else {
+      const appendSlot = (
+        inputLabel: string,
+        emptyLabel: string,
+        slot: typeof equipmentSlots.weapon,
+        key: string,
+      ): void => {
+        const row = createElement(
+          this.document,
+          'div',
+          'p1-equipment-slot',
+        );
+        row.dataset.equipmentSlot = key;
+        row.append(createElement(
+          this.document,
+          'span',
+          'p1-equipment-slot-label',
+          '[' + inputLabel + ']',
+        ));
+        if (slot === null) {
+          row.append(emptyLabel + ' · —');
+        } else {
+          const icon = assetSprite(
+            this.document,
+            'p1-asset-icon p1-equipment-icon',
+            itemIconSprite(slot.name),
+          );
+          if (icon !== null) row.append(icon);
+          const conditionLabel =
+            slot.condition === null
+            || slot.conditionMax === null
+            || slot.conditionMax <= 0
+              ? ''
+              : ' C' + String(slot.condition);
+          row.title = slot.name
+            + (slot.condition === null || slot.conditionMax === null
+              ? ''
+              : ' · condition '
+                + String(slot.condition)
+                + '/'
+                + String(slot.conditionMax));
+          row.append(slot.name + conditionLabel);
+        }
+        equipment.append(row);
+      };
+      appendSlot('Q', 'WEAPON', equipmentSlots.weapon, 'weapon');
+      appendSlot('T', 'WRAP', equipmentSlots.protection, 'protection');
+
+      const quickUse = createElement(
+        this.document,
+        'div',
+        'p1-quick-use',
       );
+      quickUse.dataset.quickUseState = equipmentSlots.quickUse.state;
+      quickUse.append(
+        '[V] CONSUME · '
+        + (equipmentSlots.quickUse.target ?? '—'),
+      );
+      equipment.append(quickUse);
     }
 
     const carry = createElement(this.document, 'section', 'p1-carry p1-box');
@@ -616,6 +789,17 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     this.layer.append(survival, world, equipment, carry, toasts, team);
+
+    if (state.firstActionCue !== undefined && state.firstActionCue !== null) {
+      const firstAction = createElement(
+        this.document,
+        'div',
+        'p1-first-action',
+        state.firstActionCue,
+      );
+      firstAction.dataset.firstActionCue = 'visible';
+      this.layer.append(firstAction);
+    }
 
     if (state.interaction !== null) {
       const interaction = createElement(this.document, 'section', 'p1-interaction p1-box');
