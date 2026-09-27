@@ -700,11 +700,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
             || slot.conditionMax === null
             || slot.conditionMax <= 0
               ? ''
-              : ' · '
-                + String(Math.round(
-                  (slot.condition / slot.conditionMax) * 100,
-                ))
-                + '%';
+              : ' · C' + String(slot.condition);
           row.title = slot.name
             + (slot.condition === null || slot.conditionMax === null
               ? ''
@@ -717,7 +713,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         equipment.append(row);
       };
       appendSlot('WEAPON', equipmentSlots.weapon, 'weapon');
-      appendSlot('PROTECT', equipmentSlots.protection, 'protection');
+      appendSlot('WRAP', equipmentSlots.protection, 'protection');
 
       const quickUse = createElement(
         this.document,
