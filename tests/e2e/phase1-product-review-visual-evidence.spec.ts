@@ -300,6 +300,36 @@ async function createDeathSave(
   );
 }
 
+async function createCriticalHealthSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  return createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+    async (authority) => {
+      const result = authority.survival.applyAuthorityDamage({
+        damageId: 'evidence:critical-health',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'evidence:predator',
+        targetPlayerId: 'visual-local',
+        amount: 75,
+        tick: authority.authorityTick,
+      });
+      if (result.status !== 'applied' || result.healthAfter > 30) {
+        throw new Error('Evidence setup failed to stage critical health.');
+      }
+      await authority.stepSolo();
+    },
+  );
+}
+
 async function createWorldDropSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -434,7 +464,7 @@ async function openProductReview(
   page: Page,
   bundle: PortableSaveBundleV2,
   databaseName: string,
-  scale: 2 | 3,
+  scale: 1 | 2 | 3,
   localPlayerId = 'visual-local',
   sessionPlayerIds?: readonly string[],
 ): Promise<void> {
@@ -564,6 +594,11 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     'visual-local',
     { thermalWrap: true },
   );
+  const dualEquipment = withLocalLoadout(
+    normalBase,
+    'visual-local',
+    { thermalWrap: true, spear: true },
+  );
   const buildValid = withLocalLoadout(
     normalBase,
     'visual-local',
@@ -670,8 +705,69 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(page.locator('[data-region="world"]'))
     .toContainText('4 TEAM');
 
+  await expect(
+    page.locator('[data-first-action-cue="visible"]'),
+  ).toContainText('FIRST STEP · Move near a resource.');
+
+  const survivalBox = await page.locator('[data-region="survival"]').boundingBox();
+  const controlsHintBox = await page.locator('.p1-product-controls-hint').boundingBox();
+  if (survivalBox === null || controlsHintBox === null) {
+    throw new Error('Polish evidence requires survival and controls bounds.');
+  }
+  expect(survivalBox.y + survivalBox.height).toBeLessThanOrEqual(
+    controlsHintBox.y,
+  );
+
   await captureViewport(page, 'normal-fog-coop-2x.png');
   files.push('normal-fog-coop-2x.png');
+
+  await page.keyboard.press('i');
+  await expect(page.locator('[data-panel-kind="inventory"]')).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="inventory"] .p1-item-icon').first(),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="inventory"] .p1-item-row[data-selected="true"]'),
+  ).toHaveCount(1);
+  await captureViewport(page, 'polish-inventory-2x.png');
+  files.push('polish-inventory-2x.png');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('c');
+  await expect(page.locator('[data-panel-kind="craft"]')).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="craft"] .p1-craft-ingredient').first(),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="craft"] .p1-craft-station').first(),
+  ).toBeVisible();
+  await captureViewport(page, 'polish-craft-have-need-2x.png');
+  files.push('polish-craft-have-need-2x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-int-001-normal-1x',
+    1,
+  );
+  await captureViewport(page, 'polish-normal-1x.png');
+  files.push('polish-normal-1x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-int-001-normal-1363',
+    2,
+  );
+  await page.setViewportSize({ width: 1363, height: 936 });
+  await expect(page.locator('#proz0-canvas')).toHaveAttribute(
+    'data-display-scale',
+    '2',
+  );
+  await expect(page.locator('#proz0-canvas')).toHaveCSS('width', '1280px');
+  await expect(page.locator('#proz0-canvas')).toHaveCSS('height', '720px');
+  await captureViewport(page, 'polish-1363x936-centered-2x.png');
+  files.push('polish-1363x936-centered-2x.png');
 
   await openProductReview(
     page,
@@ -681,6 +777,21 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   );
   await captureViewport(page, 'normal-3x.png');
   files.push('normal-3x.png');
+
+  await openProductReview(
+    page,
+    dualEquipment,
+    'proz0-p1-polish-001-dual-equipment',
+    2,
+  );
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).toContainText('Basic Spear');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('Thermal Wrap');
+  await captureViewport(page, 'polish-dual-equipment-2x.png');
+  files.push('polish-dual-equipment-2x.png');
 
   await openProductReview(
     page,
@@ -743,6 +854,26 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'build-invalid-3x.png');
   await captureProductWorld(page, 'build-invalid-world-3x.png');
   files.push('build-invalid-3x.png', 'build-invalid-world-3x.png');
+
+  const criticalHealth = await createCriticalHealthSave(
+    'world:p1-polish-001-critical-health',
+  );
+  await openProductReview(
+    page,
+    criticalHealth,
+    'proz0-p1-polish-001-critical-health',
+    2,
+  );
+  await expect(
+    page.locator('[data-region="survival"] .p1-meter[data-severity="critical"]').first(),
+  ).toBeVisible();
+  await captureViewport(page, 'polish-critical-survival-2x.png');
+  files.push('polish-critical-survival-2x.png');
+
+  await page.keyboard.press('h');
+  await expect(page.locator('.p1-product-controls-panel')).toBeVisible();
+  await captureViewport(page, 'polish-controls-open-2x.png');
+  files.push('polish-controls-open-2x.png');
 
   const nightRain = withAuthorityTick(
     normal,
@@ -867,6 +998,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   const manifest = {
     schemaVersion: 1,
     task: 'P1-INT-001',
+    polishTask: 'P1-POLISH-001',
     evidenceKind: 'direct-phase1-product-review',
     testedHead: process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
     workflowCommit: process.env.GITHUB_SHA ?? 'local-worktree',
@@ -881,6 +1013,13 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     },
     cases: {
       normalFogCoop2x: 'normal-fog-coop-2x.png',
+      polishNormal1x: 'polish-normal-1x.png',
+      polish1363Centered2x: 'polish-1363x936-centered-2x.png',
+      polishInventory2x: 'polish-inventory-2x.png',
+      polishCraftHaveNeed2x: 'polish-craft-have-need-2x.png',
+      polishDualEquipment2x: 'polish-dual-equipment-2x.png',
+      polishCriticalSurvival2x: 'polish-critical-survival-2x.png',
+      polishControlsOpen2x: 'polish-controls-open-2x.png',
       normal3x: 'normal-3x.png',
       thermalWrap2x: 'thermal-wrap-2x.png',
       buildValid3x: 'build-valid-3x.png',
@@ -902,7 +1041,12 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       canonicalAuthority: true,
       saveV2Reopen: true,
       noQaWorldPreview: true,
-      integerScale2x3x: true,
+      integerScale1x2x3x: true,
+      centered1363x936Uses2x: true,
+      survivalControlsDoNotOverlap: true,
+      craftShowsAllHaveNeedAndStation: true,
+      dualEquipmentVisible: true,
+      firstActionCueBoundToProgression: true,
       terrainAndFogFromCanonicalWorld: true,
       continuousCanonicalCellCoverage: true,
       runtimeOwnedCoopIdentitySlots: true,
