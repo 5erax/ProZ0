@@ -151,13 +151,13 @@ describe('P1-POLISH-004 Save V2 checkpoint lifecycle', () => {
     const bundle = await createBundle();
     try {
       const requests: SaveCommitRequestV2[] = [];
-      let releaseFirst: (() => void) | null = null;
-      let announceFirst: (() => void) | null = null;
+      let releaseFirst!: () => void;
+      let announceFirst!: () => void;
       const firstStarted = new Promise<void>((resolve) => {
-        announceFirst = resolve;
+        announceFirst = () => resolve();
       });
       const firstGate = new Promise<void>((resolve) => {
-        releaseFirst = resolve;
+        releaseFirst = () => resolve();
       });
       let currentRevision: number | null = null;
 
@@ -165,7 +165,7 @@ describe('P1-POLISH-004 Save V2 checkpoint lifecycle', () => {
         async commit(request: SaveCommitRequestV2) {
           requests.push(request);
           if (requests.length === 1) {
-            announceFirst?.();
+            announceFirst();
             await firstGate;
           }
           if (request.expectedPreviousWorldRevision !== currentRevision) {
@@ -190,7 +190,7 @@ describe('P1-POLISH-004 Save V2 checkpoint lifecycle', () => {
       await Promise.resolve();
 
       expect(requests).toHaveLength(1);
-      releaseFirst?.();
+      releaseFirst();
 
       expect(await first).toMatchObject({
         ok: true,
