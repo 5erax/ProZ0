@@ -509,6 +509,9 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-teammate{display:flex;gap:4px;align-items:center;background:rgba(10,14,22,.84);padding:2px 4px;}',
     '.p1-teammate-marker{width:12px!important;height:12px!important;display:inline-block;image-rendering:pixelated;}',
     '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:hidden;}',
+    '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
+    '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
+    '.p1-panel[data-panel-kind="craft"] .p1-craft-list{gap:1px;}',
     '.p1-panel[data-panel-kind="build"]{left:8px;top:60px;width:252px;max-height:250px;transform:none;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
@@ -523,13 +526,13 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-item-row[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
     '.p1-container-panes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
     '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;}',
-    '.p1-craft-row{display:grid;grid-template-columns:1fr;gap:2px;padding:3px;}',
-    '.p1-craft-heading,.p1-craft-footer{display:flex;justify-content:space-between;gap:6px;align-items:center;}',
-    '.p1-craft-ingredients{display:flex;flex-wrap:wrap;gap:2px 5px;}',
-    '.p1-craft-ingredient{display:inline-flex;align-items:center;gap:2px;border:1px solid #455066;padding:1px 2px;}',
+    '.p1-craft-row{display:grid;grid-template-columns:1fr;gap:1px;padding:2px 3px;line-height:1.05;}',
+    '.p1-craft-heading,.p1-craft-footer{display:flex;justify-content:space-between;gap:6px;align-items:center;min-height:9px;}',
+    '.p1-craft-ingredients{display:flex;flex-wrap:wrap;gap:1px 4px;min-height:9px;}',
+    '.p1-craft-ingredient{display:inline-flex;align-items:center;gap:2px;border:1px solid #455066;padding:0 2px;}',
     '.p1-craft-ingredient[data-sufficient="false"]{border-style:dashed;font-weight:700;}',
-    '.p1-craft-ingredient-icon{width:10px!important;height:10px!important;}',
-    '.p1-craft-station{border:1px solid #778094;padding:1px 3px;}',
+    '.p1-craft-ingredient-icon{width:8px!important;height:8px!important;}',
+    '.p1-craft-station{border:1px solid #778094;padding:0 3px;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
     '.p1-build-preview{width:96px;height:64px;margin:8px auto;border:2px dashed #fff;display:grid;place-items:center;position:relative;background:rgba(10,14,22,.62);}',
@@ -692,12 +695,24 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
             itemIconSprite(slot.name),
           );
           if (icon !== null) row.append(icon);
-          row.append(
-            slot.name
-            + (slot.condition === null
+          const conditionLabel =
+            slot.condition === null
+            || slot.conditionMax === null
+            || slot.conditionMax <= 0
               ? ''
-              : ' ' + String(slot.condition) + '/' + String(slot.conditionMax)),
-          );
+              : ' · '
+                + String(Math.round(
+                  (slot.condition / slot.conditionMax) * 100,
+                ))
+                + '%';
+          row.title = slot.name
+            + (slot.condition === null || slot.conditionMax === null
+              ? ''
+              : ' · condition '
+                + String(slot.condition)
+                + '/'
+                + String(slot.conditionMax));
+          row.append(slot.name + conditionLabel);
         }
         equipment.append(row);
       };
