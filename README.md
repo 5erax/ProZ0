@@ -16,6 +16,8 @@ Operational state changes frequently, so task truth lives in GitHub rather than 
 - [Project board — ProZ0 Project #4](https://github.com/users/5erax/projects/4/views/1)
 - [Cross-company coordination baseline — Issue #67](https://github.com/5erax/ProZ0/issues/67)
 - [Phase 1 integration — Issue #56](https://github.com/5erax/ProZ0/issues/56)
+- [Phase 1 experience-polish closure — Issue #122](https://github.com/5erax/ProZ0/issues/122)
+- [Dated recovery dependency and acceptance map](docs/phase-1-recovery-state.md)
 
 Phase 0 is accepted and closed. Phase 1 work is integrated through the repository's Issue/PR/QA gates.
 
@@ -221,7 +223,7 @@ Security issues should follow [SECURITY.md](SECURITY.md), not public bug-report 
 
 `npm run build` produces the static browser build in `dist/`.
 
-A manual GitHub Pages workflow is prepared at `.github/workflows/pages.yml`. Pages must first be enabled for this repository with **GitHub Actions** as the source. The workflow intentionally deploys manually so the production/review build remains an explicit release action rather than every push to `main`.
+A manual GitHub Pages workflow is available at `.github/workflows/pages.yml`. Pages is enabled with **GitHub Actions** as the source at [the ProZ0 browser build](https://5erax.github.io/ProZ0/). The workflow intentionally deploys manually so the production/review build remains an explicit release action rather than every push to `main`. Verify the deployed commit against the current QA candidate; the live site does not necessarily represent the latest `main`.
 
 ## Community and support
 

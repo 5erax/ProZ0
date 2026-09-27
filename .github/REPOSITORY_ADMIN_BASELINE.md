@@ -7,6 +7,23 @@
 
 ## Observed repository state at audit
 
+### Recovery verification — 2026-09-28
+
+The list below is the historical 2026-09-26 snapshot, not a claim about current settings. Fresh authenticated checks found:
+
+- Pages is enabled with `build_type: workflow`, HTTPS enforced, and URL https://5erax.github.io/ProZ0/.
+- No repository rulesets exist and `main` remains unprotected.
+- Discussions remains disabled; default branch remains `main`.
+- Dependency-review reruns now pass on PRs #107/#112/#113/#118; the earlier unsupported-Dependency-Graph blocker is resolved.
+- The local GitHub CLI has repository admin/write access, unlike the connector limitation described in the historical snapshot.
+- Project #4 inspection through that CLI is blocked by missing `read:project` scope. No board repair is claimed.
+
+Before enforcing the proposed approval/CODEOWNER policy, reconcile review identities with the existing same-account self-review limitation recorded on PR #126. Required independent approval must have a real eligible reviewer; recovery does not fabricate sign-offs or grant a routine bypass.
+
+See [the dated recovery map](../docs/phase-1-recovery-state.md) for exact checks and outstanding gates.
+
+### Historical snapshot — 2026-09-26
+
 Observed through available GitHub repository APIs:
 
 - Visibility: **public**
