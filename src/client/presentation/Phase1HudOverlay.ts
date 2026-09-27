@@ -533,7 +533,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-craft-ingredients{display:flex;flex-wrap:wrap;gap:1px 4px;min-height:9px;}',
     '.p1-craft-ingredient{display:inline-flex;align-items:center;gap:2px;border:1px solid #455066;padding:0 2px;}',
     '.p1-craft-ingredient[data-sufficient="false"]{border-style:dashed;font-weight:700;}',
-    '.p1-craft-ingredient-icon{flex:0 0 auto;}',
+    '.p1-craft-ingredient-icon{display:inline-block!important;width:24px!important;height:24px!important;min-width:24px;min-height:24px;flex:0 0 24px;}',
     '.p1-craft-station{border:1px solid #778094;padding:0 3px;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
