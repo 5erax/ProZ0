@@ -197,6 +197,14 @@ function itemRow(
     row.append(icon);
   }
   row.append(identity, state);
+  if (compact) {
+    row.append(createElement(
+      document,
+      'span',
+      'p1-visually-hidden',
+      item.name,
+    ));
+  }
   return row;
 }
 
