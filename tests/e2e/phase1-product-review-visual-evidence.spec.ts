@@ -764,6 +764,30 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(
     page.locator('[data-panel-kind="craft"] .p1-craft-station').first(),
   ).toBeVisible();
+  const craftLayout = await page.locator(
+    '[data-panel-kind="craft"]',
+  ).evaluate((panel) => {
+    const element = panel as HTMLElement;
+    const rows = [
+      ...element.querySelectorAll<HTMLElement>('.p1-craft-row'),
+    ];
+    const panelRect = element.getBoundingClientRect();
+    const lastRowRect = rows.at(-1)?.getBoundingClientRect();
+    return {
+      rowCount: rows.length,
+      panelBottom: panelRect.bottom,
+      lastRowBottom: lastRowRect?.bottom ?? Number.POSITIVE_INFINITY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  });
+  expect(craftLayout.rowCount).toBe(6);
+  expect(craftLayout.lastRowBottom).toBeLessThanOrEqual(
+    craftLayout.panelBottom,
+  );
+  expect(craftLayout.scrollHeight).toBeLessThanOrEqual(
+    craftLayout.clientHeight,
+  );
   await captureViewport(page, 'polish-craft-have-need-2x.png');
   files.push('polish-craft-have-need-2x.png');
 
@@ -813,6 +837,24 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(
     page.locator('[data-equipment-slot="protection"]'),
   ).toContainText('Thermal Wrap');
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).toContainText('100%');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('100%');
+  const equipmentOverflow = await page.locator(
+    '[data-region="equipment"]',
+  ).evaluate((panel) =>
+    [...panel.querySelectorAll<HTMLElement>('.p1-equipment-slot')]
+      .map((row) => ({
+        scrollWidth: row.scrollWidth,
+        clientWidth: row.clientWidth,
+      })),
+  );
+  for (const row of equipmentOverflow) {
+    expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+  }
   await captureViewport(page, 'polish-dual-equipment-2x.png');
   files.push('polish-dual-equipment-2x.png');
 
