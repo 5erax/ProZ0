@@ -315,12 +315,17 @@ function renderPanel(
               'span',
               'p1-craft-ingredient',
             );
-            const icon = assetSprite(
-              document,
-              'p1-asset-icon p1-craft-ingredient-icon',
-              itemIconSprite(ingredient.name),
-            );
-            if (icon !== null) token.append(icon);
+            const iconDefinition = itemIconSprite(ingredient.name);
+            if (iconDefinition !== null) {
+              const icon = createElement(
+                document,
+                'div',
+                'p1-asset-icon p1-craft-ingredient-icon',
+              );
+              applyProductionSprite(icon, iconDefinition);
+              icon.setAttribute('aria-hidden', 'true');
+              token.append(icon);
+            }
             token.append(
               ingredient.name
               + ' '
