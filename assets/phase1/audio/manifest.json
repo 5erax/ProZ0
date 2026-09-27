@@ -1,0 +1,2026 @@
+{
+  "task_id": "P1-AUD-002",
+  "source_issue": "#80",
+  "owner_member_id": "B-AUD-01",
+  "owner_role": "AUDIO_DESIGNER",
+  "owner_company": "COMPANY_B",
+  "coordinating_pm": "PM-B / B-PM-01",
+  "role_pack": {
+    "version": "2.0.0",
+    "commit": "a8aec0b8d377aa9c7e568573e8ba6a3a87e02cb6"
+  },
+  "accepted_audio_direction": {
+    "task_id": "P1-AUD-001",
+    "issue": "#79",
+    "artifact": "docs/audio/phase-1-audio-direction-event-map.md",
+    "commit": "f9d76c729d6831b40cd30f8283cc1ff02e9abf8a"
+  },
+  "production_state": "ASSETS_PRODUCED_TECHNICALLY_VALIDATED_UNLISTENED",
+  "delivery": "Family ZIP bundles are repository transport only and do not prescribe runtime loading/middleware/codec architecture.",
+  "format": {
+    "container": "WAV",
+    "encoding": "PCM_S16LE",
+    "sample_rate_hz": 16000,
+    "channels": 1
+  },
+  "provenance": "Procedurally synthesized specifically for P1-AUD-002; no external recordings, performances, sample libraries, or third-party music used.",
+  "relative_delivery_peak_targets": {
+    "CRITICAL": 0.78,
+    "HIGH": 0.62,
+    "STANDARD": 0.48,
+    "LOW": 0.34,
+    "BED": 0.3,
+    "note": "Pack-relative headroom only; not a project-wide mandatory loudness standard."
+  },
+  "audition": {
+    "status": "UNLISTENED",
+    "reason": "Current B-AUD-01 runtime has no audio playback/audition capability.",
+    "required_next_gate": "Listening pass, then in-game validation under existing integration/QA ownership."
+  },
+  "events": [
+    {
+      "event_id": "amb_exploration_day",
+      "family": "ambience",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ambience-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ambience/amb_exploration_day__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -18.54,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "amb_exploration_night",
+      "family": "ambience",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ambience-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ambience/amb_exploration_night__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -18.58,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "amb_landing_module",
+      "family": "ambience",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ambience-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ambience/amb_landing_module__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -18.72,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "amb_habitat_interior",
+      "family": "ambience",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ambience-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ambience/amb_habitat_interior__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -18.3,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "weather_cold_rain_warning",
+      "family": "weather",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/weather-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/weather/weather_cold_rain_warning__v01.wav",
+          "duration_seconds": 1.2,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.2,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "weather_cold_rain_active",
+      "family": "weather",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/weather-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/weather/weather_cold_rain_active__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -19.5,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "wildlife_passive_presence",
+      "family": "wildlife",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/wildlife-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/wildlife/wildlife_passive_presence__v01.wav",
+          "duration_seconds": 0.37,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -15.41,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "gather_hand_channel",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_hand_channel__v01.wav",
+          "duration_seconds": 0.54,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.66,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_hand_channel__v02.wav",
+          "duration_seconds": 0.54,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.65,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_hand_channel__v03.wav",
+          "duration_seconds": 0.54,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.48,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "gather_tool_channel",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_tool_channel__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.6,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_tool_channel__v02.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.49,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_tool_channel__v03.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.64,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "gather_success",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_success__v01.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.12,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_success__v02.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.15,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_success__v03.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.22,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "gather_cancel",
+      "family": "interactions",
+      "priority": "LOW",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/gather_cancel__v01.wav",
+          "duration_seconds": 0.29,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -9.37,
+          "rms_dbfs": -17.18,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "resource_depleted",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/resource_depleted__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.54,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "pickup_success",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/pickup_success__v01.wav",
+          "duration_seconds": 0.55,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.66,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/pickup_success__v02.wav",
+          "duration_seconds": 0.55,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.52,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/pickup_success__v03.wav",
+          "duration_seconds": 0.55,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.57,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "drop_success",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/drop_success__v01.wav",
+          "duration_seconds": 0.32,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.94,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/drop_success__v02.wav",
+          "duration_seconds": 0.32,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.07,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/drop_success__v03.wav",
+          "duration_seconds": 0.32,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.99,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "transfer_success",
+      "family": "interactions",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/transfer_success__v01.wav",
+          "duration_seconds": 0.6,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.5,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/transfer_success__v02.wav",
+          "duration_seconds": 0.6,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.58,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/transfer_success__v03.wav",
+          "duration_seconds": 0.6,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.62,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "container_open",
+      "family": "ui",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/container_open__v01.wav",
+          "duration_seconds": 0.55,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.6,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "container_close",
+      "family": "ui",
+      "priority": "LOW",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/container_close__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -9.37,
+          "rms_dbfs": -16.61,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ui_action_positive",
+      "family": "ui",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/ui_action_positive__v01.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.96,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/ui_action_positive__v02.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.96,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/ui_action_positive__v03.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.96,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ui_action_invalid",
+      "family": "ui",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/ui_action_invalid__v01.wav",
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -7.05,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ui_action_stale",
+      "family": "ui",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ui-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ui/ui_action_stale__v01.wav",
+          "duration_seconds": 0.62,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.31,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "item_broken",
+      "family": "interactions",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/interactions-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/interactions/item_broken__v01.wav",
+          "duration_seconds": 0.22,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -12.36,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "workbench_open",
+      "family": "crafting",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/workbench_open__v01.wav",
+          "duration_seconds": 0.35,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.02,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "craft_success",
+      "family": "crafting",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/craft_success__v01.wav",
+          "duration_seconds": 0.31,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.21,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/craft_success__v02.wav",
+          "duration_seconds": 0.31,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.19,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/craft_success__v03.wav",
+          "duration_seconds": 0.31,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.22,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "craft_invalid",
+      "family": "crafting",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/craft_invalid__v01.wav",
+          "duration_seconds": 0.45,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.1,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "repair_success",
+      "family": "crafting",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/repair_success__v01.wav",
+          "duration_seconds": 0.52,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.65,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/repair_success__v02.wav",
+          "duration_seconds": 0.52,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.68,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/repair_success__v03.wav",
+          "duration_seconds": 0.52,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.7,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "repair_invalid",
+      "family": "crafting",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/repair_invalid__v01.wav",
+          "duration_seconds": 0.3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.42,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "build_place_success",
+      "family": "crafting",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/build_place_success__v01.wav",
+          "duration_seconds": 0.51,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.55,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "build_place_invalid",
+      "family": "crafting",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/build_place_invalid__v01.wav",
+          "duration_seconds": 0.61,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -8.94,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "dismantle_success",
+      "family": "crafting",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/dismantle_success__v01.wav",
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.71,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "dismantle_invalid",
+      "family": "crafting",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/crafting-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/crafting/dismantle_invalid__v01.wav",
+          "duration_seconds": 0.28,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.49,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "power_unit_active",
+      "family": "machines",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/power_unit_active__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -14.36,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "habitat_shelter_enter",
+      "family": "machines",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/habitat_shelter_enter__v01.wav",
+          "duration_seconds": 0.31,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.62,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "habitat_shelter_exit",
+      "family": "machines",
+      "priority": "LOW",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/habitat_shelter_exit__v01.wav",
+          "duration_seconds": 0.41,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -9.37,
+          "rms_dbfs": -16.34,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_disabled",
+      "family": "machines",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_disabled__v01.wav",
+          "duration_seconds": 0.29,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.57,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_unpowered",
+      "family": "machines",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_unpowered__v01.wav",
+          "duration_seconds": 0.6,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.76,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_running",
+      "family": "machines",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_running__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -14.36,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_water_produced",
+      "family": "machines",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_water_produced__v01.wav",
+          "duration_seconds": 0.39,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.3,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_output_full",
+      "family": "machines",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_output_full__v01.wav",
+          "duration_seconds": 0.24,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.74,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "condenser_water_collected",
+      "family": "machines",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_water_collected__v01.wav",
+          "duration_seconds": 0.62,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.08,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_water_collected__v02.wav",
+          "duration_seconds": 0.62,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -12.98,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/machines-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/machines/condenser_water_collected__v03.wav",
+          "duration_seconds": 0.62,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.01,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_thirsty",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_thirsty__v01.wav",
+          "duration_seconds": 0.57,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.03,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_dehydrated",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_dehydrated__v01.wav",
+          "duration_seconds": 0.6,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -6.99,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_critical_dehydration",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_critical_dehydration__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -8.85,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_hungry",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_hungry__v01.wav",
+          "duration_seconds": 0.63,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -8.96,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_starving",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_starving__v01.wav",
+          "duration_seconds": 0.4,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -7.3,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_critical_starvation",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_critical_starvation__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -8.82,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_cold",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_cold__v01.wav",
+          "duration_seconds": 0.56,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.08,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_severe_cold",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_severe_cold__v01.wav",
+          "duration_seconds": 0.23,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -9.82,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_critical_cold",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_critical_cold__v01.wav",
+          "duration_seconds": 0.38,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -9.23,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "survival_exhausted",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/survival_exhausted__v01.wav",
+          "duration_seconds": 0.47,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.16,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "carry_heavy",
+      "family": "survival",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/carry_heavy__v01.wav",
+          "duration_seconds": 0.26,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -14.01,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "carry_overloaded",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/carry_overloaded__v01.wav",
+          "duration_seconds": 0.56,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.4,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "consume_complete",
+      "family": "survival",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/consume_complete__v01.wav",
+          "duration_seconds": 0.57,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.52,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "player_hurt",
+      "family": "survival",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/player_hurt__v01.wav",
+          "duration_seconds": 0.3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -17.42,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "player_death",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/player_death__v01.wav",
+          "duration_seconds": 0.95,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.19,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "player_respawn",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/player_respawn__v01.wav",
+          "duration_seconds": 0.95,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.07,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "death_cache_created",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/death_cache_created__v01.wav",
+          "duration_seconds": 0.51,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -8.19,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "death_cache_recover_item",
+      "family": "survival",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/death_cache_recover_item__v01.wav",
+          "duration_seconds": 0.39,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.58,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/death_cache_recover_item__v02.wav",
+          "duration_seconds": 0.39,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.58,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        },
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/death_cache_recover_item__v03.wav",
+          "duration_seconds": 0.39,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -10.58,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "death_cache_cleared",
+      "family": "survival",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/survival-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/survival/death_cache_cleared__v01.wav",
+          "duration_seconds": 0.37,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -8.4,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_alert",
+      "family": "hostile",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_alert__v01.wav",
+          "duration_seconds": 0.38,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.2,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_chase",
+      "family": "hostile",
+      "priority": "HIGH",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_chase__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.44,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_attack_windup",
+      "family": "hostile",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_attack_windup__v01.wav",
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -10.74,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_attack_release",
+      "family": "hostile",
+      "priority": "CRITICAL",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_attack_release__v01.wav",
+          "duration_seconds": 0.25,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -2.16,
+          "rms_dbfs": -14.16,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_recovery",
+      "family": "hostile",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_recovery__v01.wav",
+          "duration_seconds": 0.44,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.76,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_disengage_return",
+      "family": "hostile",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_disengage_return__v01.wav",
+          "duration_seconds": 0.59,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.32,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "predator_death",
+      "family": "hostile",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/hostile-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/hostile/predator_death__v01.wav",
+          "duration_seconds": 0.95,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.11,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ruin_ambient_presence",
+      "family": "ruin",
+      "priority": "BED",
+      "loop": true,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ruin_ambient_presence__loop__v01.wav",
+          "duration_seconds": 2.5,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -18.23,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ruin_located",
+      "family": "ruin",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ruin_located__v01.wav",
+          "duration_seconds": 0.52,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -12.26,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ruin_inspect",
+      "family": "ruin",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ruin_inspect__v01.wav",
+          "duration_seconds": 0.4599,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -12.45,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ruin_discovered_shared",
+      "family": "ruin",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ruin_discovered_shared__v01.wav",
+          "duration_seconds": 1.2,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -11.53,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ancient_alloy_shard_available",
+      "family": "ruin",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ancient_alloy_shard_available__v01.wav",
+          "duration_seconds": 0.28,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -15.9,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "ancient_alloy_shard_claimed",
+      "family": "ruin",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/ancient_alloy_shard_claimed__v01.wav",
+          "duration_seconds": 0.44,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -12.53,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "coop_shared_ruin_discovery_remote",
+      "family": "ruin",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/ruin-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/ruin/coop_shared_ruin_discovery_remote__v01.wav",
+          "duration_seconds": 0.53,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -12.23,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "xp_gain",
+      "family": "progression",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/xp_gain__v01.wav",
+          "duration_seconds": 0.23,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.69,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "level_up",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/level_up__v01.wav",
+          "duration_seconds": 1.2,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.98,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "skill_fieldcraft_unlocked",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/skill_fieldcraft_unlocked__v01.wav",
+          "duration_seconds": 0.41,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.54,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "skill_maintenance_unlocked",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/skill_maintenance_unlocked__v01.wav",
+          "duration_seconds": 0.42,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -10.49,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "profession_quest_available",
+      "family": "progression",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/profession_quest_available__v01.wav",
+          "duration_seconds": 0.54,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -12.51,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "profession_objective_progress",
+      "family": "progression",
+      "priority": "STANDARD",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/profession_objective_progress__v01.wav",
+          "duration_seconds": 0.29,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -6.38,
+          "rms_dbfs": -13.18,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "profession_explorer_unlocked",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/profession_explorer_unlocked__v01.wav",
+          "duration_seconds": 1.2,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.95,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "profession_engineer_unlocked",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/profession_engineer_unlocked__v01.wav",
+          "duration_seconds": 1.2,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -9.76,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "death_xp_loss",
+      "family": "progression",
+      "priority": "HIGH",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/progression-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/progression/death_xp_loss__v01.wav",
+          "duration_seconds": 0.48,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -4.15,
+          "rms_dbfs": -7.98,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "music_exploration_sparse",
+      "family": "music",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/music-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/music/music_exploration_sparse__v01.wav",
+          "duration_seconds": 3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -21.24,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "music_foothold_sparse",
+      "family": "music",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/music-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/music/music_foothold_sparse__v01.wav",
+          "duration_seconds": 3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -21.23,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "music_expedition_sparse",
+      "family": "music",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/music-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/music/music_expedition_sparse__v01.wav",
+          "duration_seconds": 3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -21.27,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "music_ruin_discovery_stinger",
+      "family": "music",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/music-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/music/music_ruin_discovery_stinger__v01.wav",
+          "duration_seconds": 3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -21.33,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    },
+    {
+      "event_id": "music_recovery_sparse",
+      "family": "music",
+      "priority": "BED",
+      "loop": false,
+      "assets": [
+        {
+          "archive": "assets/phase1/audio/bundles/music-wav-v01.zip",
+          "internal_path": "assets/phase1/audio/music/music_recovery_sparse__v01.wav",
+          "duration_seconds": 3,
+          "sample_rate_hz": 16000,
+          "channels": 1,
+          "sample_format": "PCM_S16LE",
+          "peak_dbfs": -10.46,
+          "rms_dbfs": -21.29,
+          "loop_boundary_edge_jump_linear": 0,
+          "audition_status": "UNLISTENED"
+        }
+      ]
+    }
+  ]
+}
