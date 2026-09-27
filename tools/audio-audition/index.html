@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProZ0 P1-AUD-002 Human Audition</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <p class="eyebrow">#119 / P1-DEVOPS-003</p>
+    <h1>ProZ0 Phase 1 Audio — Human Audition Harness</h1>
+    <p id="source-line">Loading exact PR #95 source identity…</p>
+    <p class="warning">Playback and notes are human review aids only. This page never marks #80 accepted and never claims listening occurred.</p>
+  </header>
+
+  <main>
+    <section class="panel" id="comparison">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Sequential comparison</p>
+          <h2 id="compare-title">Choose a listening gate</h2>
+        </div>
+        <div class="button-row">
+          <button id="compare-prev" type="button">Previous</button>
+          <button id="compare-replay" type="button">Replay</button>
+          <button id="compare-next" type="button">Next</button>
+        </div>
+      </div>
+      <p id="compare-meta">Gate buttons below load related manifest assets into this player.</p>
+      <audio id="compare-audio" controls preload="metadata"></audio>
+      <label class="inline"><input id="compare-loop" type="checkbox"> Loop current asset (enabled only for manifest loop assets)</label>
+      <ol id="compare-queue"></ol>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Mandatory human review</p>
+          <h2>Six required listening gates</h2>
+        </div>
+        <button id="export-notes" type="button">Export Markdown verdict</button>
+      </div>
+      <div id="gate-grid" class="gate-grid"></div>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Manifest inventory</p>
+          <h2>All playable assets</h2>
+        </div>
+        <span id="asset-count"></span>
+      </div>
+      <div class="filters">
+        <label>Family <select id="family-filter"><option value="">All</option></select></label>
+        <label>Event <input id="event-filter" type="search" placeholder="event_id contains…"></label>
+        <label>Priority <select id="priority-filter"><option value="">All</option></select></label>
+        <label class="inline"><input id="loops-only" type="checkbox"> Loop assets only</label>
+      </div>
+      <div id="asset-list" class="asset-list"></div>
+    </section>
+  </main>
+
+  <template id="asset-template">
+    <article class="asset-card">
+      <div class="asset-topline">
+        <strong class="event-id"></strong>
+        <span class="badges"></span>
+      </div>
+      <dl class="metadata"></dl>
+      <audio controls preload="metadata"></audio>
+      <div class="button-row">
+        <button class="replay" type="button">Replay</button>
+        <label class="inline"><input class="loop-toggle" type="checkbox"> Loop</label>
+      </div>
+    </article>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
