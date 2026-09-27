@@ -150,8 +150,14 @@ function meter(
         ? '!'
         : '',
   );
+  const semanticState = createElement(
+    document,
+    'span',
+    'p1-meter-state p1-visually-hidden',
+    presentation.stateLabel,
+  );
 
-  row.append(label, track, value, alert);
+  row.append(label, track, value, alert, semanticState);
   return row;
 }
 
@@ -463,6 +469,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-survival,.p1-world,.p1-equipment,.p1-interaction,.p1-carry,.p1-toasts,.p1-team,.p1-panel{z-index:2;}',
     '.p1-asset-icon,.p1-progression-icon,.p1-map-marker,.p1-panel-skin-corner,.p1-build-preview-pattern{display:inline-block;image-rendering:pixelated;flex:0 0 auto;}',
     '.p1-ui *{box-sizing:border-box;}',
+    '.p1-visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}',
     '.p1-box,.p1-panel{background:rgba(10,14,22,.90);border:1px solid #d6dccd;box-shadow:0 0 0 1px #111722 inset;}',
     '.p1-survival{position:absolute;left:8px;top:8px;width:156px;min-height:76px;padding:3px;display:grid;grid-template-columns:1fr;gap:1px;}',
     '.p1-meter{min-width:0;display:grid;grid-template-columns:72px 1fr 20px 14px;align-items:center;gap:2px;min-height:12px;}',
