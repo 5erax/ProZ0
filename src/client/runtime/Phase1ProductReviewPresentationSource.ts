@@ -243,7 +243,7 @@ export class Phase1ProductReviewPresentationSource
 
     return Object.freeze({
       ...projected,
-      firstActionCue,
+      ...(firstActionCue === undefined ? {} : { firstActionCue }),
       interaction: this.interactionOverride,
     });
   }
