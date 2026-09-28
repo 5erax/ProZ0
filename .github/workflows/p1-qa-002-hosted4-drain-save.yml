@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 30
     env:
       P1_QA_HOSTED4_DRAIN_SAVE_EXPECTED_MAIN_SHA: 709b7b44e41916ff6330e3f153ce14ba66a328b3
-      P1_QA_HOSTED4_DRAIN_SAVE_EVIDENCE_HEAD_SHA: ${{ github.sha }}
+      P1_QA_HOSTED4_DRAIN_SAVE_EVIDENCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - uses: actions/checkout@v7
