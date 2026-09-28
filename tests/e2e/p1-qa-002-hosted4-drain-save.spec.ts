@@ -78,6 +78,7 @@ function bundleFromRequest(
 
 class EvidenceSaveRepository implements SaveRepositoryV2 {
   private stored: PortableSaveBundleV2 | null = null;
+  public lastCommitResult: SaveResultV2<WorldManifestV2> | null = null;
 
   public constructor(
     private readonly compatibility: SaveV2CompatibilityPolicy,
@@ -141,11 +142,14 @@ class EvidenceSaveRepository implements SaveRepositoryV2 {
       request,
       this.compatibility,
     );
-    if (!validated.ok) return validated;
+    if (!validated.ok) {
+      this.lastCommitResult = validated;
+      return validated;
+    }
 
     const currentRevision = this.stored?.world.worldRevision ?? null;
     if (currentRevision !== request.expectedPreviousWorldRevision) {
-      return saveFailureV2(
+      const failure = saveFailureV2(
         'STALE_WRITE',
         'Expected previous world revision '
           + String(request.expectedPreviousWorldRevision)
@@ -153,12 +157,16 @@ class EvidenceSaveRepository implements SaveRepositoryV2 {
           + String(currentRevision)
           + '.',
       );
+      this.lastCommitResult = failure;
+      return failure;
     }
 
     this.stored = canonicalizePortableSaveBundleV2(
       bundleFromRequest(request),
     );
-    return saveSuccessV2(this.stored.world);
+    const success = saveSuccessV2(this.stored.world);
+    this.lastCommitResult = success;
+    return success;
   }
 
   public async exportWorld(
@@ -1338,8 +1346,12 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
       await messageByType(activePages[0]!, 'SESSION_CLOSING');
 
     const stored = await repository.loadWorld(WORLD_ID);
-    expect(stored.ok).toBe(true);
-    if (!stored.ok) throw new Error(stored.message);
+    if (!stored.ok) {
+      throw new Error(
+        'Hosted Save V2 evidence commit unavailable: '
+          + JSON.stringify(repository.lastCommitResult),
+      );
+    }
 
     expect(stored.value.world.authorityTick).toBe(
       initialServer.composition.host.getAuthorityTick(),
