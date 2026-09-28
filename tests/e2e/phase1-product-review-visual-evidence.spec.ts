@@ -1353,6 +1353,12 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
   ).toContainText('×4');
   await expect(panel.locator('.p1-feedback'))
     .toContainText('STORAGE → PLAYER');
+  await expect(
+    panel.locator(
+      '[data-inventory-pane="storage"] '
+        + '.p1-item-row[data-selected="true"]',
+    ),
+  ).toContainText('Timber');
 
   await page.keyboard.press('i');
   const carryAfterRetrieve = await carryWeight(page);
@@ -1432,6 +1438,7 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
         storageExactRetrieve: true,
         carryChangesWithTransfer: true,
         conditionPreserved: true,
+        selectionNormalizesAfterRemoval: true,
         reopenSelectionUnderstandable: true,
         invalidUseNoFallback: true,
       },
