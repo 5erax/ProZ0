@@ -45,6 +45,8 @@ function localCommandResult(
   });
 }
 
+const PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 12;
+
 export class Phase1ProductReviewPresentationSource
   implements Phase1PresentationSource {
   private readonly listeners =
@@ -54,6 +56,7 @@ export class Phase1ProductReviewPresentationSource
     null;
   private interactionOverride: Phase1InteractionPresentation | null = null;
   private commandFeedback: Phase1AuthoritativeCommandFeedback | null = null;
+  private commandFeedbackExpiresAfterAuthorityTick: number | null = null;
   private current: Readonly<Phase1PresentationState>;
 
   public constructor(
@@ -128,12 +131,16 @@ export class Phase1ProductReviewPresentationSource
         ? {}
         : { panelTargetId: input.panelTargetId }),
     });
+    this.commandFeedbackExpiresAfterAuthorityTick =
+      this.bundle.authorityTick
+      + PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS;
     this.interactionOverride = null;
     this.refresh();
   }
 
   public clearCommandFeedback(): void {
     this.commandFeedback = null;
+    this.commandFeedbackExpiresAfterAuthorityTick = null;
     this.refresh();
   }
 
@@ -148,6 +155,15 @@ export class Phase1ProductReviewPresentationSource
   }
 
   public refresh(): void {
+    if (
+      this.commandFeedback !== null
+      && this.commandFeedbackExpiresAfterAuthorityTick !== null
+      && this.bundle.authorityTick
+        > this.commandFeedbackExpiresAfterAuthorityTick
+    ) {
+      this.commandFeedback = null;
+      this.commandFeedbackExpiresAfterAuthorityTick = null;
+    }
     this.current = this.project();
     for (const listener of this.listeners) {
       listener(this.current);
