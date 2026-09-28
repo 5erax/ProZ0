@@ -1287,7 +1287,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
     const inventoryCapacity = inventoryPanel.locator(
       '.p1-panel-capacity',
     );
-    await expect(inventoryCapacity).toContainText('/25.0 kg');
+    await expect(inventoryCapacity).toContainText('/20.0 kg');
     await expect(inventoryCapacity).toContainText('/24.0 u');
     await expect(inventoryCapacity).toContainText(
       /NORMAL|HEAVY|OVERLOADED/,
@@ -1383,6 +1383,12 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
       '[data-panel-kind="progression"]',
     );
     await expect(progression).toBeVisible();
+    await expect(
+      progression.locator('.p1-progress-level'),
+    ).toHaveAttribute('data-progression-icon-index', '6');
+    await expect(
+      progression.locator('.p1-progress-level .p1-progression-icon'),
+    ).toBeVisible();
     const progressionExpected = [
       ['skill:fieldcraft-basics', '0', 'LOCKED'],
       ['skill:maintenance-basics', '1', 'LOCKED'],
@@ -1440,7 +1446,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
       '.p1-panel-capacity',
     );
     await expect(capacityRows).toHaveCount(2);
-    await expect(capacityRows.nth(0)).toContainText('/25.0 kg');
+    await expect(capacityRows.nth(0)).toContainText('/20.0 kg');
     await expect(capacityRows.nth(0)).toContainText('/24.0 u');
     await expect(capacityRows.nth(0)).toContainText(
       /NORMAL|HEAVY|OVERLOADED/,
@@ -1482,6 +1488,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
         exactFiveBuildCatalog: true,
         buildKitCountCapSelectedState: true,
         progressionApprovedStateIcons: true,
+        progressionLevelEmblemBound: true,
         orderedQuestObjectives: true,
         noPersistentQuestRail: true,
         integerPresentation1x2x3x: true,
