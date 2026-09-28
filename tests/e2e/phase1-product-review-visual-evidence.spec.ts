@@ -923,6 +923,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     'world:p1-polish-002-map-evidence-mid',
     Object.freeze({ x: 100, y: 0 }),
   );
+  const worldReadability = await createResourceFocusSave(
+    'world:p1-polish-002-world-readability',
+  );
   const playerIds = ['visual-local', 'visual-teammate'] as const;
   const files: string[] = [];
 
@@ -1030,31 +1033,6 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       playerIds,
     );
 
-    if (scale === 2) {
-      await expect(
-        page.locator(
-          '[data-world-role="structure"]'
-            + '[data-world-id="structure-instance:landing-module"]',
-        ),
-      ).toHaveCount(1);
-      await expect(
-        page.locator('[data-world-role="flora-decor"]'),
-      ).not.toHaveCount(0);
-      await expect(
-        page.locator('[data-world-role="resource"]'),
-      ).not.toHaveCount(0);
-      await expect(
-        page.locator('[data-world-role="flora-decor"]').first(),
-      ).toHaveAttribute('data-interactive', 'false');
-      await captureProductWorld(
-        page,
-        'p1-polish-002-world-readability-2x.png',
-      );
-      files.push(
-        'p1-polish-002-world-readability-2x.png',
-      );
-    }
-
     await page.keyboard.press('m');
     await assertSpatialMap('NEAR', 'NEAR');
 
@@ -1094,6 +1072,38 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       files.push('p1-polish-002-map-grayscale-2x.png');
     }
   }
+
+  await openProductReview(
+    page,
+    worldReadability,
+    'proz0-p1-polish-002-world-readability-2x',
+    2,
+  );
+  await expect(
+    page.locator(
+      '[data-world-role="structure"]'
+        + '[data-world-id="structure-instance:landing-module"]',
+    ),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-world-role="flora-decor"]'),
+  ).not.toHaveCount(0);
+  await expect(
+    page.locator('[data-world-role="resource"]'),
+  ).not.toHaveCount(0);
+  await expect(
+    page.locator('[data-world-role="flora-decor"]').first(),
+  ).toHaveAttribute('data-interactive', 'false');
+  await expect(
+    page.locator('[data-world-role="resource"][data-focused-target="true"]'),
+  ).toHaveCount(1);
+  await captureProductWorld(
+    page,
+    'p1-polish-002-world-readability-2x.png',
+  );
+  files.push(
+    'p1-polish-002-world-readability-2x.png',
+  );
 
   await openProductReview(
     page,
