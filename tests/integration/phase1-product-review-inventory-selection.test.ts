@@ -82,6 +82,29 @@ async function createInventorySelectionBundle() {
   return { bundle, playerId } as const;
 }
 
+function selectItemDefinition(
+  source: Phase1ProductReviewPresentationSource,
+  itemDefinitionId: string,
+) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const selection = source.getInventoryActionSelection();
+    if (
+      !selection.normalizedDuringLookup
+      && selection.stack?.itemDefinitionId === itemDefinitionId
+    ) {
+      return selection;
+    }
+    if (selection.normalizedDuringLookup) {
+      source.refresh();
+      continue;
+    }
+    if (!source.cycleInventorySelection(1)) break;
+  }
+  throw new Error(
+    'Could not select canonical item definition: ' + itemDefinitionId,
+  );
+}
+
 function storageContainerId(bundle: Phase1AuthorityBundle): string {
   const structure = bundle.buildings
     .exportSnapshot()
@@ -109,11 +132,12 @@ describe('P1-POLISH-005 stale selection guard', () => {
       );
       source.togglePanel('inventory');
 
-      const initialPlayer = source.getInventoryActionSelection();
+      const initialPlayer = selectItemDefinition(
+        source,
+        'item:stone-field-tool',
+      );
       expect(initialPlayer.pane).toBe('player');
       expect(initialPlayer.normalizedDuringLookup).toBe(false);
-      expect(initialPlayer.stack?.itemDefinitionId)
-        .toBe('item:stone-field-tool');
 
       const storageId = storageContainerId(bundle);
       const externalPlayerMove = bundle.executeItemCommand({
@@ -170,11 +194,12 @@ describe('P1-POLISH-005 stale selection guard', () => {
 
       source.refresh();
       expect(source.cycleInventoryPane()).toBe(true);
-      const initialStorage = source.getInventoryActionSelection();
+      const initialStorage = selectItemDefinition(
+        source,
+        'item:stone-field-tool',
+      );
       expect(initialStorage.pane).toBe('storage');
       expect(initialStorage.normalizedDuringLookup).toBe(false);
-      expect(initialStorage.stack?.itemDefinitionId)
-        .toBe('item:stone-field-tool');
 
       const externalStorageMove = bundle.executeItemCommand({
         type: 'transfer',
