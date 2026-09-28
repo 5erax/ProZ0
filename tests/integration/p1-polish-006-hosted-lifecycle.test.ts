@@ -513,6 +513,7 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
           aggregateId: 'foothold:landing',
         }),
       );
+      deliver(clients, checkpoints);
 
       const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
         'resource:fiber-plant',
