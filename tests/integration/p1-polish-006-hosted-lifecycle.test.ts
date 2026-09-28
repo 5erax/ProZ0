@@ -23,7 +23,9 @@ import {
   type RevisionedAggregateViewV1,
 } from '../../src/protocol';
 import {
+  Phase1HostedCommandDispatcher,
   SaveV2HostedPersistenceAdapter,
+  WebSocketServerTransport,
 } from '../../src/server';
 import {
   PHASE1_WORLD_GENERATION_VERSION,
@@ -440,6 +442,12 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
       const secondInventoryId = 'inventory:' + secondPlayerId;
       requireAggregate(first, 'container', firstInventoryId);
       requireAggregate(second, 'container', secondInventoryId);
+      expect(
+        first.connection.replication.get('container', secondInventoryId),
+      ).toBeNull();
+      expect(
+        second.connection.replication.get('container', firstInventoryId),
+      ).toBeNull();
       requireAggregate(first, 'foothold', 'foothold:landing');
       requireAggregate(
         second,
@@ -574,6 +582,12 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
         .toMatchObject({ status: 'committed' });
       expect(quantityOf(first, firstInventoryId, 'item:cordage')).toBe(1);
       expect(quantityOf(second, secondInventoryId, 'item:cordage')).toBe(1);
+      expect(
+        first.connection.replication.get('container', secondInventoryId),
+      ).toBeNull();
+      expect(
+        second.connection.replication.get('container', firstInventoryId),
+      ).toBeNull();
 
       const resumeCredential = second.connection.getResumeCredential();
       if (resumeCredential === null) {
@@ -592,6 +606,12 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
         quantityOf(resumed, secondInventoryId, 'item:cordage'),
       ).toBe(1);
       expect(
+        resumed.connection.replication.get(
+          'container',
+          firstInventoryId,
+        ),
+      ).toBeNull();
+      expect(
         objectState(requireAggregate(
           resumed,
           'resource',
@@ -606,6 +626,135 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
     } finally {
       await composition.destroy();
     }
+  });
+});
+
+describe('P1-POLISH-006 hosted revision domains', () => {
+  it('keeps condenser and structure revisions independent across packet command contracts', () => {
+    const machineExpected: number[] = [];
+    const structureExpected: number[] = [];
+    const dispatcher = new Phase1HostedCommandDispatcher({
+      items: {
+        execute() {
+          throw new Error('Unexpected item command.');
+        },
+        beginGather() {
+          throw new Error('Unexpected gather command.');
+        },
+        getActiveGatherOperationId() {
+          return null;
+        },
+        cancelGather() {
+          return Object.freeze({
+            status: 'idle' as const,
+            playerId: 'player:1',
+          });
+        },
+        cancelAllGathers() {
+          return Object.freeze([]);
+        },
+      } as never,
+      buildings: {
+        place() {
+          throw new Error('Unexpected place command.');
+        },
+        dismantle(command) {
+          structureExpected.push(command.expectedStructureRevision);
+          return Object.freeze({
+            status: 'committed' as const,
+            operationId: command.operationId,
+            structureId: command.structureId,
+            buildRevision: 5,
+            inventoryRevision: 4,
+          });
+        },
+      },
+      machines: {
+        setEnabled(command) {
+          machineExpected.push(command.expectedRevision);
+          return Object.freeze({
+            status: 'committed' as const,
+            operationId: command.operationId,
+            revision: command.expectedRevision + 1,
+            enabled: command.enabled,
+          });
+        },
+      },
+      death: {} as never,
+    });
+
+    const machine = dispatcher.execute({
+      playerId: 'player:1',
+      authorityTick: 10,
+      authorityIngressOrdinal: 1,
+      command: {
+        operationId: 'revision-domain:machine',
+        commandType: 'machine.set-enabled',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'structure',
+            aggregateId: 'structure-instance:condenser',
+            revision: 3,
+          },
+          {
+            aggregateType: 'condenser',
+            aggregateId: 'structure-instance:condenser',
+            revision: 7,
+          },
+        ]),
+        payload: {
+          structureId: 'structure-instance:condenser',
+          enabled: false,
+        },
+      },
+    });
+    expect(machineExpected).toEqual([7]);
+    expect(machine).toMatchObject({
+      status: 'committed',
+      resultingRevisions: [{
+        aggregateType: 'condenser',
+        aggregateId: 'structure-instance:condenser',
+        revision: 8,
+      }],
+    });
+
+    const dismantle = dispatcher.execute({
+      playerId: 'player:1',
+      authorityTick: 11,
+      authorityIngressOrdinal: 2,
+      command: {
+        operationId: 'revision-domain:dismantle',
+        commandType: 'building.dismantle',
+        expectedRevisions: Object.freeze([
+          {
+            aggregateType: 'container',
+            aggregateId: 'inventory:player:1',
+            revision: 4,
+          },
+          {
+            aggregateType: 'foothold',
+            aggregateId: 'foothold:landing',
+            revision: 5,
+          },
+          {
+            aggregateType: 'structure',
+            aggregateId: 'structure-instance:condenser',
+            revision: 3,
+          },
+          {
+            aggregateType: 'condenser',
+            aggregateId: 'structure-instance:condenser',
+            revision: 8,
+          },
+        ]),
+        payload: {
+          structureId: 'structure-instance:condenser',
+          inventoryContainerId: 'inventory:player:1',
+        },
+      },
+    });
+    expect(structureExpected).toEqual([3]);
+    expect(dismantle).toMatchObject({ status: 'committed' });
   });
 });
 
@@ -718,6 +867,43 @@ describe('P1-POLISH-006 hosted drain/save lifecycle', () => {
       } finally {
         await reopened.composition.destroy();
       }
+    } finally {
+      if (composition.host.getSessionState() !== 'CLOSED') {
+        await composition.destroy();
+      }
+    }
+  });
+
+  it('keeps queued-command WebSocket shutdown on the Phase 1 lifecycle tick path', async () => {
+    const harness = await createPersistenceHarness(
+      'world:p1-polish-006-websocket-drain',
+    );
+    const composition = harness.composition;
+    const client = connectClient(
+      composition,
+      'transport:websocket-drain',
+    );
+
+    try {
+      await makePlayerFacingPersistable(composition, client);
+      sendGameplay(
+        composition,
+        client,
+        craftCordageCommand(client, 'websocket-drain:queued'),
+      );
+      const beforeDrainTick = composition.host.getAuthorityTick();
+
+      const transport = new WebSocketServerTransport(composition.host);
+      await transport.drainSaveAndClose();
+
+      expect(composition.host.getSessionState()).toBe('CLOSED');
+      expect(composition.host.getAuthorityTick()).toBe(beforeDrainTick + 1);
+      expect(composition.bundle.authorityTick).toBe(beforeDrainTick + 1);
+      expect(harness.requests).toHaveLength(1);
+      expect(harness.requests[0]?.world.authorityTick)
+        .toBe(beforeDrainTick + 1);
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(0);
     } finally {
       if (composition.host.getSessionState() !== 'CLOSED') {
         await composition.destroy();
