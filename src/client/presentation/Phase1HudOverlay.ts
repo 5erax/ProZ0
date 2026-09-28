@@ -253,6 +253,8 @@ function renderPanel(
 
   switch (panel.kind) {
     case 'inventory': {
+      root.dataset.inventoryActivePane = 'player';
+      root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
       for (const item of panel.items) {
         list.append(itemRow(
@@ -262,26 +264,85 @@ function renderPanel(
           true,
         ));
       }
-      root.append(list, createElement(document, 'div', 'p1-panel-detail', panel.detail));
+      root.append(
+        list,
+        createElement(document, 'div', 'p1-panel-detail', panel.detail),
+        createElement(
+          document,
+          'div',
+          'p1-inventory-controls',
+          panel.controls,
+        ),
+      );
+      if (panel.feedback !== null) {
+        root.append(
+          createElement(
+            document,
+            'div',
+            'p1-feedback',
+            panel.feedback,
+          ),
+        );
+      }
       return root;
     }
 
     case 'container': {
+      root.dataset.inventoryActivePane = panel.activePane;
+      root.dataset.inventoryQuantity = String(panel.quantity);
       const panes = createElement(document, 'div', 'p1-container-panes');
-      const left = createElement(document, 'div', 'p1-container-pane');
+      const left = createElement(
+        document,
+        'div',
+        'p1-container-pane',
+      );
+      left.dataset.inventoryPane = 'player';
+      left.dataset.active = String(panel.activePane === 'player');
       left.append(createElement(document, 'div', 'p1-subtitle', 'PLAYER'));
       for (const item of panel.playerItems) {
-        left.append(itemRow(document, item, false));
+        const selected = item.id === panel.selectedPlayerItemId;
+        const row = itemRow(document, item, selected);
+        left.append(row);
+        if (selected) {
+          queueMicrotask(() => {
+            if (row.isConnected) {
+              row.scrollIntoView({ block: 'nearest' });
+            }
+          });
+        }
       }
 
-      const right = createElement(document, 'div', 'p1-container-pane');
+      const right = createElement(
+        document,
+        'div',
+        'p1-container-pane',
+      );
+      right.dataset.inventoryPane = 'storage';
+      right.dataset.active = String(panel.activePane === 'storage');
       right.append(createElement(document, 'div', 'p1-subtitle', panel.containerLabel));
       for (const item of panel.containerItems) {
-        right.append(itemRow(document, item, false));
+        const selected = item.id === panel.selectedContainerItemId;
+        const row = itemRow(document, item, selected);
+        right.append(row);
+        if (selected) {
+          queueMicrotask(() => {
+            if (row.isConnected) {
+              row.scrollIntoView({ block: 'nearest' });
+            }
+          });
+        }
       }
 
       panes.append(left, right);
-      root.append(panes);
+      root.append(
+        panes,
+        createElement(
+          document,
+          'div',
+          'p1-inventory-controls',
+          panel.controls,
+        ),
+      );
       if (panel.feedback !== null) {
         const feedback = createElement(document, 'div', 'p1-feedback', panel.feedback);
         feedback.dataset.feedback = panel.feedback;
@@ -790,7 +851,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-item-icon{width:24px!important;height:24px!important;}',
     '.p1-item-row[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
     '.p1-container-panes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
-    '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;}',
+    '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;max-height:190px;overflow-y:auto;}',
     '.p1-craft-row{display:grid;grid-template-columns:1fr;gap:1px;padding:2px 3px;line-height:1.05;}',
     '.p1-craft-heading,.p1-craft-footer{display:flex;justify-content:space-between;gap:6px;align-items:center;min-height:9px;}',
     '.p1-craft-ingredients{display:flex;flex-wrap:wrap;gap:1px 4px;min-height:9px;}',

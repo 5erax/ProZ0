@@ -79,6 +79,7 @@ interface GatherInteractionState {
 interface ConsumeInteractionState {
   readonly operationId: string;
   readonly targetName: string;
+  readonly inputLabel: string;
   readonly requiredTicks: number;
   readonly startedTick: number;
 }
@@ -1067,16 +1068,18 @@ export async function createPhase1ProductReviewRuntime(
   const presentConsumeStart = (
     start: Readonly<ConsumeStartResult>,
     targetName: string,
+    inputLabel: string,
   ): void => {
     if (start.status === 'started') {
       activeConsume = Object.freeze({
         operationId: start.operationId,
         targetName,
+        inputLabel,
         requiredTicks: start.requiredTicks,
         startedTick: bundle.authorityTick,
       });
       source.setInteraction(Object.freeze({
-        inputLabel: 'V',
+        inputLabel,
         verb: 'CONSUME',
         target: targetName,
         state: 'CHANNELING',
@@ -1087,7 +1090,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     source.setLocalCommandFeedback({
-      inputLabel: 'V',
+      inputLabel,
       operationId: start.operationId,
       status: 'rejected',
       reason: start.reason,
@@ -1099,7 +1102,11 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
-  const beginConsume = (): void => {
+  const beginConsumeStack = (
+    stackId: string | null,
+    inputLabel: string,
+    missingTargetLabel: string,
+  ): void => {
     if (activeConsume !== null) {
       bundle.survival.cancelConsume(config.localPlayerId);
       return;
@@ -1108,24 +1115,31 @@ export async function createPhase1ProductReviewRuntime(
     const inventory = bundle.items.getContainerView(
       'inventory:' + config.localPlayerId,
     );
-    const quickUseStackId = source.resolveQuickUseStackId();
-    const stack = quickUseStackId === null
+    const stack = stackId === null
       ? undefined
       : inventory.stacks.find(
-          (candidate) => candidate.stackId === quickUseStackId,
+          (candidate) => candidate.stackId === stackId,
         );
     const operationId = nextOperationId('consume');
     const targetName = stack === undefined
-      ? 'Consumable'
+      ? missingTargetLabel
       : bundle.catalog.get(stack.itemDefinitionId).displayName;
     const start = bundle.survival.beginConsume({
       operationId,
       playerId: config.localPlayerId,
       inventoryContainerId: inventory.containerId,
       expectedInventoryRevision: inventory.revision,
-      sourceStackId: stack?.stackId ?? 'missing-consumable',
+      sourceStackId: stack?.stackId ?? 'missing-selected-stack',
     });
-    presentConsumeStart(start, targetName);
+    presentConsumeStart(start, targetName, inputLabel);
+  };
+
+  const beginConsume = (): void => {
+    beginConsumeStack(
+      source.resolveQuickUseStackId(),
+      'V',
+      'Consumable',
+    );
   };
 
   const updateConsume = (
@@ -1139,7 +1153,7 @@ export async function createPhase1ProductReviewRuntime(
       case 'channeling':
         if (result.operationId !== activeConsume.operationId) return;
         source.setInteraction(Object.freeze({
-          inputLabel: 'V',
+          inputLabel: activeConsume.inputLabel,
           verb: 'CONSUME',
           target: activeConsume.targetName,
           state: 'CHANNELING',
@@ -1151,9 +1165,10 @@ export async function createPhase1ProductReviewRuntime(
         return;
       case 'canceled': {
         const targetName = activeConsume.targetName;
+        const inputLabel = activeConsume.inputLabel;
         activeConsume = null;
         source.setLocalCommandFeedback({
-          inputLabel: 'V',
+          inputLabel,
           operationId: result.operationId,
           status: 'rejected',
           reason: result.reason,
@@ -1164,9 +1179,10 @@ export async function createPhase1ProductReviewRuntime(
       }
       case 'resolved': {
         const targetName = activeConsume.targetName;
+        const inputLabel = activeConsume.inputLabel;
         activeConsume = null;
         source.setLocalCommandFeedback({
-          inputLabel: 'V',
+          inputLabel,
           operationId: result.operationId,
           status: result.committed ? 'committed' : 'rejected',
           ...(result.committed ? {} : { reason: 'SOURCE_MISSING' }),
@@ -1438,6 +1454,190 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const presentInventoryGuard = (
+    inputLabel: string,
+    verb: string,
+    reason: string,
+  ): void => {
+    source.setLocalCommandFeedback({
+      inputLabel,
+      operationId: nextOperationId('inventory-guard'),
+      status: 'rejected',
+      reason,
+      verb,
+      target: 'Selected item',
+    });
+  };
+
+  const selectedInventoryAction = (
+    inputLabel: string,
+    verb: string,
+  ) => {
+    const selection = source.getInventoryActionSelection();
+    if (selection.normalizedDuringLookup) {
+      presentInventoryGuard(
+        inputLabel,
+        verb,
+        'SOURCE_MISSING',
+      );
+      return null;
+    }
+    return selection;
+  };
+
+  const beginSelectedConsume = (): void => {
+    const selection = selectedInventoryAction('V', 'CONSUME');
+    if (selection === null) return;
+    if (selection.pane !== 'player') {
+      presentInventoryGuard('V', 'CONSUME', 'TARGET_UNAVAILABLE');
+      return;
+    }
+    beginConsumeStack(
+      selection.stack?.stackId ?? null,
+      'V',
+      'Selected item',
+    );
+  };
+
+  const toggleSelectedEquipment = (inputLabel: string): void => {
+    const selection = selectedInventoryAction(inputLabel, 'EQUIP');
+    if (selection === null) return;
+    if (selection.pane !== 'player' || selection.stack === null) {
+      presentInventoryGuard(inputLabel, 'EQUIP', 'SOURCE_MISSING');
+      return;
+    }
+    const stack = selection.stack;
+    const definition = bundle.catalog.getAs(
+      stack.itemDefinitionId,
+      'item',
+    );
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    let verb: 'EQUIP' | 'UNEQUIP';
+    let result:
+      | ReturnType<typeof bundle.equipWeapon>
+      | ReturnType<typeof bundle.equipThermalWrap>;
+
+    if (stack.itemDefinitionId === 'item:thermal-wrap') {
+      const next = current.equippedThermalWrapStackId === stack.stackId
+        ? null
+        : stack.stackId;
+      verb = next === null ? 'UNEQUIP' : 'EQUIP';
+      result = bundle.equipThermalWrap(config.localPlayerId, next);
+    } else {
+      const next = current.equippedWeaponStackId === stack.stackId
+        ? null
+        : stack.stackId;
+      verb = next === null ? 'UNEQUIP' : 'EQUIP';
+      result = bundle.equipWeapon(config.localPlayerId, next);
+    }
+
+    source.setLocalCommandFeedback({
+      inputLabel,
+      operationId: nextOperationId('inventory-equipment'),
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb,
+      target: definition.displayName,
+    });
+  };
+
+  const reconcileEquipmentAfterItemMove = (): void => {
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    bundle.equipWeapon(
+      config.localPlayerId,
+      current.equippedWeaponStackId,
+    );
+    bundle.equipThermalWrap(
+      config.localPlayerId,
+      current.equippedThermalWrapStackId,
+    );
+  };
+
+  const dropSelectedInventoryQuantity = (): void => {
+    const selection = selectedInventoryAction('G', 'DROP');
+    if (selection === null) return;
+    if (selection.pane !== 'player' || selection.stack === null) {
+      presentInventoryGuard('G', 'DROP', 'SOURCE_MISSING');
+      return;
+    }
+    const definition = bundle.catalog.getAs(
+      selection.stack.itemDefinitionId,
+      'item',
+    );
+    const result = bundle.executeItemCommand({
+      type: 'drop',
+      operationId: nextOperationId('inventory-drop'),
+      playerId: config.localPlayerId,
+      inventoryContainerId: selection.inventory.containerId,
+      expectedInventoryRevision: selection.inventory.revision,
+      sourceStackId: selection.stack.stackId,
+      quantity: selection.quantity,
+    });
+    if (result.status === 'committed') {
+      reconcileEquipmentAfterItemMove();
+    }
+    source.setLocalCommandFeedback({
+      inputLabel: 'G',
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'DROP',
+      target:
+        definition.displayName + ' ×' + String(selection.quantity),
+    });
+  };
+
+  const transferSelectedInventoryQuantity = (): void => {
+    const selection = selectedInventoryAction('ENTER', 'TRANSFER');
+    if (selection === null) return;
+    if (
+      selection.storage === null
+      || selection.target === null
+      || selection.stack === null
+    ) {
+      presentInventoryGuard('ENTER', 'TRANSFER', 'TARGET_UNAVAILABLE');
+      return;
+    }
+    const definition = bundle.catalog.getAs(
+      selection.stack.itemDefinitionId,
+      'item',
+    );
+    const result = bundle.executeItemCommand({
+      type: 'transfer',
+      operationId: nextOperationId('inventory-transfer'),
+      playerId: config.localPlayerId,
+      sourceContainerId: selection.source.containerId,
+      sourceExpectedRevision: selection.source.revision,
+      targetContainerId: selection.target.containerId,
+      targetExpectedRevision: selection.target.revision,
+      sourceStackId: selection.stack.stackId,
+      quantity: selection.quantity,
+    });
+    if (result.status === 'committed') {
+      reconcileEquipmentAfterItemMove();
+    }
+    source.setLocalCommandFeedback({
+      inputLabel: 'ENTER',
+      operationId: result.operationId,
+      status: result.status,
+      ...(result.status === 'rejected'
+        ? { reason: result.reason }
+        : {}),
+      verb: 'TRANSFER',
+      target:
+        definition.displayName
+        + ' ×'
+        + String(selection.quantity)
+        + (selection.pane === 'player'
+          ? ' · PLAYER → STORAGE'
+          : ' · STORAGE → PLAYER'),
+    });
+  };
+
   const attackPredator = (): void => {
     const predator = bundle.world.findGeneratedEntityByDefinition(
       'hostile:territorial-predator',
@@ -1506,6 +1706,52 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
+
+    if (source.isInventoryOpen()) {
+      switch (event.code) {
+        case 'ArrowUp':
+          event.preventDefault();
+          event.stopPropagation();
+          source.cycleInventorySelection(-1);
+          return;
+        case 'ArrowDown':
+          event.preventDefault();
+          event.stopPropagation();
+          source.cycleInventorySelection(1);
+          return;
+        case 'Tab':
+          event.preventDefault();
+          source.cycleInventoryPane();
+          return;
+        case 'BracketLeft':
+          event.preventDefault();
+          source.adjustInventoryQuantity(-1);
+          return;
+        case 'BracketRight':
+          event.preventDefault();
+          source.adjustInventoryQuantity(1);
+          return;
+        case 'Enter':
+          event.preventDefault();
+          transferSelectedInventoryQuantity();
+          return;
+        case 'KeyV':
+          event.preventDefault();
+          beginSelectedConsume();
+          return;
+        case 'KeyX':
+        case 'KeyQ':
+        case 'KeyT':
+          event.preventDefault();
+          toggleSelectedEquipment(event.code.slice(-1));
+          return;
+        case 'KeyG':
+          event.preventDefault();
+          dropSelectedInventoryQuantity();
+          return;
+      }
+    }
+
     switch (event.code) {
       case 'KeyH':
         event.preventDefault();

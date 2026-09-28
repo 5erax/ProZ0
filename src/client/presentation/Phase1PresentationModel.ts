@@ -78,6 +78,9 @@ export interface Phase1InventoryPanelPresentation {
   readonly items: readonly Phase1InventoryItemPresentation[];
   readonly selectedItemId: string | null;
   readonly detail: string;
+  readonly quantity: number;
+  readonly controls: string;
+  readonly feedback: string | null;
 }
 
 export interface Phase1ContainerPanelPresentation {
@@ -86,6 +89,11 @@ export interface Phase1ContainerPanelPresentation {
   readonly playerItems: readonly Phase1InventoryItemPresentation[];
   readonly containerItems: readonly Phase1InventoryItemPresentation[];
   readonly containerLabel: string;
+  readonly selectedPlayerItemId: string | null;
+  readonly selectedContainerItemId: string | null;
+  readonly activePane: 'player' | 'storage';
+  readonly quantity: number;
+  readonly controls: string;
   readonly feedback: string | null;
 }
 

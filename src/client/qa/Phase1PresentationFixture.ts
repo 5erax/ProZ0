@@ -61,6 +61,9 @@ function panelForMode(
         ]),
         selectedItemId: 'tool',
         detail: 'Stone Field Tool · 64/100 condition · 2.0 kg',
+        quantity: 1,
+        controls: '↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY 1',
+        feedback: null,
       });
 
     case 'container':
@@ -86,6 +89,12 @@ function panelForMode(
           }),
         ]),
         containerLabel: 'STORAGE CRATE · 100 kg / 120 u',
+        selectedPlayerItemId: 'timber',
+        selectedContainerItemId: 'stone',
+        activePane: 'player',
+        quantity: 2,
+        controls:
+          '↑/↓ SELECT · TAB PANE · [/] QTY 2 · ENTER TRANSFER · V USE · X EQUIP · G DROP',
         feedback: 'STALE / WORLD STATE CHANGED',
       });
 
