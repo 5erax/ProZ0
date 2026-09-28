@@ -79,6 +79,9 @@ function bundleFromRequest(
 class EvidenceSaveRepository implements SaveRepositoryV2 {
   private stored: PortableSaveBundleV2 | null = null;
   public lastCommitResult: SaveResultV2<WorldManifestV2> | null = null;
+  public lastSnapshotError: string | null = null;
+  public lastSnapshotAuthorityTick: number | null = null;
+  public lastSnapshotBundleTick: number | null = null;
 
   public constructor(
     private readonly compatibility: SaveV2CompatibilityPolicy,
@@ -354,7 +357,7 @@ interface BrowserBaselineSummary {
 
 async function startHosted4Server(
   catalog: ContentCatalogV1,
-  repository: SaveRepositoryV2,
+  repository: EvidenceSaveRepository,
   options: {
     readonly sessionId: string;
     readonly sessionEpoch: string;
@@ -365,16 +368,34 @@ async function startHosted4Server(
   const persistence = new SaveV2HostedPersistenceAdapter({
     repository,
     snapshot: (authorityTick) => {
-      if (composition === null) {
-        throw new Error('Hosted composition is not bound to Save V2 persistence.');
+      repository.lastSnapshotAuthorityTick = authorityTick;
+      repository.lastSnapshotBundleTick =
+        composition?.bundle.authorityTick ?? null;
+      try {
+        if (composition === null) {
+          throw new Error(
+            'Hosted composition is not bound to Save V2 persistence.',
+          );
+        }
+        const request = composePhase1SaveV2(composition.bundle, {
+          nowUtc: '2026-09-29T00:00:00.000Z',
+        });
+        repository.lastSnapshotBundleTick =
+          request.world.authorityTick;
+        if (request.world.authorityTick !== authorityTick) {
+          throw new Error(
+            'Evidence Save V2 authority tick mismatch: host='
+              + String(authorityTick)
+              + ' bundle='
+              + String(request.world.authorityTick),
+          );
+        }
+        return request;
+      } catch (error) {
+        repository.lastSnapshotError =
+          error instanceof Error ? error.message : String(error);
+        throw error;
       }
-      const request = composePhase1SaveV2(composition.bundle, {
-        nowUtc: '2026-09-29T00:00:00.000Z',
-      });
-      if (request.world.authorityTick !== authorityTick) {
-        throw new Error('Evidence Save V2 authority tick mismatch.');
-      }
-      return request;
     },
   });
 
@@ -1349,7 +1370,14 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
     if (!stored.ok) {
       throw new Error(
         'Hosted Save V2 evidence commit unavailable: '
-          + JSON.stringify(repository.lastCommitResult),
+          + JSON.stringify({
+              snapshotError: repository.lastSnapshotError,
+              snapshotAuthorityTick:
+                repository.lastSnapshotAuthorityTick,
+              snapshotBundleTick:
+                repository.lastSnapshotBundleTick,
+              commitResult: repository.lastCommitResult,
+            }),
       );
     }
 
