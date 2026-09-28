@@ -92,6 +92,14 @@ interface AttackPresentationState {
 
 const CRAFT_PAGE_SIZE = 6;
 
+const PHASE1_BUILD_CATALOG_ORDER = Object.freeze([
+  'structure:storage-crate',
+  'structure:workbench',
+  'structure:habitat-room',
+  'structure:compact-power-unit',
+  'structure:atmospheric-water-condenser',
+] as const);
+
 type PlaceableStructureDefinitionId = Exclude<
   Phase1StructureDefinitionId,
   'structure:landing-module'
@@ -508,6 +516,12 @@ export async function createPhase1ProductReviewRuntime(
               + bundle.catalog.get(output.itemId).displayName,
             )
             .join(' + '),
+          outputs: Object.freeze(recipe.outputs.map((output) =>
+            Object.freeze({
+              name: bundle.catalog.get(output.itemId).displayName,
+              quantity: output.quantity,
+            }),
+          )),
           requirementLabel: recipe.inputs
             .map((input) =>
               String(input.quantity)
@@ -614,6 +628,23 @@ export async function createPhase1ProductReviewRuntime(
         .sort((left, right) => left.id.localeCompare(right.id)),
     );
 
+  const buildCatalogDefinitions = () => {
+    const placeable = new Map(
+      buildDefinitions().map(
+        (definition) => [definition.id, definition] as const,
+      ),
+    );
+    return Object.freeze(PHASE1_BUILD_CATALOG_ORDER.map((id) => {
+      const definition = placeable.get(id);
+      if (definition === undefined) {
+        throw new Error(
+          'Approved Phase 1 building catalog is missing ' + id + '.',
+        );
+      }
+      return definition;
+    }));
+  };
+
   const landingConnectors = () =>
     bundle.buildings
       .exportSnapshot()
@@ -661,6 +692,8 @@ export async function createPhase1ProductReviewRuntime(
         ? 'NO LANDING CONNECTOR'
         : null;
 
+    const structures =
+      bundle.buildings.exportSnapshot().foothold.structures;
     return Object.freeze({
       kind: 'build',
       title:
@@ -682,6 +715,32 @@ export async function createPhase1ProductReviewRuntime(
           ? 'CONNECTOR'
           : 'VALID',
       reason,
+      catalogEntries: Object.freeze(buildCatalogDefinitions().map((entry) => {
+        const entryKitId = entry.sourceKitItemId;
+        if (entryKitId === null) {
+          throw new Error(
+            'Approved player-placeable structure is missing source kit.',
+          );
+        }
+        const availableKitCount = inventory.stacks
+          .filter((stack) => stack.itemDefinitionId === entryKitId)
+          .reduce((sum, stack) => sum + stack.quantity, 0);
+        const builtCount = structures.filter(
+          (structure) => structure.definitionId === entry.id,
+        ).length;
+        return Object.freeze({
+          structureId: entry.id,
+          name: entry.displayName,
+          sourceKitName: bundle.catalog.get(entryKitId).displayName,
+          availableKitCount,
+          builtCount,
+          buildCap: entry.phase1WorldCap,
+          buildCapState: builtCount >= entry.phase1WorldCap
+            ? 'CAP REACHED' as const
+            : 'AVAILABLE' as const,
+          selected: entry.id === definition.id,
+        });
+      })),
     });
   };
 
