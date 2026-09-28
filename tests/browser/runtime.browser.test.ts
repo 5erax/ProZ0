@@ -47,6 +47,20 @@ async function waitPastProductReviewFeedbackLifetime(
   );
 }
 
+async function waitForSaveState(
+  root: HTMLElement,
+  state: 'idle' | 'pending' | 'success' | 'failure',
+): Promise<HTMLElement> {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const control = root.querySelector<HTMLElement>(
+      '[data-product-review-save="local-authority"]',
+    );
+    if (control?.dataset.saveState === state) return control;
+    await wait(10);
+  }
+  throw new Error('Product Review SAVE WORLD did not reach state ' + state + '.');
+}
+
 describe('Phase 0 browser runtime', () => {
   let handle: RuntimeHandle | null = null;
   let root: HTMLElement | null = null;
@@ -495,6 +509,288 @@ describe('Phase 0 browser runtime', () => {
       if (!firstDestroyed) {
         first.destroy();
       }
+      await deleteIndexedDbSaveDatabase(databaseName);
+    }
+  });
+
+  it('exposes local SAVE WORLD, keeps S movement-only, and reopens the latest successful checkpoint', async () => {
+    const databaseName = 'proz0-test-product-review-save-world';
+    await deleteIndexedDbSaveDatabase(databaseName);
+
+    root = document.createElement('div');
+    document.body.append(root);
+
+    const config = {
+      worldId: 'world:browser-product-review-save-world',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['browser-player'],
+      localPlayerId: 'browser-player',
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: { databaseName },
+    } as const;
+
+    let current = await bootPersistedPhase1ProductReview(root, config);
+    try {
+      const saveControl = root.querySelector<HTMLElement>(
+        '[data-product-review-save="local-authority"]',
+      );
+      expect(saveControl?.dataset.saveState).toBe('idle');
+      expect(saveControl?.textContent).toContain('L · SAVE WORLD');
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyH',
+        cancelable: true,
+      }));
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save-help]')
+          ?.textContent,
+      ).toBe('L · SAVE WORLD');
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyH',
+        cancelable: true,
+      }));
+
+      const movementCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      const initialY = Number(movementCanvas?.dataset.playerY);
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyS',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(140);
+      document.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyS',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(30);
+
+      expect(Number(movementCanvas?.dataset.playerY))
+        .toBeGreaterThan(initialY);
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save]')
+          ?.dataset.saveState,
+      ).toBe('idle');
+
+      current.destroy();
+      current = await bootPersistedPhase1ProductReview(root, config);
+      expect(current.reopened).toBe(false);
+
+      const canvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      const initialX = Number(canvas?.dataset.playerX);
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(180);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(40);
+      const firstSavedX = Number(canvas?.dataset.playerX);
+      expect(firstSavedX).toBeGreaterThan(initialX);
+
+      const beforeSaveX = Number(canvas?.dataset.playerX);
+      const beforeSaveY = Number(canvas?.dataset.playerY);
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyL',
+        cancelable: true,
+        bubbles: true,
+      }));
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save]')
+          ?.dataset.saveState,
+      ).toBe('pending');
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save]')
+          ?.textContent,
+      ).toContain('Saving…');
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyL',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await waitForSaveState(root, 'success');
+      document.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyL',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(30);
+
+      expect(Number(canvas?.dataset.playerX)).toBeCloseTo(beforeSaveX, 6);
+      expect(Number(canvas?.dataset.playerY)).toBeCloseTo(beforeSaveY, 6);
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save]')
+          ?.textContent,
+      ).toContain('World saved');
+
+      expect(await current.checkpoint(
+        '2026-09-28T01:40:00.000Z',
+      )).toMatchObject({
+        ok: true,
+        value: {
+          worldId: config.worldId,
+          worldRevision: 1,
+        },
+      });
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(160);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(40);
+      const unsavedX = Number(canvas?.dataset.playerX);
+      expect(unsavedX).toBeGreaterThan(firstSavedX);
+
+      current.destroy();
+      current = await bootPersistedPhase1ProductReview(root, config);
+      const reopenedCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      expect(Number(reopenedCanvas?.dataset.playerX))
+        .toBeCloseTo(firstSavedX, 6);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(160);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(40);
+      const secondSavedX = Number(reopenedCanvas?.dataset.playerX);
+      expect(secondSavedX).toBeGreaterThan(firstSavedX);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyL',
+        cancelable: true,
+      }));
+      await waitForSaveState(root, 'success');
+
+      current.destroy();
+      current = await bootPersistedPhase1ProductReview(root, config);
+      expect(
+        Number(
+          root.querySelector<HTMLCanvasElement>('#proz0-canvas')
+            ?.dataset.playerX,
+        ),
+      ).toBeCloseTo(secondSavedX, 6);
+    } finally {
+      current.destroy();
+      await deleteIndexedDbSaveDatabase(databaseName);
+    }
+  });
+
+  it('reports SAVE WORLD failure without advancing the durable checkpoint', async () => {
+    const databaseName = 'proz0-test-product-review-save-failure';
+    await deleteIndexedDbSaveDatabase(databaseName);
+
+    root = document.createElement('div');
+    document.body.append(root);
+
+    const config = {
+      worldId: 'world:browser-product-review-save-failure',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['browser-player'],
+      localPlayerId: 'browser-player',
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
+      persistence: { databaseName },
+    } as const;
+
+    let current = await bootPersistedPhase1ProductReview(root, config);
+    const originalTransaction = IDBDatabase.prototype.transaction;
+    try {
+      const canvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(160);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(40);
+      const durableX = Number(canvas?.dataset.playerX);
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyL',
+        cancelable: true,
+      }));
+      await waitForSaveState(root, 'success');
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(160);
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyD',
+        cancelable: true,
+      }));
+      await wait(40);
+      const failedSaveX = Number(canvas?.dataset.playerX);
+      expect(failedSaveX).toBeGreaterThan(durableX);
+
+      let failNextWrite = true;
+      IDBDatabase.prototype.transaction = function (
+        storeNames: string | Iterable<string>,
+        mode?: IDBTransactionMode,
+        options?: IDBTransactionOptions,
+      ): IDBTransaction {
+        if (failNextWrite && mode === 'readwrite') {
+          failNextWrite = false;
+          throw new DOMException(
+            'Forced Product Review SAVE WORLD storage failure.',
+            'InvalidStateError',
+          );
+        }
+        return originalTransaction.call(
+          this,
+          storeNames,
+          mode,
+          options,
+        );
+      };
+
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyL',
+        cancelable: true,
+      }));
+      const failed = await waitForSaveState(root, 'failure');
+      expect(failed.textContent).toContain('Save failed');
+      expect(failed.textContent).toContain('not durable');
+      expect(failed.textContent).toContain('Retry Save');
+
+      IDBDatabase.prototype.transaction = originalTransaction;
+
+      current.destroy();
+      current = await bootPersistedPhase1ProductReview(root, config);
+      expect(
+        Number(
+          root.querySelector<HTMLCanvasElement>('#proz0-canvas')
+            ?.dataset.playerX,
+        ),
+      ).toBeCloseTo(durableX, 6);
+    } finally {
+      IDBDatabase.prototype.transaction = originalTransaction;
+      current.destroy();
       await deleteIndexedDbSaveDatabase(databaseName);
     }
   });
