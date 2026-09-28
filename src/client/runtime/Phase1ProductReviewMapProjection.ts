@@ -9,7 +9,6 @@ import {
   PLAYER_MOVEMENT_CONFIG,
 } from '../../simulation';
 import {
-  CHUNK_SPAN_WORLD_UNITS,
   createChunkCoord,
   fromWorldPosition,
   toChunkKey,
@@ -355,6 +354,24 @@ function knownRuinState(
   return null;
 }
 
+function mapFacing(
+  facing: PlayerMotionViewV1['facing'],
+): Phase1MapFacing | null {
+  switch (facing) {
+    case 'N':
+    case 'NE':
+    case 'E':
+    case 'SE':
+    case 'S':
+    case 'SW':
+    case 'W':
+    case 'NW':
+      return facing;
+    case null:
+      return null;
+  }
+}
+
 function teammateAtlasIndex(
   slot: PresentationIdentitySlotV1,
 ): number | null {
@@ -495,7 +512,7 @@ export function projectPhase1ProductReviewMapPanel(
       atlasIndex: 0,
       worldX: playerPosition.x,
       worldY: playerPosition.y,
-      facing: localMotion?.facing ?? null,
+      facing: mapFacing(localMotion?.facing ?? null),
       distanceBand: null,
       selected: false,
       identitySlot: 'LOCAL' as const,
@@ -537,7 +554,7 @@ export function projectPhase1ProductReviewMapPanel(
       atlasIndex,
       worldX: motion.position.x,
       worldY: motion.position.y,
-      facing: motion.facing,
+      facing: mapFacing(motion.facing),
       distanceBand: null,
       selected: false,
       identitySlot: motion.presentationIdentitySlot,
