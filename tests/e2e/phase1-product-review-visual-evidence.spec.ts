@@ -1104,22 +1104,23 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       await expect(page.locator('.p1-map-detail'))
         .toContainText('DEATH CACHE · NEAR');
 
+      await page.addStyleTag({
+        content:
+          '[data-panel-kind="map"]{filter:grayscale(1)!important;}',
+      });
       const grayscalePanel = page.locator(
         '[data-panel-kind="map"]',
-      );
-      await grayscalePanel.evaluate(
-        async (panel) => {
-          (panel as HTMLElement).style.filter = 'grayscale(1)';
-          await new Promise<void>((resolve) => {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => resolve());
-            });
-          });
-        },
       );
       await expect(grayscalePanel).toHaveCSS(
         'filter',
         'grayscale(1)',
+      );
+      await page.evaluate(
+        () => new Promise<void>((resolve) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => resolve());
+          });
+        }),
       );
       await captureViewport(
         page,
