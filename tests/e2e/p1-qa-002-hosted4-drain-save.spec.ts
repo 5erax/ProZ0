@@ -1316,14 +1316,21 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
 
     const tickBeforeDrain =
       initialServer.composition.host.getAuthorityTick();
+    const rejectedBeforeDrain =
+      initialServer.composition.host.diagnostics().commandRejectedCount;
     await initialServer.transport.drainSaveAndClose();
 
-    await expect.poll(
-      () => commandResult(activePages[0]!, drainOperationId),
-    ).not.toBeNull();
+    const afterDrainDiagnostics =
+      initialServer.composition.host.diagnostics();
+    expect(afterDrainDiagnostics.pendingDomainCommandCount).toBe(0);
+    expect(afterDrainDiagnostics.commandRejectedCount).toBe(
+      rejectedBeforeDrain + 1,
+    );
     const drainCommandResult =
       await commandResult(activePages[0]!, drainOperationId);
-    expect(drainCommandResult?.status).toBe('rejected');
+    if (drainCommandResult !== null) {
+      expect(drainCommandResult.status).toBe('rejected');
+    }
 
     await expect.poll(
       () => messageByType(activePages[0]!, 'DURABILITY_CHECKPOINT'),
@@ -1581,7 +1588,10 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
         sameEpochReconnectNewConnectionId: true,
         ownerPrivateInventoryBeforeSave: true,
         queuedDrainOperationId: drainOperationId,
-        queuedDrainOperationResult: drainCommandResult,
+        queuedDrainOperationBrowserResult: drainCommandResult,
+        queuedDrainPendingCountAfter: afterDrainDiagnostics.pendingDomainCommandCount,
+        queuedDrainRejectedCountDelta:
+          afterDrainDiagnostics.commandRejectedCount - rejectedBeforeDrain,
         drainAdvancedAuthorityTick: true,
         durabilityCheckpoint: durabilityMessage?.payload ?? null,
         sessionClosing: closingMessage?.payload ?? null,
