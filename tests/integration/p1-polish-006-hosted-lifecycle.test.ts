@@ -471,22 +471,24 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
         gatherCommand(second, 'packet:contend:second', fiber.entityId),
       );
 
-      const firstResultPromise = waitForCommand(
-        composition,
-        clients,
-        first,
-        'packet:contend:first',
-      );
-      const secondResultPromise = waitForCommand(
-        composition,
-        clients,
-        second,
-        'packet:contend:second',
-      );
-      const [firstResult, secondResult] = await Promise.all([
-        firstResultPromise,
-        secondResultPromise,
-      ]);
+      let firstResult =
+        first.connection.getCommandResult('packet:contend:first');
+      let secondResult =
+        second.connection.getCommandResult('packet:contend:second');
+      for (
+        let tick = 0;
+        tick < 120 && (firstResult === null || secondResult === null);
+        tick += 1
+      ) {
+        await stepAndDeliver(composition, clients);
+        firstResult =
+          first.connection.getCommandResult('packet:contend:first');
+        secondResult =
+          second.connection.getCommandResult('packet:contend:second');
+      }
+      if (firstResult === null || secondResult === null) {
+        throw new Error('Gather contention did not resolve both operations.');
+      }
 
       const committed = [
         [first, firstResult] as const,
