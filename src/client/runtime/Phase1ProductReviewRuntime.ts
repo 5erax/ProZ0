@@ -1094,6 +1094,7 @@ export async function createPhase1ProductReviewRuntime(
       verb: 'CONSUME',
       target: targetName,
     });
+    refreshContextInteraction();
   };
 
   const beginConsume = (): void => {
@@ -1400,6 +1401,7 @@ export async function createPhase1ProductReviewRuntime(
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
       target: 'Basic Spear',
     });
+    refreshContextInteraction();
   };
 
   const toggleThermalWrap = (): void => {
@@ -1427,6 +1429,7 @@ export async function createPhase1ProductReviewRuntime(
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
       target: 'Thermal Wrap',
     });
+    refreshContextInteraction();
   };
 
   const attackPredator = (): void => {
