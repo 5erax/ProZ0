@@ -170,6 +170,7 @@ function itemRow(
   const row = createElement(document, 'div', 'p1-item-row');
   row.dataset.itemId = item.id;
   row.dataset.selected = String(selected);
+  row.dataset.available = String(item.available ?? item.condition !== 0);
 
   const icon = assetSprite(
     document,
@@ -197,6 +198,27 @@ function itemRow(
     row.append(icon);
   }
   row.append(identity, state);
+  if (
+    item.condition !== null
+    && (item.conditionMax ?? 100) > 0
+  ) {
+    const conditionTrack = createElement(
+      document,
+      'span',
+      'p1-item-condition-track',
+    );
+    const conditionFill = createElement(
+      document,
+      'span',
+      'p1-item-condition-fill',
+    );
+    conditionFill.style.width = String(percent(
+      item.condition,
+      item.conditionMax ?? 100,
+    )) + '%';
+    conditionTrack.append(conditionFill);
+    row.append(conditionTrack);
+  }
   if (compact) {
     row.append(createElement(
       document,
@@ -264,9 +286,27 @@ function renderPanel(
           true,
         ));
       }
+      const capacity = panel.capacity;
       root.append(
         list,
         createElement(document, 'div', 'p1-panel-detail', panel.detail),
+        ...(capacity === undefined
+          ? []
+          : [createElement(
+              document,
+              'div',
+              'p1-panel-capacity',
+              'CARRY · '
+                + capacity.weightCurrent.toFixed(1)
+                + '/'
+                + capacity.weightMax.toFixed(1)
+                + ' kg · '
+                + capacity.volumeCurrent.toFixed(1)
+                + '/'
+                + capacity.volumeMax.toFixed(1)
+                + ' u · '
+                + capacity.stateLabel,
+            )]),
         createElement(
           document,
           'div',
@@ -334,8 +374,48 @@ function renderPanel(
       }
 
       panes.append(left, right);
+      const capacityContext = createElement(
+        document,
+        'div',
+        'p1-container-capacity-context',
+      );
+      if (panel.playerCapacity !== undefined) {
+        capacityContext.append(createElement(
+          document,
+          'div',
+          'p1-panel-capacity',
+          'PLAYER · '
+            + panel.playerCapacity.weightCurrent.toFixed(1)
+            + '/'
+            + panel.playerCapacity.weightMax.toFixed(1)
+            + ' kg · '
+            + panel.playerCapacity.volumeCurrent.toFixed(1)
+            + '/'
+            + panel.playerCapacity.volumeMax.toFixed(1)
+            + ' u · '
+            + panel.playerCapacity.stateLabel,
+        ));
+      }
+      if (panel.containerCapacity !== undefined
+        && panel.containerCapacity !== null) {
+        capacityContext.append(createElement(
+          document,
+          'div',
+          'p1-panel-capacity',
+          'STORAGE · '
+            + panel.containerCapacity.weightCurrent.toFixed(1)
+            + '/'
+            + panel.containerCapacity.weightMax.toFixed(1)
+            + ' kg · '
+            + panel.containerCapacity.volumeCurrent.toFixed(1)
+            + '/'
+            + panel.containerCapacity.volumeMax.toFixed(1)
+            + ' u',
+        ));
+      }
       root.append(
         panes,
+        capacityContext,
         createElement(
           document,
           'div',
@@ -358,9 +438,34 @@ function renderPanel(
         row.dataset.state = rowState.state;
 
         const heading = createElement(document, 'div', 'p1-craft-heading');
+        const output = createElement(
+          document,
+          'span',
+          'p1-craft-output',
+        );
+        for (const outputState of rowState.outputs ?? []) {
+          const outputToken = createElement(
+            document,
+            'span',
+            'p1-craft-output-token',
+          );
+          const outputIcon = assetSprite(
+            document,
+            'p1-asset-icon p1-craft-output-icon',
+            itemIconSprite(outputState.name),
+          );
+          if (outputIcon !== null) outputToken.append(outputIcon);
+          outputToken.append(
+            String(outputState.quantity) + '× ' + outputState.name,
+          );
+          output.append(outputToken);
+        }
+        if ((rowState.outputs?.length ?? 0) === 0) {
+          output.append('→ ' + rowState.outputLabel);
+        }
         heading.append(
           createElement(document, 'span', 'p1-craft-name', rowState.name),
-          createElement(document, 'span', 'p1-craft-output', '→ ' + rowState.outputLabel),
+          output,
         );
         row.append(heading);
 
@@ -428,6 +533,74 @@ function renderPanel(
     }
 
     case 'build': {
+      const catalog = createElement(
+        document,
+        'div',
+        'p1-build-catalog',
+      );
+      for (const entry of panel.catalogEntries ?? []) {
+        const row = createElement(
+          document,
+          'div',
+          'p1-build-catalog-entry',
+        );
+        row.dataset.structureId = entry.structureId;
+        row.dataset.selected = String(entry.selected);
+        row.dataset.buildCapState = entry.buildCapState;
+        const iconSource = (() => {
+          switch (entry.structureId) {
+            case 'structure:storage-crate':
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.625] as const;
+            case 'structure:workbench':
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.4167] as const;
+            case 'structure:habitat-room':
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15625] as const;
+            case 'structure:compact-power-unit':
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit, 0.4167] as const;
+            case 'structure:atmospheric-water-condenser':
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.condenser, 0.3125] as const;
+            default:
+              return null;
+          }
+        })();
+        if (iconSource !== null) {
+          const icon = assetSprite(
+            document,
+            'p1-build-catalog-icon',
+            iconSource[0],
+            iconSource[1],
+          );
+          if (icon !== null) row.append(icon);
+        }
+        const copy = createElement(
+          document,
+          'div',
+          'p1-build-catalog-copy',
+        );
+        copy.append(
+          createElement(
+            document,
+            'div',
+            'p1-build-catalog-name',
+            entry.name,
+          ),
+          createElement(
+            document,
+            'div',
+            'p1-build-catalog-kit',
+            entry.sourceKitName
+              + ' ×'
+              + String(entry.availableKitCount)
+              + ' · CAP '
+              + String(entry.builtCount)
+              + '/'
+              + String(entry.buildCap),
+          ),
+        );
+        row.append(copy);
+        catalog.append(row);
+      }
+
       const preview = createElement(document, 'div', 'p1-build-preview');
       preview.dataset.placementState = panel.placementState;
       const pattern = assetSprite(
@@ -447,6 +620,7 @@ function renderPanel(
         panel.placementState,
       ));
       root.append(
+        catalog,
         createElement(document, 'div', 'p1-build-name', panel.selectedStructure),
         createElement(document, 'div', 'p1-build-kit', panel.sourceKitLabel),
         preview,
@@ -481,28 +655,67 @@ function renderPanel(
     }
 
     case 'progression': {
-      const iconRow = createElement(document, 'div', 'p1-progress-icons');
-      for (const index of [0, 1, 2, 3]) {
-        const icon = assetSprite(
-          document,
-          'p1-progression-icon',
-          progressionSprite(index),
-        );
-        if (icon !== null) {
-          iconRow.append(icon);
-        }
-      }
       root.append(
-        iconRow,
         createElement(document, 'div', 'p1-progress-level', panel.levelLabel),
         createElement(document, 'div', 'p1-progress-xp', panel.xpLabel),
-        createElement(document, 'div', 'p1-subtitle', 'SKILLS'),
-        createElement(document, 'div', 'p1-progress-list', panel.skillLabels.join(' · ')),
-        createElement(document, 'div', 'p1-subtitle', 'PROFESSIONS'),
-        createElement(document, 'div', 'p1-progress-list', panel.professionLabels.join(' · ')),
-        createElement(document, 'div', 'p1-subtitle', 'QUESTS'),
-        createElement(document, 'div', 'p1-progress-list', panel.questLabels.join(' · ')),
       );
+      if (panel.rows !== undefined) {
+        const sections = [
+          ['SKILLS', 'skill'],
+          ['PROFESSIONS', 'profession'],
+          ['OBJECTIVES', 'objective'],
+        ] as const;
+        for (const [sectionLabel, kind] of sections) {
+          root.append(createElement(
+            document,
+            'div',
+            'p1-subtitle',
+            sectionLabel,
+          ));
+          const rows = createElement(
+            document,
+            'div',
+            'p1-progression-rows',
+          );
+          for (const rowState of panel.rows.filter(
+            (entry) => entry.kind === kind,
+          )) {
+            const row = createElement(
+              document,
+              'div',
+              'p1-progression-row',
+            );
+            row.dataset.progressionKind = rowState.kind;
+            row.dataset.progressionState = rowState.state;
+            row.dataset.progressionId = rowState.id;
+            const icon = assetSprite(
+              document,
+              'p1-progression-icon',
+              progressionSprite(rowState.iconIndex),
+            );
+            if (icon !== null) row.append(icon);
+            row.append(
+              (rowState.groupLabel === undefined
+                ? ''
+                : rowState.groupLabel + ' · ')
+              + rowState.label
+              + ' · '
+              + rowState.state,
+            );
+            rows.append(row);
+          }
+          root.append(rows);
+        }
+      } else {
+        root.append(
+          createElement(document, 'div', 'p1-subtitle', 'SKILLS'),
+          createElement(document, 'div', 'p1-progress-list', panel.skillLabels.join(' · ')),
+          createElement(document, 'div', 'p1-subtitle', 'PROFESSIONS'),
+          createElement(document, 'div', 'p1-progress-list', panel.professionLabels.join(' · ')),
+          createElement(document, 'div', 'p1-subtitle', 'QUESTS'),
+          createElement(document, 'div', 'p1-progress-list', panel.questLabels.join(' · ')),
+        );
+      }
       return root;
     }
 
@@ -838,7 +1051,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-craft-list{gap:1px;}',
-    '.p1-panel[data-panel-kind="build"]{left:8px;top:60px;width:252px;max-height:250px;transform:none;}',
+    '.p1-panel[data-panel-kind="build"]{left:8px;top:54px;width:204px;max-height:252px;transform:none;padding:6px;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
@@ -849,7 +1062,10 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel[data-panel-kind="inventory"] .p1-item-row{grid-template-columns:24px 1fr;grid-template-rows:24px auto;min-height:48px;}',
     '.p1-panel[data-panel-kind="inventory"] .p1-item-state{grid-column:1/3;font-size:7px;}',
     '.p1-item-icon{width:24px!important;height:24px!important;}',
+    '.p1-item-condition-track{grid-column:1/-1;height:2px;background:#263040;display:block;align-self:end;}',
+    '.p1-item-condition-fill{height:2px;background:#f4f6ef;display:block;}',
     '.p1-item-row[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
+    '.p1-item-row[data-available="false"]{opacity:.55;border-style:dashed;background:#1b2029;}',
     '.p1-container-panes{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
     '.p1-container-pane{border:1px solid #455066;padding:5px;min-height:120px;max-height:190px;overflow-y:auto;}',
     '.p1-craft-row{display:grid;grid-template-columns:1fr;gap:1px;padding:2px 3px;line-height:1.05;}',
@@ -858,16 +1074,37 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-craft-ingredient{display:inline-flex;align-items:center;gap:2px;border:1px solid #455066;padding:0 2px;}',
     '.p1-craft-ingredient[data-sufficient="false"]{border-style:dashed;font-weight:700;}',
     '.p1-craft-ingredient-icon{display:inline-block!important;width:24px!important;height:24px!important;min-width:24px;min-height:24px;flex:0 0 24px;}',
+    '.p1-craft-output{display:inline-flex;gap:3px;align-items:center;}',
+    '.p1-craft-output-token{display:inline-flex;gap:2px;align-items:center;}',
+    '.p1-craft-output-icon{width:24px!important;height:24px!important;}',
     '.p1-craft-station{border:1px solid #778094;padding:0 3px;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
-    '.p1-build-preview{width:96px;height:64px;margin:8px auto;border:2px dashed #fff;display:grid;place-items:center;position:relative;background:rgba(10,14,22,.62);}',
+    '.p1-build-catalog{display:grid;gap:2px;}',
+    '.p1-build-catalog-entry{display:grid;grid-template-columns:22px 1fr;gap:4px;align-items:center;min-height:26px;padding:2px;border:1px solid #455066;}',
+    '.p1-build-catalog-entry[data-selected="true"]{outline:1px solid #fff;background:#253044;}',
+    '.p1-build-catalog-entry[data-build-cap-state="CAP REACHED"]{border-style:double;}',
+    '.p1-build-catalog-icon{display:inline-block;image-rendering:pixelated;align-self:center;justify-self:center;}',
+    '.p1-build-catalog-name{font-weight:700;}',
+    '.p1-build-catalog-kit{font-size:7px;color:#c5ccbd;}',
+    '.p1-build-preview{width:72px;height:36px;margin:3px auto;border:2px dashed #fff;display:grid;place-items:center;position:relative;background:rgba(10,14,22,.62);}',
     '.p1-build-preview-pattern{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);}',
     '.p1-build-preview-label{position:relative;z-index:1;padding:2px 4px;background:rgba(10,14,22,.78);}',
     '.p1-build-preview[data-placement-state="VALID"]{border-style:solid;}',
     '.p1-build-preview[data-placement-state="CONNECTOR"]{outline:2px dotted #fff;}',
     '.p1-panel-detail,.p1-progress-list{margin-top:5px;padding:4px;background:#161e2a;}',
     '.p1-progress-icons,.p1-map-markers{display:flex;align-items:center;gap:4px;margin:3px 0;}',
+    '.p1-progression-rows{display:grid;gap:2px;margin-top:2px;}',
+    '.p1-progression-row{display:flex;align-items:center;gap:4px;padding:2px 3px;border:1px solid #455066;}',
+    '.p1-progression-row[data-progression-state="LOCKED"],.p1-progression-row[data-progression-state="INCOMPLETE"]{border-style:dashed;opacity:.72;}',
+    '.p1-progression-icon{width:16px!important;height:16px!important;}',
+    '.p1-panel-capacity{margin-top:3px;padding:3px 4px;border:1px solid #778094;background:#161e2a;font-variant-numeric:tabular-nums;}',
+    '.p1-container-capacity-context{display:grid;grid-template-columns:1fr 1fr;gap:4px;}',
+    '.p1-equipment-slot{flex-wrap:wrap;}',
+    '.p1-equipment-condition-track{height:2px;background:#263040;display:block;flex:1 0 56px;min-width:40px;}',
+    '.p1-equipment-condition-fill{height:2px;background:#f4f6ef;display:block;}',
+    '.p1-equipment-slot[data-equipment-state="BROKEN"]{outline:1px dashed #fff;}',
+    '.p1-equipment-broken{font-weight:700;}',
     '.p1-panel[data-panel-kind="map"]{width:568px;max-height:318px;padding:6px;}',
     '.p1-panel[data-panel-kind="map"] .p1-panel-title{margin-bottom:3px;}',
     '.p1-spatial-map{position:relative;margin:0 auto 4px;overflow:visible;background:#090d14;border:1px solid #778094;image-rendering:pixelated;}',
@@ -1068,7 +1305,38 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
                 + String(slot.condition)
                 + '/'
                 + String(slot.conditionMax));
+          row.dataset.equipmentState = slot.stateLabel;
           row.append(slot.name + conditionLabel);
+          if (
+            slot.condition !== null
+            && slot.conditionMax !== null
+            && slot.conditionMax > 0
+          ) {
+            const conditionTrack = createElement(
+              this.document,
+              'span',
+              'p1-equipment-condition-track',
+            );
+            const conditionFill = createElement(
+              this.document,
+              'span',
+              'p1-equipment-condition-fill',
+            );
+            conditionFill.style.width = String(percent(
+              slot.condition,
+              slot.conditionMax,
+            )) + '%';
+            conditionTrack.append(conditionFill);
+            row.append(conditionTrack);
+          }
+          if (slot.stateLabel === 'BROKEN') {
+            row.append(createElement(
+              this.document,
+              'span',
+              'p1-equipment-broken',
+              'BROKEN',
+            ));
+          }
         }
         equipment.append(row);
       };

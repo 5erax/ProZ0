@@ -184,6 +184,8 @@ function inventoryItems(
       name: definition.displayName,
       quantity: stack.quantity,
       condition: stack.condition,
+      conditionMax: definition.conditionMax,
+      available: stack.condition !== 0,
       stateLabel: stack.condition === 0 ? 'BROKEN' : null,
     });
   }));
@@ -450,6 +452,13 @@ function inventoryPanel(
             feedback.result.reason ?? 'COMMAND REJECTED',
           )
         : feedback.verb + ' · ' + feedback.target,
+    capacity: Object.freeze({
+      weightCurrent: input.inventory.totalWeightKg,
+      weightMax: PLAYER_MAX_WEIGHT_KG,
+      volumeCurrent: input.inventory.totalVolume,
+      volumeMax: PLAYER_MAX_VOLUME,
+      stateLabel: input.inventory.playerWeightState ?? 'NORMAL',
+    }),
   });
 }
 
@@ -463,6 +472,10 @@ function containerPanel(
   const container = request.container;
   const feedback = input.commandFeedback;
   const quantity = request.quantity ?? 1;
+  const storageDefinition = container.kind === 'storage-crate'
+    ? input.catalog.getAs('structure:storage-crate', 'structure')
+    : null;
+  const storageCapacity = storageDefinition?.container ?? null;
   return Object.freeze({
     kind: 'container',
     title: container.kind === 'death-cache'
@@ -488,6 +501,21 @@ function containerPanel(
             feedback.result.reason ?? 'COMMAND REJECTED',
           )
         : feedback.verb + ' · ' + feedback.target,
+    playerCapacity: Object.freeze({
+      weightCurrent: input.inventory.totalWeightKg,
+      weightMax: PLAYER_MAX_WEIGHT_KG,
+      volumeCurrent: input.inventory.totalVolume,
+      volumeMax: PLAYER_MAX_VOLUME,
+      stateLabel: input.inventory.playerWeightState ?? 'NORMAL',
+    }),
+    containerCapacity: storageCapacity === null
+      ? null
+      : Object.freeze({
+          weightCurrent: container.totalWeightKg,
+          weightMax: storageCapacity.maxWeightKg,
+          volumeCurrent: container.totalVolume,
+          volumeMax: storageCapacity.maxVolume,
+        }),
   });
 }
 
@@ -539,6 +567,27 @@ function recoveryPanel(
   });
 }
 
+function progressionObjectiveLabels(
+  questId: string,
+): readonly string[] {
+  switch (questId) {
+    case 'profession-quest:chart-the-unknown':
+      return Object.freeze([
+        'Locate the Ruin',
+        'Inspect the Ruin',
+        'Return alive to Base',
+      ]);
+    case 'profession-quest:bring-water-online':
+      return Object.freeze([
+        'Build Power + Condenser',
+        'Run the Condenser',
+        'Collect Clean Water',
+      ]);
+    default:
+      return Object.freeze([]);
+  }
+}
+
 function progressionPanel(
   catalog: ContentCatalogV1,
   progression: Readonly<PlayerProgressionView>,
@@ -550,6 +599,60 @@ function progressionPanel(
   const next = definition.levelThresholds.find(
     (threshold) => threshold.level === progression.level + 1,
   );
+  const approvedSkills = Object.freeze([
+    Object.freeze({
+      id: 'skill:fieldcraft-basics' as const,
+      iconIndex: 0,
+    }),
+    Object.freeze({
+      id: 'skill:maintenance-basics' as const,
+      iconIndex: 1,
+    }),
+  ]);
+  const approvedProfessions = Object.freeze([
+    Object.freeze({
+      id: 'profession:explorer-prototype' as const,
+      iconIndex: 2,
+    }),
+    Object.freeze({
+      id: 'profession:engineer-prototype' as const,
+      iconIndex: 3,
+    }),
+  ]);
+  const rows = [
+    ...approvedSkills.map((entry) => Object.freeze({
+      id: entry.id,
+      kind: 'skill' as const,
+      label: itemName(catalog, entry.id),
+      state: progression.skillIds.includes(entry.id)
+        ? 'UNLOCKED' as const
+        : 'LOCKED' as const,
+      iconIndex: entry.iconIndex,
+    })),
+    ...approvedProfessions.map((entry) => Object.freeze({
+      id: entry.id,
+      kind: 'profession' as const,
+      label: itemName(catalog, entry.id),
+      state: progression.professionIds.includes(entry.id)
+        ? 'UNLOCKED' as const
+        : 'LOCKED' as const,
+      iconIndex: entry.iconIndex,
+    })),
+    ...progression.quests.flatMap((quest) => {
+      const groupLabel = itemName(catalog, quest.questId);
+      const labels = progressionObjectiveLabels(quest.questId);
+      return labels.map((label, index) => Object.freeze({
+        id: quest.questId + ':objective:' + String(index + 1),
+        kind: 'objective' as const,
+        label,
+        state: index < quest.completedObjectives
+          ? 'COMPLETE' as const
+          : 'INCOMPLETE' as const,
+        iconIndex: index < quest.completedObjectives ? 4 : 5,
+        groupLabel,
+      }));
+    }),
+  ];
   return Object.freeze({
     kind: 'progression',
     title: 'Progression',
@@ -569,6 +672,7 @@ function progressionPanel(
         return `${name} · ${quest.completedObjectives}/${quest.totalObjectives} · ${quest.status.toUpperCase()}`;
       }),
     ),
+    rows: Object.freeze(rows),
   });
 }
 

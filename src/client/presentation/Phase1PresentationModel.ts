@@ -69,6 +69,8 @@ export interface Phase1InventoryItemPresentation {
   readonly name: string;
   readonly quantity: number;
   readonly condition: number | null;
+  readonly conditionMax?: number | null;
+  readonly available?: boolean;
   readonly stateLabel: string | null;
 }
 
@@ -81,6 +83,14 @@ export interface Phase1InventoryPanelPresentation {
   readonly quantity: number;
   readonly controls: string;
   readonly feedback: string | null;
+  readonly capacity?: Readonly<Phase1CarryPresentation>;
+}
+
+export interface Phase1ContainerCapacityPresentation {
+  readonly weightCurrent: number;
+  readonly weightMax: number;
+  readonly volumeCurrent: number;
+  readonly volumeMax: number;
 }
 
 export interface Phase1ContainerPanelPresentation {
@@ -95,6 +105,8 @@ export interface Phase1ContainerPanelPresentation {
   readonly quantity: number;
   readonly controls: string;
   readonly feedback: string | null;
+  readonly playerCapacity?: Readonly<Phase1CarryPresentation>;
+  readonly containerCapacity?: Readonly<Phase1ContainerCapacityPresentation> | null;
 }
 
 export interface Phase1CraftIngredientPresentation {
@@ -103,10 +115,16 @@ export interface Phase1CraftIngredientPresentation {
   readonly need: number;
 }
 
+export interface Phase1CraftOutputPresentation {
+  readonly name: string;
+  readonly quantity: number;
+}
+
 export interface Phase1CraftRowPresentation {
   readonly id: string;
   readonly name: string;
   readonly outputLabel: string;
+  readonly outputs?: readonly Phase1CraftOutputPresentation[];
   readonly requirementLabel: string;
   readonly ingredients?: readonly Phase1CraftIngredientPresentation[];
   readonly stationLabel?: string | null;
@@ -120,6 +138,17 @@ export interface Phase1CraftPanelPresentation {
   readonly rows: readonly Phase1CraftRowPresentation[];
 }
 
+export interface Phase1BuildCatalogEntryPresentation {
+  readonly structureId: string;
+  readonly name: string;
+  readonly sourceKitName: string;
+  readonly availableKitCount: number;
+  readonly builtCount: number;
+  readonly buildCap: number;
+  readonly buildCapState: 'AVAILABLE' | 'CAP REACHED';
+  readonly selected: boolean;
+}
+
 export interface Phase1BuildPanelPresentation {
   readonly kind: 'build';
   readonly title: string;
@@ -127,6 +156,7 @@ export interface Phase1BuildPanelPresentation {
   readonly sourceKitLabel: string;
   readonly placementState: 'VALID' | 'INVALID' | 'CONNECTOR';
   readonly reason: string | null;
+  readonly catalogEntries?: readonly Phase1BuildCatalogEntryPresentation[];
 }
 
 export interface Phase1MachinePanelPresentation {
@@ -147,6 +177,15 @@ export interface Phase1RecoveryPanelPresentation {
   readonly cacheLabel: string;
 }
 
+export interface Phase1ProgressionRowPresentation {
+  readonly id: string;
+  readonly kind: 'skill' | 'profession' | 'objective';
+  readonly label: string;
+  readonly state: 'UNLOCKED' | 'LOCKED' | 'COMPLETE' | 'INCOMPLETE';
+  readonly iconIndex: number;
+  readonly groupLabel?: string;
+}
+
 export interface Phase1ProgressionPanelPresentation {
   readonly kind: 'progression';
   readonly title: string;
@@ -155,6 +194,7 @@ export interface Phase1ProgressionPanelPresentation {
   readonly skillLabels: readonly string[];
   readonly professionLabels: readonly string[];
   readonly questLabels: readonly string[];
+  readonly rows?: readonly Phase1ProgressionRowPresentation[];
 }
 
 export type Phase1MapDistanceBand = 'NEAR' | 'MID' | 'FAR';
