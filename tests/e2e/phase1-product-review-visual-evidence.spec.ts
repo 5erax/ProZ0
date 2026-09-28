@@ -364,6 +364,54 @@ async function createResourceFocusSave(
   );
 }
 
+async function createWorldReadabilityEvidenceSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  return createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+    async (authority) => {
+      const resource =
+        authority.world.getActiveGeneratedEntities().find(
+          (entity) =>
+            entity.type === 'resource'
+            && entity.definitionId === 'resource:fiber-plant',
+        );
+      if (resource === undefined) {
+        throw new Error(
+          'World readability evidence could not resolve Fiber Plant.',
+        );
+      }
+
+      const runtime = authority.getRuntime('visual-local');
+      runtime.relocatePlayer(
+        Object.freeze({
+          x: resource.position.x - 0.5,
+          y: resource.position.y,
+        }),
+        'E',
+      );
+      await authority.stepSolo();
+
+      runtime.relocatePlayer(
+        Object.freeze({
+          x: resource.position.x / 2,
+          y: resource.position.y / 2,
+        }),
+        'E',
+      );
+      await authority.stepSolo();
+    },
+  );
+}
+
 async function createWorldDropSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -923,9 +971,10 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     'world:p1-polish-002-map-evidence-mid',
     Object.freeze({ x: 100, y: 0 }),
   );
-  const worldReadability = await createResourceFocusSave(
-    'world:p1-polish-002-world-readability',
-  );
+  const worldReadability =
+    await createWorldReadabilityEvidenceSave(
+      'world:p1-polish-002-world-readability',
+    );
   const playerIds = ['visual-local', 'visual-teammate'] as const;
   const files: string[] = [];
 
@@ -1094,9 +1143,6 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
   await expect(
     page.locator('[data-world-role="flora-decor"]').first(),
   ).toHaveAttribute('data-interactive', 'false');
-  await expect(
-    page.locator('[data-world-role="resource"][data-focused-target="true"]'),
-  ).toHaveCount(1);
   await captureProductWorld(
     page,
     'p1-polish-002-world-readability-2x.png',
