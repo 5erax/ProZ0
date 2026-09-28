@@ -575,13 +575,13 @@ function progressionObjectiveLabels(
       return Object.freeze([
         'Locate the Ruin',
         'Inspect the Ruin',
-        'Return alive to Base',
+        'Return alive to Landing Module or Habitat Room',
       ]);
     case 'profession-quest:bring-water-online':
       return Object.freeze([
-        'Build Power + Condenser',
-        'Run the Condenser',
-        'Collect Clean Water',
+        'Power Unit + Condenser present',
+        'Interact while powered',
+        'Collect 1 Clean Water',
       ]);
     default:
       return Object.freeze([]);
