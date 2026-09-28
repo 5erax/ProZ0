@@ -38,7 +38,8 @@ import type {
   Phase1MapUnknownBoundaryCellPresentation,
 } from '../presentation/Phase1PresentationModel';
 
-const MAP_PADDING_CELLS = 3;
+const MAP_VIEW_HALF_WIDTH_CELLS = 40;
+const MAP_VIEW_HALF_HEIGHT_CELLS = 20;
 const ACTIVE_PLAYER_CHUNK_RADIUS = 1;
 
 interface ChunkKnowledge {
@@ -424,37 +425,22 @@ function normalizedSelection(
     : positiveModulo(ordinal, count);
 }
 
-function bounds(
-  explored: readonly Phase1MapExploredCellPresentation[],
-  boundary: readonly Phase1MapUnknownBoundaryCellPresentation[],
-  markers: readonly Phase1MapMarkerPresentation[],
+function playerCenteredBounds(
+  playerWorldX: number,
+  playerWorldY: number,
 ): {
   readonly minCellX: number;
   readonly maxCellX: number;
   readonly minCellY: number;
   readonly maxCellY: number;
 } {
-  const xs = [
-    ...explored.map((cell) => cell.cellX),
-    ...boundary.map((cell) => cell.cellX),
-    ...markers.map((marker) => markerCell(marker.worldX)),
-  ];
-  const ys = [
-    ...explored.map((cell) => cell.cellY),
-    ...boundary.map((cell) => cell.cellY),
-    ...markers.map((marker) => markerCell(marker.worldY)),
-  ];
-
-  const minX = xs.length === 0 ? 0 : Math.min(...xs);
-  const maxX = xs.length === 0 ? 0 : Math.max(...xs);
-  const minY = ys.length === 0 ? 0 : Math.min(...ys);
-  const maxY = ys.length === 0 ? 0 : Math.max(...ys);
-
+  const playerCellX = markerCell(playerWorldX);
+  const playerCellY = markerCell(playerWorldY);
   return Object.freeze({
-    minCellX: minX - MAP_PADDING_CELLS,
-    maxCellX: maxX + MAP_PADDING_CELLS,
-    minCellY: minY - MAP_PADDING_CELLS,
-    maxCellY: maxY + MAP_PADDING_CELLS,
+    minCellX: playerCellX - MAP_VIEW_HALF_WIDTH_CELLS,
+    maxCellX: playerCellX + MAP_VIEW_HALF_WIDTH_CELLS,
+    minCellY: playerCellY - MAP_VIEW_HALF_HEIGHT_CELLS,
+    maxCellY: playerCellY + MAP_VIEW_HALF_HEIGHT_CELLS,
   });
 }
 
@@ -582,7 +568,10 @@ export function projectPhase1ProductReviewMapPanel(
     chunkKnowledge(bundle, motions),
   );
   const boundary = unknownBoundaryCells(explored);
-  const mapBounds = bounds(explored, boundary, markers);
+  const mapBounds = playerCenteredBounds(
+    playerPosition.x,
+    playerPosition.y,
+  );
 
   return Object.freeze({
     kind: 'map',

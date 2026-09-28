@@ -961,6 +961,17 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       'data-map-knowledge',
       'explored-only',
     );
+    const mapCellScale = Number(
+      await field.getAttribute('data-map-cell-scale'),
+    );
+    expect(mapCellScale).toBeGreaterThanOrEqual(3);
+    expect(
+      Number(
+        await field.getAttribute(
+          'data-visible-explored-cell-count',
+        ),
+      ),
+    ).toBeGreaterThan(0);
     await expect(
       field.locator('[data-map-marker-kind="player"]'),
     ).toHaveAttribute('data-map-marker-label', 'YOU');
@@ -970,6 +981,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     await expect(
       field.locator('[data-map-marker-kind="ruin"]'),
     ).toHaveAttribute('data-distance-band', 'FAR');
+    await expect(
+      field.locator('[data-map-marker-kind="ruin"]'),
+    ).toHaveAttribute('data-map-marker-clamped', 'true');
     await expect(
       field.locator('[data-map-marker-kind="death-cache"]'),
     ).toHaveAttribute('data-distance-band', expectedCacheBand);
@@ -1062,6 +1076,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     await expect(initialDetail).toContainText(
       'LANDING MODULE · BASE · NEAR',
     );
+    await expect(
+      page.locator('[data-map-selection-label="BASE"]'),
+    ).toBeVisible();
 
     const scaleFile =
       'p1-polish-002-map-' + String(scale) + 'x.png';
@@ -1072,6 +1089,11 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       await page.keyboard.press('Tab');
       await expect(page.locator('.p1-map-detail'))
         .toContainText('UNINVESTIGATED RUIN · FAR');
+      await expect(
+        page.locator(
+          '[data-map-selection-label="UNINVESTIGATED RUIN"]',
+        ),
+      ).toBeVisible();
       await captureViewport(
         page,
         'p1-polish-002-map-ruin-far-2x.png',
@@ -1082,10 +1104,22 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       await expect(page.locator('.p1-map-detail'))
         .toContainText('DEATH CACHE · NEAR');
 
-      await page.locator('[data-panel-kind="map"]').evaluate(
-        (panel) => {
+      const grayscalePanel = page.locator(
+        '[data-panel-kind="map"]',
+      );
+      await grayscalePanel.evaluate(
+        async (panel) => {
           (panel as HTMLElement).style.filter = 'grayscale(1)';
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => resolve());
+            });
+          });
         },
+      );
+      await expect(grayscalePanel).toHaveCSS(
+        'filter',
+        'grayscale(1)',
       );
       await captureViewport(
         page,
@@ -1229,6 +1263,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       nearMidFarOnlyEligibleTargets: true,
       integerPresentation1x2x3x: true,
       grayscaleEvidence: true,
+      grayscalePaintedFrameVerified: true,
+      remoteMarkersDoNotCompressLocalTerrain: true,
+      selectedOverlapLabel: true,
       baseAnchorWorldEvidence: true,
       decorativeFloraPresentationOnly: true,
       deterministicDecorRevealFixture: true,

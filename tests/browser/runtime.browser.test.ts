@@ -1057,6 +1057,10 @@ describe('Phase 0 browser runtime', () => {
     expect(Number(map?.dataset.exploredCellCount)).toBeGreaterThan(0);
     expect(Number(map?.dataset.unknownBoundaryCount)).toBeGreaterThan(0);
     expect(Number(map?.dataset.mapCellScale) % 1).toBe(0);
+    expect(Number(map?.dataset.mapCellScale)).toBeGreaterThanOrEqual(3);
+    expect(
+      Number(map?.dataset.visibleExploredCellCount),
+    ).toBeGreaterThan(0);
 
     const playerMarker = map?.querySelector<HTMLElement>(
       '[data-map-marker-kind="player"]',
@@ -1071,6 +1075,11 @@ describe('Phase 0 browser runtime', () => {
     expect(baseMarker?.dataset.mapMarkerIndex).toBe('4');
     expect(baseMarker?.dataset.mapMarkerLabel).toBe('BASE');
     expect(baseMarker?.dataset.distanceBand).toBe('NEAR');
+    expect(
+      map?.querySelector<HTMLElement>(
+        '[data-map-selection-label="BASE"]',
+      )?.textContent,
+    ).toBe('BASE');
 
     const teammateMarker = map?.querySelector<HTMLElement>(
       '[data-map-marker-kind="teammate"]',

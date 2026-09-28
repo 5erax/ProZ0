@@ -478,6 +478,21 @@ function renderPanel(
         field.style.width = String(widthCells * cellScale) + 'px';
         field.style.height = String(heightCells * cellScale) + 'px';
 
+        const withinMapBounds = (
+          cellX: number,
+          cellY: number,
+        ): boolean =>
+          cellX >= spatial.minCellX
+          && cellX <= spatial.maxCellX
+          && cellY >= spatial.minCellY
+          && cellY <= spatial.maxCellY;
+
+        const clampPixel = (
+          value: number,
+          minimum: number,
+          maximum: number,
+        ): number => Math.max(minimum, Math.min(maximum, value));
+
         const setCellPosition = (
           element: HTMLElement,
           cellX: number,
@@ -491,7 +506,10 @@ function renderPanel(
           element.style.height = String(cellScale) + 'px';
         };
 
+        let visibleExploredCellCount = 0;
         for (const cell of spatial.exploredCells) {
+          if (!withinMapBounds(cell.cellX, cell.cellY)) continue;
+          visibleExploredCellCount += 1;
           const element = createElement(
             document,
             'div',
@@ -504,7 +522,10 @@ function renderPanel(
           field.append(element);
         }
 
+        let visibleUnknownBoundaryCount = 0;
         for (const cell of spatial.unknownBoundaryCells) {
+          if (!withinMapBounds(cell.cellX, cell.cellY)) continue;
+          visibleUnknownBoundaryCount += 1;
           const element = createElement(
             document,
             'div',
@@ -543,10 +564,25 @@ function renderPanel(
           const markerY =
             markerState.worldY / spatial.cellSizeWorldUnits
             - spatial.minCellY;
-          marker.style.left =
-            String(Math.round(markerX * cellScale)) + 'px';
-          marker.style.top =
-            String(Math.round(markerY * cellScale)) + 'px';
+          const rawMarkerLeft = Math.round(markerX * cellScale);
+          const rawMarkerTop = Math.round(markerY * cellScale);
+          const markerInset = 7;
+          const markerLeft = clampPixel(
+            rawMarkerLeft,
+            markerInset,
+            widthCells * cellScale - markerInset,
+          );
+          const markerTop = clampPixel(
+            rawMarkerTop,
+            markerInset,
+            heightCells * cellScale - markerInset,
+          );
+          const markerClamped =
+            markerLeft !== rawMarkerLeft
+            || markerTop !== rawMarkerTop;
+          marker.dataset.mapMarkerClamped = String(markerClamped);
+          marker.style.left = String(markerLeft) + 'px';
+          marker.style.top = String(markerTop) + 'px';
 
           const icon = assetSprite(
             document,
@@ -569,8 +605,29 @@ function renderPanel(
               ),
             );
           }
+
           field.append(marker);
+          if (markerState.selected) {
+            const selectionLabel = createElement(
+              document,
+              'span',
+              'p1-map-selection-label',
+              markerState.label,
+            );
+            selectionLabel.dataset.mapSelectionLabel =
+              markerState.label;
+            selectionLabel.dataset.mapSelectionKind =
+              markerState.kind;
+            selectionLabel.style.left = String(markerLeft) + 'px';
+            selectionLabel.style.top = String(markerTop) + 'px';
+            field.append(selectionLabel);
+          }
         }
+
+        field.dataset.visibleExploredCellCount =
+          String(visibleExploredCellCount);
+        field.dataset.visibleUnknownBoundaryCount =
+          String(visibleUnknownBoundaryCount);
 
         const legend = createElement(
           document,
@@ -762,6 +819,8 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-map-marker-position[data-map-marker-kind="player"]{z-index:7;outline:2px double #fff;}',
     '.p1-map-marker-position[data-map-marker-kind="base"]{z-index:6;outline:1px solid #fff;}',
     '.p1-map-marker-position[data-selected="true"]{box-shadow:0 0 0 2px #0a0e16,0 0 0 3px #fff;}',
+    '.p1-map-marker-position[data-map-marker-clamped="true"]{outline:1px dashed #c5ccbd;}',
+    '.p1-map-selection-label{position:absolute;z-index:9;transform:translate(8px,-13px);padding:1px 3px;background:#0a0e16;border:1px solid #fff;font-weight:700;white-space:nowrap;text-shadow:none;}',
     '.p1-map-facing-peg{position:absolute;width:2px;height:2px;background:#fff;left:5px;top:-3px;}',
     '.p1-map-marker-position[data-facing="NE"] .p1-map-facing-peg{left:10px;top:-1px;}',
     '.p1-map-marker-position[data-facing="E"] .p1-map-facing-peg{left:13px;top:5px;}',
