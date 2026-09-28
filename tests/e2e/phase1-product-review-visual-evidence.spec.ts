@@ -1424,7 +1424,11 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
         'data-progression-state',
         'INCOMPLETE',
       );
+      await expect(objectives.nth(index)).toBeVisible();
     }
+    expect(await progression.evaluate((panel) =>
+      panel.scrollHeight <= panel.clientHeight,
+    )).toBe(true);
     await expect(page.locator('[data-quest-rail]')).toHaveCount(0);
     const progressionFile =
       'p1-polish-007-progression-objectives-'
@@ -1493,6 +1497,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
         progressionApprovedStateIcons: true,
         progressionLevelEmblemBound: true,
         orderedQuestObjectives: true,
+        allProgressionRowsVisible: true,
         noPersistentQuestRail: true,
         integerPresentation1x2x3x: true,
       },
