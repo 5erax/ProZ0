@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { PHASE1_RESOURCE_IDS } from '../../src/content/Phase1Ids';
+import {
+  phase1ResourcePresentationSprite,
+} from '../../src/client/runtime/Phase1ProductReviewWorldRenderer';
 import {
   PHASE1_PRODUCTION_WORLD_SPRITES,
   PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS,
@@ -50,6 +54,24 @@ describe('Phase 1 integration production visual catalog', () => {
       expect(sprite.sourceWidth % sprite.cellWidth).toBe(0);
       expect(sprite.sourceHeight % sprite.cellHeight).toBe(0);
       expect(sprite.columns).toBe(sprite.sourceWidth / sprite.cellWidth);
+    }
+  });
+
+  it('maps every canonical Phase 1 resource id to a resource presentation instead of ground', () => {
+    for (const resourceId of PHASE1_RESOURCE_IDS) {
+      for (const depleted of [false, true]) {
+        const sprite = phase1ResourcePresentationSprite(
+          resourceId,
+          depleted,
+        );
+        expect(
+          sprite.assetPath,
+          resourceId + ' must never fall through to ground',
+        ).not.toBe(PHASE1_PRODUCTION_WORLD_SPRITES.ground.assetPath);
+        expect(sprite.assetPath).toMatch(
+          /^assets\/phase1\/world\/resources\//,
+        );
+      }
     }
   });
 

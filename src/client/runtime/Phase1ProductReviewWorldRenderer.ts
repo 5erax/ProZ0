@@ -64,6 +64,7 @@ const EMPTY_CONTEXT: Phase1ProductReviewWorldPresentationContext =
     targetedDeathCacheId: null,
     recoveredDeathCache: null,
     buildPreview: null,
+    focusedWorldTargetId: null,
   });
 
 export interface Phase1ProductReviewBuildPreview {
@@ -96,6 +97,7 @@ export interface Phase1ProductReviewWorldPresentationContext {
     | Phase1ProductReviewRecoveredDeathCache
     | null;
   readonly buildPreview: Phase1ProductReviewBuildPreview | null;
+  readonly focusedWorldTargetId: string | null;
 }
 
 function distancePx(
@@ -163,6 +165,43 @@ function setWorldCenter(
   return true;
 }
 
+export function phase1ResourcePresentationSprite(
+  definitionId: string,
+  depleted: boolean,
+): Phase1ProductionSprite {
+  switch (definitionId) {
+    case 'resource:fiber-plant':
+      return resourceNodeSprite(
+        'fiberPlant',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:food-plant':
+      return resourceNodeSprite(
+        'foodPlant',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:timber-source':
+      return resourceNodeSprite(
+        'treeTimber',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:stone-outcrop':
+      return resourceNodeSprite(
+        'stoneOutcrop',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:metal-ore-node':
+      return resourceNodeSprite(
+        'metalOre',
+        depleted ? 'DEPLETED' : 'NORMAL',
+      );
+    case 'resource:potable-water-source':
+      return PHASE1_PRODUCTION_WORLD_SPRITES.potableWater;
+    default:
+      return PHASE1_PRODUCTION_WORLD_SPRITES.ground;
+  }
+}
+
 function entitySprite(
   bundle: Phase1AuthorityBundle,
   entity: Readonly<Phase1GeneratedWorldEntity>,
@@ -176,38 +215,10 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
-      const depleted = state?.depleted === true;
-      switch (entity.definitionId) {
-        case 'resource:fiber-plant':
-          return resourceNodeSprite(
-            'fiberPlant',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:food-plant':
-          return resourceNodeSprite(
-            'foodPlant',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:tree-timber':
-          return resourceNodeSprite(
-            'treeTimber',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:stone-outcrop':
-          return resourceNodeSprite(
-            'stoneOutcrop',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:metal-ore':
-          return resourceNodeSprite(
-            'metalOre',
-            depleted ? 'DEPLETED' : 'NORMAL',
-          );
-        case 'resource:potable-water-source':
-          return PHASE1_PRODUCTION_WORLD_SPRITES.potableWater;
-        default:
-          return PHASE1_PRODUCTION_WORLD_SPRITES.ground;
-      }
+      return phase1ResourcePresentationSprite(
+        entity.definitionId,
+        state?.depleted === true,
+      );
     }
   }
 }
@@ -447,6 +458,8 @@ function styleElement(document: Document): HTMLStyleElement {
     '.p1-product-world{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center;overflow:hidden;pointer-events:none;background:#111821;image-rendering:pixelated;}',
     '.p1-product-sprite,.p1-product-terrain,.p1-product-fog{position:absolute;image-rendering:pixelated;}',
     '.p1-product-player,.p1-product-teammate{z-index:900000!important;}',
+    '.p1-product-player[data-local-player="true"]{filter:drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef);}',
+    '.p1-product-focused-target{outline:1px solid #f4f6ef;outline-offset:1px;box-shadow:0 0 0 1px #111722;}',
     '.p1-product-critical{z-index:890000!important;}',
     '.p1-product-identity{z-index:930000!important;}',
     '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);z-index:910000!important;}',
@@ -537,6 +550,10 @@ export function createPhase1ProductReviewWorldRenderer(
       + (options.className === undefined
         ? ''
         : ' ' + options.className);
+    if (id === getPresentationContext().focusedWorldTargetId) {
+      element.classList.add('p1-product-focused-target');
+      element.dataset.focusedTarget = 'true';
+    }
     element.dataset.worldRole = role;
     element.dataset.worldId = id;
     for (const [key, value] of Object.entries(options.data ?? {})) {
@@ -729,6 +746,7 @@ export function createPhase1ProductReviewWorldRenderer(
         data: Object.freeze({
           actorState: state,
           facing: movement.facing ?? 'S',
+          localPlayer: String(local),
         }),
       },
     );

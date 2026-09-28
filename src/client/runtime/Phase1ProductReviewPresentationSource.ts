@@ -15,6 +15,7 @@ import type {
 } from '../presentation/Phase1PresentationModel';
 import {
   projectPhase1RuntimePresentation,
+  resolvePhase1QuickUseStackId,
   type Phase1AuthoritativeCommandFeedback,
   type Phase1PresentationPanelRequest,
   type Phase1PresentationSource,
@@ -44,6 +45,8 @@ function localCommandResult(
   });
 }
 
+const PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 12;
+
 export class Phase1ProductReviewPresentationSource
   implements Phase1PresentationSource {
   private readonly listeners =
@@ -53,6 +56,7 @@ export class Phase1ProductReviewPresentationSource
     null;
   private interactionOverride: Phase1InteractionPresentation | null = null;
   private commandFeedback: Phase1AuthoritativeCommandFeedback | null = null;
+  private commandFeedbackExpiresAfterAuthorityTick: number | null = null;
   private current: Readonly<Phase1PresentationState>;
 
   public constructor(
@@ -108,6 +112,7 @@ export class Phase1ProductReviewPresentationSource
     readonly operationId: string;
     readonly status: 'committed' | 'rejected';
     readonly reason?: string;
+    readonly inputLabel?: string;
     readonly verb: string;
     readonly target: string;
     readonly panelTargetId?: string | null;
@@ -119,23 +124,46 @@ export class Phase1ProductReviewPresentationSource
         input.status,
         input.reason,
       ),
-      inputLabel: 'E',
+      inputLabel: input.inputLabel ?? 'E',
       verb: input.verb,
       target: input.target,
       ...(input.panelTargetId === undefined
         ? {}
         : { panelTargetId: input.panelTargetId }),
     });
+    this.commandFeedbackExpiresAfterAuthorityTick =
+      this.bundle.authorityTick
+      + PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS;
     this.interactionOverride = null;
     this.refresh();
   }
 
   public clearCommandFeedback(): void {
     this.commandFeedback = null;
+    this.commandFeedbackExpiresAfterAuthorityTick = null;
     this.refresh();
   }
 
+  public resolveQuickUseStackId(): string | null {
+    const inventory = this.bundle.items.getContainerView(
+      'inventory:' + this.playerId,
+    );
+    return resolvePhase1QuickUseStackId(
+      this.bundle.catalog,
+      inventory,
+    );
+  }
+
   public refresh(): void {
+    if (
+      this.commandFeedback !== null
+      && this.commandFeedbackExpiresAfterAuthorityTick !== null
+      && this.bundle.authorityTick
+        > this.commandFeedbackExpiresAfterAuthorityTick
+    ) {
+      this.commandFeedback = null;
+      this.commandFeedbackExpiresAfterAuthorityTick = null;
+    }
     this.current = this.project();
     for (const listener of this.listeners) {
       listener(this.current);
@@ -168,7 +196,7 @@ export class Phase1ProductReviewPresentationSource
       case 'inventory':
         panel = Object.freeze({
           kind: 'inventory',
-          selectedStackId: null,
+          selectedStackId: inventory.stacks[0]?.stackId ?? null,
         });
         break;
       case 'progression':
@@ -191,12 +219,20 @@ export class Phase1ProductReviewPresentationSource
     const equippedStackId =
       equipment.equippedWeaponStackId
       ?? equipment.equippedThermalWrapStackId;
+    const quickUseStackId = resolvePhase1QuickUseStackId(
+      this.bundle.catalog,
+      inventory,
+    );
 
     const projected = projectPhase1RuntimePresentation({
       catalog: this.bundle.catalog,
       survival: this.bundle.survival.getPlayerView(this.playerId),
       inventory,
       equippedStackId,
+      equippedWeaponStackId: equipment.equippedWeaponStackId,
+      equippedThermalWrapStackId:
+        equipment.equippedThermalWrapStackId,
+      quickUseStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
       progression: this.bundle.progression.getPlayerView(this.playerId),
       playerMotions: this.getPlayerMotions(),
@@ -212,8 +248,19 @@ export class Phase1ProductReviewPresentationSource
       return projected;
     }
 
+    const firstActionCue =
+      projected.firstActionCue === null
+      || projected.firstActionCue === undefined
+        ? projected.firstActionCue
+        : this.interactionOverride.state === 'AVAILABLE'
+          && this.interactionOverride.verb === 'GATHER'
+          ? 'FIRST STEP · [E] GATHER · '
+            + this.interactionOverride.target
+          : projected.firstActionCue;
+
     return Object.freeze({
       ...projected,
+      ...(firstActionCue === undefined ? {} : { firstActionCue }),
       interaction: this.interactionOverride,
     });
   }

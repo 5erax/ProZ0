@@ -1,0 +1,19 @@
+{
+  "task_id": "P1-AUD-002",
+  "wav_file_count": 108,
+  "event_id_count": 86,
+  "checks": {
+    "all_86_event_ids_covered": true,
+    "full_scale_clipping_detected": false,
+    "near_silent_below_minus_48_dbfs_detected": false,
+    "loop_edge_jump_above_0_02_detected": false,
+    "predator_attack_windup_seconds": 0.5,
+    "predator_attack_windup_within_approved_0_55_seconds": true
+  },
+  "limitations": [
+    "UNLISTENED: no actual audition performed.",
+    "No in-game masking/ducking validation performed.",
+    "No runtime/source integration performed; explicitly out of scope.",
+    "Waveform/metadata checks are not listening evidence."
+  ]
+}

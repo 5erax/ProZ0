@@ -51,3 +51,7 @@ The shared baseline marker is `CROSS-COMPANY BASELINE ESTABLISHED`.
 Changes to role authority, PM authority, task-lock rules, source-of-truth precedence, or Project Owner escalation boundaries require explicit Project Owner approval before becoming effective.
 
 Normal task routing and delivery decisions do not require Project Owner involvement unless they cross those authority boundaries.
+
+## Versioned operating contracts
+
+Resolve the effective approved pack through [release/adoption](docs/team/ROLE_PACK_RELEASE.md), including an explicitly retained pin; a newer branch or stale main copy does not supersede that decision. The [common execution contract](docs/team/COMMON_EXECUTION_CONTRACT.md) indexes task discovery, dependency checks, handoff/rework and recovery for every role. The [audit and migration](docs/team/CONTRACT_UPGRADE_AUDIT.md) records the 2.1.0 candidate and preserves existing live-task gates. Candidate files are not effective merely because they exist in a PR.

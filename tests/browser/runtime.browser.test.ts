@@ -23,6 +23,30 @@ function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function productReviewAuthorityTick(runtime: RuntimeHandle): number {
+  const productReviewRuntime = runtime as RuntimeHandle & {
+    getAuthorityTick?: () => number;
+  };
+  if (productReviewRuntime.getAuthorityTick === undefined) {
+    throw new Error('Expected a Product Review authority runtime handle.');
+  }
+  return productReviewRuntime.getAuthorityTick();
+}
+
+async function waitPastProductReviewFeedbackLifetime(
+  runtime: RuntimeHandle,
+  feedbackStartTick: number,
+): Promise<void> {
+  const minimumExpiredTick = feedbackStartTick + 13;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (productReviewAuthorityTick(runtime) >= minimumExpiredTick) return;
+    await wait(10);
+  }
+  throw new Error(
+    'Product Review authority did not advance past command feedback lifetime.',
+  );
+}
+
 describe('Phase 0 browser runtime', () => {
   let handle: RuntimeHandle | null = null;
   let root: HTMLElement | null = null;
@@ -619,13 +643,79 @@ describe('Phase 0 browser runtime', () => {
       code: 'KeyV',
       cancelable: true,
     }));
+    expect(
+      root.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+    ).toContain('[V] CONSUME · Consumable');
     await wait(20);
 
     const warning =
       root.querySelector<HTMLElement>('.p1-toast[data-toast-kind="warning"]');
     expect(warning).not.toBeNull();
     expect(warning?.textContent).toContain('SOURCE MISSING');
-    expect(warning?.textContent).toContain('Consumable');
+    expect(warning?.textContent).toContain('[V] CONSUME · Consumable');
+  });
+
+  it('keeps Product Review command feedback observable but bounded', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-input-feedback',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+
+    const assertFeedbackLifetime = async (
+      code: 'KeyQ' | 'KeyT' | 'KeyV',
+      expected: RegExp,
+    ): Promise<void> => {
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code,
+        cancelable: true,
+      }));
+      const feedbackStartTick = productReviewAuthorityTick(handle!);
+
+      await wait(20);
+      expect(
+        root?.querySelector<HTMLElement>('.p1-toast')?.textContent,
+      ).toMatch(expected);
+      expect(
+        root?.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+      ).toMatch(/^\[E\] /);
+
+      await waitPastProductReviewFeedbackLifetime(
+        handle!,
+        feedbackStartTick,
+      );
+      await wait(20);
+
+      expect(
+        root?.querySelector<HTMLElement>('.p1-toast')?.textContent ?? '',
+      ).not.toMatch(expected);
+      expect(
+        root?.querySelector<HTMLElement>('.p1-interaction-main')?.textContent,
+      ).toMatch(/^\[E\] /);
+    };
+
+    await assertFeedbackLifetime(
+      'KeyQ',
+      /\[Q\] (EQUIP|UNEQUIP) · Basic Spear/,
+    );
+    await assertFeedbackLifetime(
+      'KeyT',
+      /\[T\] (EQUIP|UNEQUIP) · Thermal Wrap/,
+    );
+    await assertFeedbackLifetime(
+      'KeyV',
+      /\[V\] CONSUME · Consumable/,
+    );
   });
 
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
