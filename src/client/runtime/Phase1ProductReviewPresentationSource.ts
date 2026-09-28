@@ -6,6 +6,10 @@ import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
 import type {
+  ContainerView,
+  ItemStackState,
+} from '../../simulation';
+import type {
   Phase1InteractionPresentation,
   Phase1PanelPresentation,
   Phase1PresentationState,
@@ -58,6 +62,10 @@ export class Phase1ProductReviewPresentationSource
   private commandFeedback: Phase1AuthoritativeCommandFeedback | null = null;
   private commandFeedbackExpiresAfterAuthorityTick: number | null = null;
   private mapDetailOrdinal = 0;
+  private inventorySelectedStackId: string | null = null;
+  private storageSelectedStackId: string | null = null;
+  private inventoryActivePane: 'player' | 'storage' = 'player';
+  private inventoryQuantity = 1;
   private current: Readonly<Phase1PresentationState>;
 
   public constructor(
@@ -103,7 +111,110 @@ export class Phase1ProductReviewPresentationSource
     if (opening && panel === 'map') {
       this.mapDetailOrdinal = 0;
     }
+    if (opening && panel === 'inventory') {
+      this.inventoryActivePane = 'player';
+      this.inventoryQuantity = 1;
+    }
     this.refresh();
+  }
+
+  public isInventoryOpen(): boolean {
+    return this.panel === 'inventory';
+  }
+
+  public cycleInventorySelection(step: number): boolean {
+    if (this.panel !== 'inventory') return false;
+    const state = this.resolveInventoryState();
+    const source = this.inventoryActivePane === 'storage'
+      ? state.storage
+      : state.inventory;
+    if (source === null || source.stacks.length === 0) return false;
+
+    const selectedId = this.inventoryActivePane === 'storage'
+      ? this.storageSelectedStackId
+      : this.inventorySelectedStackId;
+    const currentIndex = Math.max(
+      0,
+      source.stacks.findIndex((stack) => stack.stackId === selectedId),
+    );
+    const nextIndex =
+      ((currentIndex + step) % source.stacks.length
+        + source.stacks.length)
+      % source.stacks.length;
+    const nextId = source.stacks[nextIndex]?.stackId ?? null;
+    if (this.inventoryActivePane === 'storage') {
+      this.storageSelectedStackId = nextId;
+    } else {
+      this.inventorySelectedStackId = nextId;
+    }
+    this.inventoryQuantity = 1;
+    this.refresh();
+    return true;
+  }
+
+  public cycleInventoryPane(): boolean {
+    if (this.panel !== 'inventory') return false;
+    const state = this.resolveInventoryState();
+    if (state.storage === null) return false;
+    this.inventoryActivePane =
+      this.inventoryActivePane === 'player' ? 'storage' : 'player';
+    this.inventoryQuantity = 1;
+    this.refresh();
+    return true;
+  }
+
+  public adjustInventoryQuantity(step: number): boolean {
+    if (this.panel !== 'inventory') return false;
+    const selection = this.getInventoryActionSelection();
+    if (selection.stack === null) return false;
+    this.inventoryQuantity = Math.max(
+      1,
+      Math.min(
+        selection.stack.quantity,
+        this.inventoryQuantity + step,
+      ),
+    );
+    this.refresh();
+    return true;
+  }
+
+  public getInventoryActionSelection(): Readonly<{
+    pane: 'player' | 'storage';
+    inventory: Readonly<ContainerView>;
+    storage: Readonly<ContainerView> | null;
+    source: Readonly<ContainerView>;
+    target: Readonly<ContainerView> | null;
+    stack: Readonly<ItemStackState> | null;
+    quantity: number;
+  }> {
+    const state = this.resolveInventoryState();
+    const pane = this.inventoryActivePane;
+    const sourceContainer =
+      pane === 'storage' && state.storage !== null
+        ? state.storage
+        : state.inventory;
+    const targetContainer =
+      pane === 'storage'
+        ? state.inventory
+        : state.storage;
+    const selectedId = pane === 'storage'
+      ? this.storageSelectedStackId
+      : this.inventorySelectedStackId;
+    const stack = sourceContainer.stacks.find(
+      (candidate) => candidate.stackId === selectedId,
+    ) ?? null;
+    const quantity = stack === null
+      ? 1
+      : Math.max(1, Math.min(this.inventoryQuantity, stack.quantity));
+    return Object.freeze({
+      pane,
+      inventory: state.inventory,
+      storage: state.storage,
+      source: sourceContainer,
+      target: targetContainer,
+      stack,
+      quantity,
+    });
   }
 
   public cycleMapDetail(step: number): boolean {
@@ -182,6 +293,80 @@ export class Phase1ProductReviewPresentationSource
     }
   }
 
+  private accessibleStorage(): Readonly<ContainerView> | null {
+    const structure = this.bundle.buildings
+      .exportSnapshot()
+      .foothold.structures
+      .filter((candidate) =>
+        candidate.definitionId === 'structure:storage-crate'
+        && candidate.containerId !== null
+        && this.bundle.buildings.isStructureAccessible(
+          this.playerId,
+          candidate.structureId,
+        ),
+      )
+      .sort((left, right) =>
+        left.structureId.localeCompare(right.structureId),
+      )[0];
+    if (structure?.containerId === null || structure === undefined) {
+      return null;
+    }
+    return this.bundle.items.getContainerView(structure.containerId);
+  }
+
+  private resolveInventoryState(): Readonly<{
+    inventory: Readonly<ContainerView>;
+    storage: Readonly<ContainerView> | null;
+  }> {
+    const inventory = this.bundle.items.getContainerView(
+      'inventory:' + this.playerId,
+    );
+    const storage = this.accessibleStorage();
+
+    if (
+      this.inventorySelectedStackId === null
+      || !inventory.stacks.some(
+        (stack) => stack.stackId === this.inventorySelectedStackId,
+      )
+    ) {
+      this.inventorySelectedStackId =
+        inventory.stacks[0]?.stackId ?? null;
+    }
+
+    if (
+      storage === null
+      || this.storageSelectedStackId === null
+      || !storage.stacks.some(
+        (stack) => stack.stackId === this.storageSelectedStackId,
+      )
+    ) {
+      this.storageSelectedStackId =
+        storage?.stacks[0]?.stackId ?? null;
+    }
+
+    if (storage === null && this.inventoryActivePane === 'storage') {
+      this.inventoryActivePane = 'player';
+    }
+
+    const active = this.inventoryActivePane === 'storage'
+      ? storage
+      : inventory;
+    const selectedId = this.inventoryActivePane === 'storage'
+      ? this.storageSelectedStackId
+      : this.inventorySelectedStackId;
+    const selected = active?.stacks.find(
+      (stack) => stack.stackId === selectedId,
+    );
+    this.inventoryQuantity = selected === undefined
+      ? 1
+      : Math.max(
+          1,
+          Math.min(this.inventoryQuantity, selected.quantity),
+        );
+
+    return Object.freeze({ inventory, storage });
+  }
+
   private project(): Readonly<Phase1PresentationState> {
     const inventory = this.bundle.items.getContainerView(
       'inventory:' + this.playerId,
@@ -190,12 +375,26 @@ export class Phase1ProductReviewPresentationSource
     let panel: Phase1PresentationPanelRequest | null = null;
     let spatialMapPanel: Readonly<Phase1PanelPresentation> | null = null;
     switch (this.panel) {
-      case 'inventory':
-        panel = Object.freeze({
-          kind: 'inventory',
-          selectedStackId: inventory.stacks[0]?.stackId ?? null,
-        });
+      case 'inventory': {
+        const inventoryState = this.resolveInventoryState();
+        if (inventoryState.storage === null) {
+          panel = Object.freeze({
+            kind: 'inventory',
+            selectedStackId: this.inventorySelectedStackId,
+            quantity: this.inventoryQuantity,
+          });
+        } else {
+          panel = Object.freeze({
+            kind: 'container',
+            container: inventoryState.storage,
+            selectedPlayerStackId: this.inventorySelectedStackId,
+            selectedContainerStackId: this.storageSelectedStackId,
+            activePane: this.inventoryActivePane,
+            quantity: this.inventoryQuantity,
+          });
+        }
         break;
+      }
       case 'progression':
         panel = Object.freeze({ kind: 'progression' });
         break;

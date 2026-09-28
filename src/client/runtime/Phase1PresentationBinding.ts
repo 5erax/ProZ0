@@ -54,10 +54,15 @@ export type Phase1PresentationPanelRequest =
   | {
       readonly kind: 'inventory';
       readonly selectedStackId?: string | null;
+      readonly quantity?: number;
     }
   | {
       readonly kind: 'container';
       readonly container: Readonly<ContainerView>;
+      readonly selectedPlayerStackId?: string | null;
+      readonly selectedContainerStackId?: string | null;
+      readonly activePane?: 'player' | 'storage';
+      readonly quantity?: number;
     }
   | {
       readonly kind: 'machine';
@@ -328,6 +333,8 @@ function commandToasts(
     'CONSUME',
     'EQUIP',
     'UNEQUIP',
+    'DROP',
+    'TRANSFER',
     'ATTACK',
   ]);
   if (!toastVerbs.has(feedback.verb)) return Object.freeze([]);
@@ -415,6 +422,7 @@ function teammates(
 function inventoryPanel(
   input: Phase1RuntimePresentationInput,
   selectedStackId: string | null,
+  quantity: number,
 ): Phase1InventoryPanelPresentation {
   const selected = input.inventory.stacks.find(
     (entry) => entry.stackId === selectedStackId,
@@ -422,6 +430,7 @@ function inventoryPanel(
   const selectedDefinition = selected === undefined
     ? null
     : input.catalog.getAs(selected.itemDefinitionId, 'item');
+  const feedback = input.commandFeedback;
   return Object.freeze({
     kind: 'inventory',
     title: 'Inventory',
@@ -430,25 +439,55 @@ function inventoryPanel(
     detail: selected === undefined || selectedDefinition === null
       ? `Weight ${input.inventory.totalWeightKg.toFixed(1)} / ${PLAYER_MAX_WEIGHT_KG} kg · Volume ${input.inventory.totalVolume.toFixed(1)} / ${PLAYER_MAX_VOLUME}`
       : `${selectedDefinition.displayName} · qty ${selected.quantity}${selected.condition === null ? '' : ` · condition ${selected.condition}/${selectedDefinition.conditionMax ?? 100}`}`,
+    quantity,
+    controls:
+      '↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY '
+      + String(quantity),
+    feedback: feedback === null || feedback === undefined
+      ? null
+      : feedback.result.status === 'rejected'
+        ? phase1FailureReasonLabel(
+            feedback.result.reason ?? 'COMMAND REJECTED',
+          )
+        : feedback.verb + ' · ' + feedback.target,
   });
 }
 
 function containerPanel(
   input: Phase1RuntimePresentationInput,
-  container: Readonly<ContainerView>,
+  request: Extract<
+    Phase1PresentationPanelRequest,
+    { readonly kind: 'container' }
+  >,
 ): Phase1ContainerPanelPresentation {
-  const result = input.commandFeedback?.result;
+  const container = request.container;
+  const feedback = input.commandFeedback;
+  const quantity = request.quantity ?? 1;
   return Object.freeze({
     kind: 'container',
-    title: container.kind === 'death-cache' ? 'Death Cache' : 'Container',
+    title: container.kind === 'death-cache'
+      ? 'Death Cache'
+      : 'Inventory / Storage',
     playerItems: inventoryItems(input.catalog, input.inventory),
     containerItems: inventoryItems(input.catalog, container),
     containerLabel: container.kind === 'storage-crate'
-      ? `${container.totalWeightKg.toFixed(1)} kg · ${container.totalVolume.toFixed(1)} u`
+      ? `STORAGE · ${container.totalWeightKg.toFixed(1)} kg · ${container.totalVolume.toFixed(1)} u`
       : container.kind.replaceAll('-', ' ').toUpperCase(),
-    feedback: result?.status === 'rejected'
-      ? phase1FailureReasonLabel(result.reason ?? 'COMMAND REJECTED')
-      : null,
+    selectedPlayerItemId: request.selectedPlayerStackId ?? null,
+    selectedContainerItemId: request.selectedContainerStackId ?? null,
+    activePane: request.activePane ?? 'player',
+    quantity,
+    controls:
+      '↑/↓ SELECT · TAB PANE · [/] QTY '
+      + String(quantity)
+      + ' · ENTER TRANSFER · V USE · X EQUIP · G DROP',
+    feedback: feedback === null || feedback === undefined
+      ? null
+      : feedback.result.status === 'rejected'
+        ? phase1FailureReasonLabel(
+            feedback.result.reason ?? 'COMMAND REJECTED',
+          )
+        : feedback.verb + ' · ' + feedback.target,
   });
 }
 
@@ -624,10 +663,14 @@ function panel(
   let projected: Phase1PanelPresentation;
   switch (request.kind) {
     case 'inventory':
-      projected = inventoryPanel(input, request.selectedStackId ?? null);
+      projected = inventoryPanel(
+        input,
+        request.selectedStackId ?? null,
+        request.quantity ?? 1,
+      );
       break;
     case 'container':
-      projected = containerPanel(input, request.container);
+      projected = containerPanel(input, request);
       break;
     case 'machine':
       projected = machinePanel(request, input.commandFeedback);

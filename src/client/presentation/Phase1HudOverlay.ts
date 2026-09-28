@@ -253,6 +253,8 @@ function renderPanel(
 
   switch (panel.kind) {
     case 'inventory': {
+      root.dataset.inventoryActivePane = 'player';
+      root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
       for (const item of panel.items) {
         list.append(itemRow(
@@ -262,26 +264,75 @@ function renderPanel(
           true,
         ));
       }
-      root.append(list, createElement(document, 'div', 'p1-panel-detail', panel.detail));
+      root.append(
+        list,
+        createElement(document, 'div', 'p1-panel-detail', panel.detail),
+        createElement(
+          document,
+          'div',
+          'p1-inventory-controls',
+          panel.controls,
+        ),
+      );
+      if (panel.feedback !== null) {
+        root.append(
+          createElement(
+            document,
+            'div',
+            'p1-feedback',
+            panel.feedback,
+          ),
+        );
+      }
       return root;
     }
 
     case 'container': {
+      root.dataset.inventoryActivePane = panel.activePane;
+      root.dataset.inventoryQuantity = String(panel.quantity);
       const panes = createElement(document, 'div', 'p1-container-panes');
-      const left = createElement(document, 'div', 'p1-container-pane');
+      const left = createElement(
+        document,
+        'div',
+        'p1-container-pane',
+      );
+      left.dataset.inventoryPane = 'player';
+      left.dataset.active = String(panel.activePane === 'player');
       left.append(createElement(document, 'div', 'p1-subtitle', 'PLAYER'));
       for (const item of panel.playerItems) {
-        left.append(itemRow(document, item, false));
+        left.append(itemRow(
+          document,
+          item,
+          item.id === panel.selectedPlayerItemId,
+        ));
       }
 
-      const right = createElement(document, 'div', 'p1-container-pane');
+      const right = createElement(
+        document,
+        'div',
+        'p1-container-pane',
+      );
+      right.dataset.inventoryPane = 'storage';
+      right.dataset.active = String(panel.activePane === 'storage');
       right.append(createElement(document, 'div', 'p1-subtitle', panel.containerLabel));
       for (const item of panel.containerItems) {
-        right.append(itemRow(document, item, false));
+        right.append(itemRow(
+          document,
+          item,
+          item.id === panel.selectedContainerItemId,
+        ));
       }
 
       panes.append(left, right);
-      root.append(panes);
+      root.append(
+        panes,
+        createElement(
+          document,
+          'div',
+          'p1-inventory-controls',
+          panel.controls,
+        ),
+      );
       if (panel.feedback !== null) {
         const feedback = createElement(document, 'div', 'p1-feedback', panel.feedback);
         feedback.dataset.feedback = panel.feedback;
