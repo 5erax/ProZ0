@@ -1094,7 +1094,9 @@ export async function createPhase1ProductReviewRuntime(
       verb: 'CONSUME',
       target: targetName,
     });
-    refreshContextInteraction();
+    queueMicrotask(() => {
+      if (!destroyed) refreshContextInteraction();
+    });
   };
 
   const beginConsume = (): void => {
@@ -1401,7 +1403,9 @@ export async function createPhase1ProductReviewRuntime(
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
       target: 'Basic Spear',
     });
-    refreshContextInteraction();
+    queueMicrotask(() => {
+      if (!destroyed) refreshContextInteraction();
+    });
   };
 
   const toggleThermalWrap = (): void => {
@@ -1429,7 +1433,9 @@ export async function createPhase1ProductReviewRuntime(
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
       target: 'Thermal Wrap',
     });
-    refreshContextInteraction();
+    queueMicrotask(() => {
+      if (!destroyed) refreshContextInteraction();
+    });
   };
 
   const attackPredator = (): void => {
