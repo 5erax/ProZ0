@@ -1105,6 +1105,7 @@ export async function createPhase1ProductReviewRuntime(
   const beginConsumeStack = (
     stackId: string | null,
     inputLabel: string,
+    missingTargetLabel: string,
   ): void => {
     if (activeConsume !== null) {
       bundle.survival.cancelConsume(config.localPlayerId);
@@ -1121,7 +1122,7 @@ export async function createPhase1ProductReviewRuntime(
         );
     const operationId = nextOperationId('consume');
     const targetName = stack === undefined
-      ? 'Selected item'
+      ? missingTargetLabel
       : bundle.catalog.get(stack.itemDefinitionId).displayName;
     const start = bundle.survival.beginConsume({
       operationId,
@@ -1134,7 +1135,11 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginConsume = (): void => {
-    beginConsumeStack(source.resolveQuickUseStackId(), 'V');
+    beginConsumeStack(
+      source.resolveQuickUseStackId(),
+      'V',
+      'Consumable',
+    );
   };
 
   const updateConsume = (
@@ -1473,7 +1478,11 @@ export async function createPhase1ProductReviewRuntime(
       presentInventoryGuard('V', 'CONSUME', 'TARGET_UNAVAILABLE');
       return;
     }
-    beginConsumeStack(selection.stack?.stackId ?? null, 'V');
+    beginConsumeStack(
+      selection.stack?.stackId ?? null,
+      'V',
+      'Selected item',
+    );
   };
 
   const toggleSelectedEquipment = (inputLabel: string): void => {
