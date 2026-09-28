@@ -74,7 +74,16 @@ export interface HostedBaselineProvider {
     playerId: PlayerId,
     aggregates: readonly RevisionedAggregateViewV1[],
   ): readonly RevisionedAggregateViewV1[];
+  isVisibleToPlayer?(
+    playerId: PlayerId,
+    aggregate: RevisionedAggregateViewV1,
+  ): boolean;
   stateDigest?(): string;
+}
+
+export interface HostedDrainTickLifecycle {
+  prepareAuthorityTick(authorityTick: number): Promise<void>;
+  completeAuthorityTick(authorityTick: number): Promise<void>;
 }
 
 export interface ServerAuthorityHostOptions {
@@ -83,6 +92,7 @@ export interface ServerAuthorityHostOptions {
   readonly commandDispatcher: HostedCommandDispatcher;
   readonly persistence: HostedPersistencePort;
   readonly baselineProvider?: HostedBaselineProvider;
+  readonly drainTickLifecycle?: HostedDrainTickLifecycle;
   readonly initialDurabilityCheckpoint?: DurabilityCheckpointV1 | null;
 }
 
@@ -505,7 +515,24 @@ export class ServerAuthorityHost {
     if (!this.replication.publish(view)) {
       return Object.freeze([]);
     }
-    return this.broadcastReady('AGGREGATE_UPDATE', asJson(view));
+    const visible = this.options.baselineProvider?.isVisibleToPlayer;
+    return Object.freeze(
+      this.session.getReadyConnections()
+        .filter(
+          (connection) =>
+            visible?.(connection.playerId, view) ?? true,
+        )
+        .map((connection) =>
+          this.envelope(
+            connection.transportId,
+            'AGGREGATE_UPDATE',
+            asJson(view),
+          ),
+        )
+        .filter(
+          (entry): entry is HostedOutboundMessage => entry !== null,
+        ),
+    );
   }
 
   public requireResync(
@@ -528,34 +555,67 @@ export class ServerAuthorityHost {
   }
 
   public authorityCheckpoint(): readonly HostedOutboundMessage[] {
-    const checkpoint: AuthorityCheckpointV1 = Object.freeze({
-      authorityTick: this.authorityTick,
-      aggregateRevisions: this.replication.revisionRefs(),
-      ...(this.options.baselineProvider?.stateDigest === undefined
-        ? {}
-        : { stateDigest: this.options.baselineProvider.stateDigest() }),
-    });
-    return this.broadcastReady(
-      'AUTHORITY_CHECKPOINT',
-      asJson(checkpoint),
+    return Object.freeze(
+      this.session.getReadyConnections()
+        .map((connection) => {
+          const checkpoint: AuthorityCheckpointV1 = Object.freeze({
+            authorityTick: this.authorityTick,
+            aggregateRevisions: Object.freeze(
+              this.visibleAggregatesForPlayer(connection.playerId)
+                .map((view) => Object.freeze({
+                  aggregateType: view.aggregateType,
+                  aggregateId: view.aggregateId,
+                  revision: view.revision,
+                })),
+            ),
+            ...(this.options.baselineProvider?.stateDigest === undefined
+              ? {}
+              : { stateDigest: this.options.baselineProvider.stateDigest() }),
+          });
+          return this.envelope(
+            connection.transportId,
+            'AUTHORITY_CHECKPOINT',
+            asJson(checkpoint),
+          );
+        })
+        .filter(
+          (entry): entry is HostedOutboundMessage => entry !== null,
+        ),
     );
   }
 
-  public async drainSaveAndClose(): Promise<
-    readonly HostedOutboundMessage[]
-  > {
+  public beginDrain(): boolean {
     this.session.beginDraining();
     for (const connection of this.session.getLiveConnections()) {
       const runtime = this.runtimes.get(connection.playerId);
       runtime?.submitInput(connection.playerId, NEUTRAL_PLAYER_INPUT);
     }
+    return this.commandQueue.length > 0;
+  }
 
-    const drained: HostedOutboundMessage[] = [];
-    if (this.commandQueue.length > 0) {
-      this.advanceAuthorityTick();
-      drained.push(...this.resolveAcceptedCommands());
+  public drainQueuedCommandTick(): readonly HostedOutboundMessage[] {
+    if (this.session.getState() !== 'DRAINING') {
+      throw new Error(
+        'Hosted queued-command drain tick requires DRAINING state.',
+      );
+    }
+    if (this.commandQueue.length === 0) {
+      return Object.freeze([]);
+    }
+    this.advanceAuthorityTick();
+    return this.resolveAcceptedCommands();
+  }
+
+  public async saveAndCloseAfterDrain(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    if (this.session.getState() !== 'DRAINING') {
+      throw new Error(
+        'Hosted persistence may begin only after command drain starts.',
+      );
     }
 
+    const drained: HostedOutboundMessage[] = [];
     for (
       const operationId
       of this.options.commandDispatcher.cancelAllPending?.() ?? []
@@ -607,6 +667,26 @@ export class ServerAuthorityHost {
       this.session.fail();
       return Object.freeze([...drained, ...final]);
     }
+  }
+
+  public async drainSaveAndClose(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    const drained: HostedOutboundMessage[] = [];
+    const needsCommandTick = this.beginDrain();
+    if (needsCommandTick) {
+      const nextTick = this.authorityTick + 1;
+      const lifecycle = this.options.drainTickLifecycle;
+      if (lifecycle === undefined) {
+        drained.push(...this.drainQueuedCommandTick());
+      } else {
+        await lifecycle.prepareAuthorityTick(nextTick);
+        drained.push(...this.drainQueuedCommandTick());
+        await lifecycle.completeAuthorityTick(nextTick);
+      }
+    }
+    drained.push(...await this.saveAndCloseAfterDrain());
+    return Object.freeze(drained);
   }
 
   public diagnostics() {
@@ -825,11 +905,7 @@ export class ServerAuthorityHost {
     }
 
     for (const update of domain.aggregateUpdates ?? []) {
-      if (!this.replication.publish(update)) continue;
-      outbound.push(...this.broadcastReady(
-        'AGGREGATE_UPDATE',
-        asJson(update),
-      ));
+      outbound.push(...this.publishAggregate(update));
     }
 
     return Object.freeze(outbound);
@@ -880,15 +956,29 @@ export class ServerAuthorityHost {
     return Object.freeze([]);
   }
 
+  private visibleAggregatesForPlayer(
+    playerId: PlayerId,
+  ): readonly RevisionedAggregateViewV1[] {
+    const allAggregates = this.replication.baseline();
+    const visible = this.options.baselineProvider?.isVisibleToPlayer;
+    return visible === undefined
+      ? allAggregates
+      : Object.freeze(
+          allAggregates.filter((aggregate) =>
+            visible(playerId, aggregate),
+          ),
+        );
+  }
+
   private buildBaseline(
     playerId: PlayerId,
     snapshotId: string,
   ): BaselineSnapshotV1 {
-    const allAggregates = this.replication.baseline();
+    const visibleAggregates = this.visibleAggregatesForPlayer(playerId);
     const aggregates = this.options.baselineProvider?.filterForPlayer?.(
       playerId,
-      allAggregates,
-    ) ?? allAggregates;
+      visibleAggregates,
+    ) ?? visibleAggregates;
     const players = [...this.runtimes].map(([id, runtime]) => {
       const snapshot = runtime.getSnapshot();
       return Object.freeze({
@@ -961,21 +1051,6 @@ export class ServerAuthorityHost {
     return envelope === null
       ? null
       : Object.freeze({ transportId, envelope });
-  }
-
-  private broadcastReady(
-    messageType: Parameters<HostedSession['nextServerEnvelope']>[1],
-    payload: JsonValue,
-  ): readonly HostedOutboundMessage[] {
-    return Object.freeze(
-      this.session.getReadyConnections()
-        .map((connection) =>
-          this.envelope(connection.transportId, messageType, payload),
-        )
-        .filter(
-          (entry): entry is HostedOutboundMessage => entry !== null,
-        ),
-    );
   }
 
   private broadcastLive(

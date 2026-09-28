@@ -580,7 +580,7 @@ describe('Phase 1 hosted vertical-slice composition', () => {
       expect(composition.host.diagnostics().pendingDomainCommandCount)
         .toBe(1);
 
-      const drained = await composition.host.drainSaveAndClose();
+      const drained = await composition.drainSaveAndClose();
       expect(composition.host.getSessionState()).toBe('CLOSED');
       expect(composition.host.diagnostics().pendingDomainCommandCount)
         .toBe(0);

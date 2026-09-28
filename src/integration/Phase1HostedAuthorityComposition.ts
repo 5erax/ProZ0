@@ -34,10 +34,103 @@ function capacityPlayerIds(maxPlayers: number): readonly string[] {
   );
 }
 
+function aggregateVisibleToPlayer(
+  playerId: string,
+  view: RevisionedAggregateViewV1,
+): boolean {
+  if (
+    view.aggregateType === 'container'
+    && view.aggregateId.startsWith('inventory:')
+  ) {
+    return view.aggregateId === 'inventory:' + playerId;
+  }
+  return true;
+}
+
 function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
+
+  for (const container of bundle.items.exportLedgerSnapshot().containers) {
+    values.push(Object.freeze({
+      aggregateType: 'container',
+      aggregateId: container.containerId,
+      revision: container.revision,
+      tombstone: false,
+      state: asJson({
+        kind: container.kind,
+        ownerPlayerId: container.ownerPlayerId,
+        stacks: container.stacks.map((stack) => ({
+          stackId: stack.stackId,
+          itemDefinitionId: stack.itemDefinitionId,
+          quantity: stack.quantity,
+          condition: stack.condition,
+        })),
+      }),
+    }));
+  }
+
+  const building = bundle.buildings.exportSnapshot().foothold;
+  values.push(Object.freeze({
+    aggregateType: 'foothold',
+    aggregateId: building.footholdId,
+    revision: building.buildRevision,
+    tombstone: false,
+    state: asJson({
+      structureIds: building.structures.map((entry) => entry.structureId),
+      connections: building.connections.map((entry) => ({
+        connectionId: entry.connectionId,
+        a: entry.a,
+        b: entry.b,
+      })),
+    }),
+  }));
+  values.push(Object.freeze({
+    aggregateType: 'power-network',
+    aggregateId: building.footholdId,
+    revision: building.power.revision,
+    tombstone: false,
+    state: asJson({
+      producerStructureId: building.power.producerStructureId,
+      capacityPu: building.power.capacityPu,
+      grantedConsumerIds: [...building.power.grantedConsumerIds],
+    }),
+  }));
+
+  for (const structure of building.structures) {
+    values.push(Object.freeze({
+      aggregateType: 'structure',
+      aggregateId: structure.structureId,
+      revision: structure.revision,
+      tombstone: false,
+      state: asJson({
+        definitionId: structure.definitionId,
+        position: {
+          x: structure.position.x,
+          y: structure.position.y,
+        },
+        orientationQuarterTurns: structure.orientationQuarterTurns,
+        placedByPlayerId: structure.placedByPlayerId,
+        containerId: structure.containerId,
+      }),
+    }));
+  }
+
+  for (const condenser of building.condensers) {
+    values.push(Object.freeze({
+      aggregateType: 'condenser',
+      aggregateId: condenser.structureId,
+      revision: condenser.revision,
+      tombstone: false,
+      state: asJson({
+        enabled: condenser.enabled,
+        productionProgressTicks: condenser.productionProgressTicks,
+        completedCycleOrdinal: condenser.completedCycleOrdinal,
+        outputContainerId: condenser.outputContainerId,
+      }),
+    }));
+  }
 
   for (const view of bundle.world.getActiveChunkViews()) {
     values.push(Object.freeze({
@@ -49,6 +142,20 @@ function aggregateViews(
         words: [...view.delta.exploration.words],
       }),
     }));
+
+    for (const resource of view.delta.resourceStates) {
+      values.push(Object.freeze({
+        aggregateType: 'resource',
+        aggregateId: resource.resourceEntityId,
+        revision: resource.revision,
+        tombstone: false,
+        state: asJson({
+          remainingGatherActions: resource.remainingGatherActions,
+          depleted: resource.depleted,
+          regenerationReadyTick: resource.regenerationReadyTick,
+        }),
+      }));
+    }
 
     for (const ruin of view.delta.ruinStates) {
       values.push(Object.freeze({
@@ -279,6 +386,17 @@ export class Phase1HostedAuthorityComposition {
       },
       commandDispatcher: dispatcher,
       persistence: config.persistence,
+      baselineProvider: {
+        isVisibleToPlayer: aggregateVisibleToPlayer,
+      },
+      drainTickLifecycle: {
+        prepareAuthorityTick(authorityTick) {
+          return bundle.prepareAuthorityTick(authorityTick);
+        },
+        completeAuthorityTick(authorityTick) {
+          return bundle.completeAuthorityTick(authorityTick);
+        },
+      },
       ...(config.reopen === undefined
         ? {}
         : {
@@ -302,7 +420,20 @@ export class Phase1HostedAuthorityComposition {
     await this.bundle.prepareAuthorityTick(nextTick);
     const outbound: HostedOutboundMessage[] = [...this.host.step()];
     await this.bundle.completeAuthorityTick(nextTick);
+    this.resolveCompletedGatherCommands(outbound);
+    outbound.push(...this.publishSharedState());
+    return Object.freeze(outbound);
+  }
 
+  public async drainSaveAndClose(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    return this.host.drainSaveAndClose();
+  }
+
+  private resolveCompletedGatherCommands(
+    outbound: HostedOutboundMessage[],
+  ): void {
     for (const playerId of this.bundle.getActivePlayerIds()) {
       const gather = this.bundle.getLastGatherResult(playerId);
       if (gather === null || gather.status === 'idle'
@@ -341,9 +472,6 @@ export class Phase1HostedAuthorityComposition {
             }),
       ));
     }
-
-    outbound.push(...this.publishSharedState());
-    return Object.freeze(outbound);
   }
 
   public publishSharedState(): readonly HostedOutboundMessage[] {
