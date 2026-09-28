@@ -455,6 +455,65 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
         'structure-instance:landing-module',
       );
 
+      const checkpoints = composition.host.authorityCheckpoint();
+      const firstCheckpoint = checkpoints.find(
+        (entry) => entry.transportId === first.transportId,
+      )?.envelope.payload as unknown as {
+        readonly aggregateRevisions: readonly {
+          readonly aggregateType: string;
+          readonly aggregateId: string;
+          readonly revision: number;
+        }[];
+      } | undefined;
+      const secondCheckpoint = checkpoints.find(
+        (entry) => entry.transportId === second.transportId,
+      )?.envelope.payload as unknown as {
+        readonly aggregateRevisions: readonly {
+          readonly aggregateType: string;
+          readonly aggregateId: string;
+          readonly revision: number;
+        }[];
+      } | undefined;
+      if (firstCheckpoint === undefined || secondCheckpoint === undefined) {
+        throw new Error('Expected per-client authority checkpoints.');
+      }
+      expect(firstCheckpoint.aggregateRevisions).toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'container',
+          aggregateId: firstInventoryId,
+        }),
+      );
+      expect(firstCheckpoint.aggregateRevisions).not.toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'container',
+          aggregateId: secondInventoryId,
+        }),
+      );
+      expect(secondCheckpoint.aggregateRevisions).toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'container',
+          aggregateId: secondInventoryId,
+        }),
+      );
+      expect(secondCheckpoint.aggregateRevisions).not.toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'container',
+          aggregateId: firstInventoryId,
+        }),
+      );
+      expect(firstCheckpoint.aggregateRevisions).toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'foothold',
+          aggregateId: 'foothold:landing',
+        }),
+      );
+      expect(secondCheckpoint.aggregateRevisions).toContainEqual(
+        expect.objectContaining({
+          aggregateType: 'foothold',
+          aggregateId: 'foothold:landing',
+        }),
+      );
+
       const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
         'resource:fiber-plant',
       );

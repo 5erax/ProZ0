@@ -555,16 +555,32 @@ export class ServerAuthorityHost {
   }
 
   public authorityCheckpoint(): readonly HostedOutboundMessage[] {
-    const checkpoint: AuthorityCheckpointV1 = Object.freeze({
-      authorityTick: this.authorityTick,
-      aggregateRevisions: this.replication.revisionRefs(),
-      ...(this.options.baselineProvider?.stateDigest === undefined
-        ? {}
-        : { stateDigest: this.options.baselineProvider.stateDigest() }),
-    });
-    return this.broadcastReady(
-      'AUTHORITY_CHECKPOINT',
-      asJson(checkpoint),
+    return Object.freeze(
+      this.session.getReadyConnections()
+        .map((connection) => {
+          const checkpoint: AuthorityCheckpointV1 = Object.freeze({
+            authorityTick: this.authorityTick,
+            aggregateRevisions: Object.freeze(
+              this.visibleAggregatesForPlayer(connection.playerId)
+                .map((view) => Object.freeze({
+                  aggregateType: view.aggregateType,
+                  aggregateId: view.aggregateId,
+                  revision: view.revision,
+                })),
+            ),
+            ...(this.options.baselineProvider?.stateDigest === undefined
+              ? {}
+              : { stateDigest: this.options.baselineProvider.stateDigest() }),
+          });
+          return this.envelope(
+            connection.transportId,
+            'AUTHORITY_CHECKPOINT',
+            asJson(checkpoint),
+          );
+        })
+        .filter(
+          (entry): entry is HostedOutboundMessage => entry !== null,
+        ),
     );
   }
 
@@ -940,17 +956,25 @@ export class ServerAuthorityHost {
     return Object.freeze([]);
   }
 
+  private visibleAggregatesForPlayer(
+    playerId: PlayerId,
+  ): readonly RevisionedAggregateViewV1[] {
+    const allAggregates = this.replication.baseline();
+    const visible = this.options.baselineProvider?.isVisibleToPlayer;
+    return visible === undefined
+      ? allAggregates
+      : Object.freeze(
+          allAggregates.filter((aggregate) =>
+            visible(playerId, aggregate),
+          ),
+        );
+  }
+
   private buildBaseline(
     playerId: PlayerId,
     snapshotId: string,
   ): BaselineSnapshotV1 {
-    const allAggregates = this.replication.baseline();
-    const visible = this.options.baselineProvider?.isVisibleToPlayer;
-    const visibleAggregates = visible === undefined
-      ? allAggregates
-      : allAggregates.filter((aggregate) =>
-          visible(playerId, aggregate),
-        );
+    const visibleAggregates = this.visibleAggregatesForPlayer(playerId);
     const aggregates = this.options.baselineProvider?.filterForPlayer?.(
       playerId,
       visibleAggregates,
