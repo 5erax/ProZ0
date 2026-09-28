@@ -1454,9 +1454,6 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
-  const selectedInventoryAction = () =>
-    source.getInventoryActionSelection();
-
   const presentInventoryGuard = (
     inputLabel: string,
     verb: string,
@@ -1472,8 +1469,25 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const selectedInventoryAction = (
+    inputLabel: string,
+    verb: string,
+  ) => {
+    const selection = source.getInventoryActionSelection();
+    if (selection.normalizedDuringLookup) {
+      presentInventoryGuard(
+        inputLabel,
+        verb,
+        'SOURCE_MISSING',
+      );
+      return null;
+    }
+    return selection;
+  };
+
   const beginSelectedConsume = (): void => {
-    const selection = selectedInventoryAction();
+    const selection = selectedInventoryAction('V', 'CONSUME');
+    if (selection === null) return;
     if (selection.pane !== 'player') {
       presentInventoryGuard('V', 'CONSUME', 'TARGET_UNAVAILABLE');
       return;
@@ -1486,7 +1500,8 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const toggleSelectedEquipment = (inputLabel: string): void => {
-    const selection = selectedInventoryAction();
+    const selection = selectedInventoryAction(inputLabel, 'EQUIP');
+    if (selection === null) return;
     if (selection.pane !== 'player' || selection.stack === null) {
       presentInventoryGuard(inputLabel, 'EQUIP', 'SOURCE_MISSING');
       return;
@@ -1541,7 +1556,8 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const dropSelectedInventoryQuantity = (): void => {
-    const selection = selectedInventoryAction();
+    const selection = selectedInventoryAction('G', 'DROP');
+    if (selection === null) return;
     if (selection.pane !== 'player' || selection.stack === null) {
       presentInventoryGuard('G', 'DROP', 'SOURCE_MISSING');
       return;
@@ -1576,7 +1592,8 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const transferSelectedInventoryQuantity = (): void => {
-    const selection = selectedInventoryAction();
+    const selection = selectedInventoryAction('ENTER', 'TRANSFER');
+    if (selection === null) return;
     if (
       selection.storage === null
       || selection.target === null
