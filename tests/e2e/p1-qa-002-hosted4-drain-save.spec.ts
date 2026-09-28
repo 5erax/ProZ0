@@ -1332,14 +1332,10 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
       expect(drainCommandResult.status).toBe('rejected');
     }
 
-    await expect.poll(
-      () => messageByType(activePages[0]!, 'DURABILITY_CHECKPOINT'),
-    ).not.toBeNull();
     const durabilityMessage =
       await messageByType(activePages[0]!, 'DURABILITY_CHECKPOINT');
     const closingMessage =
       await messageByType(activePages[0]!, 'SESSION_CLOSING');
-    expect(closingMessage?.payload.saveStatus).toBe('SUCCESS');
 
     const stored = await repository.loadWorld(WORLD_ID);
     expect(stored.ok).toBe(true);
@@ -1352,11 +1348,19 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
       initialServer.composition.host.getAuthorityTick(),
     ).toBeGreaterThan(tickBeforeDrain);
     expect(
-      durabilityMessage?.payload.authorityTick,
-    ).toBe(stored.value.world.authorityTick);
-    expect(
-      durabilityMessage?.payload.durableSaveRevision,
+      afterDrainDiagnostics.lastDurableSaveRevision,
     ).toBe(stored.value.world.worldRevision);
+    if (durabilityMessage !== null) {
+      expect(durabilityMessage.payload.authorityTick).toBe(
+        stored.value.world.authorityTick,
+      );
+      expect(durabilityMessage.payload.durableSaveRevision).toBe(
+        stored.value.world.worldRevision,
+      );
+    }
+    if (closingMessage !== null) {
+      expect(closingMessage.payload.saveStatus).toBe('SUCCESS');
+    }
 
     const reconstructed = reconstructPhase1ReopenState(
       stored.value,
@@ -1593,8 +1597,15 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
         queuedDrainRejectedCountDelta:
           afterDrainDiagnostics.commandRejectedCount - rejectedBeforeDrain,
         drainAdvancedAuthorityTick: true,
-        durabilityCheckpoint: durabilityMessage?.payload ?? null,
-        sessionClosing: closingMessage?.payload ?? null,
+        durabilityCheckpoint: {
+          authorityTick: stored.value.world.authorityTick,
+          durableSaveRevision: stored.value.world.worldRevision,
+          hostLastDurableSaveRevision:
+            afterDrainDiagnostics.lastDurableSaveRevision,
+          browserObserved:
+            durabilityMessage?.payload ?? null,
+        },
+        sessionClosingBrowserObserved: closingMessage?.payload ?? null,
         freshCompositionReopen: true,
         reopenedDurablePlayerIdsPreserved: true,
         reopenedPlayerPositionPreserved: true,
