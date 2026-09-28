@@ -41,7 +41,7 @@ export function createPhase1ProductReviewSaveControl(
 
   const box = document.createElement('div');
   box.className = 'p1-product-save-box';
-  box.textContent = 'S · SAVE WORLD';
+  box.textContent = 'L · SAVE WORLD';
   layer.append(box);
   root.append(layer);
 
@@ -51,7 +51,7 @@ export function createPhase1ProductReviewSaveControl(
   const helpRow = document.createElement('div');
   helpRow.className = 'p1-product-controls-row';
   helpRow.dataset.productReviewSaveHelp = 'true';
-  helpRow.textContent = 'S · SAVE WORLD';
+  helpRow.textContent = 'L · SAVE WORLD';
   helpPanel?.append(helpRow);
 
   let destroyed = false;
@@ -88,7 +88,7 @@ export function createPhase1ProductReviewSaveControl(
     clearTimer = setTimeout(() => {
       clearTimer = null;
       if (destroyed || pending) return;
-      setState('idle', 'S · SAVE WORLD');
+      setState('idle', 'L · SAVE WORLD');
     }, delayMs);
   };
 
@@ -125,7 +125,7 @@ export function createPhase1ProductReviewSaveControl(
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (event.repeat || event.code !== 'KeyS') return;
+    if (event.repeat || event.code !== 'KeyL') return;
     event.preventDefault();
     void triggerSave();
   };

@@ -513,7 +513,7 @@ describe('Phase 0 browser runtime', () => {
     }
   });
 
-  it('exposes local SAVE WORLD, ignores duplicate pending activation, and reopens the latest successful checkpoint', async () => {
+  it('exposes local SAVE WORLD, keeps S movement-only, and reopens the latest successful checkpoint', async () => {
     const databaseName = 'proz0-test-product-review-save-world';
     await deleteIndexedDbSaveDatabase(databaseName);
 
@@ -537,7 +537,7 @@ describe('Phase 0 browser runtime', () => {
         '[data-product-review-save="local-authority"]',
       );
       expect(saveControl?.dataset.saveState).toBe('idle');
-      expect(saveControl?.textContent).toContain('S · SAVE WORLD');
+      expect(saveControl?.textContent).toContain('L · SAVE WORLD');
 
       document.dispatchEvent(new KeyboardEvent('keydown', {
         code: 'KeyH',
@@ -546,11 +546,38 @@ describe('Phase 0 browser runtime', () => {
       expect(
         root.querySelector<HTMLElement>('[data-product-review-save-help]')
           ?.textContent,
-      ).toBe('S · SAVE WORLD');
+      ).toBe('L · SAVE WORLD');
       document.dispatchEvent(new KeyboardEvent('keydown', {
         code: 'KeyH',
         cancelable: true,
       }));
+
+      const movementCanvas =
+        root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+      const initialY = Number(movementCanvas?.dataset.playerY);
+      document.dispatchEvent(new KeyboardEvent('keydown', {
+        code: 'KeyS',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(140);
+      document.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyS',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(30);
+
+      expect(Number(movementCanvas?.dataset.playerY))
+        .toBeGreaterThan(initialY);
+      expect(
+        root.querySelector<HTMLElement>('[data-product-review-save]')
+          ?.dataset.saveState,
+      ).toBe('idle');
+
+      current.destroy();
+      current = await bootPersistedPhase1ProductReview(root, config);
+      expect(current.reopened).toBe(false);
 
       const canvas =
         root.querySelector<HTMLCanvasElement>('#proz0-canvas');
@@ -568,9 +595,12 @@ describe('Phase 0 browser runtime', () => {
       const firstSavedX = Number(canvas?.dataset.playerX);
       expect(firstSavedX).toBeGreaterThan(initialX);
 
+      const beforeSaveX = Number(canvas?.dataset.playerX);
+      const beforeSaveY = Number(canvas?.dataset.playerY);
       document.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyS',
+        code: 'KeyL',
         cancelable: true,
+        bubbles: true,
       }));
       expect(
         root.querySelector<HTMLElement>('[data-product-review-save]')
@@ -582,10 +612,20 @@ describe('Phase 0 browser runtime', () => {
       ).toContain('Saving…');
 
       document.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyS',
+        code: 'KeyL',
         cancelable: true,
+        bubbles: true,
       }));
       await waitForSaveState(root, 'success');
+      document.dispatchEvent(new KeyboardEvent('keyup', {
+        code: 'KeyL',
+        cancelable: true,
+        bubbles: true,
+      }));
+      await wait(30);
+
+      expect(Number(canvas?.dataset.playerX)).toBeCloseTo(beforeSaveX, 6);
+      expect(Number(canvas?.dataset.playerY)).toBeCloseTo(beforeSaveY, 6);
       expect(
         root.querySelector<HTMLElement>('[data-product-review-save]')
           ?.textContent,
@@ -635,7 +675,7 @@ describe('Phase 0 browser runtime', () => {
       expect(secondSavedX).toBeGreaterThan(firstSavedX);
 
       document.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyS',
+        code: 'KeyL',
         cancelable: true,
       }));
       await waitForSaveState(root, 'success');
@@ -690,7 +730,7 @@ describe('Phase 0 browser runtime', () => {
       const durableX = Number(canvas?.dataset.playerX);
 
       document.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyS',
+        code: 'KeyL',
         cancelable: true,
       }));
       await waitForSaveState(root, 'success');
@@ -730,7 +770,7 @@ describe('Phase 0 browser runtime', () => {
       };
 
       document.dispatchEvent(new KeyboardEvent('keydown', {
-        code: 'KeyS',
+        code: 'KeyL',
         cancelable: true,
       }));
       const failed = await waitForSaveState(root, 'failure');
