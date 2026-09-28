@@ -1014,6 +1014,83 @@ describe('Phase 0 browser runtime', () => {
     );
   });
 
+  it('projects Product Review map from explored knowledge without resource scanning', async () => {
+    root = document.createElement('div');
+    document.body.append(root);
+
+    handle = await bootProZ0(root, {
+      mode: 'phase1-product-review',
+      config: {
+        worldId: 'world:browser-product-review-spatial-map',
+        worldSeed: 'p1-world-golden',
+        playerIds: ['browser-player', 'browser-teammate'],
+        localPlayerId: 'browser-player',
+        interactionRangeWorldUnits: 21,
+        spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0,
+      },
+    });
+    await wait(80);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyM',
+      cancelable: true,
+    }));
+    await wait(30);
+
+    const map = root.querySelector<HTMLElement>(
+      '[data-panel-kind="map"] [data-map-spatial="true"]',
+    );
+    expect(map).not.toBeNull();
+    expect(map?.dataset.mapKnowledge).toBe('explored-only');
+    expect(Number(map?.dataset.exploredCellCount)).toBeGreaterThan(0);
+    expect(Number(map?.dataset.unknownBoundaryCount)).toBeGreaterThan(0);
+    expect(Number(map?.dataset.mapCellScale) % 1).toBe(0);
+
+    const playerMarker = map?.querySelector<HTMLElement>(
+      '[data-map-marker-kind="player"]',
+    );
+    expect(playerMarker?.dataset.mapMarkerIndex).toBe('0');
+    expect(playerMarker?.dataset.mapMarkerLabel).toBe('YOU');
+    expect(playerMarker?.dataset.facing).not.toBe('');
+
+    const baseMarker = map?.querySelector<HTMLElement>(
+      '[data-map-marker-kind="base"]',
+    );
+    expect(baseMarker?.dataset.mapMarkerIndex).toBe('4');
+    expect(baseMarker?.dataset.mapMarkerLabel).toBe('BASE');
+    expect(baseMarker?.dataset.distanceBand).toBe('NEAR');
+
+    const teammateMarker = map?.querySelector<HTMLElement>(
+      '[data-map-marker-kind="teammate"]',
+    );
+    expect(teammateMarker).not.toBeNull();
+    expect(teammateMarker?.dataset.distanceBand).toBeUndefined();
+
+    expect(
+      map?.querySelector('[data-map-marker-kind="resource"]'),
+    ).toBeNull();
+    expect(map?.textContent).not.toMatch(
+      /Fiber|Food Plant|Timber|Stone|Metal Ore|Water Source/,
+    );
+
+    const explored = map?.querySelector<HTMLElement>(
+      '[data-map-cell-state="EXPLORED"]',
+    );
+    expect(explored?.dataset.terrainState).toMatch(/ground|water/);
+
+    const unknownBoundary = map?.querySelector<HTMLElement>(
+      '[data-map-cell-state="UNKNOWN_BOUNDARY"]',
+    );
+    expect(unknownBoundary?.dataset.hiddenDetail).toBe('opaque');
+    expect(unknownBoundary?.dataset.terrainState).toBeUndefined();
+
+    expect(
+      root.querySelector<HTMLElement>('.p1-map-detail')
+        ?.textContent,
+    ).toContain('LANDING MODULE · BASE · NEAR');
+  });
+
   it('fails closed when Product Review gameplay tuning is not approved', async () => {
     root = document.createElement('div');
     document.body.append(root);

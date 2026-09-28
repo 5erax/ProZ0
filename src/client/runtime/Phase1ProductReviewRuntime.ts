@@ -1534,6 +1534,8 @@ export async function createPhase1ProductReviewRuntime(
         if (actionPanel === 'build') {
           event.preventDefault();
           cycleBuildDefinition(event.shiftKey ? -1 : 1);
+        } else if (source.cycleMapDetail(event.shiftKey ? -1 : 1)) {
+          event.preventDefault();
         }
         break;
       case 'KeyR':

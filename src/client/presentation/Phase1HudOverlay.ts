@@ -446,6 +446,207 @@ function renderPanel(
     }
 
     case 'map': {
+      if (panel.spatial !== undefined) {
+        const spatial = panel.spatial;
+        const widthCells =
+          spatial.maxCellX - spatial.minCellX + 1;
+        const heightCells =
+          spatial.maxCellY - spatial.minCellY + 1;
+        const cellScale = Math.max(
+          1,
+          Math.min(
+            4,
+            Math.floor(Math.min(
+              500 / Math.max(1, widthCells),
+              190 / Math.max(1, heightCells),
+            )),
+          ),
+        );
+        const field = createElement(
+          document,
+          'div',
+          'p1-spatial-map',
+        );
+        field.dataset.mapSpatial = 'true';
+        field.dataset.mapKnowledge =
+          spatial.knowledgePolicy.toLowerCase().replace('_', '-');
+        field.dataset.mapCellScale = String(cellScale);
+        field.dataset.exploredCellCount =
+          String(spatial.exploredCells.length);
+        field.dataset.unknownBoundaryCount =
+          String(spatial.unknownBoundaryCells.length);
+        field.style.width = String(widthCells * cellScale) + 'px';
+        field.style.height = String(heightCells * cellScale) + 'px';
+
+        const setCellPosition = (
+          element: HTMLElement,
+          cellX: number,
+          cellY: number,
+        ): void => {
+          element.style.left =
+            String((cellX - spatial.minCellX) * cellScale) + 'px';
+          element.style.top =
+            String((cellY - spatial.minCellY) * cellScale) + 'px';
+          element.style.width = String(cellScale) + 'px';
+          element.style.height = String(cellScale) + 'px';
+        };
+
+        for (const cell of spatial.exploredCells) {
+          const element = createElement(
+            document,
+            'div',
+            'p1-map-cell p1-map-cell-' + cell.terrain,
+          );
+          element.dataset.mapCellState = 'EXPLORED';
+          element.dataset.terrainState = cell.terrain;
+          element.dataset.mapMotif = cell.motif;
+          setCellPosition(element, cell.cellX, cell.cellY);
+          field.append(element);
+        }
+
+        for (const cell of spatial.unknownBoundaryCells) {
+          const element = createElement(
+            document,
+            'div',
+            'p1-map-unknown-boundary',
+          );
+          element.dataset.mapCellState = 'UNKNOWN_BOUNDARY';
+          element.dataset.hiddenDetail = 'opaque';
+          setCellPosition(element, cell.cellX, cell.cellY);
+          field.append(element);
+        }
+
+        for (const markerState of spatial.markers) {
+          const marker = createElement(
+            document,
+            'div',
+            'p1-map-marker-position',
+          );
+          marker.dataset.mapMarkerKind = markerState.kind;
+          marker.dataset.mapMarkerLabel = markerState.label;
+          marker.dataset.mapMarkerIndex =
+            String(markerState.atlasIndex);
+          marker.dataset.selected = String(markerState.selected);
+          marker.dataset.facing = markerState.facing ?? '';
+          if (markerState.identitySlot !== null) {
+            marker.dataset.presentationIdentitySlot =
+              markerState.identitySlot;
+          }
+          if (markerState.distanceBand !== null) {
+            marker.dataset.distanceBand =
+              markerState.distanceBand;
+          }
+
+          const markerX =
+            markerState.worldX / spatial.cellSizeWorldUnits
+            - spatial.minCellX;
+          const markerY =
+            markerState.worldY / spatial.cellSizeWorldUnits
+            - spatial.minCellY;
+          marker.style.left =
+            String(Math.round(markerX * cellScale)) + 'px';
+          marker.style.top =
+            String(Math.round(markerY * cellScale)) + 'px';
+
+          const icon = assetSprite(
+            document,
+            'p1-map-marker',
+            mapMarkerSprite(markerState.atlasIndex),
+          );
+          if (icon !== null) {
+            marker.append(icon);
+          }
+
+          if (
+            markerState.kind === 'player'
+            && markerState.facing !== null
+          ) {
+            marker.append(
+              createElement(
+                document,
+                'span',
+                'p1-map-facing-peg',
+              ),
+            );
+          }
+          field.append(marker);
+        }
+
+        const legend = createElement(
+          document,
+          'div',
+          'p1-map-legend',
+        );
+        const seenLegend = new Set<string>();
+        for (const markerState of spatial.markers) {
+          const key =
+            markerState.kind + ':' + markerState.label;
+          if (seenLegend.has(key)) continue;
+          seenLegend.add(key);
+          const entry = createElement(
+            document,
+            'span',
+            'p1-map-legend-entry',
+          );
+          const icon = assetSprite(
+            document,
+            'p1-map-legend-marker',
+            mapMarkerSprite(markerState.atlasIndex),
+          );
+          if (icon !== null) entry.append(icon);
+          entry.append(
+            createElement(
+              document,
+              'span',
+              'p1-map-legend-label',
+              markerState.label,
+            ),
+          );
+          legend.append(entry);
+        }
+
+        root.append(
+          field,
+          legend,
+          createElement(
+            document,
+            'div',
+            'p1-map-fog',
+            panel.fogLabel,
+          ),
+        );
+        if (
+          spatial.selectedDetailLabel !== null
+          && spatial.selectedDistanceBand !== null
+        ) {
+          const detail = createElement(
+            document,
+            'div',
+            'p1-map-detail',
+            'DETAIL · '
+              + spatial.selectedDetailLabel
+              + ' · '
+              + spatial.selectedDistanceBand,
+          );
+          detail.dataset.distanceBand =
+            spatial.selectedDistanceBand;
+          detail.dataset.selectionMode =
+            'read-only-marker-detail';
+          root.append(detail);
+        }
+        if (spatial.selectableTargetCount > 1) {
+          root.append(
+            createElement(
+              document,
+              'div',
+              'p1-map-cycle-hint',
+              'TAB · MARKER DETAIL',
+            ),
+          );
+        }
+        return root;
+      }
+
       const mapMarkers = createElement(document, 'div', 'p1-map-markers');
       for (const index of [0, 4, 5, 6]) {
         const icon = assetSprite(
@@ -549,6 +750,33 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-build-preview[data-placement-state="CONNECTOR"]{outline:2px dotted #fff;}',
     '.p1-panel-detail,.p1-progress-list{margin-top:5px;padding:4px;background:#161e2a;}',
     '.p1-progress-icons,.p1-map-markers{display:flex;align-items:center;gap:4px;margin:3px 0;}',
+    '.p1-panel[data-panel-kind="map"]{width:568px;max-height:318px;padding:6px;}',
+    '.p1-panel[data-panel-kind="map"] .p1-panel-title{margin-bottom:3px;}',
+    '.p1-spatial-map{position:relative;margin:0 auto 4px;overflow:visible;background:#090d14;border:1px solid #778094;image-rendering:pixelated;}',
+    '.p1-map-cell,.p1-map-unknown-boundary{position:absolute;}',
+    '.p1-map-cell-ground{background:#53634d;}',
+    '.p1-map-cell-ground[data-map-motif="flora"]{box-shadow:inset 0 0 0 1px #7b8769;}',
+    '.p1-map-cell-water{background:#354b62;box-shadow:inset 0 0 0 1px #91a7aa;}',
+    '.p1-map-unknown-boundary{background:#161c26;box-shadow:inset 0 0 0 1px #2d3544;}',
+    '.p1-map-marker-position{position:absolute;width:12px;height:12px;transform:translate(-6px,-6px);z-index:4;}',
+    '.p1-map-marker-position[data-map-marker-kind="player"]{z-index:7;outline:2px double #fff;}',
+    '.p1-map-marker-position[data-map-marker-kind="base"]{z-index:6;outline:1px solid #fff;}',
+    '.p1-map-marker-position[data-selected="true"]{box-shadow:0 0 0 2px #0a0e16,0 0 0 3px #fff;}',
+    '.p1-map-facing-peg{position:absolute;width:2px;height:2px;background:#fff;left:5px;top:-3px;}',
+    '.p1-map-marker-position[data-facing="NE"] .p1-map-facing-peg{left:10px;top:-1px;}',
+    '.p1-map-marker-position[data-facing="E"] .p1-map-facing-peg{left:13px;top:5px;}',
+    '.p1-map-marker-position[data-facing="SE"] .p1-map-facing-peg{left:10px;top:10px;}',
+    '.p1-map-marker-position[data-facing="S"] .p1-map-facing-peg{left:5px;top:13px;}',
+    '.p1-map-marker-position[data-facing="SW"] .p1-map-facing-peg{left:0;top:10px;}',
+    '.p1-map-marker-position[data-facing="W"] .p1-map-facing-peg{left:-3px;top:5px;}',
+    '.p1-map-marker-position[data-facing="NW"] .p1-map-facing-peg{left:0;top:-1px;}',
+    '.p1-map-legend{display:flex;flex-wrap:wrap;gap:2px 7px;align-items:center;margin:2px 0;}',
+    '.p1-map-legend-entry{display:inline-flex;align-items:center;gap:2px;white-space:nowrap;}',
+    '.p1-map-legend-marker{width:12px!important;height:12px!important;}',
+    '.p1-map-detail{margin-top:3px;padding:3px 5px;border:1px solid #d6dccd;background:#161e2a;font-weight:700;}',
+    '.p1-map-detail[data-distance-band="MID"]{border-style:dashed;}',
+    '.p1-map-detail[data-distance-band="FAR"]{border-style:double;}',
+    '.p1-map-cycle-hint{margin-top:2px;color:#c5ccbd;}',
     '.p1-hidden{display:none!important;}',
   ].join('');
   return style;
