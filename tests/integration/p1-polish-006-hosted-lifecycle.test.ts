@@ -355,6 +355,9 @@ async function createPersistenceHarness(
     worldId,
     worldSeed: 'p1-world-golden',
     maxPlayers: 2,
+    interactionRangeWorldUnits: 2,
+    spawnClearanceRadiusWorldUnits: 0,
+    requiredAccessRadiusWorldUnits: 0,
     persistence,
     sessionId: 'session:' + worldId,
     sessionEpoch: 'epoch:' + worldId,
@@ -405,6 +408,9 @@ describe('P1-POLISH-006 hosted client-state projection', () => {
       worldId: 'world:p1-polish-006-packets',
       worldSeed: 'p1-world-golden',
       maxPlayers: 2,
+      interactionRangeWorldUnits: 2,
+      spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0,
       persistence: {
         async save(authorityTick: number) {
           return Object.freeze({
