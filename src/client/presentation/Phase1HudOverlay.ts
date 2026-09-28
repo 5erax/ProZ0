@@ -700,6 +700,7 @@ function renderPanel(
             'div',
             'p1-progression-rows',
           );
+          rows.dataset.progressionSection = kind;
           for (const rowState of panel.rows.filter(
             (entry) => entry.kind === kind,
           )) {
@@ -1119,10 +1120,14 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-build-preview[data-placement-state="CONNECTOR"]{outline:2px dotted #fff;}',
     '.p1-panel-detail,.p1-progress-list{margin-top:5px;padding:4px;background:#161e2a;}',
     '.p1-progress-icons,.p1-map-markers{display:flex;align-items:center;gap:4px;margin:3px 0;}',
-    '.p1-progression-rows{display:grid;gap:2px;margin-top:2px;}',
-    '.p1-progression-row{display:flex;align-items:center;gap:4px;padding:2px 3px;border:1px solid #455066;}',
+    '.p1-panel[data-panel-kind="progression"]{width:520px;max-height:280px;padding:6px;}',
+    '.p1-panel[data-panel-kind="progression"] .p1-panel-title{margin-bottom:2px;}',
+    '.p1-panel[data-panel-kind="progression"] .p1-subtitle{margin-top:2px;}',
+    '.p1-progression-rows{display:grid;gap:1px;margin-top:1px;}',
+    '.p1-progression-rows[data-progression-section="skill"],.p1-progression-rows[data-progression-section="profession"]{grid-template-columns:1fr 1fr;gap:2px 4px;}',
+    '.p1-progression-row{display:flex;align-items:center;gap:3px;padding:1px 2px;min-height:14px;border:1px solid #455066;}',
     '.p1-progression-row[data-progression-state="LOCKED"],.p1-progression-row[data-progression-state="INCOMPLETE"]{border-style:dashed;opacity:.72;}',
-    '.p1-progression-icon{width:16px!important;height:16px!important;}',
+    '.p1-progression-icon{width:12px!important;height:12px!important;}',
     '.p1-panel-capacity{margin-top:3px;padding:3px 4px;border:1px solid #778094;background:#161e2a;font-variant-numeric:tabular-nums;}',
     '.p1-container-capacity-context{display:grid;grid-template-columns:1fr 1fr;gap:4px;}',
     '.p1-equipment-slot{flex-wrap:wrap;}',
