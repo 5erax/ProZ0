@@ -1368,6 +1368,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
         'data-build-cap',
         /[1-9][0-9]*/,
       );
+      await expect(entry).toContainText(/AVAILABLE|CAP REACHED/);
     }
     await expect(
       buildEntries.locator('[data-selected="true"]'),
