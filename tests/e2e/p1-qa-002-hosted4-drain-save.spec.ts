@@ -1203,12 +1203,39 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
       },
     });
 
+    await sendMovement(
+      pages[0]!,
+      1,
+      { up: false, down: false, left: false, right: true },
+    );
+    await sendMovement(
+      pages[1]!,
+      0,
+      { up: false, down: true, left: false, right: false },
+    );
+    await sendMovement(
+      pages[2]!,
+      0,
+      { up: false, down: false, left: true, right: false },
+    );
+    await sendMovement(
+      rejoinPage,
+      0,
+      { up: true, down: false, left: false, right: false },
+    );
     await server.step();
     await expect.poll(
       async () => (await latestMotionSet(rejoinPage)).length,
       { timeout: 5_000 },
     ).toBe(4);
     expect(await latestMotionSet(rejoinPage)).toHaveLength(4);
+    for (const playerId of playerIds) {
+      expect(
+        server.composition.bundle
+          .getRuntime(playerId)
+          .getSnapshot().player.facing,
+      ).not.toBeNull();
+    }
     expect(totalAncientAlloyShards(server.composition, playerIds)).toBe(1);
 
     await renderEvidencePanel(
