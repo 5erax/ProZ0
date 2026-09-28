@@ -31,6 +31,10 @@ import {
   type Phase1ProductReviewRuntime,
   type Phase1ProductReviewRuntimeConfig,
 } from './Phase1ProductReviewRuntime';
+import {
+  createPhase1ProductReviewSaveControl,
+  type Phase1ProductReviewSaveControl,
+} from './Phase1ProductReviewSaveControl';
 
 export interface Phase1ProductReviewPersistenceOptions {
   readonly databaseName?: string;
@@ -133,6 +137,7 @@ export async function bootPersistedPhase1ProductReview(
     config.persistence,
   );
   let runtime: Phase1ProductReviewRuntime | null = null;
+  let saveControl: Phase1ProductReviewSaveControl | null = null;
 
   try {
     const reopen = await persistence.loadReopenState(config.worldId);
@@ -157,6 +162,23 @@ export async function bootPersistedPhase1ProductReview(
     });
 
     const activeRuntime = runtime;
+    const canvas =
+      root.querySelector<HTMLCanvasElement>('#proz0-canvas');
+    if (canvas === null) {
+      throw new Error(
+        'Persisted Product Review requires the canonical Product Review canvas.',
+      );
+    }
+    saveControl = createPhase1ProductReviewSaveControl(
+      root,
+      canvas,
+      () => activeRuntime.save(
+        persistence.repository,
+        new Date().toISOString(),
+      ),
+    );
+    const activeSaveControl = saveControl;
+
     return Object.freeze({
       reopened: reopen !== null,
       runtime: activeRuntime,
@@ -169,11 +191,13 @@ export async function bootPersistedPhase1ProductReview(
         );
       },
       destroy(): void {
+        activeSaveControl.destroy();
         activeRuntime.destroy();
         persistence.close();
       },
     });
   } catch (error) {
+    saveControl?.destroy();
     runtime?.destroy();
     persistence.close();
     throw error;
