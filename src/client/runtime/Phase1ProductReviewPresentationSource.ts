@@ -50,6 +50,7 @@ function localCommandResult(
 }
 
 const PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 12;
+const PRODUCT_REVIEW_INVENTORY_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 180;
 
 export class Phase1ProductReviewPresentationSource
   implements Phase1PresentationSource {
@@ -106,8 +107,16 @@ export class Phase1ProductReviewPresentationSource
 
   public togglePanel(panel: Exclude<Phase1ProductReviewPanel, null>): void {
     this.presentationPanelOverride = null;
+    const previousPanel = this.panel;
     const opening = this.panel !== panel;
     this.panel = opening ? panel : null;
+    if (
+      previousPanel === 'inventory'
+      || (opening && panel === 'inventory')
+    ) {
+      this.commandFeedback = null;
+      this.commandFeedbackExpiresAfterAuthorityTick = null;
+    }
     if (opening && panel === 'map') {
       this.mapDetailOrdinal = 0;
     }
@@ -148,6 +157,8 @@ export class Phase1ProductReviewPresentationSource
       this.inventorySelectedStackId = nextId;
     }
     this.inventoryQuantity = 1;
+    this.commandFeedback = null;
+    this.commandFeedbackExpiresAfterAuthorityTick = null;
     this.refresh();
     return true;
   }
@@ -159,6 +170,8 @@ export class Phase1ProductReviewPresentationSource
     this.inventoryActivePane =
       this.inventoryActivePane === 'player' ? 'storage' : 'player';
     this.inventoryQuantity = 1;
+    this.commandFeedback = null;
+    this.commandFeedbackExpiresAfterAuthorityTick = null;
     this.refresh();
     return true;
   }
@@ -174,6 +187,8 @@ export class Phase1ProductReviewPresentationSource
         this.inventoryQuantity + step,
       ),
     );
+    this.commandFeedback = null;
+    this.commandFeedbackExpiresAfterAuthorityTick = null;
     this.refresh();
     return true;
   }
@@ -256,7 +271,11 @@ export class Phase1ProductReviewPresentationSource
     });
     this.commandFeedbackExpiresAfterAuthorityTick =
       this.bundle.authorityTick
-      + PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS;
+      + (
+        this.panel === 'inventory'
+          ? PRODUCT_REVIEW_INVENTORY_FEEDBACK_LIFETIME_AUTHORITY_TICKS
+          : PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS
+      );
     this.interactionOverride = null;
     this.refresh();
   }
