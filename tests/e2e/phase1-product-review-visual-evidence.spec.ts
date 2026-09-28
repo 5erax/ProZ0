@@ -407,6 +407,7 @@ async function createWorldDropSave(
 
 async function createSpatialMapEvidenceSave(
   worldId: string,
+  finalPlayerPosition: Readonly<{ x: number; y: number }> | null = null,
 ): Promise<PortableSaveBundleV2> {
   const players = Object.freeze([
     Object.freeze({
@@ -511,6 +512,17 @@ async function createSpatialMapEvidenceSave(
         throw new Error(
           'Map evidence Death Cache must retain recoverable items.',
         );
+      }
+
+      if (finalPlayerPosition !== null) {
+        runtime.relocatePlayer(
+          Object.freeze({
+            x: finalPlayerPosition.x,
+            y: finalPlayerPosition.y,
+          }),
+          'W',
+        );
+        await authority.stepSolo();
       }
     },
   );
@@ -905,12 +917,19 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
   mkdirSync(EVIDENCE_DIR, { recursive: true });
 
   const evidence = await createSpatialMapEvidenceSave(
-    'world:p1-polish-002-map-evidence',
+    'world:p1-polish-002-map-evidence-near',
+  );
+  const midEvidence = await createSpatialMapEvidenceSave(
+    'world:p1-polish-002-map-evidence-mid',
+    Object.freeze({ x: 100, y: 0 }),
   );
   const playerIds = ['visual-local', 'visual-teammate'] as const;
   const files: string[] = [];
 
-  const assertSpatialMap = async (): Promise<void> => {
+  const assertSpatialMap = async (
+    expectedBaseBand: 'NEAR' | 'MID' | 'FAR',
+    expectedCacheBand: 'NEAR' | 'MID' | 'FAR',
+  ): Promise<void> => {
     const field = page.locator('[data-map-spatial="true"]');
     await expect(field).toBeVisible();
     await expect(field).toHaveAttribute(
@@ -922,13 +941,13 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     ).toHaveAttribute('data-map-marker-label', 'YOU');
     await expect(
       field.locator('[data-map-marker-kind="base"]'),
-    ).toHaveAttribute('data-distance-band', 'NEAR');
+    ).toHaveAttribute('data-distance-band', expectedBaseBand);
     await expect(
       field.locator('[data-map-marker-kind="ruin"]'),
     ).toHaveAttribute('data-distance-band', 'FAR');
     await expect(
       field.locator('[data-map-marker-kind="death-cache"]'),
-    ).toHaveAttribute('data-distance-band', 'MID');
+    ).toHaveAttribute('data-distance-band', expectedCacheBand);
     await expect(
       field.locator('[data-map-marker-kind="teammate"]'),
     ).toHaveAttribute(
@@ -1037,7 +1056,7 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     }
 
     await page.keyboard.press('m');
-    await assertSpatialMap();
+    await assertSpatialMap('NEAR', 'NEAR');
 
     const initialDetail = page.locator('.p1-map-detail');
     await expect(initialDetail).toContainText(
@@ -1061,12 +1080,7 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
 
       await page.keyboard.press('Tab');
       await expect(page.locator('.p1-map-detail'))
-        .toContainText('DEATH CACHE · MID');
-      await captureViewport(
-        page,
-        'p1-polish-002-map-cache-mid-2x.png',
-      );
-      files.push('p1-polish-002-map-cache-mid-2x.png');
+        .toContainText('DEATH CACHE · NEAR');
 
       await page.locator('[data-panel-kind="map"]').evaluate(
         (panel) => {
@@ -1080,6 +1094,30 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       files.push('p1-polish-002-map-grayscale-2x.png');
     }
   }
+
+  await openProductReview(
+    page,
+    midEvidence,
+    'proz0-p1-polish-002-map-mid-2x',
+    2,
+    'visual-local',
+    playerIds,
+  );
+  await page.keyboard.press('m');
+  await assertSpatialMap('MID', 'MID');
+  await expect(page.locator('.p1-map-detail'))
+    .toContainText('LANDING MODULE · BASE · MID');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.p1-map-detail'))
+    .toContainText('UNINVESTIGATED RUIN · FAR');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.p1-map-detail'))
+    .toContainText('DEATH CACHE · MID');
+  await captureViewport(
+    page,
+    'p1-polish-002-map-cache-mid-2x.png',
+  );
+  files.push('p1-polish-002-map-cache-mid-2x.png');
 
   const manifest = {
     schemaVersion: 1,
@@ -1100,6 +1138,8 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       map3x: 'p1-polish-002-map-3x.png',
       ruinFar2x: 'p1-polish-002-map-ruin-far-2x.png',
       deathCacheMid2x: 'p1-polish-002-map-cache-mid-2x.png',
+      nearCaseIncludesBaseAndCache: true,
+      midCaseMovesPlayerThroughAuthority: true,
       grayscale2x: 'p1-polish-002-map-grayscale-2x.png',
       worldReadability2x:
         'p1-polish-002-world-readability-2x.png',
