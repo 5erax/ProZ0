@@ -457,6 +457,7 @@ function renderPanel(
             document,
             'p1-asset-icon p1-craft-output-icon',
             itemIconSprite(outputState.name),
+            0.5,
           );
           if (outputIcon !== null) outputToken.append(outputIcon);
           outputToken.append(
@@ -557,15 +558,15 @@ function renderPanel(
         const iconSource = (() => {
           switch (entry.structureId) {
             case 'structure:storage-crate':
-              return [PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.625] as const;
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 1] as const;
             case 'structure:workbench':
-              return [PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.4167] as const;
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.5] as const;
             case 'structure:habitat-room':
-              return [PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15625] as const;
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.25] as const;
             case 'structure:compact-power-unit':
-              return [PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit, 0.4167] as const;
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit, 0.5] as const;
             case 'structure:atmospheric-water-condenser':
-              return [PHASE1_PRODUCTION_WORLD_SPRITES.condenser, 0.3125] as const;
+              return [PHASE1_PRODUCTION_WORLD_SPRITES.condenser, 0.5] as const;
             default:
               return null;
           }
@@ -662,8 +663,21 @@ function renderPanel(
     }
 
     case 'progression': {
+      const levelLine = createElement(
+        document,
+        'div',
+        'p1-progress-level',
+      );
+      levelLine.dataset.progressionIconIndex = '6';
+      const levelIcon = assetSprite(
+        document,
+        'p1-progression-icon',
+        progressionSprite(6),
+      );
+      if (levelIcon !== null) levelLine.append(levelIcon);
+      levelLine.append(panel.levelLabel);
       root.append(
-        createElement(document, 'div', 'p1-progress-level', panel.levelLabel),
+        levelLine,
         createElement(document, 'div', 'p1-progress-xp', panel.xpLabel),
       );
       if (panel.rows !== undefined) {
@@ -1084,7 +1098,8 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-craft-ingredient-icon{display:inline-block!important;width:24px!important;height:24px!important;min-width:24px;min-height:24px;flex:0 0 24px;}',
     '.p1-craft-output{display:inline-flex;gap:3px;align-items:center;}',
     '.p1-craft-output-token{display:inline-flex;gap:2px;align-items:center;}',
-    '.p1-craft-output-icon{width:24px!important;height:24px!important;}',
+    '.p1-craft-output-icon{width:12px!important;height:12px!important;min-width:12px;min-height:12px;}',
+    '.p1-craft-output-token{white-space:nowrap;font-size:7px;}',
     '.p1-craft-station{border:1px solid #778094;padding:0 3px;}',
     '.p1-craft-row[data-state="BLOCKED"]{border-style:dashed;}',
     '.p1-feedback{margin-top:5px;padding:4px;border:1px dashed #fff;}',
