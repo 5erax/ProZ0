@@ -212,6 +212,271 @@ function withLocalLoadout(
   return validateEvidenceBundle(next);
 }
 
+function withInventoryLogisticsLoadout(
+  bundle: PortableSaveBundleV2,
+  playerId: string,
+): PortableSaveBundleV2 {
+  const inventoryId = 'inventory:' + playerId;
+  const wrapStackId =
+    'evidence:p1-polish-005:thermal-wrap:' + playerId;
+  const extraStacks = Object.freeze([
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:water:' + playerId,
+      itemDefinitionId: 'item:clean-water',
+      quantity: 3,
+      condition: null,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:food:' + playerId,
+      itemDefinitionId: 'item:edible-plant',
+      quantity: 2,
+      condition: null,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:spear:' + playerId,
+      itemDefinitionId: 'item:basic-spear',
+      quantity: 1,
+      condition: 87,
+    }),
+    Object.freeze({
+      stackId: wrapStackId,
+      itemDefinitionId: 'item:thermal-wrap',
+      quantity: 1,
+      condition: 81,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:fiber:' + playerId,
+      itemDefinitionId: 'item:plant-fiber',
+      quantity: 6,
+      condition: null,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:metal:' + playerId,
+      itemDefinitionId: 'item:metal-ore',
+      quantity: 20,
+      condition: null,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:stone:' + playerId,
+      itemDefinitionId: 'item:stone',
+      quantity: 4,
+      condition: null,
+    }),
+    Object.freeze({
+      stackId: 'evidence:p1-polish-005:storage-kit:' + playerId,
+      itemDefinitionId: 'item:storage-crate-kit',
+      quantity: 1,
+      condition: null,
+    }),
+  ]);
+
+  return validateEvidenceBundle(Object.freeze({
+    ...bundle,
+    players: Object.freeze(bundle.players.map((player) =>
+      player.playerId !== playerId
+        ? player
+        : Object.freeze({
+            ...player,
+            playerRevision: player.playerRevision + 1,
+            equipment: Object.freeze({
+              ...player.equipment,
+              equippedThermalWrapStackId: wrapStackId,
+            }),
+            survival: Object.freeze({
+              ...player.survival,
+              revision: player.survival.revision + 1,
+              foodMilli: 50_000,
+            }),
+          }),
+    )),
+    containers: Object.freeze(bundle.containers.map((container) =>
+      container.containerId !== inventoryId
+        ? container
+        : Object.freeze({
+            ...container,
+            revision: container.revision + 1,
+            stacks: Object.freeze([
+              ...container.stacks,
+              ...extraStacks,
+            ]),
+          }),
+    )),
+  }));
+}
+
+function withStorageCapacityFixture(
+  bundle: PortableSaveBundleV2,
+): PortableSaveBundleV2 {
+  const storage = bundle.containers.find(
+    (container) => container.kind === 'storage-crate',
+  );
+  if (storage === undefined) {
+    throw new Error(
+      'P1-POLISH-005 fixture expected canonical Storage Crate container.',
+    );
+  }
+  return validateEvidenceBundle(Object.freeze({
+    ...bundle,
+    containers: Object.freeze(bundle.containers.map((container) =>
+      container.containerId !== storage.containerId
+        ? container
+        : Object.freeze({
+            ...container,
+            revision: container.revision + 1,
+            stacks: Object.freeze([
+              ...container.stacks,
+              Object.freeze({
+                stackId: 'evidence:p1-polish-005:storage-timber',
+                itemDefinitionId: 'item:timber',
+                quantity: 5,
+                condition: null,
+              }),
+            ]),
+          }),
+    )),
+  }));
+}
+
+async function createInventoryLogisticsSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  const playerId = 'visual-local';
+  const base = await createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId,
+        x: 8,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
+  const seeded = withInventoryLogisticsLoadout(base, playerId);
+  const catalog = createPhase1ContentCatalog();
+  const reconstructed = reconstructPhase1ReopenState(
+    seeded,
+    createPhase1SaveV2Compatibility(
+      catalog,
+      Object.freeze([PHASE1_WORLD_GENERATION_VERSION]),
+    ),
+  );
+  if (!reconstructed.ok) {
+    throw new Error(
+      'P1-POLISH-005 fixture reopen failed: '
+        + reconstructed.code
+        + ': '
+        + reconstructed.message,
+    );
+  }
+
+  const authority = await Phase1AuthorityBundle.create({
+    worldId,
+    worldSeed: WORLD_SEED,
+    playerIds: [playerId],
+    interactionRangeWorldUnits:
+      PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+    spawnClearanceRadiusWorldUnits:
+      PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+    requiredAccessRadiusWorldUnits:
+      PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+    reopen: reconstructed.value,
+  });
+
+  try {
+    const runtime = authority.getRuntime(playerId);
+    runtime.relocatePlayer(
+      Object.freeze({ x: 8, y: 0 }),
+      'E',
+    );
+    await authority.stepSolo();
+
+    const inventory = authority.items.getContainerView(
+      'inventory:' + playerId,
+    );
+    const kit = inventory.stacks.find(
+      (stack) =>
+        stack.itemDefinitionId === 'item:storage-crate-kit',
+    );
+    if (kit === undefined) {
+      throw new Error(
+        'P1-POLISH-005 fixture expected Storage Crate Kit.',
+      );
+    }
+
+    const placed = authority.placeStructure({
+      operationId: 'evidence:p1-polish-005:place-storage',
+      actorPlayerId: playerId,
+      structureDefinitionId: 'structure:storage-crate',
+      sourceKitStackId: kit.stackId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      expectedBuildRevision: authority.buildings.getBuildRevision(),
+      placement: {
+        mode: 'free',
+        anchor: Object.freeze({ x: 8, y: 0 }),
+        orientationQuarterTurns: 0,
+      },
+    });
+    if (placed.status !== 'committed') {
+      throw new Error(
+        'P1-POLISH-005 Storage Crate placement failed: '
+          + placed.reason,
+      );
+    }
+
+    const portable = portableBundle(composePhase1SaveV2(authority, {
+      nowUtc: NOW_UTC,
+    }));
+    return withStorageCapacityFixture(portable);
+  } finally {
+    await authority.destroy();
+  }
+}
+
+async function selectInventoryItem(
+  page: Page,
+  pane: 'player' | 'storage',
+  itemName: string,
+): Promise<void> {
+  const panel = page.locator('[data-panel-kind="container"]');
+  const paneSelector =
+    '[data-inventory-pane="' + pane + '"]';
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const selected = panel.locator(
+      paneSelector + ' .p1-item-row[data-selected="true"]',
+    );
+    if ((await selected.textContent())?.includes(itemName)) return;
+    await page.keyboard.press('ArrowDown');
+  }
+  throw new Error(
+    'Could not select ' + itemName + ' in ' + pane + ' pane.',
+  );
+}
+
+function inventoryItemRow(
+  page: Page,
+  pane: 'player' | 'storage',
+  itemName: string,
+) {
+  return page.locator(
+    '[data-panel-kind="container"] '
+      + '[data-inventory-pane="' + pane + '"] '
+      + '.p1-item-row',
+  ).filter({ hasText: itemName }).first();
+}
+
+async function carryWeight(page: Page): Promise<number> {
+  const label = await page.locator(
+    '[data-region="carry"]',
+  ).textContent();
+  const match = label?.match(/([0-9]+(?:\.[0-9]+)?)\//);
+  if (match?.[1] === undefined) {
+    throw new Error('Could not parse Product Review carry weight.');
+  }
+  return Number(match[1]);
+}
+
 async function createPredatorWindupSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -910,6 +1175,241 @@ test('P1-POLISH-001 isolates primary panels from contextual HUD at required inte
       }
     }
   }
+});
+
+test('P1-POLISH-005 drives selected-stack inventory and storage actions', async ({ page }) => {
+  test.setTimeout(120_000);
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+
+  const evidence = await createInventoryLogisticsSave(
+    'world:p1-polish-005-inventory-actions',
+  );
+  const files: string[] = [];
+  await openProductReview(
+    page,
+    evidence,
+    'proz0-p1-polish-005-inventory-actions',
+    2,
+  );
+
+  const carryBeforeActions = await carryWeight(page);
+  expect(carryBeforeActions).toBeGreaterThan(29);
+  expect(carryBeforeActions).toBeLessThanOrEqual(30);
+
+  await page.keyboard.press('i');
+  const panel = page.locator('[data-panel-kind="container"]');
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute(
+    'data-inventory-active-pane',
+    'player',
+  );
+
+  // Selected-stack consume: Edible Plant changes; Clean Water does not.
+  await selectInventoryItem(page, 'player', 'Edible Plant');
+  await expect(
+    inventoryItemRow(page, 'player', 'Edible Plant'),
+  ).toContainText('×2');
+  await expect(
+    inventoryItemRow(page, 'player', 'Clean Water'),
+  ).toContainText('×3');
+  await page.keyboard.press('v');
+  await expect(
+    inventoryItemRow(page, 'player', 'Edible Plant'),
+  ).toContainText('×1');
+  await expect(
+    inventoryItemRow(page, 'player', 'Clean Water'),
+  ).toContainText('×3');
+  await captureViewport(
+    page,
+    'p1-polish-005-selected-consume-2x.png',
+  );
+  files.push('p1-polish-005-selected-consume-2x.png');
+
+  // Selected equipment: spear does not disturb independent Thermal Wrap.
+  await selectInventoryItem(page, 'player', 'Basic Spear');
+  await page.keyboard.press('x');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('EQUIP · Basic Spear');
+  await page.keyboard.press('i');
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).toContainText('Basic Spear');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('Thermal Wrap');
+  await captureViewport(
+    page,
+    'p1-polish-005-selected-equip-2x.png',
+  );
+  files.push('p1-polish-005-selected-equip-2x.png');
+
+  await page.keyboard.press('i');
+  await selectInventoryItem(page, 'player', 'Basic Spear');
+  await page.keyboard.press('x');
+  await page.keyboard.press('i');
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).not.toContainText('Basic Spear');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('Thermal Wrap');
+
+  // Exact selected quantity Drop.
+  await page.keyboard.press('i');
+  await selectInventoryItem(page, 'player', 'Plant Fiber');
+  await page.keyboard.press(']');
+  await expect(panel).toHaveAttribute(
+    'data-inventory-quantity',
+    '2',
+  );
+  await page.keyboard.press('g');
+  await expect(
+    inventoryItemRow(page, 'player', 'Plant Fiber'),
+  ).toContainText('×4');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('DROP · Plant Fiber ×2');
+  await expect(
+    page.locator('[data-world-role="world-drop"]'),
+  ).toHaveCount(1);
+  await captureViewport(
+    page,
+    'p1-polish-005-selected-drop-2x.png',
+  );
+  files.push('p1-polish-005-selected-drop-2x.png');
+
+  // Capacity rejection is authoritative and does not silently partial-transfer.
+  await page.keyboard.press('Tab');
+  await expect(panel).toHaveAttribute(
+    'data-inventory-active-pane',
+    'storage',
+  );
+  await selectInventoryItem(page, 'storage', 'Timber');
+  await page.keyboard.press('Enter');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('INVENTORY WEIGHT LIMIT');
+  await expect(
+    inventoryItemRow(page, 'storage', 'Timber'),
+  ).toContainText('×5');
+  await expect(
+    inventoryItemRow(page, 'player', 'Timber'),
+  ).toHaveCount(0);
+
+  // Partial deposit through exact source StackId + chosen quantity.
+  await page.keyboard.press('Tab');
+  await selectInventoryItem(page, 'player', 'Plant Fiber');
+  await page.keyboard.press(']');
+  await page.keyboard.press('Enter');
+  await expect(
+    inventoryItemRow(page, 'player', 'Plant Fiber'),
+  ).toContainText('×2');
+  await expect(
+    inventoryItemRow(page, 'storage', 'Plant Fiber'),
+  ).toContainText('×2');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('PLAYER → STORAGE');
+
+  await page.keyboard.press('i');
+  const carryAfterDeposit = await carryWeight(page);
+  expect(carryAfterDeposit).toBeLessThan(carryBeforeActions);
+
+  // Retrieve exact quantity and restore carry.
+  await page.keyboard.press('i');
+  await page.keyboard.press('Tab');
+  await selectInventoryItem(page, 'storage', 'Plant Fiber');
+  await page.keyboard.press(']');
+  await page.keyboard.press('Enter');
+  await expect(
+    inventoryItemRow(page, 'storage', 'Plant Fiber'),
+  ).toHaveCount(0);
+  await expect(
+    inventoryItemRow(page, 'player', 'Plant Fiber'),
+  ).toContainText('×4');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('STORAGE → PLAYER');
+
+  await page.keyboard.press('i');
+  const carryAfterRetrieve = await carryWeight(page);
+  expect(carryAfterRetrieve).toBeGreaterThan(carryAfterDeposit);
+
+  // Conditioned stack survives player->storage->player round trip.
+  await page.keyboard.press('i');
+  await selectInventoryItem(page, 'player', 'Basic Spear');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await selectInventoryItem(page, 'storage', 'Basic Spear');
+  await expect(
+    inventoryItemRow(page, 'storage', 'Basic Spear'),
+  ).toContainText('COND 87');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await selectInventoryItem(page, 'player', 'Basic Spear');
+  await expect(
+    inventoryItemRow(page, 'player', 'Basic Spear'),
+  ).toContainText('COND 87');
+
+  // Reopening keeps a still-valid in-session selection understandable.
+  await page.keyboard.press('i');
+  await page.keyboard.press('i');
+  await expect(
+    panel.locator(
+      '[data-inventory-pane="player"] '
+        + '.p1-item-row[data-selected="true"]',
+    ),
+  ).toContainText('Basic Spear');
+
+  // Invalid selected Use rejects that exact stack; Water is not fallback-used.
+  await selectInventoryItem(page, 'player', 'Stone Field Tool');
+  await page.keyboard.press('v');
+  await expect(panel.locator('.p1-feedback')).toContainText(
+    /NOT CONSUMABLE|INVALID|SOURCE/,
+  );
+  await expect(
+    inventoryItemRow(page, 'player', 'Clean Water'),
+  ).toContainText('×3');
+
+  await captureViewport(
+    page,
+    'p1-polish-005-storage-logistics-2x.png',
+  );
+  files.push('p1-polish-005-storage-logistics-2x.png');
+
+  writeFileSync(
+    resolve(
+      EVIDENCE_DIR,
+      'p1-polish-005-inventory-manifest.json',
+    ),
+    JSON.stringify({
+      schemaVersion: 1,
+      task: 'P1-POLISH-005',
+      evidenceKind: 'selected-stack-player-actions',
+      testedHead:
+        process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
+      workflowCommit:
+        process.env.GITHUB_SHA ?? 'local-worktree',
+      generatedAt: new Date().toISOString(),
+      runtime: {
+        mode: 'phase1-product-review',
+        canonicalAuthority: true,
+        persistence: 'indexeddb-save-v2',
+        qaFixture: false,
+      },
+      invariants: {
+        selectedFoodNotWater: true,
+        selectedEquipmentOnly: true,
+        independentProtectionSlot: true,
+        selectedDropExactQuantity: true,
+        capacityRejectNoPartial: true,
+        storagePartialDeposit: true,
+        storageExactRetrieve: true,
+        carryChangesWithTransfer: true,
+        conditionPreserved: true,
+        reopenSelectionUnderstandable: true,
+        invalidUseNoFallback: true,
+      },
+      files,
+    }, null, 2) + '\n',
+    'utf8',
+  );
 });
 
 test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page }) => {
