@@ -24,7 +24,7 @@ async function createInventorySelectionBundle() {
   });
 
   bundle.getRuntime(playerId).relocatePlayer(
-    Object.freeze({ x: 8, y: 0 }),
+    Object.freeze({ x: 2.75, y: 0.25 }),
     'E',
   );
   await bundle.stepSolo();
@@ -61,7 +61,7 @@ async function createInventorySelectionBundle() {
     expectedBuildRevision: bundle.buildings.getBuildRevision(),
     placement: {
       mode: 'free',
-      anchor: Object.freeze({ x: 8, y: 0 }),
+      anchor: Object.freeze({ x: 2.75, y: 0.25 }),
       orientationQuarterTurns: 0,
     },
   });
