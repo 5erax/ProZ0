@@ -19,6 +19,7 @@ import {
   type PortableSaveBundleV2,
 } from '../../src/persistence';
 import {
+  getPhase1WorldLandmarks,
   PHASE1_WORLD_GENERATION_VERSION,
 } from '../../src/world/phase1/Phase1ChunkGenerator';
 
@@ -398,6 +399,117 @@ async function createWorldDropSave(
       if (result.status !== 'committed') {
         throw new Error(
           'Evidence setup failed canonical world drop: ' + result.reason,
+        );
+      }
+    },
+  );
+}
+
+async function createSpatialMapEvidenceSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  const players = Object.freeze([
+    Object.freeze({
+      playerId: 'visual-local',
+      x: 0,
+      y: 0,
+      facing: 'E' as const,
+    }),
+    Object.freeze({
+      playerId: 'visual-teammate',
+      x: 6,
+      y: 4,
+      facing: 'NW' as const,
+    }),
+  ]);
+
+  return createBaseSave(
+    worldId,
+    players,
+    async (authority) => {
+      const runtime = authority.getRuntime('visual-local');
+
+      // Reveal representative water while preserving binary discovery.
+      runtime.relocatePlayer(
+        Object.freeze({ x: 34, y: -18 }),
+        'E',
+      );
+      await authority.stepSolo();
+
+      // Locate the canonical ruin through ordinary authoritative reveal.
+      const landmarks = getPhase1WorldLandmarks(WORLD_SEED);
+      runtime.relocatePlayer(landmarks.ruinPosition, 'W');
+      await authority.stepSolo();
+      const ruin =
+        authority.world.findGeneratedEntityByDefinition(
+          'ruin:previous-civilization-ruin',
+        );
+      if (ruin === null || ruin.type !== 'ruin') {
+        throw new Error(
+          'Map evidence could not resolve canonical ruin.',
+        );
+      }
+      const ruinState = authority.worldStore.getRuinState(
+        ruin.entityId,
+      );
+      if (
+        ruinState === undefined
+        || ruinState.discoveryState === 'unknown'
+      ) {
+        throw new Error(
+          'Map evidence expected authoritative LOCATED ruin state.',
+        );
+      }
+
+      // Stage a recovery target in the accepted MID commitment band.
+      runtime.relocatePlayer(
+        Object.freeze({ x: 100, y: 0 }),
+        'W',
+      );
+      await authority.stepSolo();
+      const lethal = authority.survival.applyAuthorityDamage({
+        damageId: 'evidence:p1-polish-002-map-cache',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'evidence:map-cache-source',
+        targetPlayerId: 'visual-local',
+        amount: 100,
+        tick: authority.authorityTick,
+      });
+      if (lethal.status !== 'applied' || !lethal.lethal) {
+        throw new Error(
+          'Map evidence failed to stage canonical lethal damage.',
+        );
+      }
+      await authority.stepSolo();
+
+      const pending = authority.survival.getPlayerState(
+        'visual-local',
+      );
+      if (pending.lifeState.type !== 'dead-pending-respawn') {
+        throw new Error(
+          'Map evidence expected pending authoritative respawn.',
+        );
+      }
+      while (
+        authority.authorityTick
+        < pending.lifeState.respawnAtTick
+      ) {
+        await authority.stepSolo();
+      }
+
+      const cache =
+        authority.world.exportSnapshot().deathCaches.caches[0];
+      if (cache === undefined) {
+        throw new Error(
+          'Map evidence expected an active Death Cache.',
+        );
+      }
+      const contents = authority.items.getContainerView(
+        cache.containerId,
+      );
+      if (contents.stacks.length === 0) {
+        throw new Error(
+          'Map evidence Death Cache must retain recoverable items.',
         );
       }
     },
@@ -786,6 +898,237 @@ test('P1-POLISH-001 isolates primary panels from contextual HUD at required inte
       }
     }
   }
+});
+
+test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page }) => {
+  test.setTimeout(120_000);
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+
+  const evidence = await createSpatialMapEvidenceSave(
+    'world:p1-polish-002-map-evidence',
+  );
+  const playerIds = ['visual-local', 'visual-teammate'] as const;
+  const files: string[] = [];
+
+  const assertSpatialMap = async (): Promise<void> => {
+    const field = page.locator('[data-map-spatial="true"]');
+    await expect(field).toBeVisible();
+    await expect(field).toHaveAttribute(
+      'data-map-knowledge',
+      'explored-only',
+    );
+    await expect(
+      field.locator('[data-map-marker-kind="player"]'),
+    ).toHaveAttribute('data-map-marker-label', 'YOU');
+    await expect(
+      field.locator('[data-map-marker-kind="base"]'),
+    ).toHaveAttribute('data-distance-band', 'NEAR');
+    await expect(
+      field.locator('[data-map-marker-kind="ruin"]'),
+    ).toHaveAttribute('data-distance-band', 'FAR');
+    await expect(
+      field.locator('[data-map-marker-kind="death-cache"]'),
+    ).toHaveAttribute('data-distance-band', 'MID');
+    await expect(
+      field.locator('[data-map-marker-kind="teammate"]'),
+    ).toHaveAttribute(
+      'data-presentation-identity-slot',
+      'TEAM_A',
+    );
+    await expect(
+      field.locator('[data-map-marker-kind="resource"]'),
+    ).toHaveCount(0);
+    await expect(
+      field.locator(
+        '[data-map-cell-state="EXPLORED"]'
+          + '[data-terrain-state="ground"]',
+      ),
+    ).not.toHaveCount(0);
+    await expect(
+      field.locator(
+        '[data-map-cell-state="EXPLORED"]'
+          + '[data-terrain-state="water"]',
+      ),
+    ).not.toHaveCount(0);
+    await expect(
+      field.locator(
+        '[data-map-cell-state="UNKNOWN_BOUNDARY"]',
+      ),
+    ).not.toHaveCount(0);
+    await expect(
+      field.locator(
+        '[data-map-cell-state="UNKNOWN_BOUNDARY"]'
+          + '[data-terrain-state]',
+      ),
+    ).toHaveCount(0);
+    await expect(field).not.toContainText('HOME');
+    await expect(field).not.toContainText('Fiber');
+    await expect(field).not.toContainText('Metal Ore');
+
+    const boundaryTouchesExploredWater = await field.evaluate(
+      (node) => {
+        const element = node as HTMLElement;
+        const scale = Number(
+          element.dataset.mapCellScale ?? '0',
+        );
+        const water = [
+          ...element.querySelectorAll<HTMLElement>(
+            '[data-map-cell-state="EXPLORED"]'
+              + '[data-terrain-state="water"]',
+          ),
+        ];
+        const boundary = [
+          ...element.querySelectorAll<HTMLElement>(
+            '[data-map-cell-state="UNKNOWN_BOUNDARY"]',
+          ),
+        ];
+        const position = (entry: HTMLElement) => ({
+          x: Number.parseFloat(entry.style.left),
+          y: Number.parseFloat(entry.style.top),
+        });
+        return water.some((waterCell) => {
+          const w = position(waterCell);
+          return boundary.some((unknownCell) => {
+            const u = position(unknownCell);
+            return (
+              Math.abs(w.x - u.x)
+              + Math.abs(w.y - u.y)
+            ) === scale;
+          });
+        });
+      },
+    );
+    expect(boundaryTouchesExploredWater).toBe(true);
+  };
+
+  for (const scale of [1, 2, 3] as const) {
+    await openProductReview(
+      page,
+      evidence,
+      'proz0-p1-polish-002-map-' + String(scale) + 'x',
+      scale,
+      'visual-local',
+      playerIds,
+    );
+
+    if (scale === 2) {
+      await expect(
+        page.locator(
+          '[data-world-role="structure"]'
+            + '[data-world-id="structure-instance:landing-module"]',
+        ),
+      ).toHaveCount(1);
+      await expect(
+        page.locator('[data-world-role="flora-decor"]'),
+      ).not.toHaveCount(0);
+      await expect(
+        page.locator('[data-world-role="resource"]'),
+      ).not.toHaveCount(0);
+      await expect(
+        page.locator('[data-world-role="flora-decor"]').first(),
+      ).toHaveAttribute('data-interactive', 'false');
+      await captureProductWorld(
+        page,
+        'p1-polish-002-world-readability-2x.png',
+      );
+      files.push(
+        'p1-polish-002-world-readability-2x.png',
+      );
+    }
+
+    await page.keyboard.press('m');
+    await assertSpatialMap();
+
+    const initialDetail = page.locator('.p1-map-detail');
+    await expect(initialDetail).toContainText(
+      'LANDING MODULE · BASE · NEAR',
+    );
+
+    const scaleFile =
+      'p1-polish-002-map-' + String(scale) + 'x.png';
+    await captureViewport(page, scaleFile);
+    files.push(scaleFile);
+
+    if (scale === 2) {
+      await page.keyboard.press('Tab');
+      await expect(page.locator('.p1-map-detail'))
+        .toContainText('UNINVESTIGATED RUIN · FAR');
+      await captureViewport(
+        page,
+        'p1-polish-002-map-ruin-far-2x.png',
+      );
+      files.push('p1-polish-002-map-ruin-far-2x.png');
+
+      await page.keyboard.press('Tab');
+      await expect(page.locator('.p1-map-detail'))
+        .toContainText('DEATH CACHE · MID');
+      await captureViewport(
+        page,
+        'p1-polish-002-map-cache-mid-2x.png',
+      );
+      files.push('p1-polish-002-map-cache-mid-2x.png');
+
+      await page.locator('[data-panel-kind="map"]').evaluate(
+        (panel) => {
+          (panel as HTMLElement).style.filter = 'grayscale(1)';
+        },
+      );
+      await captureViewport(
+        page,
+        'p1-polish-002-map-grayscale-2x.png',
+      );
+      files.push('p1-polish-002-map-grayscale-2x.png');
+    }
+  }
+
+  const manifest = {
+    schemaVersion: 1,
+    task: 'P1-POLISH-002',
+    evidenceKind: 'authoritative-spatial-map',
+    testedHead: process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
+    workflowCommit: process.env.GITHUB_SHA ?? 'local-worktree',
+    generatedAt: new Date().toISOString(),
+    runtime: {
+      mode: 'phase1-product-review',
+      canonicalAuthority: true,
+      persistence: 'indexeddb-save-v2',
+      qaFixture: false,
+    },
+    cases: {
+      map1x: 'p1-polish-002-map-1x.png',
+      map2x: 'p1-polish-002-map-2x.png',
+      map3x: 'p1-polish-002-map-3x.png',
+      ruinFar2x: 'p1-polish-002-map-ruin-far-2x.png',
+      deathCacheMid2x: 'p1-polish-002-map-cache-mid-2x.png',
+      grayscale2x: 'p1-polish-002-map-grayscale-2x.png',
+      worldReadability2x:
+        'p1-polish-002-world-readability-2x.png',
+    },
+    invariants: {
+      playerFirstReadMarker: true,
+      baseAnchorNoHomeState: true,
+      exploredUnknownBinary: true,
+      unknownCarriesNoTerrainDetail: true,
+      waterBoundaryEvidence: true,
+      ruinLocatedMarker: true,
+      activeDeathCacheMarker: true,
+      teammateCurrentPositionOnly: true,
+      noGenericResourcePins: true,
+      nearMidFarOnlyEligibleTargets: true,
+      integerPresentation1x2x3x: true,
+      grayscaleEvidence: true,
+      decorativeFloraPresentationOnly: true,
+    },
+    files,
+  };
+  writeFileSync(
+    resolve(
+      EVIDENCE_DIR,
+      'p1-polish-002-map-manifest.json',
+    ),
+    JSON.stringify(manifest, null, 2) + '\n',
+    'utf8',
+  );
 });
 
 test('P1-INT-001 captures direct Product Review visual correction evidence', async ({ page }) => {
