@@ -660,9 +660,14 @@ export class ServerAuthorityHost {
     const needsCommandTick = this.beginDrain();
     if (needsCommandTick) {
       const nextTick = this.authorityTick + 1;
-      await this.options.drainTickLifecycle?.prepareAuthorityTick(nextTick);
-      drained.push(...this.drainQueuedCommandTick());
-      await this.options.drainTickLifecycle?.completeAuthorityTick(nextTick);
+      const lifecycle = this.options.drainTickLifecycle;
+      if (lifecycle === undefined) {
+        drained.push(...this.drainQueuedCommandTick());
+      } else {
+        await lifecycle.prepareAuthorityTick(nextTick);
+        drained.push(...this.drainQueuedCommandTick());
+        await lifecycle.completeAuthorityTick(nextTick);
+      }
     }
     drained.push(...await this.saveAndCloseAfterDrain());
     return Object.freeze(drained);
@@ -884,11 +889,7 @@ export class ServerAuthorityHost {
     }
 
     for (const update of domain.aggregateUpdates ?? []) {
-      if (!this.replication.publish(update)) continue;
-      outbound.push(...this.broadcastReady(
-        'AGGREGATE_UPDATE',
-        asJson(update),
-      ));
+      outbound.push(...this.publishAggregate(update));
     }
 
     return Object.freeze(outbound);
