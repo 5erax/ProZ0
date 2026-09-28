@@ -74,7 +74,16 @@ export interface HostedBaselineProvider {
     playerId: PlayerId,
     aggregates: readonly RevisionedAggregateViewV1[],
   ): readonly RevisionedAggregateViewV1[];
+  isVisibleToPlayer?(
+    playerId: PlayerId,
+    aggregate: RevisionedAggregateViewV1,
+  ): boolean;
   stateDigest?(): string;
+}
+
+export interface HostedDrainTickLifecycle {
+  prepareAuthorityTick(authorityTick: number): Promise<void>;
+  completeAuthorityTick(authorityTick: number): Promise<void>;
 }
 
 export interface ServerAuthorityHostOptions {
@@ -83,6 +92,7 @@ export interface ServerAuthorityHostOptions {
   readonly commandDispatcher: HostedCommandDispatcher;
   readonly persistence: HostedPersistencePort;
   readonly baselineProvider?: HostedBaselineProvider;
+  readonly drainTickLifecycle?: HostedDrainTickLifecycle;
   readonly initialDurabilityCheckpoint?: DurabilityCheckpointV1 | null;
 }
 
@@ -505,7 +515,24 @@ export class ServerAuthorityHost {
     if (!this.replication.publish(view)) {
       return Object.freeze([]);
     }
-    return this.broadcastReady('AGGREGATE_UPDATE', asJson(view));
+    const visible = this.options.baselineProvider?.isVisibleToPlayer;
+    return Object.freeze(
+      this.session.getReadyConnections()
+        .filter(
+          (connection) =>
+            visible?.(connection.playerId, view) ?? true,
+        )
+        .map((connection) =>
+          this.envelope(
+            connection.transportId,
+            'AGGREGATE_UPDATE',
+            asJson(view),
+          ),
+        )
+        .filter(
+          (entry): entry is HostedOutboundMessage => entry !== null,
+        ),
+    );
   }
 
   public requireResync(
@@ -632,7 +659,10 @@ export class ServerAuthorityHost {
     const drained: HostedOutboundMessage[] = [];
     const needsCommandTick = this.beginDrain();
     if (needsCommandTick) {
+      const nextTick = this.authorityTick + 1;
+      await this.options.drainTickLifecycle?.prepareAuthorityTick(nextTick);
       drained.push(...this.drainQueuedCommandTick());
+      await this.options.drainTickLifecycle?.completeAuthorityTick(nextTick);
     }
     drained.push(...await this.saveAndCloseAfterDrain());
     return Object.freeze(drained);
@@ -914,10 +944,16 @@ export class ServerAuthorityHost {
     snapshotId: string,
   ): BaselineSnapshotV1 {
     const allAggregates = this.replication.baseline();
+    const visible = this.options.baselineProvider?.isVisibleToPlayer;
+    const visibleAggregates = visible === undefined
+      ? allAggregates
+      : allAggregates.filter((aggregate) =>
+          visible(playerId, aggregate),
+        );
     const aggregates = this.options.baselineProvider?.filterForPlayer?.(
       playerId,
-      allAggregates,
-    ) ?? allAggregates;
+      visibleAggregates,
+    ) ?? visibleAggregates;
     const players = [...this.runtimes].map(([id, runtime]) => {
       const snapshot = runtime.getSnapshot();
       return Object.freeze({

@@ -692,7 +692,7 @@ implements HostedCommandDispatcher {
       structureId,
       expectedRevision: expectedRevision(
         envelope,
-        'structure',
+        'condenser',
         structureId,
       ),
       enabled: booleanField(payload, 'enabled'),
@@ -705,7 +705,7 @@ implements HostedCommandDispatcher {
         ? {
             status: 'committed',
             resultingRevisions: Object.freeze([{
-              aggregateType: 'structure',
+              aggregateType: 'condenser',
               aggregateId: structureId,
               revision: result.revision,
             }]),

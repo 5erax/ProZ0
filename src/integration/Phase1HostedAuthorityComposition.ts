@@ -34,6 +34,19 @@ function capacityPlayerIds(maxPlayers: number): readonly string[] {
   );
 }
 
+function aggregateVisibleToPlayer(
+  playerId: string,
+  view: RevisionedAggregateViewV1,
+): boolean {
+  if (
+    view.aggregateType === 'container'
+    && view.aggregateId.startsWith('inventory:')
+  ) {
+    return view.aggregateId === 'inventory:' + playerId;
+  }
+  return true;
+}
+
 function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
@@ -86,13 +99,10 @@ function aggregateViews(
   }));
 
   for (const structure of building.structures) {
-    const condenser = building.condensers.find(
-      (entry) => entry.structureId === structure.structureId,
-    );
     values.push(Object.freeze({
       aggregateType: 'structure',
       aggregateId: structure.structureId,
-      revision: condenser?.revision ?? structure.revision,
+      revision: structure.revision,
       tombstone: false,
       state: asJson({
         definitionId: structure.definitionId,
@@ -103,19 +113,21 @@ function aggregateViews(
         orientationQuarterTurns: structure.orientationQuarterTurns,
         placedByPlayerId: structure.placedByPlayerId,
         containerId: structure.containerId,
-        ...(condenser === undefined
-          ? {}
-          : {
-              machine: {
-                type: 'atmospheric-water-condenser',
-                enabled: condenser.enabled,
-                productionProgressTicks:
-                  condenser.productionProgressTicks,
-                completedCycleOrdinal:
-                  condenser.completedCycleOrdinal,
-                outputContainerId: condenser.outputContainerId,
-              },
-            }),
+      }),
+    }));
+  }
+
+  for (const condenser of building.condensers) {
+    values.push(Object.freeze({
+      aggregateType: 'condenser',
+      aggregateId: condenser.structureId,
+      revision: condenser.revision,
+      tombstone: false,
+      state: asJson({
+        enabled: condenser.enabled,
+        productionProgressTicks: condenser.productionProgressTicks,
+        completedCycleOrdinal: condenser.completedCycleOrdinal,
+        outputContainerId: condenser.outputContainerId,
       }),
     }));
   }
@@ -374,6 +386,17 @@ export class Phase1HostedAuthorityComposition {
       },
       commandDispatcher: dispatcher,
       persistence: config.persistence,
+      baselineProvider: {
+        isVisibleToPlayer: aggregateVisibleToPlayer,
+      },
+      drainTickLifecycle: {
+        prepareAuthorityTick(authorityTick) {
+          return bundle.prepareAuthorityTick(authorityTick);
+        },
+        completeAuthorityTick(authorityTick) {
+          return bundle.completeAuthorityTick(authorityTick);
+        },
+      },
       ...(config.reopen === undefined
         ? {}
         : {
@@ -405,20 +428,7 @@ export class Phase1HostedAuthorityComposition {
   public async drainSaveAndClose(): Promise<
     readonly HostedOutboundMessage[]
   > {
-    const outbound: HostedOutboundMessage[] = [];
-    const needsCommandTick = this.host.beginDrain();
-
-    if (needsCommandTick) {
-      const nextTick = this.host.getAuthorityTick() + 1;
-      await this.bundle.prepareAuthorityTick(nextTick);
-      outbound.push(...this.host.drainQueuedCommandTick());
-      await this.bundle.completeAuthorityTick(nextTick);
-      this.resolveCompletedGatherCommands(outbound);
-      outbound.push(...this.publishSharedState());
-    }
-
-    outbound.push(...await this.host.saveAndCloseAfterDrain());
-    return Object.freeze(outbound);
+    return this.host.drainSaveAndClose();
   }
 
   private resolveCompletedGatherCommands(
