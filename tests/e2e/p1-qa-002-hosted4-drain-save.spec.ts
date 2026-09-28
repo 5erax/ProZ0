@@ -43,7 +43,7 @@ import {
   type ServerWebSocketLike,
 } from '../../src/server';
 import {
-  getPhase1WorldLandmarks,
+  PHASE1_WORLD_GENERATION_VERSION,
 } from '../../src/world/phase1/Phase1ChunkGenerator';
 
 const EXPECTED_MAIN_SHA =
@@ -711,44 +711,6 @@ async function latestMotionSet(page: Page): Promise<readonly {
   });
 }
 
-async function latestAggregate(
-  page: Page,
-  aggregateType: string,
-  aggregateId: string,
-): Promise<BrowserAggregateSummary | null> {
-  return page.evaluate(
-    ({ type, id }) => {
-      const messages = (
-        globalThis as unknown as {
-          __proz0Hosted4?: {
-            messages: Array<{
-              messageType: string;
-              payload: Record<string, unknown>;
-            }>;
-          };
-        }
-      ).__proz0Hosted4?.messages ?? [];
-
-      const matching = messages.filter(
-        (message) =>
-          message.messageType === 'AGGREGATE_UPDATE'
-          && message.payload.aggregateType === type
-          && message.payload.aggregateId === id,
-      );
-      const latest = matching.at(-1);
-      if (latest === undefined) return null;
-      return {
-        aggregateType: String(latest.payload.aggregateType),
-        aggregateId: String(latest.payload.aggregateId),
-        revision: Number(latest.payload.revision),
-        tombstone: Boolean(latest.payload.tombstone),
-        state: latest.payload.state,
-      };
-    },
-    { type: aggregateType, id: aggregateId },
-  );
-}
-
 async function commandResult(
   page: Page,
   operationId: string,
@@ -871,20 +833,6 @@ async function renderEvidencePanel(
     },
     { panelTitle: title, panelLines: [...lines] },
   );
-}
-
-function totalAncientAlloyShards(
-  composition: Phase1HostedAuthorityComposition,
-  playerIds: readonly string[],
-): number {
-  return playerIds.reduce((total, playerId) => {
-    const inventory = composition.bundle.items.getContainerView(
-      'inventory:' + playerId,
-    );
-    return total + inventory.stacks
-      .filter((stack) => stack.itemDefinitionId === 'item:ancient-alloy-shard')
-      .reduce((quantity, stack) => quantity + stack.quantity, 0);
-  }, 0);
 }
 
 async function currentAggregate(
