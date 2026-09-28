@@ -126,6 +126,7 @@ function ledgerSnapshotForPersistence(
 ) {
   const snapshot = bundle.items.exportLedgerSnapshot();
   const world = bundle.world.exportSnapshot();
+  const activePlayerIds = new Set(bundle.getActivePlayerIds());
   const liveWorldContainerIds = new Set([
     ...world.deathCaches.caches.map((entry) => entry.containerId),
     ...world.drops
@@ -136,6 +137,10 @@ function ledgerSnapshotForPersistence(
   return Object.freeze({
     containers: Object.freeze(
       snapshot.containers.filter((container) => {
+        if (container.kind === 'player-inventory') {
+          return container.ownerPlayerId !== null
+            && activePlayerIds.has(container.ownerPlayerId);
+        }
         if (
           container.kind !== 'death-cache'
           && container.kind !== 'world-drop'
