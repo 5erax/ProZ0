@@ -1280,6 +1280,9 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
 
     const reopen = reconstruct(server.composition, saved);
     reopenedServer = await startHosted4Server(reopen, 'reopen');
+    const reopenedInitialAuthorityTick =
+      reopenedServer.composition.host.getAuthorityTick();
+    expect(reopenedInitialAuthorityTick).toBe(saved.world.authorityTick);
 
     const reopenedPages: Page[] = [];
     const reopenedClients: BrowserHostedState[] = [];
@@ -1400,7 +1403,9 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
         'evidenceHead=' + EVIDENCE_HEAD_SHA,
         'savedAuthorityTick=' + String(saved.world.authorityTick),
         'durableSaveRevision=' + String(saved.world.worldRevision),
-        'reopenedAuthorityTick='
+        'reopenedInitialAuthorityTick='
+          + String(reopenedInitialAuthorityTick),
+        'reopenedPostValidationAuthorityTick='
           + String(reopenedServer.composition.host.getAuthorityTick()),
         'durable PlayerIds preserved=true',
         'shared aggregate state exact=true',
@@ -1476,7 +1481,8 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
         durabilityCheckpointRevision:
           server.composition.host.diagnostics().lastDurableSaveRevision,
         reopenedFourPlayersReady: true,
-        reopenedAuthorityTick:
+        reopenedInitialAuthorityTick,
+        reopenedPostValidationAuthorityTick:
           reopenedServer.composition.host.getAuthorityTick(),
         reopenedSharedStateExact: true,
         reopenedBuildingStateExact: true,
