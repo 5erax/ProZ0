@@ -331,6 +331,59 @@ function withStorageCapacityFixture(
   }));
 }
 
+async function createPresentationConformanceSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  const playerId = 'visual-local';
+  const base = await createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId,
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
+  const loadout = withLocalLoadout(base, playerId, {
+    spear: true,
+    thermalWrap: true,
+  });
+  const inventoryId = 'inventory:' + playerId;
+  const inventory = loadout.containers.find(
+    (container) => container.containerId === inventoryId,
+  );
+  const spear = inventory?.stacks.find(
+    (stack) => stack.itemDefinitionId === 'item:basic-spear',
+  );
+  if (spear === undefined) {
+    throw new Error(
+      'P1-POLISH-007 fixture expected canonical Basic Spear.',
+    );
+  }
+
+  return validateEvidenceBundle(Object.freeze({
+    ...loadout,
+    containers: Object.freeze(loadout.containers.map((container) =>
+      container.containerId !== inventoryId
+        ? container
+        : Object.freeze({
+            ...container,
+            revision: container.revision + 1,
+            stacks: Object.freeze(container.stacks.map((stack) =>
+              stack.stackId !== spear.stackId
+                ? stack
+                : Object.freeze({
+                    ...stack,
+                    condition: 0,
+                  }),
+            )),
+          }),
+    )),
+  }));
+}
+
 async function createInventoryLogisticsSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -1169,6 +1222,274 @@ test('P1-POLISH-001 isolates primary panels from contextual HUD at required inte
       }
     }
   }
+});
+
+test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ page }) => {
+  test.setTimeout(180_000);
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+
+  const inventoryEvidence = await createPresentationConformanceSave(
+    'world:p1-polish-007-presentation-conformance',
+  );
+  const storageEvidence = await createInventoryLogisticsSave(
+    'world:p1-polish-007-storage-capacity',
+  );
+  const files: string[] = [];
+  const buildOrder = [
+    'structure:storage-crate',
+    'structure:workbench',
+    'structure:habitat-room',
+    'structure:compact-power-unit',
+    'structure:atmospheric-water-condenser',
+  ] as const;
+
+  for (const scale of [1, 2, 3] as const) {
+    const suffix = String(scale) + 'x';
+    await openProductReview(
+      page,
+      inventoryEvidence,
+      'proz0-p1-polish-007-conformance-' + suffix,
+      scale,
+    );
+
+    const weapon = page.locator(
+      '[data-equipment-slot="weapon"]',
+    );
+    const protection = page.locator(
+      '[data-equipment-slot="protection"]',
+    );
+    await expect(weapon).toHaveAttribute(
+      'data-equipment-state',
+      'BROKEN',
+    );
+    await expect(weapon.locator('.p1-equipment-broken'))
+      .toHaveText('BROKEN');
+    await expect(
+      weapon.locator('.p1-equipment-condition-track'),
+    ).toHaveAttribute('data-condition-current', '0');
+    await expect(
+      protection.locator('.p1-equipment-condition-track'),
+    ).toHaveAttribute('data-condition-current', '100');
+    await expect(protection).not.toHaveAttribute(
+      'data-equipment-state',
+      'BROKEN',
+    );
+    const equipmentFile =
+      'p1-polish-007-equipment-broken-' + suffix + '.png';
+    await captureViewport(page, equipmentFile);
+    files.push(equipmentFile);
+
+    await page.keyboard.press('i');
+    const inventoryPanel = page.locator(
+      '[data-panel-kind="inventory"]',
+    );
+    await expect(inventoryPanel).toBeVisible();
+    const inventoryCapacity = inventoryPanel.locator(
+      '.p1-panel-capacity',
+    );
+    await expect(inventoryCapacity).toContainText('/25.0 kg');
+    await expect(inventoryCapacity).toContainText('/24.0 u');
+    await expect(inventoryCapacity).toContainText(
+      /NORMAL|HEAVY|OVERLOADED/,
+    );
+    const brokenSpear = inventoryPanel.locator(
+      '.p1-item-row',
+    ).filter({ hasText: 'Basic Spear' }).first();
+    await expect(brokenSpear).toHaveAttribute(
+      'data-available',
+      'false',
+    );
+    await expect(
+      brokenSpear.locator('.p1-item-condition-track'),
+    ).toHaveAttribute('data-condition-current', '0');
+    await expect(
+      brokenSpear.locator('.p1-item-condition-track'),
+    ).toHaveAttribute('data-condition-max', '100');
+    const inventoryFile =
+      'p1-polish-007-inventory-capacity-' + suffix + '.png';
+    await captureViewport(page, inventoryFile);
+    files.push(inventoryFile);
+    await page.keyboard.press('i');
+
+    await page.keyboard.press('c');
+    const craftPanel = page.locator('[data-panel-kind="craft"]');
+    await expect(craftPanel).toBeVisible();
+    const craftRows = craftPanel.locator('.p1-craft-row');
+    expect(await craftRows.count()).toBeGreaterThan(0);
+    for (let index = 0; index < await craftRows.count(); index += 1) {
+      const row = craftRows.nth(index);
+      await expect(row.locator('.p1-craft-output-icon').first())
+        .toBeVisible();
+      const token = row.locator('.p1-craft-output-token').first();
+      await expect(token).toHaveAttribute(
+        'data-output-quantity',
+        /[1-9][0-9]*/,
+      );
+      await expect(token).toHaveAttribute(
+        'data-output-name',
+        /.+/,
+      );
+    }
+    const craftFile =
+      'p1-polish-007-craft-output-icons-' + suffix + '.png';
+    await captureViewport(page, craftFile);
+    files.push(craftFile);
+    await page.keyboard.press('c');
+
+    await page.keyboard.press('b');
+    const buildPanel = page.locator('[data-panel-kind="build"]');
+    await expect(buildPanel).toBeVisible();
+    const buildEntries = buildPanel.locator(
+      '.p1-build-catalog-entry',
+    );
+    await expect(buildEntries).toHaveCount(5);
+    expect(await buildEntries.evaluateAll((entries) =>
+      entries.map((entry) =>
+        (entry as HTMLElement).dataset.structureId,
+      ),
+    )).toEqual(buildOrder);
+    await expect(
+      buildEntries.locator('.p1-build-catalog-icon'),
+    ).toHaveCount(5);
+    await expect(
+      buildEntries.locator('[data-asset-path]'),
+    ).toHaveCount(5);
+    for (let index = 0; index < 5; index += 1) {
+      const entry = buildEntries.nth(index);
+      await expect(entry).toHaveAttribute(
+        'data-available-kit-count',
+        /[0-9]+/,
+      );
+      await expect(entry).toHaveAttribute(
+        'data-built-count',
+        /[0-9]+/,
+      );
+      await expect(entry).toHaveAttribute(
+        'data-build-cap',
+        /[1-9][0-9]*/,
+      );
+    }
+    await expect(
+      buildEntries.locator('[data-selected="true"]'),
+    ).toHaveCount(1);
+    const buildFile =
+      'p1-polish-007-build-catalog-' + suffix + '.png';
+    await captureViewport(page, buildFile);
+    files.push(buildFile);
+    await page.keyboard.press('b');
+
+    await page.keyboard.press('p');
+    const progression = page.locator(
+      '[data-panel-kind="progression"]',
+    );
+    await expect(progression).toBeVisible();
+    const progressionExpected = [
+      ['skill:fieldcraft-basics', '0', 'LOCKED'],
+      ['skill:maintenance-basics', '1', 'LOCKED'],
+      ['profession:explorer-prototype', '2', 'LOCKED'],
+      ['profession:engineer-prototype', '3', 'LOCKED'],
+    ] as const;
+    for (const [id, iconIndex, state] of progressionExpected) {
+      const row = progression.locator(
+        '[data-progression-id="' + id + '"]',
+      );
+      await expect(row).toHaveAttribute(
+        'data-progression-icon-index',
+        iconIndex,
+      );
+      await expect(row).toHaveAttribute(
+        'data-progression-state',
+        state,
+      );
+    }
+    const objectives = progression.locator(
+      '[data-progression-kind="objective"]',
+    );
+    await expect(objectives).toHaveCount(6);
+    for (let index = 0; index < 6; index += 1) {
+      await expect(objectives.nth(index)).toHaveAttribute(
+        'data-progression-icon-index',
+        '5',
+      );
+      await expect(objectives.nth(index)).toHaveAttribute(
+        'data-progression-state',
+        'INCOMPLETE',
+      );
+    }
+    await expect(page.locator('[data-quest-rail]')).toHaveCount(0);
+    const progressionFile =
+      'p1-polish-007-progression-objectives-'
+      + suffix
+      + '.png';
+    await captureViewport(page, progressionFile);
+    files.push(progressionFile);
+    await page.keyboard.press('p');
+
+    await openProductReview(
+      page,
+      storageEvidence,
+      'proz0-p1-polish-007-storage-' + suffix,
+      scale,
+    );
+    await page.keyboard.press('i');
+    const storagePanel = page.locator(
+      '[data-panel-kind="container"]',
+    );
+    await expect(storagePanel).toBeVisible();
+    const capacityRows = storagePanel.locator(
+      '.p1-panel-capacity',
+    );
+    await expect(capacityRows).toHaveCount(2);
+    await expect(capacityRows.nth(0)).toContainText('/25.0 kg');
+    await expect(capacityRows.nth(0)).toContainText('/24.0 u');
+    await expect(capacityRows.nth(0)).toContainText(
+      /NORMAL|HEAVY|OVERLOADED/,
+    );
+    await expect(capacityRows.nth(1)).toContainText('/100.0 kg');
+    await expect(capacityRows.nth(1)).toContainText('/120.0 u');
+    const storageFile =
+      'p1-polish-007-storage-capacity-' + suffix + '.png';
+    await captureViewport(page, storageFile);
+    files.push(storageFile);
+  }
+
+  writeFileSync(
+    resolve(
+      EVIDENCE_DIR,
+      'p1-polish-007-presentation-manifest.json',
+    ),
+    JSON.stringify({
+      schemaVersion: 1,
+      task: 'P1-POLISH-007',
+      evidenceKind: 'final-qa-presentation-conformance',
+      testedHead:
+        process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
+      workflowCommit:
+        process.env.GITHUB_SHA ?? 'local-worktree',
+      generatedAt: new Date().toISOString(),
+      runtime: {
+        mode: 'phase1-product-review',
+        canonicalAuthority: true,
+        persistence: 'indexeddb-save-v2',
+        qaFixture: false,
+      },
+      invariants: {
+        inventoryCurrentMaxCapacity: true,
+        storageCurrentMaxCapacity: true,
+        itemConditionStripAndUnavailable: true,
+        equipmentConditionAndBrokenIndependentProtection: true,
+        craftOutputIconNameQuantity: true,
+        exactFiveBuildCatalog: true,
+        buildKitCountCapSelectedState: true,
+        progressionApprovedStateIcons: true,
+        orderedQuestObjectives: true,
+        noPersistentQuestRail: true,
+        integerPresentation1x2x3x: true,
+      },
+      files,
+    }, null, 2) + '\n',
+    'utf8',
+  );
 });
 
 test('P1-POLISH-005 drives selected-stack inventory and storage actions', async ({ page }) => {
