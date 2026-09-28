@@ -300,6 +300,69 @@ async function createDeathSave(
   );
 }
 
+async function createCriticalHealthSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  return createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+    async (authority) => {
+      const result = authority.survival.applyAuthorityDamage({
+        damageId: 'evidence:critical-health',
+        sourceType: 'hostile-attack',
+        sourceEntityId: 'evidence:predator',
+        targetPlayerId: 'visual-local',
+        amount: 75,
+        tick: authority.authorityTick,
+      });
+      if (result.status !== 'applied' || result.healthAfter > 30) {
+        throw new Error('Evidence setup failed to stage critical health.');
+      }
+      await authority.stepSolo();
+    },
+  );
+}
+
+async function createResourceFocusSave(
+  worldId: string,
+): Promise<PortableSaveBundleV2> {
+  return createBaseSave(
+    worldId,
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+    (authority) => {
+      const resource = authority.world.getActiveGeneratedEntities().find(
+        (entity) =>
+          entity.type === 'resource'
+          && entity.definitionId === 'resource:fiber-plant',
+      );
+      if (resource === undefined) {
+        throw new Error('Evidence setup could not resolve canonical Fiber Plant.');
+      }
+      authority.getRuntime('visual-local').relocatePlayer(
+        Object.freeze({
+          x: resource.position.x - 0.5,
+          y: resource.position.y,
+        }),
+        'E',
+      );
+    },
+  );
+}
+
 async function createWorldDropSave(
   worldId: string,
 ): Promise<PortableSaveBundleV2> {
@@ -434,7 +497,7 @@ async function openProductReview(
   page: Page,
   bundle: PortableSaveBundleV2,
   databaseName: string,
-  scale: 2 | 3,
+  scale: 1 | 2 | 3,
   localPlayerId = 'visual-local',
   sessionPlayerIds?: readonly string[],
 ): Promise<void> {
@@ -522,7 +585,208 @@ async function captureProductWorld(
   });
 }
 
+async function assertPanelCompositionIsolated(
+  page: Page,
+  activePanelSelector: string,
+): Promise<void> {
+  const geometry = await page.evaluate((panelSelector) => {
+    type Rect = {
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      width: number;
+      height: number;
+    };
+
+    const visibleRect = (element: Element | null): Rect | null => {
+      if (!(element instanceof HTMLElement)) return null;
+      const style = getComputedStyle(element);
+      if (
+        style.display === 'none'
+        || style.visibility === 'hidden'
+        || Number(style.opacity) === 0
+      ) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return null;
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+
+    const panel = visibleRect(document.querySelector(panelSelector));
+    const controlsHint = visibleRect(
+      document.querySelector('.p1-product-controls-hint'),
+    );
+    const firstAction = visibleRect(
+      document.querySelector('[data-first-action-cue="visible"]'),
+    );
+    const contextualHud = [
+      ...document.querySelectorAll('.p1-context-hud'),
+    ].map(visibleRect).filter((rect): rect is Rect => rect !== null);
+
+    return {
+      panel,
+      controlsHint,
+      firstAction,
+      contextualHud,
+      viewport: {
+        width: innerWidth,
+        height: innerHeight,
+      },
+    };
+  }, activePanelSelector);
+
+  if (geometry.panel === null) {
+    throw new Error(
+      'Expected visible active panel: ' + activePanelSelector,
+    );
+  }
+  const activePanel = geometry.panel;
+
+  const intersects = (
+    left: NonNullable<typeof geometry.panel>,
+    right: typeof geometry.controlsHint,
+  ): boolean => {
+    if (right === null) return false;
+    return !(
+      left.right <= right.left
+      || right.right <= left.left
+      || left.bottom <= right.top
+      || right.bottom <= left.top
+    );
+  };
+
+  expect(
+    intersects(activePanel, geometry.controlsHint),
+    'Controls hint must not intersect active panel',
+  ).toBe(false);
+  expect(
+    intersects(activePanel, geometry.firstAction),
+    'First-action cue must not intersect active panel',
+  ).toBe(false);
+  expect(geometry.controlsHint).toBeNull();
+  expect(geometry.firstAction).toBeNull();
+  expect(geometry.contextualHud).toEqual([]);
+
+  expect(activePanel.left).toBeGreaterThanOrEqual(0);
+  expect(activePanel.top).toBeGreaterThanOrEqual(0);
+  expect(activePanel.right).toBeLessThanOrEqual(
+    geometry.viewport.width,
+  );
+  expect(activePanel.bottom).toBeLessThanOrEqual(
+    geometry.viewport.height,
+  );
+}
+
 test.use({ deviceScaleFactor: 1 });
+
+test('P1-POLISH-001 isolates primary panels from contextual HUD at required integer scales', async ({ page }) => {
+  const normal = await createBaseSave(
+    'world:p1-polish-001-panel-composition',
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
+
+  const layouts = [
+    Object.freeze({ label: '1x', scale: 1 as const, viewport: null }),
+    Object.freeze({ label: '2x', scale: 2 as const, viewport: null }),
+    Object.freeze({ label: '3x', scale: 3 as const, viewport: null }),
+    Object.freeze({
+      label: '1363x936',
+      scale: 2 as const,
+      viewport: Object.freeze({ width: 1363, height: 936 }),
+    }),
+  ] as const;
+
+  const panels = [
+    Object.freeze({
+      label: 'inventory',
+      key: 'i',
+      selector: '[data-panel-kind="inventory"]',
+    }),
+    Object.freeze({
+      label: 'craft',
+      key: 'c',
+      selector: '[data-panel-kind="craft"]',
+    }),
+    Object.freeze({
+      label: 'map',
+      key: 'm',
+      selector: '[data-panel-kind="map"]',
+    }),
+    Object.freeze({
+      label: 'build',
+      key: 'b',
+      selector: '[data-panel-kind="build"]',
+    }),
+    Object.freeze({
+      label: 'help',
+      key: 'h',
+      selector: '.p1-product-controls-panel',
+    }),
+  ] as const;
+
+  for (const layout of layouts) {
+    for (const panelCase of panels) {
+      const databaseName =
+        'proz0-p1-polish-001-panel-'
+        + layout.label
+        + '-'
+        + panelCase.label;
+      await openProductReview(
+        page,
+        normal,
+        databaseName,
+        layout.scale,
+      );
+
+      if (layout.viewport !== null) {
+        await page.setViewportSize(layout.viewport);
+        await expect(page.locator('#proz0-canvas')).toHaveAttribute(
+          'data-display-scale',
+          String(layout.scale),
+        );
+      }
+
+      await expect(page.locator('.p1-product-controls-hint')).toBeVisible();
+      await expect(
+        page.locator('[data-first-action-cue="visible"]'),
+      ).toBeVisible();
+
+      await page.keyboard.press(panelCase.key);
+      await expect(page.locator(panelCase.selector)).toBeVisible();
+
+      await assertPanelCompositionIsolated(
+        page,
+        panelCase.selector,
+      );
+
+      if (panelCase.label === 'help') {
+        await expect(
+          page.locator('[data-proz0-autoboot]'),
+        ).toHaveAttribute('data-product-review-help-open', 'true');
+      } else {
+        await expect(
+          page.locator('[data-proz0-autoboot]'),
+        ).toHaveAttribute('data-product-review-panel-open', 'true');
+      }
+    }
+  }
+});
 
 test('P1-INT-001 captures direct Product Review visual correction evidence', async ({ page }) => {
   test.setTimeout(120_000);
@@ -563,6 +827,11 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     normalBase,
     'visual-local',
     { thermalWrap: true },
+  );
+  const dualEquipment = withLocalLoadout(
+    normalBase,
+    'visual-local',
+    { thermalWrap: true, spear: true },
   );
   const buildValid = withLocalLoadout(
     normalBase,
@@ -670,8 +939,232 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await expect(page.locator('[data-region="world"]'))
     .toContainText('4 TEAM');
 
+  await expect(
+    page.locator('[data-first-action-cue="visible"]'),
+  ).toContainText('FIRST STEP · Move near a resource.');
+  await expect(
+    page.locator('[data-world-role="player"][data-local-player="true"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.locator(
+      '[data-world-role="structure"]'
+        + '[data-world-id="structure-instance:landing-module"]',
+    ),
+  ).toHaveCount(1);
+  await expect(
+    page.locator('[data-world-role="player"][data-local-player="true"]'),
+  ).not.toHaveCSS('filter', 'none');
+  await expect(page.locator('.p1-product-controls-panel')).toBeHidden();
+
+  await captureViewport(page, 'polish-first-entry-2x.png');
+  files.push('polish-first-entry-2x.png');
+
+  await expect(page.locator('.p1-product-controls-hint')).toBeVisible();
+  const hudLaneBounds = await page.evaluate(() => {
+    const survival = document.querySelector<HTMLElement>(
+      '[data-region="survival"]',
+    );
+    const controlsHint = document.querySelector<HTMLElement>(
+      '.p1-product-controls-hint',
+    );
+    if (survival === null || controlsHint === null) {
+      throw new Error(
+        'Polish evidence requires survival and controls elements.',
+      );
+    }
+    const survivalRect = survival.getBoundingClientRect();
+    const controlsRect = controlsHint.getBoundingClientRect();
+    return {
+      survivalBottom: survivalRect.bottom,
+      controlsTop: controlsRect.top,
+      survivalHeight: survivalRect.height,
+      controlsHeight: controlsRect.height,
+      controlsDisplay: getComputedStyle(controlsHint).display,
+      controlsVisibility: getComputedStyle(controlsHint).visibility,
+    };
+  });
+  expect(hudLaneBounds.survivalHeight).toBeGreaterThan(0);
+  expect(hudLaneBounds.controlsHeight).toBeGreaterThan(0);
+  expect(hudLaneBounds.controlsDisplay).not.toBe('none');
+  expect(hudLaneBounds.controlsVisibility).not.toBe('hidden');
+  expect(hudLaneBounds.survivalBottom).toBeLessThanOrEqual(
+    hudLaneBounds.controlsTop,
+  );
+
   await captureViewport(page, 'normal-fog-coop-2x.png');
   files.push('normal-fog-coop-2x.png');
+
+  const resourceFocus = await createResourceFocusSave(
+    'world:p1-polish-001-resource-focus',
+  );
+  await openProductReview(
+    page,
+    resourceFocus,
+    'proz0-p1-polish-001-resource-focus',
+    2,
+  );
+  await expect(page.locator('.p1-interaction-main')).toContainText(
+    '[E] GATHER · Fiber Plant',
+  );
+  await expect(
+    page.locator('[data-first-action-cue="visible"]'),
+  ).toContainText('[E] GATHER · Fiber Plant');
+  await expect(
+    page.locator(
+      '[data-world-role="resource"][data-focused-target="true"]',
+    ),
+  ).toHaveCount(1);
+  await captureViewport(page, 'polish-exact-target-2x.png');
+  files.push('polish-exact-target-2x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-polish-001-inventory',
+    2,
+    'visual-local',
+    players.map((player) => player.playerId),
+  );
+  await page.keyboard.press('i');
+  await expect(page.locator('[data-panel-kind="inventory"]')).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="inventory"] .p1-item-icon').first(),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="inventory"] .p1-item-row[data-selected="true"]'),
+  ).toHaveCount(1);
+  await captureViewport(page, 'polish-inventory-2x.png');
+  files.push('polish-inventory-2x.png');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('c');
+  await expect(page.locator('[data-panel-kind="craft"]')).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="craft"] .p1-craft-ingredient').first(),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-panel-kind="craft"] .p1-craft-station').first(),
+  ).toBeVisible();
+  const craftIcons2x = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(
+      '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
+    )].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        assetPath: element.dataset.assetPath ?? null,
+        inlineWidth: element.style.width,
+        inlineHeight: element.style.height,
+        backgroundSize: element.style.backgroundSize,
+        renderedWidth: rect.width,
+        renderedHeight: rect.height,
+        connected: element.isConnected,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+      };
+    }),
+  );
+  expect(craftIcons2x.length).toBeGreaterThan(0);
+  for (const icon of craftIcons2x) {
+    expect(icon.assetPath).toBe('assets/phase1/items/item_icon_atlas.png');
+    expect(icon.inlineWidth).toBe('24px');
+    expect(icon.inlineHeight).toBe('24px');
+    expect(icon.backgroundSize).toBe('144px 72px');
+    expect(icon.connected).toBe(true);
+    expect(icon.display).not.toBe('none');
+    expect(icon.visibility).not.toBe('hidden');
+    expect(icon.renderedWidth).toBe(48);
+    expect(icon.renderedHeight).toBe(48);
+  }
+  const craftLayout = await page.locator(
+    '[data-panel-kind="craft"]',
+  ).evaluate((panel) => {
+    const element = panel as HTMLElement;
+    const rows = [
+      ...element.querySelectorAll<HTMLElement>('.p1-craft-row'),
+    ];
+    const panelRect = element.getBoundingClientRect();
+    const lastRowRect = rows.at(-1)?.getBoundingClientRect();
+    return {
+      rowCount: rows.length,
+      panelBottom: panelRect.bottom,
+      lastRowBottom: lastRowRect?.bottom ?? Number.POSITIVE_INFINITY,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    };
+  });
+  expect(craftLayout.rowCount).toBe(6);
+  expect(craftLayout.lastRowBottom).toBeLessThanOrEqual(
+    craftLayout.panelBottom,
+  );
+  expect(craftLayout.scrollHeight).toBeLessThanOrEqual(
+    craftLayout.clientHeight,
+  );
+  await captureViewport(page, 'polish-craft-have-need-2x.png');
+  files.push('polish-craft-have-need-2x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-polish-001-craft-1x',
+    1,
+    'visual-local',
+    players.map((player) => player.playerId),
+  );
+  await page.keyboard.press('c');
+  await expect(page.locator('[data-panel-kind="craft"]')).toBeVisible();
+  const craftIcons1x = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>(
+      '[data-panel-kind="craft"] .p1-craft-ingredient-icon',
+    )].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        assetPath: element.dataset.assetPath ?? null,
+        renderedWidth: rect.width,
+        renderedHeight: rect.height,
+        backgroundImage: getComputedStyle(element).backgroundImage,
+        connected: element.isConnected,
+        display: getComputedStyle(element).display,
+        visibility: getComputedStyle(element).visibility,
+      };
+    }),
+  );
+  expect(craftIcons1x.length).toBeGreaterThan(0);
+  for (const icon of craftIcons1x) {
+    expect(icon.assetPath).toBe('assets/phase1/items/item_icon_atlas.png');
+    expect(icon.connected).toBe(true);
+    expect(icon.display).not.toBe('none');
+    expect(icon.visibility).not.toBe('hidden');
+    expect(icon.renderedWidth).toBe(24);
+    expect(icon.renderedHeight).toBe(24);
+    expect(icon.backgroundImage).not.toBe('none');
+  }
+  await captureViewport(page, 'polish-craft-have-need-1x.png');
+  files.push('polish-craft-have-need-1x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-int-001-normal-1x',
+    1,
+  );
+  await captureViewport(page, 'polish-normal-1x.png');
+  files.push('polish-normal-1x.png');
+
+  await openProductReview(
+    page,
+    normal,
+    'proz0-p1-int-001-normal-1363',
+    2,
+  );
+  await page.setViewportSize({ width: 1363, height: 936 });
+  await expect(page.locator('#proz0-canvas')).toHaveAttribute(
+    'data-display-scale',
+    '2',
+  );
+  await expect(page.locator('#proz0-canvas')).toHaveCSS('width', '1280px');
+  await expect(page.locator('#proz0-canvas')).toHaveCSS('height', '720px');
+  await captureViewport(page, 'polish-1363x936-centered-2x.png');
+  files.push('polish-1363x936-centered-2x.png');
 
   await openProductReview(
     page,
@@ -681,6 +1174,39 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   );
   await captureViewport(page, 'normal-3x.png');
   files.push('normal-3x.png');
+
+  await openProductReview(
+    page,
+    dualEquipment,
+    'proz0-p1-polish-001-dual-equipment',
+    2,
+  );
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).toContainText('Basic Spear');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('Thermal Wrap');
+  await expect(
+    page.locator('[data-equipment-slot="weapon"]'),
+  ).toContainText('C100');
+  await expect(
+    page.locator('[data-equipment-slot="protection"]'),
+  ).toContainText('C100');
+  const equipmentOverflow = await page.locator(
+    '[data-region="equipment"]',
+  ).evaluate((panel) =>
+    [...panel.querySelectorAll<HTMLElement>('.p1-equipment-slot')]
+      .map((row) => ({
+        scrollWidth: row.scrollWidth,
+        clientWidth: row.clientWidth,
+      })),
+  );
+  for (const row of equipmentOverflow) {
+    expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+  }
+  await captureViewport(page, 'polish-dual-equipment-2x.png');
+  files.push('polish-dual-equipment-2x.png');
 
   await openProductReview(
     page,
@@ -743,6 +1269,26 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await captureViewport(page, 'build-invalid-3x.png');
   await captureProductWorld(page, 'build-invalid-world-3x.png');
   files.push('build-invalid-3x.png', 'build-invalid-world-3x.png');
+
+  const criticalHealth = await createCriticalHealthSave(
+    'world:p1-polish-001-critical-health',
+  );
+  await openProductReview(
+    page,
+    criticalHealth,
+    'proz0-p1-polish-001-critical-health',
+    2,
+  );
+  await expect(
+    page.locator('[data-region="survival"] .p1-meter[data-severity="critical"]').first(),
+  ).toBeVisible();
+  await captureViewport(page, 'polish-critical-survival-2x.png');
+  files.push('polish-critical-survival-2x.png');
+
+  await page.keyboard.press('h');
+  await expect(page.locator('.p1-product-controls-panel')).toBeVisible();
+  await captureViewport(page, 'polish-controls-open-2x.png');
+  files.push('polish-controls-open-2x.png');
 
   const nightRain = withAuthorityTick(
     normal,
@@ -867,6 +1413,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   const manifest = {
     schemaVersion: 1,
     task: 'P1-INT-001',
+    polishTask: 'P1-POLISH-001',
     evidenceKind: 'direct-phase1-product-review',
     testedHead: process.env.P0_TEST_HEAD_SHA ?? 'local-worktree',
     workflowCommit: process.env.GITHUB_SHA ?? 'local-worktree',
@@ -881,6 +1428,16 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     },
     cases: {
       normalFogCoop2x: 'normal-fog-coop-2x.png',
+      polishFirstEntry2x: 'polish-first-entry-2x.png',
+      polishExactTarget2x: 'polish-exact-target-2x.png',
+      polishNormal1x: 'polish-normal-1x.png',
+      polish1363Centered2x: 'polish-1363x936-centered-2x.png',
+      polishInventory2x: 'polish-inventory-2x.png',
+      polishCraftHaveNeed1x: 'polish-craft-have-need-1x.png',
+      polishCraftHaveNeed2x: 'polish-craft-have-need-2x.png',
+      polishDualEquipment2x: 'polish-dual-equipment-2x.png',
+      polishCriticalSurvival2x: 'polish-critical-survival-2x.png',
+      polishControlsOpen2x: 'polish-controls-open-2x.png',
       normal3x: 'normal-3x.png',
       thermalWrap2x: 'thermal-wrap-2x.png',
       buildValid3x: 'build-valid-3x.png',
@@ -902,7 +1459,15 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       canonicalAuthority: true,
       saveV2Reopen: true,
       noQaWorldPreview: true,
-      integerScale2x3x: true,
+      integerScale1x2x3x: true,
+      centered1363x936Uses2x: true,
+      survivalControlsDoNotOverlap: true,
+      craftShowsAllHaveNeedAndStation: true,
+      craftUsesNativeItemIcons: true,
+      dualEquipmentVisible: true,
+      firstActionCueBoundToProgression: true,
+      firstEntryBeforeControlsShowsPlayerBaseAndCue: true,
+      focusedTargetMatchesInteractionResolver: true,
       terrainAndFogFromCanonicalWorld: true,
       continuousCanonicalCellCoverage: true,
       runtimeOwnedCoopIdentitySlots: true,

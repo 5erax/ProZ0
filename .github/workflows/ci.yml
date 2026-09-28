@@ -103,3 +103,12 @@ jobs:
           path: test-results/p1-qa-002-entrypoint/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Upload P1-POLISH-001 first-10-minute evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: p1-polish-001-first-10min-${{ github.sha }}
+          path: test-results/p1-int-001-product-review/
+          if-no-files-found: ignore
+          retention-days: 30

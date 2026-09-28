@@ -90,6 +90,9 @@ export interface Phase1RuntimePresentationInput {
   readonly survival: Readonly<PlayerSurvivalView>;
   readonly inventory: Readonly<ContainerView>;
   readonly equippedStackId?: string | null;
+  readonly equippedWeaponStackId?: string | null;
+  readonly equippedThermalWrapStackId?: string | null;
+  readonly quickUseStackId?: string | null;
   readonly environment: Readonly<Phase1EnvironmentView>;
   readonly progression: Readonly<PlayerProgressionView>;
   readonly playerMotions?: readonly Readonly<PlayerMotionViewV1>[];
@@ -204,6 +207,39 @@ function equipment(
   });
 }
 
+export function resolvePhase1QuickUseStackId(
+  catalog: ContentCatalogV1,
+  inventory: Readonly<ContainerView>,
+): string | null {
+  return inventory.stacks
+    .filter((candidate) =>
+      catalog.getAs(candidate.itemDefinitionId, 'item')
+        .capabilities.includes('consumable'),
+    )
+    .sort((left, right) => {
+      const leftPriority =
+        left.itemDefinitionId === 'item:clean-water' ? 0 : 1;
+      const rightPriority =
+        right.itemDefinitionId === 'item:clean-water' ? 0 : 1;
+      return leftPriority - rightPriority
+        || left.stackId.localeCompare(right.stackId);
+    })[0]?.stackId ?? null;
+}
+
+function quickUseTargetName(
+  catalog: ContentCatalogV1,
+  inventory: Readonly<ContainerView>,
+  stackId: string | null,
+): string | null {
+  if (stackId === null) return null;
+  const stack = inventory.stacks.find(
+    (candidate) => candidate.stackId === stackId,
+  );
+  return stack === undefined
+    ? null
+    : catalog.get(stack.itemDefinitionId).displayName;
+}
+
 const FAILURE_REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({
   STALE_REVISION: 'STALE / WORLD STATE CHANGED',
   WORLD_STATE_CHANGED: 'STALE / WORLD STATE CHANGED',
@@ -266,15 +302,42 @@ function commandToasts(
 ): readonly Phase1ToastPresentation[] {
   if (feedback === null || feedback === undefined) return Object.freeze([]);
   const result = feedback.result;
+  const actionLabel =
+    '[' + feedback.inputLabel + '] '
+    + feedback.verb + ' · ' + feedback.target;
+
   if (result.status === 'rejected') {
     return Object.freeze([Object.freeze({
       id: `command:${result.operationId}`,
       kind: 'warning' as const,
       title: phase1FailureReasonLabel(result.reason ?? 'COMMAND REJECTED'),
-      detail: feedback.target,
+      detail: actionLabel,
     })]);
   }
-  return Object.freeze([]);
+
+  const toastVerbs = new Set([
+    'GATHER',
+    'CRAFT',
+    'BUILD',
+    'REPAIR',
+    'COLLECT',
+    'CLAIM',
+    'ENABLE',
+    'DISABLE',
+    'RECOVER',
+    'CONSUME',
+    'EQUIP',
+    'UNEQUIP',
+    'ATTACK',
+  ]);
+  if (!toastVerbs.has(feedback.verb)) return Object.freeze([]);
+
+  return Object.freeze([Object.freeze({
+    id: `command:${result.operationId}`,
+    kind: 'info' as const,
+    title: feedback.verb + ' · COMPLETE',
+    detail: actionLabel,
+  })]);
 }
 
 function worldTimeLabel(environment: Readonly<Phase1EnvironmentView>): string {
@@ -590,6 +653,16 @@ export function projectPhase1RuntimePresentation(
 ): Readonly<Phase1PresentationState> {
   const environment = input.environment;
   const coldRain = environment.coldRainStatus;
+  const hasExplicitEquipmentSlots =
+    input.equippedWeaponStackId !== undefined
+    || input.equippedThermalWrapStackId !== undefined;
+  const quickUseStackId = input.quickUseStackId
+    ?? resolvePhase1QuickUseStackId(input.catalog, input.inventory);
+  const quickUseTarget = quickUseTargetName(
+    input.catalog,
+    input.inventory,
+    quickUseStackId,
+  );
   const teammateViews = teammates(
     input.survival.playerId,
     input.playerMotions ?? [],
@@ -619,6 +692,35 @@ export function projectPhase1RuntimePresentation(
       input.inventory,
       input.equippedStackId,
     ),
+    ...(hasExplicitEquipmentSlots
+      ? {
+          equipmentSlots: Object.freeze({
+            weapon: equipment(
+              input.catalog,
+              input.inventory,
+              input.equippedWeaponStackId,
+            ),
+            protection: equipment(
+              input.catalog,
+              input.inventory,
+              input.equippedThermalWrapStackId,
+            ),
+            quickUse: Object.freeze({
+              inputLabel: 'V' as const,
+              verb: 'CONSUME' as const,
+              target: quickUseTarget,
+              state: quickUseTarget === null
+                ? 'UNAVAILABLE' as const
+                : 'AVAILABLE' as const,
+            }),
+          }),
+        }
+      : {}),
+    firstActionCue: input.progression.milestoneRuleIds.some(
+      (ruleId) => ruleId.startsWith('first-gather:'),
+    )
+      ? null
+      : 'FIRST STEP · Move near a resource.',
     world: Object.freeze({
       timeLabel: worldTimeLabel(environment),
       dayPeriod: environment.dayPeriod.toUpperCase() as 'DAY' | 'NIGHT',

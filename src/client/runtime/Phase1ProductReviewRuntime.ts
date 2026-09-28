@@ -264,6 +264,7 @@ export async function createPhase1ProductReviewRuntime(
         targetedDeathCacheId: null,
         recoveredDeathCache: null,
         buildPreview: null,
+        focusedWorldTargetId: null,
       });
 
   const worldRenderer = createPhase1ProductReviewWorldRenderer(
@@ -510,12 +511,19 @@ export async function createPhase1ProductReviewRuntime(
               + '× '
               + bundle.catalog.get(input.itemId).displayName,
             )
-            .concat(
-              recipe.requiredStationStructureId === null
-                ? []
-                : ['Workbench'],
-            )
             .join(' + '),
+          ingredients: Object.freeze(recipe.inputs.map((input) =>
+            Object.freeze({
+              name: bundle.catalog.get(input.itemId).displayName,
+              have: itemQuantity(input.itemId),
+              need: input.quantity,
+            }),
+          )),
+          stationLabel: recipe.requiredStationStructureId === null
+            ? null
+            : workbench === null
+              ? 'WORKBENCH · REQUIRED'
+              : 'WORKBENCH · READY',
           state: reason === null ? 'AVAILABLE' : 'BLOCKED',
           reason,
         });
@@ -583,6 +591,7 @@ export async function createPhase1ProductReviewRuntime(
 
     source.setPresentationPanel(craftPanel());
     source.setLocalCommandFeedback({
+      inputLabel: String(slot + 1),
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
@@ -762,6 +771,7 @@ export async function createPhase1ProductReviewRuntime(
 
     source.setPresentationPanel(buildPanel());
     source.setLocalCommandFeedback({
+      inputLabel: 'ENTER',
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
@@ -1075,6 +1085,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     source.setLocalCommandFeedback({
+      inputLabel: 'V',
       operationId: start.operationId,
       status: 'rejected',
       reason: start.reason,
@@ -1092,19 +1103,12 @@ export async function createPhase1ProductReviewRuntime(
     const inventory = bundle.items.getContainerView(
       'inventory:' + config.localPlayerId,
     );
-    const stack = inventory.stacks
-      .filter((candidate) =>
-        bundle.catalog.getAs(candidate.itemDefinitionId, 'item')
-          .capabilities.includes('consumable'),
-      )
-      .sort((left, right) => {
-        const leftPriority =
-          left.itemDefinitionId === 'item:clean-water' ? 0 : 1;
-        const rightPriority =
-          right.itemDefinitionId === 'item:clean-water' ? 0 : 1;
-        return leftPriority - rightPriority
-          || left.stackId.localeCompare(right.stackId);
-      })[0];
+    const quickUseStackId = source.resolveQuickUseStackId();
+    const stack = quickUseStackId === null
+      ? undefined
+      : inventory.stacks.find(
+          (candidate) => candidate.stackId === quickUseStackId,
+        );
     const operationId = nextOperationId('consume');
     const targetName = stack === undefined
       ? 'Consumable'
@@ -1144,6 +1148,7 @@ export async function createPhase1ProductReviewRuntime(
         const targetName = activeConsume.targetName;
         activeConsume = null;
         source.setLocalCommandFeedback({
+          inputLabel: 'V',
           operationId: result.operationId,
           status: 'rejected',
           reason: result.reason,
@@ -1156,6 +1161,7 @@ export async function createPhase1ProductReviewRuntime(
         const targetName = activeConsume.targetName;
         activeConsume = null;
         source.setLocalCommandFeedback({
+          inputLabel: 'V',
           operationId: result.operationId,
           status: result.committed ? 'committed' : 'rejected',
           ...(result.committed ? {} : { reason: 'SOURCE_MISSING' }),
@@ -1254,7 +1260,11 @@ export async function createPhase1ProductReviewRuntime(
       const view = bundle.machines.getView(machine.structureId);
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: view.outputCount > 0 ? 'COLLECT' : 'USE MACHINE',
+        verb: view.outputCount > 0
+          ? 'COLLECT'
+          : view.enabled
+            ? 'DISABLE'
+            : 'ENABLE',
         target: 'Atmospheric Water Condenser',
         state: 'AVAILABLE',
         reason: view.derivedState,
@@ -1309,14 +1319,7 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
-    source.setInteraction(Object.freeze({
-      inputLabel: 'E',
-      verb: 'INTERACT',
-      target: 'Move near an interactable',
-      state: 'UNAVAILABLE',
-      reason: null,
-      progress: null,
-    }));
+    source.setInteraction(null);
   };
 
   const beginContextInteraction = (): void => {
@@ -1386,6 +1389,7 @@ export async function createPhase1ProductReviewRuntime(
       : null;
     const result = bundle.equipWeapon(config.localPlayerId, next);
     source.setLocalCommandFeedback({
+      inputLabel: 'Q',
       operationId: nextOperationId('equip-weapon'),
       status: result.status,
       ...(result.status === 'rejected'
@@ -1412,6 +1416,7 @@ export async function createPhase1ProductReviewRuntime(
       : null;
     const result = bundle.equipThermalWrap(config.localPlayerId, next);
     source.setLocalCommandFeedback({
+      inputLabel: 'T',
       operationId: nextOperationId('equip-thermal-wrap'),
       status: result.status,
       ...(result.status === 'rejected'
@@ -1475,6 +1480,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     source.setLocalCommandFeedback({
+      inputLabel: 'SPACE',
       operationId: result.attackId,
       status: result.status === 'rejected' ? 'rejected' : 'committed',
       ...(result.status === 'rejected' && result.reason !== undefined
@@ -1639,6 +1645,23 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const focusedWorldTargetId = (): string | null => {
+    const cache = deathCacheTarget();
+    if (cache !== null) return cache.entityId;
+
+    const ruin = ruinTarget();
+    if (ruin !== null) return ruin.entity.entityId;
+
+    const machine = machineTarget();
+    if (machine !== null) return machine.structureId;
+
+    const workbench = accessibleWorkbench();
+    if (workbench !== null) return workbench.structureId;
+
+    const resource = resourceTarget();
+    return resource?.entityId ?? null;
+  };
+
   const refreshWorldPresentationContext = (): void => {
     if (
       attackPresentation !== null
@@ -1668,6 +1691,7 @@ export async function createPhase1ProductReviewRuntime(
       targetedDeathCacheId: deathCacheTarget()?.entityId ?? null,
       recoveredDeathCache,
       buildPreview: buildPreview(),
+      focusedWorldTargetId: focusedWorldTargetId(),
     });
   };
 

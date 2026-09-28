@@ -27,6 +27,19 @@ export interface Phase1EquipmentPresentation {
   readonly stateLabel: string;
 }
 
+export interface Phase1QuickUsePresentation {
+  readonly inputLabel: 'V';
+  readonly verb: 'CONSUME';
+  readonly target: string | null;
+  readonly state: 'AVAILABLE' | 'UNAVAILABLE';
+}
+
+export interface Phase1EquipmentSlotsPresentation {
+  readonly weapon: Phase1EquipmentPresentation | null;
+  readonly protection: Phase1EquipmentPresentation | null;
+  readonly quickUse: Phase1QuickUsePresentation;
+}
+
 export interface Phase1WorldPresentation {
   readonly timeLabel: string;
   readonly dayPeriod: 'DAY' | 'NIGHT';
@@ -76,11 +89,19 @@ export interface Phase1ContainerPanelPresentation {
   readonly feedback: string | null;
 }
 
+export interface Phase1CraftIngredientPresentation {
+  readonly name: string;
+  readonly have: number;
+  readonly need: number;
+}
+
 export interface Phase1CraftRowPresentation {
   readonly id: string;
   readonly name: string;
   readonly outputLabel: string;
   readonly requirementLabel: string;
+  readonly ingredients?: readonly Phase1CraftIngredientPresentation[];
+  readonly stationLabel?: string | null;
   readonly state: 'AVAILABLE' | 'BLOCKED';
   readonly reason: string | null;
 }
@@ -163,6 +184,8 @@ export interface Phase1PresentationState {
   readonly temperature: Phase1MeterPresentation;
   readonly carry: Phase1CarryPresentation;
   readonly equipment: Phase1EquipmentPresentation | null;
+  readonly equipmentSlots?: Phase1EquipmentSlotsPresentation;
+  readonly firstActionCue?: string | null;
   readonly world: Phase1WorldPresentation;
   readonly interaction: Phase1InteractionPresentation | null;
   readonly toasts: readonly Phase1ToastPresentation[];
