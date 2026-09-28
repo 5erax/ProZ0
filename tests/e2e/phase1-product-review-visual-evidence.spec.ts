@@ -340,8 +340,8 @@ async function createInventoryLogisticsSave(
     Object.freeze([
       Object.freeze({
         playerId,
-        x: 8,
-        y: 0,
+        x: 2.75,
+        y: 0.25,
         facing: 'E' as const,
       }),
     ]),
@@ -380,7 +380,7 @@ async function createInventoryLogisticsSave(
   try {
     const runtime = authority.getRuntime(playerId);
     runtime.relocatePlayer(
-      Object.freeze({ x: 8, y: 0 }),
+      Object.freeze({ x: 2.75, y: 0.25 }),
       'E',
     );
     await authority.stepSolo();
@@ -408,7 +408,7 @@ async function createInventoryLogisticsSave(
       expectedBuildRevision: authority.buildings.getBuildRevision(),
       placement: {
         mode: 'free',
-        anchor: Object.freeze({ x: 8, y: 0 }),
+        anchor: Object.freeze({ x: 2.75, y: 0.25 }),
         orientationQuarterTurns: 0,
       },
     });
