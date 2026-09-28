@@ -1208,7 +1208,7 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
       async () => (await latestMotionSet(rejoinPage)).length,
       { timeout: 5_000 },
     ).toBe(4);
-    const resumedMotions = await latestMotionSet(rejoinPage);
+    expect(await latestMotionSet(rejoinPage)).toHaveLength(4);
     expect(totalAncientAlloyShards(server.composition, playerIds)).toBe(1);
 
     await renderEvidencePanel(
@@ -1313,7 +1313,10 @@ test('four real Chromium clients reconnect, drain through Save V2, reopen, and p
     const savedInventoryByPlayer = new Map(
       saved.containers
         .filter((container) => container.kind === 'player-inventory')
-        .map((container) => [container.owner.playerId, container]),
+        .map((container) => [
+          container.containerId.slice('inventory:'.length),
+          container,
+        ]),
     );
     for (let index = 0; index < reopenedClients.length; index += 1) {
       const client = reopenedClients[index]!;
