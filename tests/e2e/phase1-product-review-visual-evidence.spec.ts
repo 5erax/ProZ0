@@ -223,7 +223,7 @@ function withInventoryLogisticsLoadout(
     Object.freeze({
       stackId: 'evidence:p1-polish-005:water:' + playerId,
       itemDefinitionId: 'item:clean-water',
-      quantity: 3,
+      quantity: 2,
       condition: null,
     }),
     Object.freeze({
@@ -253,13 +253,7 @@ function withInventoryLogisticsLoadout(
     Object.freeze({
       stackId: 'evidence:p1-polish-005:metal:' + playerId,
       itemDefinitionId: 'item:metal-ore',
-      quantity: 20,
-      condition: null,
-    }),
-    Object.freeze({
-      stackId: 'evidence:p1-polish-005:stone:' + playerId,
-      itemDefinitionId: 'item:stone',
-      quantity: 4,
+      quantity: 12,
       condition: null,
     }),
     Object.freeze({
@@ -1193,8 +1187,8 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
   );
 
   const carryBeforeActions = await carryWeight(page);
-  expect(carryBeforeActions).toBeGreaterThan(29);
-  expect(carryBeforeActions).toBeLessThanOrEqual(30);
+  expect(carryBeforeActions).toBeGreaterThan(17);
+  expect(carryBeforeActions).toBeLessThan(20);
 
   await page.keyboard.press('i');
   const panel = page.locator('[data-panel-kind="container"]');
@@ -1204,6 +1198,23 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
     'player',
   );
 
+  // Multiple-stack keyboard selection keeps the selected row inside
+  // the scrollable pane viewport rather than clipping below the panel.
+  await selectInventoryItem(page, 'player', 'Metal Ore');
+  const selectedWithinPane = await panel.locator(
+    '[data-inventory-pane="player"]',
+  ).evaluate((paneElement) => {
+    const paneRect = paneElement.getBoundingClientRect();
+    const selected = paneElement.querySelector<HTMLElement>(
+      '.p1-item-row[data-selected="true"]',
+    );
+    if (selected === null) return false;
+    const selectedRect = selected.getBoundingClientRect();
+    return selectedRect.top >= paneRect.top
+      && selectedRect.bottom <= paneRect.bottom;
+  });
+  expect(selectedWithinPane).toBe(true);
+
   // Selected-stack consume: Edible Plant changes; Clean Water does not.
   await selectInventoryItem(page, 'player', 'Edible Plant');
   await expect(
@@ -1211,14 +1222,14 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
   ).toContainText('×2');
   await expect(
     inventoryItemRow(page, 'player', 'Clean Water'),
-  ).toContainText('×3');
+  ).toContainText('×2');
   await page.keyboard.press('v');
   await expect(
     inventoryItemRow(page, 'player', 'Edible Plant'),
   ).toContainText('×1');
   await expect(
     inventoryItemRow(page, 'player', 'Clean Water'),
-  ).toContainText('×3');
+  ).toContainText('×2');
   await captureViewport(
     page,
     'p1-polish-005-selected-consume-2x.png',
@@ -1284,6 +1295,22 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
     'storage',
   );
   await selectInventoryItem(page, 'storage', 'Timber');
+
+  // Invalid Drop source pane rejects without deleting the selected stack.
+  await page.keyboard.press('g');
+  await expect(panel.locator('.p1-feedback'))
+    .toContainText('SOURCE MISSING');
+  await expect(
+    inventoryItemRow(page, 'storage', 'Timber'),
+  ).toContainText('×5');
+
+  // Chosen quantity 3 crosses the normal inbound weight threshold.
+  await page.keyboard.press(']');
+  await page.keyboard.press(']');
+  await expect(panel).toHaveAttribute(
+    'data-inventory-quantity',
+    '3',
+  );
   await page.keyboard.press('Enter');
   await expect(panel.locator('.p1-feedback'))
     .toContainText('INVENTORY WEIGHT LIMIT');
@@ -1365,7 +1392,7 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
   );
   await expect(
     inventoryItemRow(page, 'player', 'Clean Water'),
-  ).toContainText('×3');
+  ).toContainText('×2');
 
   await captureViewport(
     page,
@@ -1398,6 +1425,8 @@ test('P1-POLISH-005 drives selected-stack inventory and storage actions', async 
         selectedEquipmentOnly: true,
         independentProtectionSlot: true,
         selectedDropExactQuantity: true,
+        invalidDropNoLoss: true,
+        longListSelectionVisible: true,
         capacityRejectNoPartial: true,
         storagePartialDeposit: true,
         storageExactRetrieve: true,
