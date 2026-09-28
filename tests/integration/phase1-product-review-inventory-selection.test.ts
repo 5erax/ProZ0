@@ -23,6 +23,12 @@ async function createInventorySelectionBundle() {
       PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
   });
 
+  bundle.getRuntime(playerId).relocatePlayer(
+    Object.freeze({ x: 8, y: 0 }),
+    'E',
+  );
+  await bundle.stepSolo();
+
   let inventory = bundle.items.getContainerView(
     'inventory:' + playerId,
   );
