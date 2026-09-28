@@ -1053,21 +1053,6 @@ export class ServerAuthorityHost {
       : Object.freeze({ transportId, envelope });
   }
 
-  private broadcastReady(
-    messageType: Parameters<HostedSession['nextServerEnvelope']>[1],
-    payload: JsonValue,
-  ): readonly HostedOutboundMessage[] {
-    return Object.freeze(
-      this.session.getReadyConnections()
-        .map((connection) =>
-          this.envelope(connection.transportId, messageType, payload),
-        )
-        .filter(
-          (entry): entry is HostedOutboundMessage => entry !== null,
-        ),
-    );
-  }
-
   private broadcastLive(
     messageType: Parameters<HostedSession['nextServerEnvelope']>[1],
     payload: JsonValue,
