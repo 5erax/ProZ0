@@ -934,6 +934,17 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       }),
     ]),
   );
+  const decorReadability = await createBaseSave(
+    'world:p1-polish-002-decor-readability',
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 8,
+        y: 1,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
   const worldReadability = await createResourceFocusSave(
     'world:p1-polish-002-resource-readability',
   );
@@ -1109,19 +1120,37 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
 
   await openProductReview(
     page,
-    worldReadability,
-    'proz0-p1-polish-002-resource-readability-2x',
+    decorReadability,
+    'proz0-p1-polish-002-decor-readability-2x',
     2,
   );
   await expect(
     page.locator('[data-world-role="flora-decor"]'),
   ).not.toHaveCount(0);
   await expect(
-    page.locator('[data-world-role="resource"]'),
-  ).not.toHaveCount(0);
-  await expect(
     page.locator('[data-world-role="flora-decor"]').first(),
   ).toHaveAttribute('data-interactive', 'false');
+  await expect(
+    page.locator('[data-world-role="flora-decor"]').first(),
+  ).toHaveAttribute(
+    'data-asset-path',
+    'assets/phase1/world/terrain/flora_decor.png',
+  );
+  await captureProductWorld(
+    page,
+    'p1-polish-002-decor-readability-2x.png',
+  );
+  files.push('p1-polish-002-decor-readability-2x.png');
+
+  await openProductReview(
+    page,
+    worldReadability,
+    'proz0-p1-polish-002-resource-readability-2x',
+    2,
+  );
+  await expect(
+    page.locator('[data-world-role="resource"]'),
+  ).not.toHaveCount(0);
   await expect(
     page.locator(
       '[data-world-role="resource"][data-focused-target="true"]',
@@ -1182,6 +1211,8 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       midCaseMovesPlayerThroughAuthority: true,
       grayscale2x: 'p1-polish-002-map-grayscale-2x.png',
       baseAnchor2x: 'p1-polish-002-base-anchor-2x.png',
+      decorReadability2x:
+        'p1-polish-002-decor-readability-2x.png',
       resourceReadability2x:
         'p1-polish-002-resource-readability-2x.png',
     },
@@ -1200,6 +1231,7 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       grayscaleEvidence: true,
       baseAnchorWorldEvidence: true,
       decorativeFloraPresentationOnly: true,
+      deterministicDecorRevealFixture: true,
       gatherableVsDecorWorldEvidence: true,
     },
     files,
