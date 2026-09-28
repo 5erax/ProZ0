@@ -1488,7 +1488,7 @@ export async function createPhase1ProductReviewRuntime(
       'item',
     );
     const current = bundle.equipment.reconcile(config.localPlayerId);
-    let verb: 'EQUIP' | 'UNEQUIP' = 'EQUIP';
+    let verb: 'EQUIP' | 'UNEQUIP';
     let result:
       | ReturnType<typeof bundle.equipWeapon>
       | ReturnType<typeof bundle.equipThermalWrap>;
