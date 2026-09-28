@@ -32,6 +32,7 @@ import {
 import type {
   Phase1MapDistanceBand,
   Phase1MapExploredCellPresentation,
+  Phase1MapFacing,
   Phase1MapMarkerPresentation,
   Phase1MapPanelPresentation,
   Phase1MapUnknownBoundaryCellPresentation,
@@ -385,6 +386,20 @@ function teammateAtlasIndex(
   }
 }
 
+function teammateIdentitySlot(
+  slot: PresentationIdentitySlotV1,
+): 'TEAM_A' | 'TEAM_B' | 'TEAM_C' | null {
+  switch (slot) {
+    case 'TEAM_A':
+    case 'TEAM_B':
+    case 'TEAM_C':
+      return slot;
+    case 'LOCAL':
+    case 'UNASSIGNED':
+      return null;
+  }
+}
+
 function teammateLabel(
   slot: PresentationIdentitySlotV1,
 ): string | null {
@@ -540,12 +555,12 @@ export function projectPhase1ProductReviewMapPanel(
 
   for (const motion of motions) {
     if (motion.playerId === playerId) continue;
-    const atlasIndex = teammateAtlasIndex(
+    const identitySlot = teammateIdentitySlot(
       motion.presentationIdentitySlot,
     );
-    const label = teammateLabel(
-      motion.presentationIdentitySlot,
-    );
+    if (identitySlot === null) continue;
+    const atlasIndex = teammateAtlasIndex(identitySlot);
+    const label = teammateLabel(identitySlot);
     if (atlasIndex === null || label === null) continue;
     markers.push(Object.freeze({
       id: 'map:teammate:' + motion.playerId,
@@ -557,7 +572,7 @@ export function projectPhase1ProductReviewMapPanel(
       facing: mapFacing(motion.facing),
       distanceBand: null,
       selected: false,
-      identitySlot: motion.presentationIdentitySlot,
+      identitySlot,
     }));
   }
 
