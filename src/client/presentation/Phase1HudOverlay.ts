@@ -207,6 +207,8 @@ function itemRow(
       'span',
       'p1-item-condition-track',
     );
+    conditionTrack.dataset.conditionCurrent = String(item.condition);
+    conditionTrack.dataset.conditionMax = String(item.conditionMax ?? 100);
     const conditionFill = createElement(
       document,
       'span',
@@ -449,6 +451,8 @@ function renderPanel(
             'span',
             'p1-craft-output-token',
           );
+          outputToken.dataset.outputName = outputState.name;
+          outputToken.dataset.outputQuantity = String(outputState.quantity);
           const outputIcon = assetSprite(
             document,
             'p1-asset-icon p1-craft-output-icon',
@@ -547,6 +551,9 @@ function renderPanel(
         row.dataset.structureId = entry.structureId;
         row.dataset.selected = String(entry.selected);
         row.dataset.buildCapState = entry.buildCapState;
+        row.dataset.availableKitCount = String(entry.availableKitCount);
+        row.dataset.builtCount = String(entry.builtCount);
+        row.dataset.buildCap = String(entry.buildCap);
         const iconSource = (() => {
           switch (entry.structureId) {
             case 'structure:storage-crate':
@@ -688,6 +695,7 @@ function renderPanel(
             row.dataset.progressionKind = rowState.kind;
             row.dataset.progressionState = rowState.state;
             row.dataset.progressionId = rowState.id;
+            row.dataset.progressionIconIndex = String(rowState.iconIndex);
             const icon = assetSprite(
               document,
               'p1-progression-icon',
@@ -1317,6 +1325,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
               'span',
               'p1-equipment-condition-track',
             );
+            conditionTrack.dataset.conditionCurrent = String(slot.condition);
+            conditionTrack.dataset.conditionMax = String(slot.conditionMax);
             const conditionFill = createElement(
               this.document,
               'span',
