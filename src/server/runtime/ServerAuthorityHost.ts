@@ -541,21 +541,38 @@ export class ServerAuthorityHost {
     );
   }
 
-  public async drainSaveAndClose(): Promise<
-    readonly HostedOutboundMessage[]
-  > {
+  public beginDrain(): boolean {
     this.session.beginDraining();
     for (const connection of this.session.getLiveConnections()) {
       const runtime = this.runtimes.get(connection.playerId);
       runtime?.submitInput(connection.playerId, NEUTRAL_PLAYER_INPUT);
     }
+    return this.commandQueue.length > 0;
+  }
 
-    const drained: HostedOutboundMessage[] = [];
-    if (this.commandQueue.length > 0) {
-      this.advanceAuthorityTick();
-      drained.push(...this.resolveAcceptedCommands());
+  public drainQueuedCommandTick(): readonly HostedOutboundMessage[] {
+    if (this.session.getState() !== 'DRAINING') {
+      throw new Error(
+        'Hosted queued-command drain tick requires DRAINING state.',
+      );
+    }
+    if (this.commandQueue.length === 0) {
+      return Object.freeze([]);
+    }
+    this.advanceAuthorityTick();
+    return this.resolveAcceptedCommands();
+  }
+
+  public async saveAndCloseAfterDrain(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    if (this.session.getState() !== 'DRAINING') {
+      throw new Error(
+        'Hosted persistence may begin only after command drain starts.',
+      );
     }
 
+    const drained: HostedOutboundMessage[] = [];
     for (
       const operationId
       of this.options.commandDispatcher.cancelAllPending?.() ?? []
@@ -607,6 +624,18 @@ export class ServerAuthorityHost {
       this.session.fail();
       return Object.freeze([...drained, ...final]);
     }
+  }
+
+  public async drainSaveAndClose(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    const drained: HostedOutboundMessage[] = [];
+    const needsCommandTick = this.beginDrain();
+    if (needsCommandTick) {
+      drained.push(...this.drainQueuedCommandTick());
+    }
+    drained.push(...await this.saveAndCloseAfterDrain());
+    return Object.freeze(drained);
   }
 
   public diagnostics() {

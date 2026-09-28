@@ -39,6 +39,87 @@ function aggregateViews(
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
 
+  for (const container of bundle.items.exportLedgerSnapshot().containers) {
+    values.push(Object.freeze({
+      aggregateType: 'container',
+      aggregateId: container.containerId,
+      revision: container.revision,
+      tombstone: false,
+      state: asJson({
+        kind: container.kind,
+        ownerPlayerId: container.ownerPlayerId,
+        stacks: container.stacks.map((stack) => ({
+          stackId: stack.stackId,
+          itemDefinitionId: stack.itemDefinitionId,
+          quantity: stack.quantity,
+          condition: stack.condition,
+        })),
+      }),
+    }));
+  }
+
+  const building = bundle.buildings.exportSnapshot().foothold;
+  values.push(Object.freeze({
+    aggregateType: 'foothold',
+    aggregateId: building.footholdId,
+    revision: building.buildRevision,
+    tombstone: false,
+    state: asJson({
+      structureIds: building.structures.map((entry) => entry.structureId),
+      connections: building.connections.map((entry) => ({
+        connectionId: entry.connectionId,
+        a: entry.a,
+        b: entry.b,
+      })),
+    }),
+  }));
+  values.push(Object.freeze({
+    aggregateType: 'power-network',
+    aggregateId: building.footholdId,
+    revision: building.power.revision,
+    tombstone: false,
+    state: asJson({
+      producerStructureId: building.power.producerStructureId,
+      capacityPu: building.power.capacityPu,
+      grantedConsumerIds: [...building.power.grantedConsumerIds],
+    }),
+  }));
+
+  for (const structure of building.structures) {
+    const condenser = building.condensers.find(
+      (entry) => entry.structureId === structure.structureId,
+    );
+    values.push(Object.freeze({
+      aggregateType: 'structure',
+      aggregateId: structure.structureId,
+      revision: condenser?.revision ?? structure.revision,
+      tombstone: false,
+      state: asJson({
+        definitionId: structure.definitionId,
+        position: {
+          x: structure.position.x,
+          y: structure.position.y,
+        },
+        orientationQuarterTurns: structure.orientationQuarterTurns,
+        placedByPlayerId: structure.placedByPlayerId,
+        containerId: structure.containerId,
+        ...(condenser === undefined
+          ? {}
+          : {
+              machine: {
+                type: 'atmospheric-water-condenser',
+                enabled: condenser.enabled,
+                productionProgressTicks:
+                  condenser.productionProgressTicks,
+                completedCycleOrdinal:
+                  condenser.completedCycleOrdinal,
+                outputContainerId: condenser.outputContainerId,
+              },
+            }),
+      }),
+    }));
+  }
+
   for (const view of bundle.world.getActiveChunkViews()) {
     values.push(Object.freeze({
       aggregateType: 'exploration',
@@ -302,7 +383,33 @@ export class Phase1HostedAuthorityComposition {
     await this.bundle.prepareAuthorityTick(nextTick);
     const outbound: HostedOutboundMessage[] = [...this.host.step()];
     await this.bundle.completeAuthorityTick(nextTick);
+    this.resolveCompletedGatherCommands(outbound);
+    outbound.push(...this.publishSharedState());
+    return Object.freeze(outbound);
+  }
 
+  public async drainSaveAndClose(): Promise<
+    readonly HostedOutboundMessage[]
+  > {
+    const outbound: HostedOutboundMessage[] = [];
+    const needsCommandTick = this.host.beginDrain();
+
+    if (needsCommandTick) {
+      const nextTick = this.host.getAuthorityTick() + 1;
+      await this.bundle.prepareAuthorityTick(nextTick);
+      outbound.push(...this.host.drainQueuedCommandTick());
+      await this.bundle.completeAuthorityTick(nextTick);
+      this.resolveCompletedGatherCommands(outbound);
+      outbound.push(...this.publishSharedState());
+    }
+
+    outbound.push(...await this.host.saveAndCloseAfterDrain());
+    return Object.freeze(outbound);
+  }
+
+  private resolveCompletedGatherCommands(
+    outbound: HostedOutboundMessage[],
+  ): void {
     for (const playerId of this.bundle.getActivePlayerIds()) {
       const gather = this.bundle.getLastGatherResult(playerId);
       if (gather === null || gather.status === 'idle'
@@ -341,9 +448,6 @@ export class Phase1HostedAuthorityComposition {
             }),
       ));
     }
-
-    outbound.push(...this.publishSharedState());
-    return Object.freeze(outbound);
   }
 
   public publishSharedState(): readonly HostedOutboundMessage[] {
