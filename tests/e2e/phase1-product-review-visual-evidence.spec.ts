@@ -1370,9 +1370,11 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
       );
       await expect(entry).toContainText(/AVAILABLE|CAP REACHED/);
     }
-    await expect(
-      buildEntries.locator('[data-selected="true"]'),
-    ).toHaveCount(1);
+    expect(await buildEntries.evaluateAll((entries) =>
+      entries.filter((entry) =>
+        (entry as HTMLElement).dataset.selected === 'true',
+      ).length,
+    )).toBe(1);
     const buildFile =
       'p1-polish-007-build-catalog-' + suffix + '.png';
     await captureViewport(page, buildFile);
