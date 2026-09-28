@@ -620,12 +620,19 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
-  const buildDefinitions = () => {
-    const placeable = new Map(
+  const buildDefinitions = () =>
+    Object.freeze(
       bundle.catalog
         .list('structure')
         .filter((definition) => definition.placeableByPlayer)
-        .map((definition) => [definition.id, definition] as const),
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    );
+
+  const buildCatalogDefinitions = () => {
+    const placeable = new Map(
+      buildDefinitions().map(
+        (definition) => [definition.id, definition] as const,
+      ),
     );
     return Object.freeze(PHASE1_BUILD_CATALOG_ORDER.map((id) => {
       const definition = placeable.get(id);
@@ -708,7 +715,7 @@ export async function createPhase1ProductReviewRuntime(
           ? 'CONNECTOR'
           : 'VALID',
       reason,
-      catalogEntries: Object.freeze(buildDefinitions().map((entry) => {
+      catalogEntries: Object.freeze(buildCatalogDefinitions().map((entry) => {
         const entryKitId = entry.sourceKitItemId;
         if (entryKitId === null) {
           throw new Error(
