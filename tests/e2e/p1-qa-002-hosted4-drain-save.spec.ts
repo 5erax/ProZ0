@@ -1368,16 +1368,133 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
 
     const stored = await repository.loadWorld(WORLD_ID);
     if (!stored.ok) {
+      const finishedAt = Date.now();
+      const failureDetail = {
+        stage: 'hosted-drain-save-snapshot',
+        snapshotError: repository.lastSnapshotError,
+        snapshotAuthorityTick:
+          repository.lastSnapshotAuthorityTick,
+        snapshotBundleTick:
+          repository.lastSnapshotBundleTick,
+        commitResult: repository.lastCommitResult,
+        loadWorldResult: stored,
+      };
+
+      await renderEvidencePanel(
+        activePages[0]!,
+        'P1-QA-002 · Hosted-4 · Drain/Save FAIL',
+        [
+          'productCandidate=' + EXPECTED_MAIN_SHA,
+          'evidenceBranchHead=' + EVIDENCE_BRANCH_HEAD,
+          'result=FAIL',
+          'stage=hosted-drain-save-snapshot',
+          'snapshotAuthorityTick='
+            + String(repository.lastSnapshotAuthorityTick),
+          'snapshotBundleTick='
+            + String(repository.lastSnapshotBundleTick),
+          'snapshotError='
+            + String(repository.lastSnapshotError),
+          'pendingDomainCommandCount='
+            + String(afterDrainDiagnostics.pendingDomainCommandCount),
+          'commandRejectedCountDelta='
+            + String(
+                afterDrainDiagnostics.commandRejectedCount
+                  - rejectedBeforeDrain,
+              ),
+          'product source modified=false',
+        ],
+      );
+      await activePages[0]!.screenshot({
+        path: resolve(
+          EVIDENCE_DIR,
+          '03-drain-save-snapshot-failure.png',
+        ),
+        fullPage: true,
+      });
+
+      const failureEvidence = {
+        schemaVersion: 1,
+        task: 'P1-QA-HOSTED-001',
+        evidenceKind:
+          'post-129-real-browser-hosted4-reconnect-drain-save-reopen',
+        result: 'FAIL',
+        productCandidateSha: EXPECTED_MAIN_SHA,
+        evidenceBranchHeadSha: EVIDENCE_BRANCH_HEAD,
+        workflowRunId: process.env.GITHUB_RUN_ID ?? null,
+        browser: {
+          engine: 'chromium',
+          version: browserVersion,
+          initialIsolatedContexts: 4,
+          reconnectFreshContext: true,
+          viewport: '1280x720',
+        },
+        runtime: {
+          node: process.version,
+          platform: process.platform,
+          osRelease: osRelease(),
+        },
+        session: {
+          sessionId: clients[0]!.sessionId,
+          sessionEpoch: clients[0]!.sessionEpoch,
+          initialPlayers: clients.map((client) => ({
+            playerId: client.playerId,
+            connectionId: client.connectionId,
+          })),
+          rejoinedPlayerId: resumed.playerId,
+          rejoinedConnectionId: resumed.connectionId,
+          readyPlayersBeforeDrain: 4,
+          resumeCredentialRetained: false,
+        },
+        checksBeforeFailure: {
+          fourClientsReady: true,
+          distinctPlayerIds: 4,
+          sharedBrowserMovementReplicated: true,
+          peerDisconnectObserved: true,
+          survivingClientsContinued: true,
+          sameEpochReconnectSamePlayerId: true,
+          sameEpochReconnectNewConnectionId: true,
+          rejoinBaselinePlayers: resumedBaseline.players.length,
+          ownerPrivateInventoryIsolation: true,
+          pendingDomainCommandCountAfterDrain:
+            afterDrainDiagnostics.pendingDomainCommandCount,
+          queuedDrainRejectedCountDelta:
+            afterDrainDiagnostics.commandRejectedCount
+              - rejectedBeforeDrain,
+          hostBundleTickCoherentAtSnapshot:
+            repository.lastSnapshotAuthorityTick
+              === repository.lastSnapshotBundleTick,
+        },
+        failure: failureDetail,
+        errorsWarnings: browserEvents,
+        timings: {
+          startedAtUtc: new Date(startedAt).toISOString(),
+          finishedAtUtc: new Date(finishedAt).toISOString(),
+          elapsedMs: finishedAt - startedAt,
+        },
+        screenshots: [
+          '01-four-ready-shared-state.png',
+          '02-post-reconnect-coherent.png',
+          '03-drain-save-snapshot-failure.png',
+        ],
+        secrets: {
+          resumeCredentialPersisted: false,
+        },
+      };
+
+      writeFileSync(
+        resolve(EVIDENCE_DIR, 'hosted4-drain-save-evidence.json'),
+        JSON.stringify(failureEvidence, null, 2) + '\n',
+        'utf8',
+      );
+      writeFileSync(
+        resolve(EVIDENCE_DIR, 'browser-events.json'),
+        JSON.stringify(browserEvents, null, 2) + '\n',
+        'utf8',
+      );
+
       throw new Error(
         'Hosted Save V2 evidence commit unavailable: '
-          + JSON.stringify({
-              snapshotError: repository.lastSnapshotError,
-              snapshotAuthorityTick:
-                repository.lastSnapshotAuthorityTick,
-              snapshotBundleTick:
-                repository.lastSnapshotBundleTick,
-              commitResult: repository.lastCommitResult,
-            }),
+          + JSON.stringify(failureDetail),
       );
     }
 
