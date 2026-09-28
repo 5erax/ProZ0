@@ -1032,6 +1032,17 @@ describe('Phase 0 browser runtime', () => {
     });
     await wait(80);
 
+    window.dispatchEvent(new KeyboardEvent('keydown', {
+      code: 'KeyD',
+      cancelable: true,
+    }));
+    await wait(80);
+    window.dispatchEvent(new KeyboardEvent('keyup', {
+      code: 'KeyD',
+      cancelable: true,
+    }));
+    await wait(30);
+
     document.dispatchEvent(new KeyboardEvent('keydown', {
       code: 'KeyM',
       cancelable: true,
