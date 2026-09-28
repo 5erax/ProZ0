@@ -971,6 +971,17 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
     'world:p1-polish-002-map-evidence-mid',
     Object.freeze({ x: 100, y: 0 }),
   );
+  const baseReadability = await createBaseSave(
+    'world:p1-polish-002-base-anchor',
+    Object.freeze([
+      Object.freeze({
+        playerId: 'visual-local',
+        x: 0,
+        y: 0,
+        facing: 'E' as const,
+      }),
+    ]),
+  );
   const worldReadability =
     await createWorldReadabilityEvidenceSave(
       'world:p1-polish-002-world-readability',
@@ -1124,8 +1135,8 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
 
   await openProductReview(
     page,
-    worldReadability,
-    'proz0-p1-polish-002-world-readability-2x',
+    baseReadability,
+    'proz0-p1-polish-002-base-anchor-2x',
     2,
   );
   await expect(
@@ -1134,6 +1145,23 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
         + '[data-world-id="structure-instance:landing-module"]',
     ),
   ).toHaveCount(1);
+  await expect(
+    page.locator(
+      '[data-world-role="player"][data-local-player="true"]',
+    ),
+  ).toHaveCount(1);
+  await captureProductWorld(
+    page,
+    'p1-polish-002-base-anchor-2x.png',
+  );
+  files.push('p1-polish-002-base-anchor-2x.png');
+
+  await openProductReview(
+    page,
+    worldReadability,
+    'proz0-p1-polish-002-resource-readability-2x',
+    2,
+  );
   await expect(
     page.locator('[data-world-role="flora-decor"]'),
   ).not.toHaveCount(0);
@@ -1145,10 +1173,10 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
   ).toHaveAttribute('data-interactive', 'false');
   await captureProductWorld(
     page,
-    'p1-polish-002-world-readability-2x.png',
+    'p1-polish-002-resource-readability-2x.png',
   );
   files.push(
-    'p1-polish-002-world-readability-2x.png',
+    'p1-polish-002-resource-readability-2x.png',
   );
 
   await openProductReview(
@@ -1197,8 +1225,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       nearCaseIncludesBaseAndCache: true,
       midCaseMovesPlayerThroughAuthority: true,
       grayscale2x: 'p1-polish-002-map-grayscale-2x.png',
-      worldReadability2x:
-        'p1-polish-002-world-readability-2x.png',
+      baseAnchor2x: 'p1-polish-002-base-anchor-2x.png',
+      resourceReadability2x:
+        'p1-polish-002-resource-readability-2x.png',
     },
     invariants: {
       playerFirstReadMarker: true,
@@ -1213,7 +1242,9 @@ test('P1-POLISH-002 captures authoritative spatial map evidence', async ({ page 
       nearMidFarOnlyEligibleTargets: true,
       integerPresentation1x2x3x: true,
       grayscaleEvidence: true,
+      baseAnchorWorldEvidence: true,
       decorativeFloraPresentationOnly: true,
+      gatherableVsDecorWorldEvidence: true,
     },
     files,
   };
