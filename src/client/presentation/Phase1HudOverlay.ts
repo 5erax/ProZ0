@@ -602,7 +602,9 @@ function renderPanel(
               + ' · CAP '
               + String(entry.builtCount)
               + '/'
-              + String(entry.buildCap),
+              + String(entry.buildCap)
+              + ' · '
+              + entry.buildCapState,
           ),
         );
         row.append(copy);
