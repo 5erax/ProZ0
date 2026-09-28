@@ -179,6 +179,10 @@ export class Phase1ProductReviewPresentationSource
   public adjustInventoryQuantity(step: number): boolean {
     if (this.panel !== 'inventory') return false;
     const selection = this.getInventoryActionSelection();
+    if (selection.normalizedDuringLookup) {
+      this.refresh();
+      return false;
+    }
     if (selection.stack === null) return false;
     this.inventoryQuantity = Math.max(
       1,
@@ -201,9 +205,15 @@ export class Phase1ProductReviewPresentationSource
     target: Readonly<ContainerView> | null;
     stack: Readonly<ItemStackState> | null;
     quantity: number;
+    normalizedDuringLookup: boolean;
   }> {
     const state = this.resolveInventoryState();
     const pane = this.inventoryActivePane;
+    const normalizedDuringLookup =
+      state.paneNormalized
+      || (pane === 'storage'
+        ? state.storageSelectionNormalized
+        : state.inventorySelectionNormalized);
     const sourceContainer =
       pane === 'storage' && state.storage !== null
         ? state.storage
@@ -215,9 +225,10 @@ export class Phase1ProductReviewPresentationSource
     const selectedId = pane === 'storage'
       ? this.storageSelectedStackId
       : this.inventorySelectedStackId;
-    const stack = sourceContainer.stacks.find(
+    const resolvedStack = sourceContainer.stacks.find(
       (candidate) => candidate.stackId === selectedId,
     ) ?? null;
+    const stack = normalizedDuringLookup ? null : resolvedStack;
     const quantity = stack === null
       ? 1
       : Math.max(1, Math.min(this.inventoryQuantity, stack.quantity));
@@ -229,6 +240,7 @@ export class Phase1ProductReviewPresentationSource
       target: targetContainer,
       stack,
       quantity,
+      normalizedDuringLookup,
     });
   }
 
@@ -336,12 +348,17 @@ export class Phase1ProductReviewPresentationSource
   private resolveInventoryState(): Readonly<{
     inventory: Readonly<ContainerView>;
     storage: Readonly<ContainerView> | null;
+    inventorySelectionNormalized: boolean;
+    storageSelectionNormalized: boolean;
+    paneNormalized: boolean;
   }> {
     const inventory = this.bundle.items.getContainerView(
       'inventory:' + this.playerId,
     );
     const storage = this.accessibleStorage();
 
+    const previousInventorySelection =
+      this.inventorySelectedStackId;
     if (
       this.inventorySelectedStackId === null
       || !inventory.stacks.some(
@@ -351,7 +368,11 @@ export class Phase1ProductReviewPresentationSource
       this.inventorySelectedStackId =
         inventory.stacks[0]?.stackId ?? null;
     }
+    const inventorySelectionNormalized =
+      previousInventorySelection !== this.inventorySelectedStackId;
 
+    const previousStorageSelection =
+      this.storageSelectedStackId;
     if (
       storage === null
       || this.storageSelectedStackId === null
@@ -362,10 +383,14 @@ export class Phase1ProductReviewPresentationSource
       this.storageSelectedStackId =
         storage?.stacks[0]?.stackId ?? null;
     }
+    const storageSelectionNormalized =
+      previousStorageSelection !== this.storageSelectedStackId;
 
+    const previousPane = this.inventoryActivePane;
     if (storage === null && this.inventoryActivePane === 'storage') {
       this.inventoryActivePane = 'player';
     }
+    const paneNormalized = previousPane !== this.inventoryActivePane;
 
     const active = this.inventoryActivePane === 'storage'
       ? storage
@@ -383,7 +408,13 @@ export class Phase1ProductReviewPresentationSource
           Math.min(this.inventoryQuantity, selected.quantity),
         );
 
-    return Object.freeze({ inventory, storage });
+    return Object.freeze({
+      inventory,
+      storage,
+      inventorySelectionNormalized,
+      storageSelectionNormalized,
+      paneNormalized,
+    });
   }
 
   private project(): Readonly<Phase1PresentationState> {
