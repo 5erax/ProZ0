@@ -310,6 +310,9 @@ async function gatherOnce(
 
 function portableBundle(request: SaveCommitRequestV2) {
   return Object.freeze({
+    formatId: request.world.formatId,
+    schemaVersion: request.world.schemaVersion,
+    recordKind: 'portable-bundle' as const,
     world: request.world,
     players: request.players,
     containers: request.containers,
@@ -733,6 +736,7 @@ describe('P1-POLISH-006 hosted drain/save lifecycle', () => {
         throw new Error('Expected active-gather player.');
       }
       const inventoryId = 'inventory:' + playerId;
+      await makePlayerFacingPersistable(composition, client);
       const fiber = composition.bundle.world.findGeneratedEntityByDefinition(
         'resource:fiber-plant',
       );
