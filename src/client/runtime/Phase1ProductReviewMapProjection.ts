@@ -370,6 +370,8 @@ function mapFacing(
       return facing;
     case null:
       return null;
+    default:
+      return null;
   }
 }
 
