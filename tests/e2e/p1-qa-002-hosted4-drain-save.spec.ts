@@ -927,7 +927,7 @@ async function visibleInventoryIds(
         message.messageType === 'AGGREGATE_UPDATE'
         && message.payload.aggregateType === 'container'
         && String(message.payload.aggregateId).startsWith('inventory:')
-        && !Boolean(message.payload.tombstone)
+        && !message.payload.tombstone
       ) {
         ids.add(String(message.payload.aggregateId));
       }
