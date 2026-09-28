@@ -31,10 +31,37 @@ export interface Phase1SaveV2ComposeOptions {
   readonly nowUtc: string;
 }
 
+interface Phase1SaveV2RevisionState {
+  readonly previousWorldRevision: number | null;
+  readonly playerRevisions: ReadonlyMap<string, number | null>;
+  readonly createdAtUtc: string | null;
+}
+
+function initialRevisionState(
+  bundle: Phase1AuthorityBundle,
+): Phase1SaveV2RevisionState {
+  return Object.freeze({
+    previousWorldRevision:
+      bundle.config.reopen?.bundle.world.worldRevision ?? null,
+    playerRevisions: new Map(
+      (bundle.config.reopen?.players ?? []).map((entry) => [
+        entry.record.playerId,
+        entry.record.playerRevision,
+      ]),
+    ),
+    createdAtUtc:
+      bundle.config.reopen?.bundle.world.createdAtUtc ?? null,
+  });
+}
+
 function previousPlayerRevision(
   bundle: Phase1AuthorityBundle,
+  state: Phase1SaveV2RevisionState,
   playerId: string,
 ): number | null {
+  if (state.playerRevisions.has(playerId)) {
+    return state.playerRevisions.get(playerId) ?? null;
+  }
   return bundle.config.reopen?.players.find(
     (entry) => entry.record.playerId === playerId,
   )?.record.playerRevision ?? null;
@@ -179,16 +206,16 @@ function ownerResolver(
   });
 }
 
-export function composePhase1SaveV2(
+function composePhase1SaveV2AtRevision(
   bundle: Phase1AuthorityBundle,
   options: Phase1SaveV2ComposeOptions,
+  revisionState: Phase1SaveV2RevisionState,
 ): SaveCommitRequestV2 {
   if (options.nowUtc.length === 0) {
     throw new Error('Save checkpoint UTC timestamp is required.');
   }
 
-  const previousWorldRevision =
-    bundle.config.reopen?.bundle.world.worldRevision ?? null;
+  const previousWorldRevision = revisionState.previousWorldRevision;
   const worldRevision = nextRecordRevision(previousWorldRevision);
   const environment = bundle.worldStore.getEnvironmentView().state;
   if (
@@ -220,7 +247,7 @@ export function composePhase1SaveV2(
       worldId: bundle.config.worldId,
       playerId,
       playerRevision: nextRecordRevision(
-        previousPlayerRevision(bundle, playerId),
+        previousPlayerRevision(bundle, revisionState, playerId),
       ),
       authorityTick: bundle.authorityTick,
       position: movement.position,
@@ -297,8 +324,7 @@ export function composePhase1SaveV2(
     seedDerivationVersion: SEED_DERIVATION_VERSION,
     contentCompatibility: bundle.catalog.compatibility,
     environment: environmentStateToManifestFieldsV2(environment),
-    createdAtUtc:
-      bundle.config.reopen?.bundle.world.createdAtUtc ?? options.nowUtc,
+    createdAtUtc: revisionState.createdAtUtc ?? options.nowUtc,
     lastActiveAtUtc: options.nowUtc,
   });
 
@@ -311,6 +337,76 @@ export function composePhase1SaveV2(
     structures: building.structures,
     expectedPreviousWorldRevision: previousWorldRevision,
   });
+}
+
+export function composePhase1SaveV2(
+  bundle: Phase1AuthorityBundle,
+  options: Phase1SaveV2ComposeOptions,
+): SaveCommitRequestV2 {
+  return composePhase1SaveV2AtRevision(
+    bundle,
+    options,
+    initialRevisionState(bundle),
+  );
+}
+
+/**
+ * Owns the durable Save V2 revision lifecycle for one active authority bundle.
+ *
+ * Save records remain snapshots only; this coordinator never repairs or
+ * mutates live gameplay authority. It advances its revision cursor only after
+ * the repository confirms a successful atomic commit and serializes concurrent
+ * checkpoint requests so each commit observes the previous committed revision.
+ */
+export class Phase1SaveV2CheckpointCoordinator {
+  private previousWorldRevision: number | null;
+  private readonly playerRevisions = new Map<string, number | null>();
+  private createdAtUtc: string | null;
+  private commitQueue: Promise<void> = Promise.resolve();
+
+  public constructor(private readonly bundle: Phase1AuthorityBundle) {
+    const initial = initialRevisionState(bundle);
+    this.previousWorldRevision = initial.previousWorldRevision;
+    this.createdAtUtc = initial.createdAtUtc;
+    for (const [playerId, revision] of initial.playerRevisions) {
+      this.playerRevisions.set(playerId, revision);
+    }
+  }
+
+  public checkpoint(
+    repository: SaveRepositoryV2,
+    options: Phase1SaveV2ComposeOptions,
+  ): Promise<SaveResultV2<WorldManifestV2>> {
+    const operation = this.commitQueue.then(async () => {
+      const request = composePhase1SaveV2AtRevision(
+        this.bundle,
+        options,
+        Object.freeze({
+          previousWorldRevision: this.previousWorldRevision,
+          playerRevisions: this.playerRevisions,
+          createdAtUtc: this.createdAtUtc,
+        }),
+      );
+      const result = await repository.commit(request);
+      if (result.ok) {
+        this.previousWorldRevision = result.value.worldRevision;
+        this.createdAtUtc = result.value.createdAtUtc;
+        for (const player of request.players) {
+          this.playerRevisions.set(
+            player.playerId,
+            player.playerRevision,
+          );
+        }
+      }
+      return result;
+    });
+
+    this.commitQueue = operation.then(
+      () => undefined,
+      () => undefined,
+    );
+    return operation;
+  }
 }
 
 export async function savePhase1AuthorityBundle(

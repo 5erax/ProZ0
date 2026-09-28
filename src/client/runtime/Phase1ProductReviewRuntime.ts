@@ -19,7 +19,7 @@ import type {
   GatherTickResult,
 } from '../../simulation';
 import {
-  savePhase1AuthorityBundle,
+  Phase1SaveV2CheckpointCoordinator,
 } from '../../integration/Phase1SaveV2Composer';
 import type {
   SaveRepositoryV2,
@@ -198,6 +198,8 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.runtimeStatus = 'booting';
 
   const bundle = await Phase1AuthorityBundle.create(config);
+  const checkpointCoordinator =
+    new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(
     mapMovementInput,
     isMovementInputCode,
@@ -1747,8 +1749,7 @@ export async function createPhase1ProductReviewRuntime(
           'Cannot save a destroyed Phase 1 Product Review runtime.',
         );
       }
-      return savePhase1AuthorityBundle(
-        bundle,
+      return checkpointCoordinator.checkpoint(
         repository,
         { nowUtc },
       );
