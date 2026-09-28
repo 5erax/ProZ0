@@ -630,6 +630,11 @@ describe('P1-POLISH-006 hosted drain/save lifecycle', () => {
       expect(harness.requests).toHaveLength(1);
       const saved = harness.requests[0]!;
       expect(saved.world.authorityTick).toBe(beforeDrainTick);
+      expect(
+        saved.containers.some(
+          (entry) => entry.containerId === 'inventory:player:2',
+        ),
+      ).toBe(false);
       expect(composition.bundle.authorityTick).toBe(beforeDrainTick);
       expect(composition.host.diagnostics().pendingDomainCommandCount)
         .toBe(0);
