@@ -5,9 +5,6 @@ import type {
 import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
-import {
-  fromWorldPosition,
-} from '../../world';
 import type {
   Phase1InteractionPresentation,
   Phase1PanelPresentation,
@@ -20,6 +17,9 @@ import {
   type Phase1PresentationPanelRequest,
   type Phase1PresentationSource,
 } from './Phase1PresentationBinding';
+import {
+  projectPhase1ProductReviewMapPanel,
+} from './Phase1ProductReviewMapProjection';
 
 export type Phase1ProductReviewPanel =
   | 'inventory'
@@ -57,6 +57,7 @@ export class Phase1ProductReviewPresentationSource
   private interactionOverride: Phase1InteractionPresentation | null = null;
   private commandFeedback: Phase1AuthoritativeCommandFeedback | null = null;
   private commandFeedbackExpiresAfterAuthorityTick: number | null = null;
+  private mapDetailOrdinal = 0;
   private current: Readonly<Phase1PresentationState>;
 
   public constructor(
@@ -97,8 +98,19 @@ export class Phase1ProductReviewPresentationSource
 
   public togglePanel(panel: Exclude<Phase1ProductReviewPanel, null>): void {
     this.presentationPanelOverride = null;
-    this.panel = this.panel === panel ? null : panel;
+    const opening = this.panel !== panel;
+    this.panel = opening ? panel : null;
+    if (opening && panel === 'map') {
+      this.mapDetailOrdinal = 0;
+    }
     this.refresh();
+  }
+
+  public cycleMapDetail(step: number): boolean {
+    if (this.panel !== 'map') return false;
+    this.mapDetailOrdinal += step;
+    this.refresh();
+    return true;
   }
 
   public setInteraction(
@@ -174,24 +186,9 @@ export class Phase1ProductReviewPresentationSource
     const inventory = this.bundle.items.getContainerView(
       'inventory:' + this.playerId,
     );
-    const position = this.bundle.getPlayerPosition(this.playerId);
-    const active = this.bundle.worldStore.query(
-      fromWorldPosition(position),
-    );
-    const ruinEntity =
-      this.bundle.world.findGeneratedEntityByDefinition(
-        'ruin:previous-civilization-ruin',
-      );
-    const ruin = ruinEntity === null
-      ? null
-      : this.bundle.worldStore.getRuinState(ruinEntity.entityId) ?? null;
-    const deathCaches =
-      this.bundle.world.exportSnapshot().deathCaches.caches;
-    const deathCache = deathCaches.length === 0
-      ? null
-      : deathCaches[deathCaches.length - 1] ?? null;
 
     let panel: Phase1PresentationPanelRequest | null = null;
+    let spatialMapPanel: Readonly<Phase1PanelPresentation> | null = null;
     switch (this.panel) {
       case 'inventory':
         panel = Object.freeze({
@@ -203,13 +200,12 @@ export class Phase1ProductReviewPresentationSource
         panel = Object.freeze({ kind: 'progression' });
         break;
       case 'map':
-        panel = Object.freeze({
-          kind: 'map',
-          exploration: active?.delta.exploration ?? null,
-          ruin,
-          deathCache,
-          sharedDiscoveryConfirmed: false,
-        });
+        spatialMapPanel = projectPhase1ProductReviewMapPanel(
+          this.bundle,
+          this.playerId,
+          this.getPlayerMotions(),
+          this.mapDetailOrdinal,
+        );
         break;
       case null:
         break;
@@ -239,9 +235,11 @@ export class Phase1ProductReviewPresentationSource
       commandFeedback: this.commandFeedback,
       deathResult: this.bundle.getLastDeathResult(this.playerId),
       panel,
-      ...(this.presentationPanelOverride === null
-        ? {}
-        : { presentationPanel: this.presentationPanelOverride }),
+      ...(this.presentationPanelOverride !== null
+        ? { presentationPanel: this.presentationPanelOverride }
+        : spatialMapPanel === null
+          ? {}
+          : { presentationPanel: spatialMapPanel }),
     });
 
     if (this.interactionOverride === null) {

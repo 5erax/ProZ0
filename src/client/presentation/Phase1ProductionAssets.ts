@@ -141,6 +141,10 @@ const NONBUILDABLE_PATTERN_URL = new URL(
   '../../../assets/phase1/world/terrain/nonbuildable_pattern.png',
   import.meta.url,
 ).href;
+const FLORA_DECOR_URL = new URL(
+  '../../../assets/phase1/world/terrain/flora_decor.png',
+  import.meta.url,
+).href;
 
 function sprite(
   assetPath: string,
@@ -395,6 +399,16 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     1,
     0,
   ),
+  floraDecor: sprite(
+    'assets/phase1/world/terrain/flora_decor.png',
+    FLORA_DECOR_URL,
+    24,
+    24,
+    24,
+    24,
+    1,
+    0,
+  ),
   player: atlasSprite(
     'assets/phase1/actors/player_pioneer.png',
     PLAYER_URL,
@@ -629,6 +643,7 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
 
 export const PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS = Object.freeze([
   'ground',
+  'floraDecor',
   'player',
   'thermalWrap',
   'passiveWildlife',

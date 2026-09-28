@@ -20,6 +20,7 @@ describe('Phase 1 integration production visual catalog', () => {
   it('covers every player-facing category required by the vertical-slice flow', () => {
     expect(PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS).toEqual([
       'ground',
+      'floraDecor',
       'player',
       'thermalWrap',
       'passiveWildlife',

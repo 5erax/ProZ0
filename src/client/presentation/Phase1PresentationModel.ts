@@ -149,6 +149,71 @@ export interface Phase1ProgressionPanelPresentation {
   readonly questLabels: readonly string[];
 }
 
+export type Phase1MapDistanceBand = 'NEAR' | 'MID' | 'FAR';
+
+export type Phase1MapMarkerKind =
+  | 'player'
+  | 'base'
+  | 'ruin'
+  | 'death-cache'
+  | 'teammate';
+
+export type Phase1MapFacing =
+  | 'N'
+  | 'NE'
+  | 'E'
+  | 'SE'
+  | 'S'
+  | 'SW'
+  | 'W'
+  | 'NW';
+
+export interface Phase1MapExploredCellPresentation {
+  readonly cellX: number;
+  readonly cellY: number;
+  readonly terrain: 'ground' | 'water';
+  readonly motif: 'none' | 'flora';
+}
+
+export interface Phase1MapUnknownBoundaryCellPresentation {
+  readonly cellX: number;
+  readonly cellY: number;
+}
+
+export interface Phase1MapMarkerPresentation {
+  readonly id: string;
+  readonly kind: Phase1MapMarkerKind;
+  readonly label: string;
+  readonly atlasIndex: number;
+  readonly worldX: number;
+  readonly worldY: number;
+  readonly facing: Phase1MapFacing | null;
+  readonly distanceBand: Phase1MapDistanceBand | null;
+  readonly selected: boolean;
+  readonly identitySlot:
+    | 'LOCAL'
+    | 'TEAM_A'
+    | 'TEAM_B'
+    | 'TEAM_C'
+    | null;
+}
+
+export interface Phase1SpatialMapPresentation {
+  readonly cellSizeWorldUnits: number;
+  readonly minCellX: number;
+  readonly maxCellX: number;
+  readonly minCellY: number;
+  readonly maxCellY: number;
+  readonly exploredCells: readonly Phase1MapExploredCellPresentation[];
+  readonly unknownBoundaryCells:
+    readonly Phase1MapUnknownBoundaryCellPresentation[];
+  readonly markers: readonly Phase1MapMarkerPresentation[];
+  readonly selectedDetailLabel: string | null;
+  readonly selectedDistanceBand: Phase1MapDistanceBand | null;
+  readonly selectableTargetCount: number;
+  readonly knowledgePolicy: 'EXPLORED_ONLY';
+}
+
 export interface Phase1MapPanelPresentation {
   readonly kind: 'map';
   readonly title: string;
@@ -156,6 +221,7 @@ export interface Phase1MapPanelPresentation {
   readonly ruinLabel: string;
   readonly deathCacheLabel: string | null;
   readonly sharedDiscoveryLabel: string | null;
+  readonly spatial?: Readonly<Phase1SpatialMapPresentation>;
 }
 
 export type Phase1PanelPresentation =

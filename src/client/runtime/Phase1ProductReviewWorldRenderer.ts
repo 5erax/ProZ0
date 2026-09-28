@@ -56,6 +56,40 @@ const EXPLORATION_CELL_LOGICAL_PIXELS =
   PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS * WORLD_PIXELS_PER_UNIT;
 const EXPLORATION_CELL_RASTER_SCALE =
   EXPLORATION_CELL_LOGICAL_PIXELS / 32;
+const DECORATIVE_FLORA_CLEARANCE_WORLD_UNITS = 4;
+
+function stableDecorHash(x: number, y: number): number {
+  let value =
+    Math.imul(x | 0, 0x45d9f3b)
+    ^ Math.imul(y | 0, 0x119de1f3);
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x45d9f3b);
+  value ^= value >>> 16;
+  return value >>> 0;
+}
+
+function decorativeFloraCell(gx: number, gy: number): boolean {
+  const clusterX = Math.floor(gx / 5);
+  const clusterY = Math.floor(gy / 5);
+  if (stableDecorHash(clusterX, clusterY) % 5 > 1) {
+    return false;
+  }
+  return stableDecorHash(gx, gy) % 4 === 0;
+}
+
+function withinDecorClearance(
+  position: WorldPosition,
+  anchors: readonly Readonly<WorldPosition>[],
+): boolean {
+  const clearanceSquared =
+    DECORATIVE_FLORA_CLEARANCE_WORLD_UNITS
+    * DECORATIVE_FLORA_CLEARANCE_WORLD_UNITS;
+  return anchors.some((anchor) => {
+    const dx = anchor.x - position.x;
+    const dy = anchor.y - position.y;
+    return dx * dx + dy * dy <= clearanceSquared;
+  });
+}
 
 const EMPTY_CONTEXT: Phase1ProductReviewWorldPresentationContext =
   Object.freeze({
@@ -586,6 +620,30 @@ export function createPhase1ProductReviewWorldRenderer(
     authorityTick: number,
     night: boolean,
   ): void => {
+    const knownGeneratedAnchors =
+      bundle.world.getActiveGeneratedEntities()
+        .filter((entity) =>
+          worldPositionKnown(bundle, entity.position),
+        )
+        .map((entity) => entity.position);
+    const knownStructureAnchors =
+      bundle.buildings.exportSnapshot().foothold.structures
+        .filter((structure) =>
+          worldPositionKnown(bundle, structure.position),
+        )
+        .map((structure) => structure.position);
+    const playerAnchors = getPlayerMotions()
+      .map((motion) => motion.position);
+    const deathCacheAnchors =
+      bundle.world.exportSnapshot().deathCaches.caches
+        .map((cache) => cache.position);
+    const decorClearanceAnchors = Object.freeze([
+      ...knownGeneratedAnchors,
+      ...knownStructureAnchors,
+      ...playerAnchors,
+      ...deathCacheAnchors,
+    ]);
+
     const cellSize = PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS;
     const minimumX = Math.floor(
       (camera.x - WORLD_HALF_WIDTH) / cellSize,
@@ -635,6 +693,32 @@ export function createPhase1ProductReviewWorldRenderer(
           )
         ) {
           layer.append(tile);
+        }
+
+        if (
+          known
+          && terrain === 'ground'
+          && decorativeFloraCell(gx, gy)
+          && !withinDecorClearance(
+            position,
+            decorClearanceAnchors,
+          )
+        ) {
+          renderSprite(
+            PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor,
+            position,
+            camera,
+            'flora-decor',
+            'flora-decor:' + String(gx) + ':' + String(gy),
+            {
+              zIndex: -50000,
+              data: Object.freeze({
+                decorativeFlora: 'true',
+                interactive: 'false',
+                explorationState: 'EXPLORED',
+              }),
+            },
+          );
         }
 
         if (!known) {
