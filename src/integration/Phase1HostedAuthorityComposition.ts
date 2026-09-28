@@ -131,6 +131,20 @@ function aggregateViews(
       }),
     }));
 
+    for (const resource of view.delta.resourceStates) {
+      values.push(Object.freeze({
+        aggregateType: 'resource',
+        aggregateId: resource.resourceEntityId,
+        revision: resource.revision,
+        tombstone: false,
+        state: asJson({
+          remainingGatherActions: resource.remainingGatherActions,
+          depleted: resource.depleted,
+          regenerationReadyTick: resource.regenerationReadyTick,
+        }),
+      }));
+    }
+
     for (const ruin of view.delta.ruinStates) {
       values.push(Object.freeze({
         aggregateType: 'ruin',
