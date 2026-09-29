@@ -48,6 +48,53 @@ describe('Phase 1 canonical authority bundle', () => {
         temperature: 50,
       });
       expect(bundle.authorityTick).toBe(0);
+
+      bundle.submitInput('p1', {
+        moveUp: false,
+        moveDown: false,
+        moveLeft: false,
+        moveRight: true,
+      });
+      await bundle.stepSolo();
+
+      const moved = bundle.getPlayerPosition('p1');
+      expect(moved.x).toBeGreaterThan(0);
+      expect(moved.y).toBe(0);
+      expect(bundle.authorityTick).toBe(1);
+      expect(bundle.worldStore.getEnvironmentView().state.activeTick).toBe(1);
+      expect(bundle.survival.getPlayerState('p1').tick).toBe(1);
+
+      expect(bundle.world.isFootprintExplored(
+        moved,
+        PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:storage-crate'],
+        0,
+      )).toBe(true);
+
+      const reservation = bundle.world.reservePlayerRespawn('p1');
+      expect(reservation).not.toBeNull();
+      bundle.world.commitReservedPlayerRespawn(reservation!);
+      expect(bundle.getPlayerPosition('p1')).toMatchObject({ x: 0, y: 0 });
+      expect(bundle.getRuntime('p1').getSnapshot().player.locomotionState)
+        .toBe('IDLE');
+    } finally {
+      await bundle.destroy();
+    }
+  });
+
+  it('initializes fresh player facing east, preserves it under neutral input, and lets directional movement replace it', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-fresh-facing',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+      spawnClearanceRadiusWorldUnits:
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+      requiredAccessRadiusWorldUnits:
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+    });
+
+    try {
       expect(
         bundle.getRuntime('p1').getSnapshot().player.facing,
       ).toBe('E');
@@ -73,34 +120,6 @@ describe('Phase 1 canonical authority bundle', () => {
       expect(
         bundle.getRuntime('p1').getSnapshot().player.facing,
       ).toBe('S');
-
-      bundle.submitInput('p1', {
-        moveUp: false,
-        moveDown: false,
-        moveLeft: false,
-        moveRight: true,
-      });
-      await bundle.stepSolo();
-
-      const moved = bundle.getPlayerPosition('p1');
-      expect(moved.x).toBeGreaterThan(0);
-      expect(moved.y).toBe(0);
-      expect(bundle.authorityTick).toBe(3);
-      expect(bundle.worldStore.getEnvironmentView().state.activeTick).toBe(3);
-      expect(bundle.survival.getPlayerState('p1').tick).toBe(3);
-
-      expect(bundle.world.isFootprintExplored(
-        moved,
-        PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:storage-crate'],
-        0,
-      )).toBe(true);
-
-      const reservation = bundle.world.reservePlayerRespawn('p1');
-      expect(reservation).not.toBeNull();
-      bundle.world.commitReservedPlayerRespawn(reservation!);
-      expect(bundle.getPlayerPosition('p1')).toMatchObject({ x: 0, y: 0 });
-      expect(bundle.getRuntime('p1').getSnapshot().player.locomotionState)
-        .toBe('IDLE');
     } finally {
       await bundle.destroy();
     }
