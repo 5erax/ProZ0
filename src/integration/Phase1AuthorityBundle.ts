@@ -640,9 +640,7 @@ export class Phase1AuthorityBundle {
     const runtime = createSimulationRuntime({
       worldQuery: this.world,
       initialPlayerPosition: this.positions.get(playerId),
-      ...(reopened?.record.facing === undefined
-        ? {}
-        : { initialPlayerFacing: reopened.record.facing }),
+      initialPlayerFacing: reopened?.record.facing ?? 'E',
     });
     this.positions.bind(playerId, runtime);
     this.runtimes.set(playerId, runtime);

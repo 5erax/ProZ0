@@ -48,6 +48,31 @@ describe('Phase 1 canonical authority bundle', () => {
         temperature: 50,
       });
       expect(bundle.authorityTick).toBe(0);
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('E');
+
+      bundle.submitInput('p1', {
+        moveUp: false,
+        moveDown: false,
+        moveLeft: false,
+        moveRight: false,
+      });
+      await bundle.stepSolo();
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('E');
+
+      bundle.submitInput('p1', {
+        moveUp: false,
+        moveDown: true,
+        moveLeft: false,
+        moveRight: false,
+      });
+      await bundle.stepSolo();
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('S');
 
       bundle.submitInput('p1', {
         moveUp: false,
@@ -60,9 +85,9 @@ describe('Phase 1 canonical authority bundle', () => {
       const moved = bundle.getPlayerPosition('p1');
       expect(moved.x).toBeGreaterThan(0);
       expect(moved.y).toBe(0);
-      expect(bundle.authorityTick).toBe(1);
-      expect(bundle.worldStore.getEnvironmentView().state.activeTick).toBe(1);
-      expect(bundle.survival.getPlayerState('p1').tick).toBe(1);
+      expect(bundle.authorityTick).toBe(3);
+      expect(bundle.worldStore.getEnvironmentView().state.activeTick).toBe(3);
+      expect(bundle.survival.getPlayerState('p1').tick).toBe(3);
 
       expect(bundle.world.isFootprintExplored(
         moved,

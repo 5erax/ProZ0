@@ -818,6 +818,146 @@ describe('P1-POLISH-006 hosted revision domains', () => {
   });
 });
 
+describe('P1-HOSTFIX-001 canonical hosted facing', () => {
+  it('keeps fresh facing canonical through READY, reconnect, drain/save, and reopen without requiring every player to move', async () => {
+    const worldId = 'world:p1-hostfix-001-facing';
+    const harness = await createPersistenceHarness(worldId);
+    const composition = harness.composition;
+    const first = connectClient(
+      composition,
+      'transport:hostfix:first',
+    );
+    const second = connectClient(
+      composition,
+      'transport:hostfix:second',
+    );
+
+    try {
+      const firstPlayerId = first.connection.getPlayerId();
+      const secondPlayerId = second.connection.getPlayerId();
+      if (firstPlayerId === null || secondPlayerId === null) {
+        throw new Error('Expected two admitted hosted players.');
+      }
+
+      expect(
+        composition.bundle.getRuntime(firstPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('E');
+      expect(
+        composition.bundle.getRuntime(secondPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('E');
+
+      first.connection.sendMovement({
+        up: false,
+        down: true,
+        left: false,
+        right: false,
+      });
+      pumpClientToHost(composition, first);
+      await stepAndDeliver(composition, [first, second]);
+      expect(
+        composition.bundle.getRuntime(firstPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('S');
+      expect(
+        composition.bundle.getRuntime(secondPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('E');
+
+      const resumeCredential = first.connection.getResumeCredential();
+      if (resumeCredential === null) {
+        throw new Error('Expected hosted resume credential.');
+      }
+      first.connection.leave();
+      pumpClientToHost(composition, first);
+      const resumed = connectClient(
+        composition,
+        'transport:hostfix:first:resumed',
+        resumeCredential,
+      );
+
+      expect(resumed.connection.getPlayerId()).toBe(firstPlayerId);
+      expect(
+        composition.bundle.getRuntime(firstPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('S');
+      expect(
+        composition.bundle.getRuntime(secondPlayerId)
+          .getSnapshot().player.facing,
+      ).toBe('E');
+      expect(
+        resumed.connection.replication.get(
+          'container',
+          'inventory:' + secondPlayerId,
+        ),
+      ).toBeNull();
+      expect(
+        second.connection.replication.get(
+          'container',
+          'inventory:' + firstPlayerId,
+        ),
+      ).toBeNull();
+
+      const beforeDrainTick = composition.host.getAuthorityTick();
+      const final = await composition.drainSaveAndClose();
+      deliver([resumed, second], final);
+
+      expect(composition.host.getSessionState()).toBe('CLOSED');
+      expect(composition.host.getAuthorityTick()).toBe(beforeDrainTick);
+      expect(composition.bundle.authorityTick).toBe(beforeDrainTick);
+      expect(composition.host.diagnostics().pendingDomainCommandCount)
+        .toBe(0);
+      expect(harness.requests).toHaveLength(1);
+
+      const saved = harness.requests[0]!;
+      expect(
+        saved.players.find(
+          (entry) => entry.playerId === firstPlayerId,
+        )?.facing,
+      ).toBe('S');
+      expect(
+        saved.players.find(
+          (entry) => entry.playerId === secondPlayerId,
+        )?.facing,
+      ).toBe('E');
+
+      const reopen = reconstruct(composition, saved);
+      await composition.destroy();
+      const reopened = await createPersistenceHarness(
+        worldId,
+        reopen,
+      );
+      try {
+        const reopenedFirst = connectClient(
+          reopened.composition,
+          'transport:hostfix:reopened:first',
+        );
+        const reopenedSecond = connectClient(
+          reopened.composition,
+          'transport:hostfix:reopened:second',
+        );
+        expect(reopenedFirst.connection.getPlayerId()).toBe(firstPlayerId);
+        expect(reopenedSecond.connection.getPlayerId()).toBe(secondPlayerId);
+        expect(
+          reopened.composition.bundle.getRuntime(firstPlayerId)
+            .getSnapshot().player.facing,
+        ).toBe('S');
+        expect(
+          reopened.composition.bundle.getRuntime(secondPlayerId)
+            .getSnapshot().player.facing,
+        ).toBe('E');
+      } finally {
+        await reopened.composition.destroy();
+      }
+    } finally {
+      if (composition.host.getSessionState() !== 'CLOSED') {
+        await composition.destroy();
+      }
+    }
+  });
+});
+
 describe('P1-POLISH-006 hosted drain/save lifecycle', () => {
   it('saves and reopens coherently with an empty command queue', async () => {
     const harness = await createPersistenceHarness(
