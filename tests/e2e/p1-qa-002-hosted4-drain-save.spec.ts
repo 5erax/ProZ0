@@ -1289,10 +1289,6 @@ test('four real Chromium clients reconnect, drain Save V2, reopen, and preserve 
         'owner-private inventory visibility=true',
         'sharedAggregateCount=' + String(preDrainShared.length),
         'condenserAggregateCount=' + String(preDrainCondenserCount),
-        'neverDirectionallyMoved='
-          + neverDirectionallyMovedPlayerIds.join(','),
-        'neverMovedFacing=E',
-        'preDrainFacings=' + JSON.stringify(preDrainBrowserFacings),
       ],
     );
     await rejoinPage.screenshot({
