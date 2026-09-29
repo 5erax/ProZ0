@@ -81,6 +81,50 @@ describe('Phase 1 canonical authority bundle', () => {
     }
   });
 
+  it('initializes fresh player facing east, preserves it under neutral input, and lets directional movement replace it', async () => {
+    const bundle = await Phase1AuthorityBundle.create({
+      worldId: 'world:p1-fresh-facing',
+      worldSeed: 'p1-world-golden',
+      playerIds: ['p1'],
+      interactionRangeWorldUnits:
+        PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
+      spawnClearanceRadiusWorldUnits:
+        PHASE1_LANDING_SPAWN_CLEARANCE_RADIUS_WORLD_UNITS,
+      requiredAccessRadiusWorldUnits:
+        PHASE1_LANDING_REQUIRED_ACCESS_RADIUS_WORLD_UNITS,
+    });
+
+    try {
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('E');
+
+      bundle.submitInput('p1', {
+        moveUp: false,
+        moveDown: false,
+        moveLeft: false,
+        moveRight: false,
+      });
+      await bundle.stepSolo();
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('E');
+
+      bundle.submitInput('p1', {
+        moveUp: false,
+        moveDown: true,
+        moveLeft: false,
+        moveRight: false,
+      });
+      await bundle.stepSolo();
+      expect(
+        bundle.getRuntime('p1').getSnapshot().player.facing,
+      ).toBe('S');
+    } finally {
+      await bundle.destroy();
+    }
+  });
+
   it('applies approved 1.25 WU interaction and Landing clearance boundaries inclusively', async () => {
     const bundle = await Phase1AuthorityBundle.create({
       worldId: 'world:p1-approved-spatial-tuning',
