@@ -242,5 +242,13 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       expect(report.authorityTicks).toBeGreaterThan(100);
       if (moving) expect(report.distance).toBeGreaterThan(0.2);
     }
+    for(const scale of [1,3]){
+      await page.setViewportSize({width:640*scale,height:360*scale});
+      await expect(page.locator('canvas')).toHaveAttribute('data-display-scale',String(scale));
+      const box=await page.locator('.p2-colony-controls').boundingBox();
+      expect(box).not.toBeNull();expect(box!.x).toBeGreaterThanOrEqual(0);expect(box!.x+box!.width).toBeLessThanOrEqual(640*scale);
+      await page.screenshot({path:resolve(directory,scene.name+'-'+String(scale)+'x.png')});
+    }
+    await page.setViewportSize({width:1280,height:720});
   }
 });
