@@ -49,7 +49,7 @@ function localCommandResult(
   });
 }
 
-const PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 12;
+const PRODUCT_REVIEW_COMMAND_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 180;
 const PRODUCT_REVIEW_INVENTORY_FEEDBACK_LIFETIME_AUTHORITY_TICKS = 180;
 
 export class Phase1ProductReviewPresentationSource
@@ -68,6 +68,13 @@ export class Phase1ProductReviewPresentationSource
   private inventoryActivePane: 'player' | 'storage' = 'player';
   private inventoryQuantity = 1;
   private current: Readonly<Phase1PresentationState>;
+  private presentationBatchActive = false;
+
+  public beginPresentationBatch(): void { this.presentationBatchActive = true; }
+  public endPresentationBatch(): void {
+    this.presentationBatchActive = false;
+    this.refresh();
+  }
 
   public constructor(
     private readonly bundle: Phase1AuthorityBundle,
@@ -324,6 +331,7 @@ export class Phase1ProductReviewPresentationSource
   }
 
   public refresh(): void {
+    if (this.presentationBatchActive) return;
     if (
       this.commandFeedback !== null
       && this.commandFeedbackExpiresAfterAuthorityTick !== null

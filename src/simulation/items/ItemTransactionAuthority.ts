@@ -404,6 +404,44 @@ export class Phase1ItemAuthority {
     return this.ledger.exportSnapshot();
   }
 
+  public commitColonyExchange(request: {
+    readonly operationId: string;
+    readonly playerId: PlayerId;
+    readonly expectedInventoryRevision: number;
+    readonly inputs: readonly { itemDefinitionId: string; quantity: number }[];
+    readonly outputs: readonly { itemDefinitionId: string; quantity: number }[];
+  }): { status: 'committed'; inventoryRevision: number } | { status: 'rejected'; reason: string } {
+    const draft = this.ledger.createDraft();
+    const containerId = 'inventory:' + request.playerId;
+    const inventory = draft.getContainer(containerId);
+    if (inventory === null || inventory.ownerPlayerId !== request.playerId) return { status: 'rejected', reason: 'SOURCE_MISSING' };
+    if (inventory.revision !== request.expectedInventoryRevision) return { status: 'rejected', reason: 'STALE_REVISION' };
+    for (const input of request.inputs) {
+      if (!Number.isSafeInteger(input.quantity) || input.quantity <= 0) return { status: 'rejected', reason: 'INVALID_QUANTITY' };
+      let remaining = input.quantity;
+      for (const stack of [...inventory.stacks]) {
+        if (stack.itemDefinitionId !== input.itemDefinitionId) continue;
+        const count = Math.min(remaining, stack.quantity);
+        const removal = draft.removeQuantity(containerId, stack.stackId, count);
+        if (typeof removal === 'string') return { status: 'rejected', reason: removal };
+        remaining -= count;
+        if (remaining === 0) break;
+      }
+      if (remaining > 0) return { status: 'rejected', reason: 'NEED ' + input.itemDefinitionId + ' ×' + String(input.quantity) };
+    }
+    let ordinal = 0;
+    for (const output of request.outputs) {
+      const insertion = draft.insert({ containerId, itemDefinitionId: output.itemDefinitionId,
+        quantity: output.quantity, condition: null, operationId: request.operationId, generatedOrdinal: ordinal });
+      if (typeof insertion === 'string') return { status: 'rejected', reason: insertion };
+      ordinal = insertion.nextGeneratedOrdinal;
+    }
+    const inventoryRevision = request.inputs.length + request.outputs.length > 0
+      ? draft.incrementRevision(containerId) : inventory.revision;
+    this.ledger.publish(draft);
+    return { status: 'committed', inventoryRevision };
+  }
+
   public getPendingAuthorityEvents(): readonly Readonly<ItemAuthorityEvent>[] {
     return Object.freeze([...this.pendingAuthorityEvents]);
   }

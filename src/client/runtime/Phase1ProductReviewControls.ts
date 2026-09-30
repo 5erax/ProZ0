@@ -78,6 +78,7 @@ export function createPhase1ProductReviewControls(
     'INVENTORY · CLICK ITEM / ↑↓ SELECT · X EQUIP · G DROP',
     'B · BUILD · TAB STRUCTURE · R ROTATE · ENTER PLACE',
     'I · INVENTORY · M · MAP · P · PROGRESSION',
+    'N · COLONY · GROW FOOD / CARE FOR GRAZER · E CAPTURE',
     'ESC · CLOSE ACTIVE PANEL',
   ]);
   for (const text of rows) {

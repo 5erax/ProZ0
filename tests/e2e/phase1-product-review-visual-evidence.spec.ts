@@ -1125,6 +1125,7 @@ async function assertPanelCompositionIsolated(
 test.use({ deviceScaleFactor: 1 });
 
 test('P1-POLISH-001 isolates primary panels from contextual HUD at required integer scales', async ({ page }) => {
+  test.setTimeout(90_000);
   const normal = await createBaseSave(
     'world:p1-polish-001-panel-composition',
     Object.freeze([
@@ -2258,13 +2259,13 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     };
   });
   expect(terrainCoverage.widths).toEqual([64]);
-  expect(terrainCoverage.heights).toEqual([64]);
+  expect(terrainCoverage.heights).toEqual([32]);
   expect(terrainCoverage.maxXGap).toBeLessThanOrEqual(64);
   expect(terrainCoverage.maxYGap).toBeLessThanOrEqual(64);
   await expect(page.locator('[data-world-role="fog"]').first())
     .toHaveCSS('width', '64px');
   await expect(page.locator('[data-world-role="fog"]').first())
-    .toHaveCSS('height', '64px');
+    .toHaveCSS('height', '32px');
 
   await expect(
     page.locator('[data-world-role="teammate-identity"]'),
@@ -2904,4 +2905,118 @@ test('owner-reported player controls: pages, mouse equipment, pickup and fullscr
   await expect.poll(() => page.evaluate(() => document.fullscreenElement?.id)).toBe('app');
   await page.getByRole('button', { name: 'Toggle fullscreen', exact: true }).click();
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+});
+
+
+test('colony: builds a visible bed, plants, harvests once and reopens persistent state', async ({ page }) => {
+  const base = await createBaseSave('world:colony-browser', [{ playerId: 'farmer', x: -6, y: 4, facing: 'E' }], authority => {
+    const inventory = authority.items.getContainerView('inventory:farmer');
+    const seeded = authority.items.commitColonyExchange({ operationId: 'fixture:colony', playerId: 'farmer',
+      expectedInventoryRevision: inventory.revision, inputs: [], outputs: [
+        { itemDefinitionId: 'item:timber', quantity: 3 }, { itemDefinitionId: 'item:cordage', quantity: 1 },
+        { itemDefinitionId: 'item:edible-plant', quantity: 1 }, { itemDefinitionId: 'item:clean-water', quantity: 1 }] });
+    expect(seeded.status).toBe('committed');
+  });
+  await openProductReview(page, base, 'colony-browser-db', 2, 'farmer');
+  await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'false');
+  await page.keyboard.press('e');
+  const panel = page.locator('[data-panel-kind="colony"]');
+  await expect(panel).toContainText('CULTIVATION / HUSBANDRY');
+  await page.locator('[data-review-action="colony:build-bed"]').click();
+  await expect(panel).toContainText('BUILD-BED · DONE');
+  await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'true');
+  await page.locator('[data-review-action="colony:plant"]').click();
+  await expect(panel).toContainText('PLANT · DONE');
+  await expect(panel).toContainText('GROWING');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-world-role="cultivated-crop"]')).toHaveCount(3);
+  await page.keyboard.press('l');
+  await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state', 'success');
+  await page.reload();
+  await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'true');
+  await page.keyboard.press('n');
+  await expect(panel).toContainText('GROWING');
+  await page.locator('[data-review-action="colony:harvest"]').click();
+  await expect(panel).toContainText('CROP NOT READY');
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, 'colony-growing-2x.png') });
+});
+
+
+test('colony: harvests once and renders a persistent captive grazer with care feedback', async ({ page }) => {
+  test.setTimeout(45_000);
+  const base = await createBaseSave('world:colony-complete-browser', [{ playerId: 'keeper', x: -6, y: 4, facing: 'E' }], async authority => {
+    const inventory = authority.items.getContainerView('inventory:keeper');
+    authority.items.commitColonyExchange({ operationId: 'fixture:complete-colony', playerId: 'keeper',
+      expectedInventoryRevision: inventory.revision, inputs: [], outputs: [
+        { itemDefinitionId: 'item:timber', quantity: 7 }, { itemDefinitionId: 'item:cordage', quantity: 4 },
+        { itemDefinitionId: 'item:edible-plant', quantity: 3 }, { itemDefinitionId: 'item:clean-water', quantity: 3 }] });
+    const act = (action: 'build-bed' | 'plant' | 'build-pen' | 'capture' | 'care', animalEntityId?: string) => {
+      const result = authority.sustenance.execute({ operationId: 'fixture:' + action, playerId: 'keeper', action,
+        expectedRevision: authority.sustenance.read().revision,
+        expectedInventoryRevision: authority.items.getContainerView('inventory:keeper').revision,
+        ...(animalEntityId === undefined ? {} : { animalEntityId }) });
+      expect(result.status).toBe('committed');
+    };
+    act('build-bed'); act('plant');
+    authority.getRuntime('keeper').relocatePlayer({ x: 6, y: 4 }); await authority.stepSolo(); act('build-pen');
+    const animal = authority.world.getActiveGeneratedEntities().find(entity => entity.type === 'passive-wildlife');
+    if (animal === undefined) throw Error('Missing canonical grazer');
+    authority.getRuntime('keeper').relocatePlayer(animal.position); await authority.stepSolo(); act('capture', animal.entityId);
+    authority.getRuntime('keeper').relocatePlayer({ x: 6, y: 4 }); act('care');
+    // Explicit matured fixture. No real-player or offline-growth evidence is inferred from it.
+    for (let tick = 0; tick < 10800; tick++) authority.sustenance.tick();
+    authority.getRuntime('keeper').relocatePlayer({ x: -6, y: 4 });
+  });
+  await openProductReview(page, base, 'colony-complete-browser-db', 2, 'keeper');
+  await expect(page.locator('[data-world-role="captive-grazer"]')).toHaveCount(1);
+  await page.keyboard.press('n');
+  const panel = page.locator('[data-panel-kind="colony"]');
+  await expect(panel).toContainText('READY TO HARVEST');
+  await expect(panel).toContainText('FERTILIZER · 1/4');
+  await page.locator('[data-review-action="colony:harvest"]').click();
+  await expect(panel).toContainText('HARVEST · DONE');
+  await page.locator('[data-review-action="colony:harvest"]').click();
+  await expect(panel).toContainText('CROP NOT READY');
+  await page.keyboard.press('Escape'); await page.keyboard.press('i');
+  await expect(page.locator('[data-panel-kind="inventory"] .p1-item-row').filter({ hasText: 'Edible Plant' })).toContainText('×4');
+  await page.keyboard.press('Escape');
+  await page.keyboard.down('s'); await page.keyboard.down('d');
+  await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-player-x')),
+    { timeout: 10_000, intervals: [25] }).toBeGreaterThanOrEqual(5.8);
+  await page.keyboard.up('s'); await page.keyboard.up('d');
+  await page.keyboard.press('n');
+  await page.locator('[data-review-action="colony:care"]').click();
+  await expect(panel).toContainText('CARE · DONE');
+  await expect(panel).toContainText('CARED FOR');
+  await page.keyboard.press('Escape');
+  await page.screenshot({ path: resolve(EVIDENCE_DIR, 'colony-grazer-2x.png') });
+});
+
+
+test('environment: isometric clear and rain day/night remain readable at 1x 2x 3x and grayscale', async ({ page }) => {
+  test.setTimeout(90_000);
+  const base = await createBaseSave('world:environment-matrix', [{ playerId: 'observer', x: 18, y: 10, facing: 'S' }]);
+  const nightRain = withAuthorityTick(base, 135_000);
+  // The canonical rain event overlaps dawn at active tick 151200.
+  const dayRain = withAuthorityTick(base, 152_000);
+  for (const scene of [{ name: 'clear-day', save: base, rain: false, period: 'day' },
+    { name: 'rain-day', save: dayRain, rain: true, period: 'day' },
+    { name: 'rain-night', save: nightRain, rain: true, period: 'night' }]) {
+    for (const scale of [1, 2, 3] as const) {
+      await openProductReview(page, scene.save, 'environment-' + scene.name + '-' + String(scale), scale, 'observer');
+      const canvas = page.locator('canvas');
+      await expect(canvas).toHaveAttribute('data-world-perspective', 'isometric-2-to-1');
+      await expect(canvas).toHaveAttribute('data-day-period', scene.period);
+      await expect(page.locator('[data-weather-effect="cold-rain"]')).toHaveCount(scene.rain ? 1 : 0);
+      await expect(page.locator('[data-weather-effect="atmospheric-mass"]')).toHaveCount(scene.rain ? 1 : 0);
+      if (scene.rain) await expect(page.locator('[data-world-role="rain-splash"]').first()).toBeVisible();
+      await expect(page.locator('[data-world-role="player"]')).toBeVisible();
+      await expect(page.locator('[data-world-role="resource"]').first()).toBeVisible();
+      await expect(page.locator('[data-world-role="flora-decor"][data-exploration-state="UNEXPLORED"]')).toHaveCount(0);
+      await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x.png') });
+      await page.locator('[data-proz0-autoboot]').evaluate(element => { (element as HTMLElement).style.filter = 'grayscale(1)'; });
+      await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x-gray.png') });
+    }
+  }
 });

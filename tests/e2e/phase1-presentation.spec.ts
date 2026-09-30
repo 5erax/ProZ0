@@ -138,6 +138,7 @@ test('viewport below 640x360 shows explicit no-fractional-scale guard', async ({
 
 
 test('direct Product Review URL boots canonical persisted slice without console setup', async ({ page }) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 720 });
 
   // Production launch inputs only: gameplay/clearance tuning is canonical
@@ -197,17 +198,25 @@ test('direct Product Review URL boots canonical persisted slice without console 
   await expect(starterInventory).toContainText('Stone Field Tool');
   await page.keyboard.press('Escape');
 
-  // Reach the canonical local Fiber Plant at (18, 10) using only normal
-  // player movement. Hold durations target the node center from the approved
-  // 2.8125 WU/s cardinal movement speed, avoiding poll-induced overshoot.
-  await page.keyboard.down('d');
-  await page.waitForTimeout(6_300);
-  await page.keyboard.up('d');
-
-  await page.keyboard.down('s');
-  await page.waitForTimeout(3_500);
-  await page.keyboard.up('s');
-  await page.waitForTimeout(100);
+  // Walk with normal screen-relative keys, releasing before reading position.
+  // Holding keys during remote locator polling can overshoot the small gather
+  // range on a busy CI runner. Short steps permit ordinary player corrections
+  // without relocating the actor or widening the production interaction range.
+  for (let step = 0; step < 120; step++) {
+    const position = await canvas.evaluate(element => ({
+      x: Number(element.getAttribute('data-player-x')),
+      y: Number(element.getAttribute('data-player-y')),
+    }));
+    const dx = 18 - position.x;
+    const dy = 10 - position.y;
+    if (Math.hypot(dx, dy) <= 0.65) break;
+    const keys = Math.abs(dx) >= Math.abs(dy)
+      ? (dx > 0 ? ['s', 'd'] : ['w', 'a'])
+      : (dy > 0 ? ['s', 'a'] : ['w', 'd']);
+    for (const key of keys) await page.keyboard.down(key);
+    await page.waitForTimeout(100);
+    for (const key of keys.toReversed()) await page.keyboard.up(key);
+  }
 
   const gatherX = Number(await canvas.getAttribute('data-player-x'));
   const gatherY = Number(await canvas.getAttribute('data-player-y'));

@@ -1,4 +1,5 @@
 import type { PlayerId } from '../../foundation';
+import { COLONY_ACTIONS, type ColonySustenanceAuthority, type ColonySustenanceAction } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import {
   type AttackCommand,
   type DismantleStructureCommand,
@@ -87,6 +88,7 @@ export interface Phase1HostedCommandDispatcherOptions {
   readonly machines: Pick<Phase1CondenserAuthority, 'setEnabled'>;
   readonly death: Phase1DeathAuthority;
   readonly combat?: Phase1CombatAuthority;
+  readonly sustenance?: Pick<ColonySustenanceAuthority, 'execute'>;
   readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
 }
@@ -419,6 +421,26 @@ implements HostedCommandDispatcher {
 
       case 'machine.set-enabled':
         return this.setMachineEnabled(context.playerId, command, payload);
+
+      case 'colony.sustenance': {
+        const action = textField(payload, 'action') as ColonySustenanceAction;
+        if (this.options.sustenance === undefined || !COLONY_ACTIONS.includes(action)
+          || command.expectedRevisions.length !== 2) {
+          return Object.freeze({ status: 'rejected', reason: 'INVALID_MESSAGE' });
+        }
+        const inventoryId = 'inventory:' + context.playerId;
+        const result = this.options.sustenance.execute({
+          operationId: command.operationId, playerId: context.playerId, action,
+          expectedRevision: expectedRevision(command, 'colony-sustenance', 'colony'),
+          expectedInventoryRevision: expectedRevision(command, 'container', inventoryId),
+          ...(action === 'capture' ? { animalEntityId: textField(payload, 'animalEntityId') } : {}),
+        });
+        return withReplication(this.options, command.commandType, context.playerId,
+          result.status === 'committed' ? { status: 'committed', resultingRevisions: Object.freeze([
+            { aggregateType: 'colony-sustenance', aggregateId: 'colony', revision: result.revision },
+            { aggregateType: 'container', aggregateId: inventoryId, revision: result.inventoryRevision },
+          ]) } : { status: 'rejected', reason: result.reason });
+      }
 
       case 'death-cache.recover':
         return this.recoverDeathCache(context.playerId, command, payload);

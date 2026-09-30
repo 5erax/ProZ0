@@ -272,7 +272,14 @@ export interface Phase1MapPanelPresentation {
   readonly spatial?: Readonly<Phase1SpatialMapPresentation>;
 }
 
+export interface Phase1ColonyPanelPresentation {
+  readonly kind: 'colony';
+  readonly title: string;
+  readonly lines: readonly string[];
+}
+
 export type Phase1PanelPresentation =
+  | Phase1ColonyPanelPresentation
   | Phase1InventoryPanelPresentation
   | Phase1ContainerPanelPresentation
   | Phase1CraftPanelPresentation

@@ -323,6 +323,7 @@ function commandToasts(
   }
 
   const toastVerbs = new Set([
+    'BUILD-BED', 'PLANT', 'HARVEST', 'BUILD-PEN', 'CAPTURE', 'CARE', 'FERTILIZE',
     'GATHER',
     'CRAFT',
     'BUILD',
@@ -749,6 +750,7 @@ export function applyPhase1AuthoritativeCommandFeedback(
     case 'recovery':
     case 'progression':
     case 'map':
+    case 'colony':
       return basePanel;
   }
 }

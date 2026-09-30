@@ -42,7 +42,7 @@ const BUILD_PREVIEW_PATTERN_URL = new URL(
   import.meta.url,
 ).href;
 const TERRAIN_ATLAS_URL = new URL(
-  '../../../assets/phase1/world/terrain/terrain_region_atlas.png',
+  '../../../assets/phase1/world/terrain/terrain_diorama_v1.svg',
   import.meta.url,
 ).href;
 const PLAYER_URL = new URL(
@@ -380,12 +380,12 @@ export function panelSkinCornerSprite(): Phase1ProductionSprite {
 
 export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
   ground: atlasSprite(
-    'assets/phase1/world/terrain/terrain_region_atlas.png',
+    'assets/phase1/world/terrain/terrain_diorama_v1.svg',
     TERRAIN_ATLAS_URL,
     32,
-    32,
+    16,
     192,
-    128,
+    64,
     6,
     0,
   ),

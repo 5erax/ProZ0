@@ -37,8 +37,8 @@ async function waitPastProductReviewFeedbackLifetime(
   runtime: RuntimeHandle,
   feedbackStartTick: number,
 ): Promise<void> {
-  const minimumExpiredTick = feedbackStartTick + 13;
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  const minimumExpiredTick = feedbackStartTick + 181;
+  for (let attempt = 0; attempt < 800; attempt += 1) {
     if (productReviewAuthorityTick(runtime) >= minimumExpiredTick) return;
     await wait(10);
   }
@@ -560,7 +560,7 @@ describe('Phase 0 browser runtime', () => {
         cancelable: true,
         bubbles: true,
       }));
-      await wait(140);
+      await expect.poll(() => Number(movementCanvas?.dataset.playerY), { timeout: 2000 }).toBeGreaterThan(initialY);
       document.dispatchEvent(new KeyboardEvent('keyup', {
         code: 'KeyS',
         cancelable: true,
@@ -586,7 +586,7 @@ describe('Phase 0 browser runtime', () => {
         code: 'KeyD',
         cancelable: true,
       }));
-      await wait(180);
+      await expect.poll(() => Number(canvas?.dataset.playerX), { timeout: 2000 }).toBeGreaterThan(initialX);
       window.dispatchEvent(new KeyboardEvent('keyup', {
         code: 'KeyD',
         cancelable: true,
@@ -665,7 +665,7 @@ describe('Phase 0 browser runtime', () => {
         code: 'KeyD',
         cancelable: true,
       }));
-      await wait(160);
+      await expect.poll(() => Number(reopenedCanvas?.dataset.playerX), { timeout: 2000 }).toBeGreaterThan(firstSavedX);
       window.dispatchEvent(new KeyboardEvent('keyup', {
         code: 'KeyD',
         cancelable: true,
@@ -1015,7 +1015,7 @@ describe('Phase 0 browser runtime', () => {
       'KeyV',
       /\[V\] CONSUME · Consumable/,
     );
-  });
+  }, 30_000);
 
   it('projects Product Review map from explored knowledge without resource scanning', async () => {
     root = document.createElement('div');

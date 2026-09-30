@@ -323,6 +323,7 @@ function composePhase1SaveV2AtRevision(
     worldId: bundle.config.worldId,
     worldRevision,
     authorityTick: bundle.authorityTick,
+    sustenance: bundle.sustenance.read(),
     worldSeed: bundle.config.worldSeed,
     generationVersion: PHASE1_WORLD_GENERATION_VERSION,
     rngAlgorithmVersion: RNG_ALGORITHM_VERSION,
