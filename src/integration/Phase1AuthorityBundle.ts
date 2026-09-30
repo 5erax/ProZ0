@@ -361,6 +361,7 @@ export type Phase1RuinRewardClaimResult =
     };
 
 export interface Phase1AuthorityBundleConfig {
+  readonly worldGenerationVersion?: number;
   readonly colonyDepthEnabled?: boolean;
   readonly worldId: string;
   readonly worldSeed: string;
@@ -504,6 +505,7 @@ export class Phase1AuthorityBundle {
       chunks: reopen?.chunks.map((entry) => entry.worldSlice) ?? [],
     });
     const worldStore = new Phase1WorldStore({
+      generationVersion: reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       worldSeed: config.worldSeed,
       catalog,
       persistence: worldPersistence,
@@ -1188,7 +1190,7 @@ export class Phase1AuthorityBundle {
 
   public getWorldCompatibility() {
     return Object.freeze({
-      worldGenerationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      worldGenerationVersion: this.config.reopen?.bundle.world.generationVersion ?? this.config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       rngAlgorithmVersion: RNG_ALGORITHM_VERSION,
       seedDerivationVersion: SEED_DERIVATION_VERSION,
     });

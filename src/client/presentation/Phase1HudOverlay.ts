@@ -303,6 +303,8 @@ function renderPanel(
     }
     case 'inventory': {
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
+      root.append(actionButton(document,'Build storage crate','build-storage'));
+      root.append(createElement(document,'div','p1-storage-tip','Store supplies near a crate: open Inventory [I] beside it. Build a crate with 4 Timber + 2 Cordage.'));
       root.dataset.inventoryActivePane = 'player';
       root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
@@ -1373,6 +1375,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     equipment.dataset.region = 'equipment';
 
     const equipmentSlots = state.equipmentSlots;
+    equipment.dataset.empty = String(equipmentSlots!==undefined ? equipmentSlots.weapon===null && equipmentSlots.protection===null && equipmentSlots.quickUse.target===null : state.equipment===null);
     if (equipmentSlots === undefined) {
       if (state.equipment === null) {
         equipment.textContent = 'NO ACTIVE EQUIPMENT';
@@ -1541,6 +1544,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         toast.title + (toast.detail === null ? '' : ' · ' + toast.detail),
       );
       entry.dataset.toastKind = toast.kind;
+      entry.dataset.routineCooldown=String((toast.title+' '+(toast.detail??'')).includes('COOLDOWN'));
       entry.dataset.toastId = toast.id;
       toasts.append(entry);
     }
@@ -1588,6 +1592,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       const interaction = createElement(this.document, 'section', 'p1-interaction p1-box p1-context-hud');
       interaction.dataset.region = 'interaction';
       interaction.dataset.state = state.interaction.state;
+      interaction.dataset.reason = state.interaction.reason ?? '';
       const interactionMain = createElement(
         this.document,
         'div',

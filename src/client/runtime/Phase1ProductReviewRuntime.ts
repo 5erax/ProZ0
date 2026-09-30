@@ -305,6 +305,7 @@ export async function createPhase1ProductReviewRuntime(
   const controls = createPhase1ProductReviewControls(
     root,
     worldRenderer.canvas,
+    config.colonyDepthEnabled === true,
   );
 
   const nextOperationId = (kind: string): string =>
@@ -979,7 +980,7 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
-  const beginGather = (): void => {
+  const beginGather = (clickedId?: string): void => {
     if (activeGather !== null) {
       bundle.items.cancelGather(config.localPlayerId);
       activeGather = null;
@@ -987,7 +988,7 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
-    const entity = resourceTarget();
+    const entity = clickedId===undefined ? resourceTarget() : bundle.world.getActiveGeneratedEntities().find(candidate=>candidate.entityId===clickedId) ?? null;
     if (entity === null || entity.type !== 'resource') {
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
@@ -1872,6 +1873,8 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
+    if(root.dataset.colonySettingsOpen==='true')return;
+    if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
       switch (event.code) {
@@ -2129,7 +2132,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = input.sample();
+      const sampled = root.dataset.colonySettingsOpen==='true' ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
@@ -2182,6 +2185,9 @@ export async function createPhase1ProductReviewRuntime(
 
   const onPanelClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element)) return;
+    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true'){
+      const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){beginGather(resource.dataset.worldId);return;}
+    }
     const item = event.target.closest<HTMLElement>('[data-review-item]');
     if (item !== null) {
       source.selectInventoryItem(item.dataset.reviewItem ?? '');
@@ -2199,6 +2205,11 @@ export async function createPhase1ProductReviewRuntime(
       source.togglePanel(action === 'open-map' ? 'map' : 'inventory'); return;
     }
     if (action === 'open-craft') { source.setPanel(null); toggleCraftPanel(); return; }
+    if (action === 'build-storage') {
+      colonyDepthOverlay?.close();source.setPanel(null);actionPanel=null;toggleBuildPanel();
+      buildIndex=Math.max(0,buildDefinitions().findIndex(definition=>definition.id==='structure:storage-crate'));
+      source.setPresentationPanel(buildPanel());return;
+    }
     if (action === 'open-build') { source.setPanel(null); toggleBuildPanel(); return; }
     if (action === 'open-colony') {
       source.setPanel(null);

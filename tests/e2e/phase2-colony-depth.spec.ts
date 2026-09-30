@@ -85,12 +85,14 @@ test("colony exploration: real gathering funds research; walking reveals and ins
   const sound = page.waitForResponse((response) =>
     /landing.*\.wav/.test(response.url()),
   );
+  await page.getByRole('button',{name:'Settings',exact:true}).click();
   await page.getByRole("button", { name: "Enable sound", exact: true }).click();
   expect((await sound).ok()).toBe(true);
   await expect(
     page.getByRole("button", { name: "Mute sound", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Mute sound", exact: true }).click();
+  await page.getByRole('button',{name:'Close',exact:true}).click();
   await expect(page.locator('[data-world-role="survey-site"]')).toHaveCount(0);
   await expect(page.locator(".p2-colony-controls")).toHaveAttribute(
     "data-biome",

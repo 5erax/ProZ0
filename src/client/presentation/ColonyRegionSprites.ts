@@ -38,9 +38,9 @@ function tiles(id: ColonyBiomeId): readonly Phase1ProductionSprite[] {
         accent +
         '" opacity=".4"/>'
       : id === "mist-marsh"
-        ? '<path d="M18 17v-5m3 7v-8m19 11v-6" stroke="' +
+        ? '<path d="M'+String(12+index*5)+' 18v-3m3 4v-5" stroke="' +
           accent +
-          '"/><path d="M26 22h9l3-3-8-2z" fill="' +
+          '" opacity=".7"/><path d="'+(index===0?'M26 22h9l3-3-8-2z':index===1?'M36 13h4l2-2-5-1z':index===2?'M17 21h5l3-2-5-1z':'M27 14h2v1h-2z')+'" fill="' +
           p.water +
           '"/>'
         : '<path d="m19 19 5-5 9 2-4 5z" fill="' +
@@ -55,8 +55,6 @@ function tiles(id: ColonyBiomeId): readonly Phase1ProductionSprite[] {
       String(Math.floor(index / 4) * 32) +
       ')"><path d="M0 16 32 0 64 16 32 32z" fill="' +
       (water ? p.water : p.ground) +
-      '"/><path d="M0 16 32 32 64 16" fill="none" stroke="' +
-      p.edge +
       '"/>' +
       details +
       '<rect x="' +
@@ -121,3 +119,12 @@ const sites = {
 export function colonySiteSprite(biome: ColonyBiomeId): Phase1ProductionSprite {
   return sites[biome === "mist-marsh" ? "mist-marsh" : "ochre-badlands"];
 }
+
+const trees = Object.fromEntries(Object.keys(COLONY_BIOMES).map(id=>{
+  const marsh=id==='mist-marsh',arid=id==='ochre-badlands';
+  const dark=marsh?'#244d49':arid?'#4e6042':'#2d4b3e',light=marsh?'#678d69':arid?'#9caa68':'#789663';
+  const base='<ellipse cx="16" cy="44" rx="13" ry="3" fill="#122b2b" opacity=".5"/><path d="M14 43V25h5v18zm3-11 6-5 2 2-6 6z" fill="#78654d"/><path d="M14 42h5v2h-5" fill="#b79868"/>';
+  return [id,sprite('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" shape-rendering="crispEdges">'+base+'<path d="M5 25v-8h4V9h6V5h8v7h5v13h-4v5H9v-5z" fill="'+dark+'"/><path d="M9 15V9h6V5h8v7h-5v5h-9zm-4 5h8v4H5" fill="'+light+'"/><path d="M13 27h10v3H13" fill="#172f32"/></svg>','phase2:tree:'+id,32,48,32,48,1)];
+})) as Record<ColonyBiomeId,Phase1ProductionSprite>;
+const stump=sprite('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="48" shape-rendering="crispEdges"><ellipse cx="16" cy="44" rx="10" ry="3" fill="#122b2b" opacity=".5"/><path d="M12 44v-8h9v8z" fill="#78654d"/><path d="M12 36h9v3h-9" fill="#c0a47b"/><path d="M15 37h4" stroke="#78654d"/></svg>','phase2:tree:stump',32,48,32,48,1);
+export function colonyTimberSprite(biome:ColonyBiomeId,depleted:boolean):Phase1ProductionSprite{return depleted?stump:trees[biome];}

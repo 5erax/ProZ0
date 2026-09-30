@@ -1,3 +1,4 @@
+import {COLONY_WORLD_GENERATION_VERSION,PHASE1_WORLD_GENERATION_VERSION} from '../world/phase1/Phase1ChunkGenerator';
 import type {
   JsonValue,
   RevisionRefV1,
@@ -316,6 +317,7 @@ export class Phase1HostedAuthorityComposition {
   ): Promise<Phase1HostedAuthorityComposition> {
     const playerIds = capacityPlayerIds(config.maxPlayers);
     const bundle = await Phase1AuthorityBundle.create({
+      worldGenerationVersion: config.colonyDepthEnabled===true ? COLONY_WORLD_GENERATION_VERSION : PHASE1_WORLD_GENERATION_VERSION,
       worldId: config.worldId,
       worldSeed: config.worldSeed,
       playerIds,
