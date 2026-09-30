@@ -29,25 +29,25 @@ describe('Phase 1 world deterministic generation', () => {
       '3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c',
     );
     expect(generated.generationSeed).toEqual([
-      1019647624,
-      3012870872,
-      1319635487,
-      3451020681,
+      1459385696,
+      2403860609,
+      1252396350,
+      1861302902,
     ]);
     expect(generated.generationFingerprint).toEqual([
-      2468347456,
-      2169107716,
-      878942094,
-      2049803912,
+      3557513750,
+      530554215,
+      348549188,
+      3127413865,
     ]);
     expect(generated.baseGenerationFingerprint).toBe(
-      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:398f82f1',
+      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-3:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:d48e56d0',
     );
     expect(generated.entities).toEqual([
       {
         type: 'resource',
         entityId:
-          'generated:resource:d049d66d3bfea471ac0521571b5c7186',
+          'generated:resource:9af3ba4ac9b2152e7cbfe61ab63a5c7f',
         definitionId: 'resource:fiber-plant',
         position: { x: 18, y: 10 },
       },
@@ -248,23 +248,23 @@ describe('Phase 1 world deterministic generation', () => {
     });
 
     expect(generated.generationSeed).toEqual([
-      3649120711,
-      1196511147,
-      564566834,
-      3059098403,
+      3594170994,
+      4015969615,
+      2340749809,
+      2400525720,
     ]);
     expect(generated.generationFingerprint).toEqual([
-      2776664386,
-      4114925134,
-      3693742601,
-      751075795,
+      3586094214,
+      3481858103,
+      3034780435,
+      14758211,
     ]);
     expect(generated.baseGenerationFingerprint).toBe(
-      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-2:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:74a2bca7',
+      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-3:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:6595dbb7',
     );
     expect(generated.entities).toContainEqual({
       type: 'ruin',
-      entityId: 'generated:ruin:3b53940f17bff6c5577120c0b62f3dda',
+      entityId: 'generated:ruin:435d74921c6ff3129122741cb61c2b3a',
       definitionId: 'ruin:previous-civilization-ruin',
       position: { x: -392, y: 0 },
     });
