@@ -432,8 +432,11 @@ export class Phase1AuthorityBundle {
     this.buildings = buildings;
     this.items = items;
     this.sustenance = new ColonySustenanceAuthority(items,
-      (playerId) => ({ position: this.positions.get(playerId),
-        alive: survival.getPlayerState(playerId).healthMilli > 0 }),
+      (playerId) => {
+        const state = survival.getPlayerState(playerId);
+        return { position: this.positions.get(playerId),
+          alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
+      },
       (entityId) => {
         const entity = world.getActiveGeneratedEntities().find((candidate) => candidate.entityId === entityId);
         return entity?.type === 'passive-wildlife' ? entity.position : null;

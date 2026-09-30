@@ -498,7 +498,7 @@ function styleElement(document: Document): HTMLStyleElement {
     '.p1-product-critical{z-index:890000!important;}',
     '.p1-product-identity{z-index:930000!important;}',
     '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);z-index:910000!important;}',
-    '.p1-product-night{position:absolute;inset:0;z-index:-50000;pointer-events:none;background:rgba(7,12,28,.48);mix-blend-mode:multiply;}',
+    '.p1-product-night{position:absolute;inset:0;z-index:-50000;pointer-events:none;background:rgba(7,12,28,.28);mix-blend-mode:multiply;}',
     '.p1-product-weather{position:absolute;inset:0;z-index:800000;pointer-events:none;opacity:.24;}',
     '.p1-product-build-preview{z-index:920000!important;opacity:.82;}',
     '.p1-product-module-night{filter:drop-shadow(0 0 2px rgba(101,166,175,.42));}',
@@ -679,7 +679,7 @@ export function createPhase1ProductReviewWorldRenderer(
           EXPLORATION_CELL_RASTER_SCALE,
         );
         if (night) {
-          tile.style.filter = 'brightness(.62) saturate(.72)';
+          tile.style.filter = 'brightness(.78) saturate(.72)';
         }
         if (known && terrain === 'ground' && explorationCellKnown(bundle, gx, gy + 1)
           && terrainForCell(bundle, gx, gy + 1) === 'water') {

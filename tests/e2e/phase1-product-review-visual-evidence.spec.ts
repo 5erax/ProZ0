@@ -2991,3 +2991,31 @@ test('colony: harvests once and renders a persistent captive grazer with care fe
   await page.keyboard.press('Escape');
   await page.screenshot({ path: resolve(EVIDENCE_DIR, 'colony-grazer-2x.png') });
 });
+
+
+test('environment: isometric clear and rain day/night remain readable at 1x 2x 3x and grayscale', async ({ page }) => {
+  test.setTimeout(90_000);
+  const base = await createBaseSave('world:environment-matrix', [{ playerId: 'observer', x: 18, y: 10, facing: 'S' }]);
+  const nightRain = withAuthorityTick(base, 135_000);
+  // The canonical rain event overlaps dawn at active tick 151200.
+  const dayRain = withAuthorityTick(base, 152_000);
+  for (const scene of [{ name: 'clear-day', save: base, rain: false, period: 'day' },
+    { name: 'rain-day', save: dayRain, rain: true, period: 'day' },
+    { name: 'rain-night', save: nightRain, rain: true, period: 'night' }]) {
+    for (const scale of [1, 2, 3] as const) {
+      await openProductReview(page, scene.save, 'environment-' + scene.name + '-' + String(scale), scale, 'observer');
+      const canvas = page.locator('canvas');
+      await expect(canvas).toHaveAttribute('data-world-perspective', 'isometric-2-to-1');
+      await expect(canvas).toHaveAttribute('data-day-period', scene.period);
+      await expect(page.locator('[data-weather-effect="cold-rain"]')).toHaveCount(scene.rain ? 1 : 0);
+      await expect(page.locator('[data-weather-effect="atmospheric-mass"]')).toHaveCount(scene.rain ? 1 : 0);
+      if (scene.rain) await expect(page.locator('[data-world-role="rain-splash"]').first()).toBeVisible();
+      await expect(page.locator('[data-world-role="player"]')).toBeVisible();
+      await expect(page.locator('[data-world-role="resource"]').first()).toBeVisible();
+      await expect(page.locator('[data-world-role="flora-decor"][data-exploration-state="UNEXPLORED"]')).toHaveCount(0);
+      await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x.png') });
+      await page.locator('[data-proz0-autoboot]').evaluate(element => { (element as HTMLElement).style.filter = 'grayscale(1)'; });
+      await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x-gray.png') });
+    }
+  }
+});

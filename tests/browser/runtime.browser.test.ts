@@ -586,7 +586,7 @@ describe('Phase 0 browser runtime', () => {
         code: 'KeyD',
         cancelable: true,
       }));
-      await wait(180);
+      await expect.poll(() => Number(canvas?.dataset.playerX), { timeout: 2000 }).toBeGreaterThan(initialX);
       window.dispatchEvent(new KeyboardEvent('keyup', {
         code: 'KeyD',
         cancelable: true,
