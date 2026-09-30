@@ -324,6 +324,8 @@ function composePhase1SaveV2AtRevision(
     worldRevision,
     authorityTick: bundle.authorityTick,
     sustenance: bundle.sustenance.read(),
+    ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
+      ? { colonyDepth: bundle.colonyDepth.read() } : {}),
     worldSeed: bundle.config.worldSeed,
     generationVersion: PHASE1_WORLD_GENERATION_VERSION,
     rngAlgorithmVersion: RNG_ALGORITHM_VERSION,

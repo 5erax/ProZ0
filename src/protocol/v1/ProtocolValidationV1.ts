@@ -41,6 +41,7 @@ const PRESENTATION_IDENTITY_SLOTS = new Set([
   'TEAM_A',
   'TEAM_B',
   'TEAM_C',
+  'TEAM_D', 'TEAM_E', 'TEAM_F', 'TEAM_G',
   'UNASSIGNED',
 ]);
 

@@ -74,14 +74,14 @@ export class ColonySustenanceAuthority {
 
   public read(): ColonySustenanceState { return this.state; }
 
-  public tick(): void {
+  public tick(context: { readonly cropStep: 0 | 1 | 2; readonly careStep: 0 | 1 | 2 } = {cropStep:1,careStep:1}): void {
     const state = this.state;
     let crop = state.cropProgressTicks;
     let care = state.careProgressTicks;
     let fertilizer = state.fertilizer;
-    if (crop !== null && crop < state.cropCycleTicks) crop += 1;
+    if (crop !== null && crop < state.cropCycleTicks) crop = Math.min(state.cropCycleTicks,crop+context.cropStep);
     if (care !== null) {
-      if (care < GRAZER_CARE_TICKS) care += 1;
+      if (care < GRAZER_CARE_TICKS) care = Math.min(GRAZER_CARE_TICKS,care+context.careStep);
       if (care === GRAZER_CARE_TICKS && fertilizer < 4) { fertilizer += 1; care = null; }
     }
     if (crop !== state.cropProgressTicks || care !== state.careProgressTicks || fertilizer !== state.fertilizer) {

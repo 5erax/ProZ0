@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { expect, test, type Page } from '@playwright/test';
 import { createPhase1ContentCatalog } from '../../src/content';
+import { Phase1HostedAuthorityComposition } from '../../src/integration';
 import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
@@ -168,11 +169,11 @@ function decodeClientFrame(buffer: Buffer): {
   });
 }
 
-async function startLoopbackServer() {
+async function startLoopbackServer(existing?: {readonly host: ServerAuthorityHost; readonly hello: unknown}) {
   const catalog = createPhase1ContentCatalog();
   let id = 0;
   let credential = 0;
-  const host = new ServerAuthorityHost({
+  const host = existing?.host ?? new ServerAuthorityHost({
     session: {
       worldId: 'world-alpha',
       maxPlayers: 4,
@@ -196,7 +197,7 @@ async function startLoopbackServer() {
     },
     persistence: new NoopPersistence(),
   });
-  host.start();
+  if (existing === undefined) host.start();
   const transport = new WebSocketServerTransport(host);
   let connectionOrdinal = 0;
 
@@ -235,7 +236,7 @@ async function startLoopbackServer() {
     host,
     transport,
     url: `ws://127.0.0.1:${address.port}`,
-    hello: {
+    hello: existing?.hello ?? {
       protocolVersion: HOSTED_PROTOCOL_VERSION,
       contentCompatibility: catalog.compatibility,
       worldCompatibility: {
@@ -483,4 +484,40 @@ test('two real Chromium WebSocket clients baseline, move, replicate teammate mot
     await context.close();
     await loopback.close();
   }
+});
+
+test('eight real Chromium WebSocket clients share colony research and distinct teammate identities', async ({browser})=>{
+  const colony=await Phase1HostedAuthorityComposition.create({worldId:'world:p2-websocket',worldSeed:'p1-world-golden',maxPlayers:8,colonyDepthEnabled:true,interactionRangeWorldUnits:1.25,spawnClearanceRadiusWorldUnits:1.25,requiredAccessRadiusWorldUnits:1.25,persistence:new NoopPersistence()});
+  const loopback=await startLoopbackServer({host:colony.host,hello:{protocolVersion:HOSTED_PROTOCOL_VERSION,contentCompatibility:colony.bundle.getContentCompatibility(),worldCompatibility:colony.bundle.getWorldCompatibility()}});
+  const context=await browser.newContext();
+  try {
+    const pages:Page[]=[];const identities:BrowserHostedState[]=[];
+    for(let n=0;n<8;n++){
+      const page=await context.newPage();pages.push(page);
+      identities.push(await connectBrowserClient(page,loopback.url,loopback.hello));
+    }
+    expect(new Set(identities.map(identity=>identity.playerId)).size).toBe(8);
+    await expect.poll(()=>colony.host.diagnostics().session.readyPlayers).toBe(8);
+    loopback.transport.flush(await colony.step());
+    const first=identities[0]!;
+    // This explicit material fixture tests transport/authority convergence; natural gathering is covered separately.
+    expect(colony.bundle.items.commitColonyExchange({operationId:'fixture:ws-research',playerId:first.playerId,expectedInventoryRevision:colony.bundle.items.getContainerView('inventory:'+first.playerId).revision,inputs:[],outputs:[{itemDefinitionId:'item:plant-fiber',quantity:3},{itemDefinitionId:'item:stone',quantity:2}]}).status).toBe('committed');
+    const ingress=colony.host.diagnostics().nextAuthorityIngressOrdinal;
+    await pages[0]!.evaluate(command=>{
+      const state=(globalThis as unknown as {__proz0HostedTest:{socket:WebSocket;nextClientSeq:number;sessionId:string;connectionId:string;protocolVersion:number}}).__proz0HostedTest;
+      state.socket.send(JSON.stringify({protocolVersion:state.protocolVersion,messageType:'GAMEPLAY_COMMAND',clientMessageSeq:state.nextClientSeq++,sessionId:state.sessionId,connectionId:state.connectionId,payload:command}));
+    },{operationId:'p2:ws:research',commandType:'colony.depth',expectedRevisions:[{aggregateType:'colony-depth',aggregateId:'colony',revision:colony.bundle.colonyDepth.read().revision},{aggregateType:'container',aggregateId:'inventory:'+first.playerId,revision:colony.bundle.items.getContainerView('inventory:'+first.playerId).revision}],payload:{action:'research',targetId:'field-survey'}});
+    await expect.poll(()=>colony.host.diagnostics().nextAuthorityIngressOrdinal).toBeGreaterThan(ingress);
+    loopback.transport.flush(await colony.step());
+    expect(colony.bundle.colonyDepth.read().researchIds).toEqual(['field-survey']);
+    for(const page of pages) await expect.poll(()=>page.evaluate(()=>{
+      const messages=(globalThis as unknown as {__proz0HostedTest:{messages:unknown[]}}).__proz0HostedTest.messages;
+      return messages.some(message=>JSON.stringify(message).includes('field-survey'));
+    })).toBe(true);
+    const slots=await pages[0]!.evaluate(()=>{
+      const messages=(globalThis as unknown as {__proz0HostedTest:{messages:{messageType:string;payload:{presentationIdentitySlot?:string}}[]}}).__proz0HostedTest.messages;
+      return [...new Set(messages.filter(message=>message.messageType==='PLAYER_MOTION').map(message=>message.payload.presentationIdentitySlot))];
+    });
+    expect(new Set(slots)).toEqual(new Set(['LOCAL','TEAM_A','TEAM_B','TEAM_C','TEAM_D','TEAM_E','TEAM_F','TEAM_G']));
+  } finally {await context.close();await loopback.close();await colony.destroy();}
 });

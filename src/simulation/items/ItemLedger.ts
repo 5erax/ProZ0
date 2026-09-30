@@ -113,6 +113,7 @@ export class ItemLedgerDraft {
   public constructor(
     private readonly catalog: ContentCatalogV1,
     snapshot: ItemLedgerSnapshot,
+    private readonly storageMultiplier = 1,
   ) {
     this.containers = new Map(
       snapshot.containers.map((container) => [
@@ -287,6 +288,7 @@ export class ItemLedgerDraft {
       container.kind,
       currentUsage,
       projectedUsage,
+      this.storageMultiplier,
     );
 
     if (capacityFailure !== null) {
@@ -344,6 +346,7 @@ export class ItemLedgerDraft {
     const capacityFailure = validateContainerAbsoluteCapacity(
       candidate.kind,
       usage,
+      this.storageMultiplier,
     );
     if (capacityFailure !== null) {
       return capacityFailure;
@@ -410,6 +413,7 @@ function validateStack(
 function validateInitialSnapshot(
   catalog: ContentCatalogV1,
   snapshot: ItemLedgerSnapshot,
+  storageMultiplier = 1,
 ): void {
   const containerIds = new Set<ContainerId>();
   const stackIds = new Set<ItemStackId>();
@@ -458,6 +462,7 @@ function validateInitialSnapshot(
     const capacityFailure = validateContainerAbsoluteCapacity(
       container.kind,
       usage,
+      storageMultiplier,
     );
     if (capacityFailure !== null) {
       throw new Error(
@@ -473,13 +478,14 @@ export class ItemLedger {
   public constructor(
     private readonly catalog: ContentCatalogV1,
     snapshot: ItemLedgerSnapshot,
+    private readonly storageMultiplier: () => number = () => 1,
   ) {
-    validateInitialSnapshot(catalog, snapshot);
-    this.snapshotState = new ItemLedgerDraft(catalog, snapshot).snapshot();
+    validateInitialSnapshot(catalog, snapshot,storageMultiplier());
+    this.snapshotState = new ItemLedgerDraft(catalog, snapshot,storageMultiplier()).snapshot();
   }
 
   public createDraft(): ItemLedgerDraft {
-    return new ItemLedgerDraft(this.catalog, this.snapshotState);
+    return new ItemLedgerDraft(this.catalog, this.snapshotState,this.storageMultiplier());
   }
 
   public publish(draft: ItemLedgerDraft): void {
@@ -503,6 +509,7 @@ export class ItemLedger {
       ...container,
       totalWeightKg: usage.totalWeightKg,
       totalVolume: usage.totalVolume,
+      ...(container.kind==='storage-crate'?{storageCapacityMultiplier:this.storageMultiplier()}:{}),
       playerWeightState:
         container.kind === 'player-inventory'
           ? getPlayerWeightState(usage.totalWeightKg)

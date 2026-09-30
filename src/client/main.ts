@@ -243,6 +243,7 @@ export function resolveProductReviewAutoBootConfig(
       'proz0WorldSeed',
     ),
     playerIds: Object.freeze(playerIds),
+    colonyDepthEnabled: (root.dataset.proz0Mode?.trim() || query.get('proz0Mode')) === 'phase2-colony-review',
     localPlayerId: requiredAutoBootText(
       root,
       'proz0LocalPlayerId',
@@ -276,7 +277,7 @@ export async function bootAutoProZ0(
     return bootProZ0(root, { mode: 'local-demo' });
   }
 
-  if (mode !== 'phase1-product-review') {
+  if (mode !== 'phase1-product-review' && mode !== 'phase2-colony-review') {
     throw new Error('Unsupported ProZ0 autoboot mode: ' + mode);
   }
 
@@ -284,6 +285,9 @@ export async function bootAutoProZ0(
     root,
     resolveProductReviewAutoBootConfig(root, search),
   );
+  document.title = mode === 'phase2-colony-review'
+    ? 'ProZ0 — Colony depth'
+    : 'ProZ0 — Phase 1 Product Review';
   root.dataset.productReviewPersistence = 'indexeddb-save-v2';
   root.dataset.productReviewReopened = String(persisted.reopened);
 

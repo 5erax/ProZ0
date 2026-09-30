@@ -357,6 +357,7 @@ function renderPanel(
 
     case 'container': {
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
+      root.append(actionButton(document,'Move one','inventory-transfer-one'),actionButton(document,'Move stack','inventory-transfer-stack'));
       root.dataset.inventoryActivePane = panel.activePane;
       root.dataset.inventoryQuantity = String(panel.quantity);
       const panes = createElement(document, 'div', 'p1-container-panes');

@@ -1,5 +1,6 @@
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
 import { validateColonySustenanceState } from '../../simulation/sustenance/ColonySustenanceAuthority';
+import { validateColonyDepthState } from '../../simulation/colony/ColonyDepthAuthority';
 import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
@@ -190,6 +191,10 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if (record.colonyDepth !== undefined) {
+    try { validateColonyDepthState(record.colonyDepth); }
+    catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported colony-depth state.'); }
+  }
   if (record.sustenance !== undefined) {
     try { validateColonySustenanceState(record.sustenance); }
     catch { return saveFailure('CORRUPT_RECORD', 'Invalid colony production state.'); }
@@ -200,6 +205,9 @@ export function validateWorldManifestV2(
     || !nonEmpty(record.rngAlgorithmVersion) || !nonEmpty(record.seedDerivationVersion)
     || !utc(record.createdAtUtc) || !utc(record.lastActiveAtUtc)) {
     return saveFailure('CORRUPT_RECORD', 'World manifest scalar fields are invalid.');
+  }
+  if (record.colonyDepth?.pressure.some(entry => entry.lastRecoveryTick > record.authorityTick)) {
+    return saveFailure('CORRUPT_RECORD', 'Ecology recovery tick exceeds coherent authority time.');
   }
   if (!policy.generationVersions.includes(record.generationVersion)) {
     return saveFailure('UNSUPPORTED_GENERATION_VERSION', `Generation version ${record.generationVersion} is unsupported.`);
@@ -929,6 +937,9 @@ function globalCrossReferences(
   policy: SaveV2CompatibilityPolicy,
 ): SaveFailure | null {
   const players = new Map(bundle.players.map((entry) => [entry.playerId, entry]));
+  if (Object.keys(bundle.world.colonyDepth?.professions ?? {}).some(playerId => !players.has(playerId))) {
+    return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
+  }
   const containers = new Map(
     bundle.containers.map((entry) => [entry.containerId, entry]),
   );

@@ -147,6 +147,7 @@ export async function bootPersistedPhase1ProductReview(
       worldSeed: config.worldSeed,
       playerIds: config.playerIds,
       localPlayerId: config.localPlayerId,
+      ...(config.colonyDepthEnabled===undefined && reopen?.bundle.world.colonyDepth===undefined?{}:{colonyDepthEnabled:config.colonyDepthEnabled===true || reopen?.bundle.world.colonyDepth!==undefined}),
       interactionRangeWorldUnits: config.interactionRangeWorldUnits,
       spawnClearanceRadiusWorldUnits:
         config.spawnClearanceRadiusWorldUnits,

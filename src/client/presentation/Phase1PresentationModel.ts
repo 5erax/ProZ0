@@ -243,6 +243,7 @@ export interface Phase1MapMarkerPresentation {
     | 'TEAM_A'
     | 'TEAM_B'
     | 'TEAM_C'
+    | 'TEAM_D' | 'TEAM_E' | 'TEAM_F' | 'TEAM_G'
     | null;
 }
 
@@ -291,7 +292,7 @@ export type Phase1PanelPresentation =
 
 export interface Phase1TeammatePresentation {
   readonly playerId: string;
-  readonly presentationIdentitySlot: 'TEAM_A' | 'TEAM_B' | 'TEAM_C';
+  readonly presentationIdentitySlot: 'TEAM_A' | 'TEAM_B' | 'TEAM_C' | 'TEAM_D' | 'TEAM_E' | 'TEAM_F' | 'TEAM_G';
   readonly label: string;
   readonly markerShape: 'circle' | 'diamond' | 'triangle';
   readonly stateLabel: string;

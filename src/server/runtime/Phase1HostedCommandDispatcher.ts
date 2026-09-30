@@ -1,5 +1,6 @@
 import type { PlayerId } from '../../foundation';
 import { COLONY_ACTIONS, type ColonySustenanceAuthority, type ColonySustenanceAction } from '../../simulation/sustenance/ColonySustenanceAuthority';
+import type { ColonyDepthAuthority, ColonyDepthCommand } from '../../simulation/colony/ColonyDepthAuthority';
 import {
   type AttackCommand,
   type DismantleStructureCommand,
@@ -89,6 +90,7 @@ export interface Phase1HostedCommandDispatcherOptions {
   readonly death: Phase1DeathAuthority;
   readonly combat?: Phase1CombatAuthority;
   readonly sustenance?: Pick<ColonySustenanceAuthority, 'execute'>;
+  readonly colonyDepth?: Pick<ColonyDepthAuthority,'execute'>;
   readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
 }
@@ -440,6 +442,13 @@ implements HostedCommandDispatcher {
             { aggregateType: 'colony-sustenance', aggregateId: 'colony', revision: result.revision },
             { aggregateType: 'container', aggregateId: inventoryId, revision: result.inventoryRevision },
           ]) } : { status: 'rejected', reason: result.reason });
+      }
+
+      case 'colony.depth': {
+        const action=textField(payload,'action');
+        if(this.options.colonyDepth===undefined||!['research','specialize','inspect-site'].includes(action)||command.expectedRevisions.length!==2)return Object.freeze({status:'rejected',reason:'INVALID_MESSAGE'});
+        const result=this.options.colonyDepth.execute({operationId:command.operationId,playerId:context.playerId,action:action as ColonyDepthCommand['action'],targetId:textField(payload,'targetId'),expectedRevision:expectedRevision(command,'colony-depth','colony'),expectedInventoryRevision:expectedRevision(command,'container','inventory:'+context.playerId)});
+        return withReplication(this.options,command.commandType,context.playerId,result.status==='committed'?{status:'committed',resultingRevisions:Object.freeze([{aggregateType:'colony-depth',aggregateId:'colony',revision:result.revision}])}:{status:'rejected',reason:result.reason});
       }
 
       case 'death-cache.recover':

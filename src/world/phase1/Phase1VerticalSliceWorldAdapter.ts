@@ -279,6 +279,14 @@ export class Phase1VerticalSliceWorldAdapter
     }
   }
 
+  public async releaseCoord(coord: ChunkCoord): Promise<void> {
+    const key = toChunkKey(coord);
+    if (!this.activeCoords.has(key)) return;
+    await this.options.store.releaseInterest(coord);
+    this.activeChunks.delete(key);
+    this.activeCoords.delete(key);
+  }
+
   public getActiveChunkViews(): readonly Readonly<Phase1WorldChunkView>[] {
     const values: Phase1WorldChunkView[] = [];
     for (const coord of this.activeCoords.values()) {

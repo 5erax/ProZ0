@@ -2,6 +2,7 @@ import type {
   CommandResultV1,
   PlayerMotionViewV1,
 } from '../../protocol';
+import {colonyWeatherAt} from '../../world/phase2/ColonyRegions';
 import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
@@ -492,6 +493,7 @@ export class Phase1ProductReviewPresentationSource
       inventory,
     );
 
+    const regionalWeather=this.bundle.config.colonyDepthEnabled===true?colonyWeatherAt(this.bundle.config.worldSeed,this.bundle.getPlayerPosition(this.playerId),this.bundle.authorityTick):null;
     const projected = projectPhase1RuntimePresentation({
       catalog: this.bundle.catalog,
       survival: this.bundle.survival.getPlayerView(this.playerId),
@@ -502,6 +504,7 @@ export class Phase1ProductReviewPresentationSource
         equipment.equippedThermalWrapStackId,
       quickUseStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
+      ...(regionalWeather===null?{}:{weatherOverride:{label:regionalWeather.warning?'WEATHER · FORECAST':regionalWeather.weather.replaceAll('-',' ').toUpperCase(),state:regionalWeather.warning?'FORECAST' as const:regionalWeather.weather==='clear'?'CLEAR' as const:'ACTIVE' as const}}),
       progression: this.bundle.progression.getPlayerView(this.playerId),
       playerMotions: this.getPlayerMotions(),
       commandFeedback: this.commandFeedback,

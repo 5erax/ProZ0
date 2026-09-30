@@ -1,5 +1,6 @@
 import type { ContentCompatibilityIdentityV1 } from '../../../content';
 import type { ColonySustenanceState } from '../../../simulation/sustenance/ColonySustenanceAuthority';
+import type { ColonyDepthState } from '../../../simulation/colony/ColonyDepthAuthority';
 import type { SAVE_FORMAT_ID, SAVE_SCHEMA_VERSION_V2 } from '../SaveSchema';
 
 export type SaveContentCompatibilityV2 = ContentCompatibilityIdentityV1;
@@ -21,6 +22,7 @@ export interface WorldManifestV2 {
   readonly worldRevision: number;
   readonly authorityTick: number;
   readonly sustenance?: ColonySustenanceState;
+  readonly colonyDepth?: ColonyDepthState;
   readonly worldSeed: string;
   readonly generationVersion: number;
   readonly rngAlgorithmVersion: string;

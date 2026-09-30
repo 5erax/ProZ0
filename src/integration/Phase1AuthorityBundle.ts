@@ -8,6 +8,8 @@ import {
   type WorldPosition,
 } from '../foundation';
 import { ColonySustenanceAuthority } from '../simulation/sustenance/ColonySustenanceAuthority';
+import { ColonyDepthAuthority, colonyStorageMultiplier } from '../simulation/colony/ColonyDepthAuthority';
+import { colonyWeatherAt } from '../world/phase2/ColonyRegions';
 import {
   createPhase1ContentCatalog,
   type ContentCatalogV1,
@@ -359,6 +361,7 @@ export type Phase1RuinRewardClaimResult =
     };
 
 export interface Phase1AuthorityBundleConfig {
+  readonly colonyDepthEnabled?: boolean;
   readonly worldId: string;
   readonly worldSeed: string;
   readonly playerIds: readonly PlayerId[];
@@ -376,6 +379,7 @@ export interface Phase1AuthorityBundleConfig {
 }
 
 export class Phase1AuthorityBundle {
+  private readonly pinnedChunkKeys = new Set<string>();
   public readonly catalog: ContentCatalogV1;
   public readonly worldPersistence: Phase1SessionWorldPersistence;
   public readonly worldStore: Phase1WorldStore;
@@ -388,6 +392,7 @@ export class Phase1AuthorityBundle {
   public readonly buildingAuthority: Phase1BuildingAuthority;
   public readonly machines: Phase1CondenserAuthority;
   public readonly sustenance: ColonySustenanceAuthority;
+  public readonly colonyDepth: ColonyDepthAuthority;
   public readonly combat: Phase1CombatAuthority;
   public readonly death: Phase1DeathAuthority;
 
@@ -429,8 +434,19 @@ export class Phase1AuthorityBundle {
     this.worldPersistence = worldPersistence;
     this.worldStore = worldStore;
     this.world = world;
+    for (const view of world.getActiveChunkViews()) {
+      this.pinnedChunkKeys.add(String(view.base.coord.x) + ':' + String(view.base.coord.y));
+    }
     this.buildings = buildings;
     this.items = items;
+    this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
+      const state = survival.getPlayerState(playerId);
+      return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
+    }, config.reopen?.bundle.world.colonyDepth);
+    if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
+      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId),
+      harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
+    });
     this.sustenance = new ColonySustenanceAuthority(items,
       (playerId) => {
         const state = survival.getPlayerState(playerId);
@@ -460,7 +476,7 @@ export class Phase1AuthorityBundle {
     if (config.worldId.length === 0 || config.worldSeed.length === 0) {
       throw new Error('Phase 1 vertical-slice world identity is required.');
     }
-    if (config.playerIds.length === 0 || config.playerIds.length > 4) {
+    if (config.playerIds.length === 0 || config.playerIds.length > (config.colonyDepthEnabled===true?8:4)) {
       throw new Error('Phase 1 vertical slice supports 1-4 configured players.');
     }
     const playerIds = [...new Set(config.playerIds)];
@@ -554,12 +570,14 @@ export class Phase1AuthorityBundle {
         : { snapshot: reopenedProgression }),
     });
     const gatherCost = new DeferredGatherCostPort();
+    let capacityAuthority:ColonyDepthAuthority|null=null;
     const items = new Phase1ItemAuthority({
       catalog,
       world: itemWorld,
       initialLedger: initialLedger(playerIds, reopen),
       gatherCost,
       events: new ProgressionItemEventSink(progression),
+      storageCapacityMultiplier:()=>colonyStorageMultiplier(capacityAuthority?.read()??config.reopen?.bundle.world.colonyDepth),
     });
     const equipment = new Phase1EquipmentAuthority(
       items,
@@ -617,6 +635,7 @@ export class Phase1AuthorityBundle {
       combat,
       death,
     );
+    capacityAuthority=bundle.colonyDepth;
 
     if (config.activatePlayersOnCreate !== false) {
       for (const playerId of playerIds) {
@@ -771,6 +790,24 @@ export class Phase1AuthorityBundle {
       );
     }
 
+    if (this.config.colonyDepthEnabled === true) {
+      const required = new Map<string, ReturnType<typeof createChunkCoord>>();
+      for (const playerId of this.getActivePlayerIds()) {
+        const center = fromWorldPosition(this.getPlayerPosition(playerId));
+        for (let dy = -1; dy <= 1; dy += 1) {
+          for (let dx = -1; dx <= 1; dx += 1) {
+            const coord = createChunkCoord(center.x + dx, center.y + dy);
+            required.set(String(coord.x) + ':' + String(coord.y), coord);
+          }
+        }
+      }
+      for (const coord of required.values()) await this.world.activateCoord(coord);
+      for (const view of this.world.getActiveChunkViews()) {
+        const key = String(view.base.coord.x) + ':' + String(view.base.coord.y);
+        if (!required.has(key) && !this.pinnedChunkKeys.has(key)) await this.world.releaseCoord(view.base.coord);
+      }
+    }
+
     // Resolve any canonical lethal event published at the completed prior
     // tick before advancing survival state past that DeathId source tick.
     this.processPendingDeaths(this.authorityTickRef.value);
@@ -797,7 +834,8 @@ export class Phase1AuthorityBundle {
       const thermalWrapActive =
         this.equipment.isThermalWrapActive(playerId);
       this.survival.stepPlayer(playerId, authorityTick, {
-        thermalTarget: exposure.thermalTarget,
+        thermalTarget: this.config.colonyDepthEnabled === true && !exposure.sheltered
+          ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',
       });
@@ -814,7 +852,9 @@ export class Phase1AuthorityBundle {
       );
       await this.worldStore.revealResolvedPlayerPosition(
         this.positions.get(playerId),
+        this.config.colonyDepthEnabled === true && this.colonyDepth.profession(playerId) === 'explorer' ? 8 : 6.25,
       );
+      if (this.config.colonyDepthEnabled === true) this.colonyDepth.discover(playerId);
       if (
         ruinEntity !== null
         && this.isWithinRuinLocateRange(
@@ -832,7 +872,14 @@ export class Phase1AuthorityBundle {
     }
 
     this.processPendingDeaths(authorityTick);
-    this.sustenance.tick();
+    if(this.config.colonyDepthEnabled===true){
+      const depth=this.colonyDepth.read();
+      const cultivated=Object.values(depth.professions).includes('cultivator');
+      const wet=colonyWeatherAt(this.config.worldSeed,{x:-6,y:4},authorityTick).weather==='mist-rain';
+      const pressure=this.colonyDepth.recoveryMultiplier({x:-6,y:4})>1.5;
+      this.sustenance.tick({cropStep:pressure&&authorityTick%2===0?0:cultivated&&this.colonyDepth.hasResearch('cultivation')?2:this.colonyDepth.hasResearch('cultivation')&&authorityTick%4===0?2:wet&&this.colonyDepth.hasResearch('water-stewardship')&&authorityTick%4===0?2:1,careStep:this.colonyDepth.hasResearch('water-stewardship')&&authorityTick%4===0?2:1});
+    }else this.sustenance.tick();
+    if (this.config.colonyDepthEnabled === true) this.colonyDepth.recover(authorityTick);
 
     for (const structure of this.buildings.exportSnapshot().foothold.structures) {
       if (structure.definitionId === 'structure:atmospheric-water-condenser') {

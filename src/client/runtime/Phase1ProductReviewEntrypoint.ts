@@ -10,10 +10,11 @@ const REVIEW_WORLD_SEED = 'phase1-product-review';
 function launchUrl(
   targetWindow: Window,
   reviewId: string,
+  mode = 'phase1-product-review',
 ): string {
   const url = new URL(targetWindow.location.href);
   url.search = new URLSearchParams({
-    proz0Mode: 'phase1-product-review',
+    proz0Mode: mode,
     proz0WorldId: 'review-world-' + reviewId,
     proz0WorldSeed: REVIEW_WORLD_SEED,
     proz0Players: REVIEW_PLAYER_ID,
@@ -68,7 +69,7 @@ export function createPhase1ProductReviewEntrypoint(
   root.dataset.phase1QaMode = 'none';
   root.dataset.visualQaMode = 'none';
 
-  document.title = 'ProZ0 — Phase 1 Product Review';
+  document.title = 'ProZ0 — Colony depth';
 
   const style = document.createElement('style');
   style.textContent = [
@@ -85,11 +86,11 @@ export function createPhase1ProductReviewEntrypoint(
   panel.dataset.phase1ReviewEntrypoint = 'ready';
 
   const title = document.createElement('h1');
-  title.textContent = 'PROZ0 · PHASE 1 PRODUCT REVIEW';
+  title.textContent = 'PROZ0 · COLONY DEPTH';
 
   const intro = document.createElement('p');
   intro.textContent =
-    'Start a fresh Phase 1 review world. No developer console or query-string setup is required.';
+    'Explore the mist marsh and ochre badlands. Survey relics, research colony improvements, and specialize your colonist.';
 
   const persistence = document.createElement('p');
   persistence.textContent =
@@ -107,6 +108,25 @@ export function createPhase1ProductReviewEntrypoint(
   start.className = 'p1-review-primary';
   start.dataset.startPhase1Review = 'true';
   start.textContent = 'START PHASE 1 REVIEW';
+  const startColony = document.createElement('button');
+  startColony.type = 'button';
+  startColony.className = 'p1-review-primary';
+  startColony.dataset.startPhase2Review = 'true';
+  startColony.textContent = 'START COLONY WORLD';
+  const onStartColony = (): void => {
+    startColony.disabled = true;
+    targetWindow.location.assign(launchUrl(targetWindow, targetWindow.crypto.randomUUID(), 'phase2-colony-review'));
+  };
+  startColony.addEventListener('click', onStartColony);
+  const upgrade = document.createElement('a');
+  upgrade.className = 'p1-review-primary';
+  upgrade.dataset.upgradeColonyReview = 'true';
+  upgrade.textContent = 'CONTINUE WITH COLONY DEPTH';
+  if (savedUrl !== null) {
+    const upgradeUrl = new URL(savedUrl);
+    upgradeUrl.searchParams.set('proz0Mode', 'phase2-colony-review');
+    upgrade.href = upgradeUrl.toString();
+  }
 
   const meta = document.createElement('div');
   meta.className = 'p1-review-meta';
@@ -128,13 +148,14 @@ export function createPhase1ProductReviewEntrypoint(
   start.addEventListener('click', onStart);
 
   panel.append(title, intro, persistence);
-  if (savedUrl !== null) panel.append(continueWorld);
-  panel.append(start, meta);
+  if (savedUrl !== null) panel.append(continueWorld, upgrade);
+  panel.append(startColony, start, meta);
   root.append(style, panel);
 
   return Object.freeze({
     destroy(): void {
       start.removeEventListener('click', onStart);
+      startColony.removeEventListener('click', onStartColony);
       root.replaceChildren();
       root.dataset.runtimeStatus = 'stopped';
     },
