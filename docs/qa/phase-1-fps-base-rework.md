@@ -12,6 +12,8 @@ The independent full-scene Playwright check measures three-second idle and norma
 
 The timing project runs after functional tests so the measured game does not compete with another worker launching/playing a second game on the same runner. The first PR CI run recorded 48.18 FPS while the new-world journey was still running in another Chromium worker; it failed the 50 FPS gate. The gate was retained. Each sample is now written before its assertion so a failing sample also remains in the artifact.
 
+Isolation alone was insufficient: exact-head CI still measured 45.92 FPS, and Windows Chromium 153 measured 12.93 FPS moving. The subsequent rendering fix moves static world coordinates through one composited camera stage, draws deep UNKNOWN clouds as one screen-space backdrop while retaining masks at the canonical reveal boundary, and pre-batches the accepted rain atlas into four reusable pixel frames. Weather remains in screen space. No hidden terrain/entities are projected. The resulting Windows 1280 × 720 matrix measured 57.81–60.30 FPS over all six samples, frame P95 16.7–16.8 ms, with real simulation advancement and movement; scene size fell from 441–544 to 58–71 nodes in that fixture. Final exact-head/main verification remains required.
+
 ## Visual controls and facilities
 
 Survival, equipment and ingredient displays use icons, quantities, condition bars and tooltips. A mouse action bar opens inventory, craft, build, map and colony; when a panel is open it moves below the panel so craft cannot obscure it. Names and status remain available for accessibility and failure reasons.

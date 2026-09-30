@@ -32,6 +32,14 @@ describe('Phase 1 environmental projection', () => {
       expect(root.querySelector('[data-world-role="flora-decor"]')).toBe(flora);
       expect(root.querySelector('[data-world-role="terrain"]')).toBe(terrain);
       expect(root.querySelector('[data-world-role="fog"]')).toBe(fog);
+      const terrainLeft = (terrain as HTMLElement).style.left;
+      const stage = root.querySelector<HTMLElement>('.p1-product-world-stage')!;
+      const previousTransform = stage.style.transform;
+      bundle.getRuntime('gardener').relocatePlayer({ x: .5, y: .5 });
+      renderer.render();
+      expect((terrain as HTMLElement).style.left).toBe(terrainLeft);
+      expect(stage.style.transform).not.toBe(previousTransform);
+      expect(root.querySelector('[data-world-role="fog"][data-fog-mask="15"]')).toBeNull();
       const identity = flora.dataset.worldId!;
       const [, gx, gy] = identity.split(':');
       const position = { x: (Number(gx) + .5) * PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,

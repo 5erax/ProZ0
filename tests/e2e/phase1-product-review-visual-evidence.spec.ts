@@ -2989,10 +2989,15 @@ test('colony: harvests once and renders a persistent captive grazer with care fe
   await page.keyboard.press('Escape'); await page.keyboard.press('i');
   await expect(page.locator('[data-panel-kind="inventory"] .p1-item-row').filter({ hasText: 'Edible Plant' })).toContainText('×4');
   await page.keyboard.press('Escape');
-  await page.keyboard.down('s'); await page.keyboard.down('d');
-  await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-player-x')),
-    { timeout: 10_000, intervals: [25] }).toBeGreaterThanOrEqual(5.8);
-  await page.keyboard.up('s'); await page.keyboard.up('d');
+  // Release before observing so a slow browser cannot keep walking beyond the pen.
+  for (let step = 0; step < 100; step += 1) {
+    const x = Number(await page.locator('canvas').getAttribute('data-player-x'));
+    if (Math.abs(x - 6) <= .65) break;
+    const keys = x < 6 ? ['s', 'd'] : ['w', 'a'];
+    for (const key of keys) await page.keyboard.down(key);
+    await page.waitForTimeout(100);
+    for (const key of keys.toReversed()) await page.keyboard.up(key);
+  }
   await page.keyboard.press('n');
   await page.locator('[data-review-action="colony:care"]').click();
   await expect(panel).toContainText('CARE · DONE');
