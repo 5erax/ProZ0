@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { colonySurveySites } from "../../src/world/phase2/ColonyRegions";
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 
 async function walkTo(page: Page, x: number, y: number): Promise<void> {
   let previous = "";
@@ -58,6 +60,7 @@ test("colony exploration: real gathering funds research; walking reveals and ins
   page,
 }) => {
   test.setTimeout(360_000);
+  const directory=resolve('test-results/phase2-colony-depth');mkdirSync(directory,{recursive:true});
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -134,6 +137,7 @@ test("colony exploration: real gathering funds research; walking reveals and ins
     await expect(page.locator(".p2-colony-panel")).toContainText(
       site.observation,
     );
+    await page.screenshot({path:resolve(directory,site.biomeId+'.png')});
     await page.keyboard.press("Escape");
   }
   await page.keyboard.press("l");
@@ -152,6 +156,7 @@ test("colony exploration: real gathering funds research; walking reveals and ins
       site.observation,
     );
   expect(errors).toEqual([]);
+  writeFileSync(resolve(directory,'journey.json'),JSON.stringify({sourceHeadSha:process.env.P0_TEST_HEAD_SHA??'local-working-tree',setup:'fresh world; keyboard movement and actual gather commands; no item grants or relocation',research:'field-survey',inspectedSites:colonySurveySites('p1-world-golden').map(site=>site.id),reopened:true,errors},null,2));
 });
 
 test("accepted Phase 1 world upgrades from the launcher while keeping its saved position and inventory", async ({

@@ -59,6 +59,17 @@ jobs:
           P0_TEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run test:e2e
 
+      - name: Upload Phase 2 colony journeys and frame evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase2-colony-evidence-${{ github.sha }}
+          path: |
+            test-results/phase2-frame-pacing/
+            test-results/phase2-colony-depth/
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Upload P0-BUG-001 responsiveness evidence
         if: always()
         uses: actions/upload-artifact@v7
