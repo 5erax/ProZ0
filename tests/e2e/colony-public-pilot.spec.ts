@@ -201,8 +201,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
           headers: { Authorization: "Bearer " + owner.ownerToken },
         });
         removed = response.ok;
-        if (!removed && response.status !== 409)
-          throw Error("Test room cleanup failed: " + response.status);
+        if (!removed) expect(response.status).toBe(409);
       }
       expect(removed).toBe(true);
     }

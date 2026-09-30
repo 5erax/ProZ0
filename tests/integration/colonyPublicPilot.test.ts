@@ -116,8 +116,7 @@ test.skipIf(!endpoint)(
           headers: { Authorization: "Bearer " + details.ownerToken },
         });
         removed = response.ok;
-        if (!removed && response.status !== 409)
-          throw Error("Test room cleanup failed: " + response.status);
+        if (!removed) expect(response.status).toBe(409);
       }
       expect(removed).toBe(true);
     }
