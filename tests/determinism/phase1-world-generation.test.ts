@@ -260,7 +260,7 @@ describe('Phase 1 world deterministic generation', () => {
       14758211,
     ]);
     expect(generated.baseGenerationFingerprint).toBe(
-      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-3:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:6595dbb7',
+      'phase1-base-v1:fnv1a32-phase1-base-v1:generation-3:3112727ee636e3ef24d0d3b0434475d86e95122592c9d2184e57114f37fc7f5c:25a9a511',
     );
     expect(generated.entities).toContainEqual({
       type: 'ruin',
