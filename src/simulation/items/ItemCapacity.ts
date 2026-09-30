@@ -61,7 +61,9 @@ export function getPlayerWeightState(
 export function validateContainerAbsoluteCapacity(
   kind: ContainerKind,
   usage: ContainerUsage,
+  storageMultiplier = 1,
 ): TransactionRejectionReason | null {
+  if(!Number.isFinite(storageMultiplier)||storageMultiplier<1||storageMultiplier>2)throw new Error('Invalid storage capacity multiplier.');
   switch (kind) {
     case 'player-inventory':
       if (usage.totalVolume > PLAYER_MAX_VOLUME) {
@@ -73,10 +75,10 @@ export function validateContainerAbsoluteCapacity(
       return null;
 
     case 'storage-crate':
-      if (usage.totalVolume > STORAGE_CRATE_MAX_VOLUME) {
+      if (usage.totalVolume > STORAGE_CRATE_MAX_VOLUME * storageMultiplier) {
         return 'TARGET_CAPACITY_VOLUME';
       }
-      if (usage.totalWeightKg > STORAGE_CRATE_MAX_WEIGHT_KG) {
+      if (usage.totalWeightKg > STORAGE_CRATE_MAX_WEIGHT_KG * storageMultiplier) {
         return 'TARGET_CAPACITY_WEIGHT';
       }
       return null;
@@ -92,8 +94,9 @@ export function validateInboundCapacityTransition(
   kind: ContainerKind,
   current: ContainerUsage,
   projected: ContainerUsage,
+  storageMultiplier = 1,
 ): TransactionRejectionReason | null {
-  const absolute = validateContainerAbsoluteCapacity(kind, projected);
+  const absolute = validateContainerAbsoluteCapacity(kind, projected,storageMultiplier);
   if (absolute !== null) {
     return absolute;
   }

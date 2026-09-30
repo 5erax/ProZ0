@@ -439,7 +439,7 @@ export class HostedSession {
     }
 
     const used = new Set(slots.values());
-    const slot = (['TEAM_A', 'TEAM_B', 'TEAM_C'] as const).find(
+    const slot = (['TEAM_A', 'TEAM_B', 'TEAM_C', 'TEAM_D', 'TEAM_E', 'TEAM_F', 'TEAM_G'] as const).find(
       (candidate) => !used.has(candidate),
     ) ?? 'UNASSIGNED';
     slots.set(subjectPlayerId, slot);

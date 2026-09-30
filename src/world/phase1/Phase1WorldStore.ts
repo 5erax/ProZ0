@@ -436,6 +436,8 @@ function circleChunkCoords(
 }
 
 export class Phase1WorldStore {
+  private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
+  public setRenewalPolicy(policy: NonNullable<Phase1WorldStore['renewalPolicy']>): void { this.renewalPolicy = policy; }
   private readonly entries = new Map<string, Phase1WorldChunkEntry>();
   private readonly entityChunk = new Map<string, string>();
   private readonly generator: Phase1ChunkGenerator;
@@ -658,11 +660,13 @@ export class Phase1WorldStore {
 
   public async revealResolvedPlayerPosition(
     position: WorldPosition,
+    radius = PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS,
   ): Promise<number> {
+    if (!Number.isFinite(radius) || radius <= 0 || radius > 8) throw new Error('Invalid exploration reveal radius.');
     this.requireEnvironment();
     const coords = circleChunkCoords(
       position,
-      PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS,
+      radius,
     );
     let changedCells = 0;
 
@@ -674,7 +678,7 @@ export class Phase1WorldStore {
           coord,
           view.delta.exploration,
           position,
-          PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS,
+          radius,
         );
 
         let changed = false;
@@ -813,7 +817,7 @@ export class Phase1WorldStore {
     const depleted = remaining === 0;
     const regenerationReadyTick = depleted
       ? authorityTick
-        + this.requireRegenerationTicks(definition)
+        + Math.ceil(this.requireRegenerationTicks(definition) * (this.renewalPolicy?.multiplier(entity.position, entity.definitionId) ?? 1))
       : null;
     const next = Object.freeze({
       ...current,
@@ -833,6 +837,7 @@ export class Phase1WorldStore {
       ),
     }));
 
+    this.renewalPolicy?.harvested(entity.position,authorityTick);
     return Object.freeze({ changed: true, state: next });
   }
 

@@ -3,6 +3,8 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
+import { colonyBiomeAt, colonySurveySites, colonyWeatherAt } from '../../world/phase2/ColonyRegions';
+import { colonyTerrainSprite, colonySiteSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
@@ -746,11 +748,12 @@ export function createPhase1ProductReviewWorldRenderer(
         tile.className = 'p1-product-terrain';
         tile.dataset.worldRole = 'terrain';
         tile.dataset.terrainState = terrain;
+        if(bundle.config.colonyDepthEnabled===true)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
         tile.dataset.explorationState =
           known ? 'EXPLORED' : 'UNEXPLORED';
         applySprite(
           tile,
-          terrainCellSprite(terrain, variant),
+          bundle.config.colonyDepthEnabled===true?colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant):terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
         tile.style.filter = night ? 'brightness(.78) saturate(.72)' : '';
@@ -969,11 +972,11 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     if (!local) {
-      const shape = presentationIdentitySlot === 'TEAM_A'
+      const shape = presentationIdentitySlot === 'TEAM_A'||presentationIdentitySlot==='TEAM_D'||presentationIdentitySlot==='TEAM_G'
         ? 'circle'
-        : presentationIdentitySlot === 'TEAM_B'
+        : presentationIdentitySlot === 'TEAM_B'||presentationIdentitySlot==='TEAM_E'
           ? 'diamond'
-          : presentationIdentitySlot === 'TEAM_C'
+          : presentationIdentitySlot === 'TEAM_C'||presentationIdentitySlot==='TEAM_F'
             ? 'triangle'
             : null;
       if (shape === null) return;
@@ -1154,12 +1157,20 @@ export function createPhase1ProductReviewWorldRenderer(
     layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
     const environment = bundle.worldStore.getEnvironmentView();
     const context = getPresentationContext();
+    const regionalWeather=bundle.config.colonyDepthEnabled===true?colonyWeatherAt(bundle.config.worldSeed,camera,bundle.authorityTick):null;
+    if(regionalWeather!==null){
+      canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
+      for(const site of colonySurveySites(bundle.config.worldSeed)){
+        if(!worldPositionKnown(bundle,site.position))continue;
+        renderSprite(colonySiteSprite(site.biomeId),site.position,camera,'survey-site',site.id,{zIndex:700000,data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED'})});
+      }
+    }
 
     renderTerrain(
       camera,
       bundle.authorityTick,
       environment.dayPeriod === 'night',
-      environment.coldRainStatus === 'active',
+      environment.coldRainStatus === 'active'||regionalWeather?.weather==='mist-rain',
     );
 
     if (environment.dayPeriod === 'night') {
@@ -1395,6 +1406,7 @@ export function createPhase1ProductReviewWorldRenderer(
       TEAM_A: 0,
       TEAM_B: 1,
       TEAM_C: 2,
+      TEAM_D: 3, TEAM_E: 4, TEAM_F: 5, TEAM_G: 6,
       LOCAL: 3,
       UNASSIGNED: 4,
     });
@@ -1405,6 +1417,8 @@ export function createPhase1ProductReviewWorldRenderer(
           motion.presentationIdentitySlot === 'TEAM_A'
           || motion.presentationIdentitySlot === 'TEAM_B'
           || motion.presentationIdentitySlot === 'TEAM_C'
+          || motion.presentationIdentitySlot === 'TEAM_D' || motion.presentationIdentitySlot === 'TEAM_E'
+          || motion.presentationIdentitySlot === 'TEAM_F' || motion.presentationIdentitySlot === 'TEAM_G'
         ),
       )
       .sort(
@@ -1423,7 +1437,7 @@ export function createPhase1ProductReviewWorldRenderer(
     }
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
-    if (environment.coldRainStatus === 'active') {
+    if (environment.coldRainStatus === 'active'||regionalWeather?.weather==='mist-rain') {
       const weather = sceneElement('weather:rain');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
@@ -1460,6 +1474,19 @@ export function createPhase1ProductReviewWorldRenderer(
       }
       appendScene(atmosphere, true);
       appendScene(weather, true);
+    }
+
+    if (regionalWeather?.weather === 'dry-wind') {
+      const dust = sceneElement('weather:dust');
+      dust.dataset.weatherEffect = 'dry-wind';
+      const drift = Math.floor(bundle.authorityTick / 8) % 128;
+      if (dust.dataset.drift !== String(drift)) {
+        dust.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none;opacity:.22;'
+          + 'background-image:repeating-linear-gradient(172deg,transparent 0px,transparent 46px,#dfb575 47px,#dfb575 48px,transparent 49px,transparent 92px);'
+          + 'background-position:' + String(drift) + 'px 0;image-rendering:pixelated;';
+        dust.dataset.drift = String(drift);
+      }
+      appendScene(dust, true);
     }
 
     // Remove only entities that actually leave the visible canonical scene.

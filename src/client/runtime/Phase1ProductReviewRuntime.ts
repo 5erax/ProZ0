@@ -57,6 +57,7 @@ import {
   mountPhase1Presentation,
 } from './Phase1PresentationMount';
 import { FixedStepHost } from './FixedStepHost';
+import { createColonyDepthOverlay } from '../presentation/ColonyDepthOverlay';
 
 export interface Phase1ProductReviewRuntimeConfig
   extends Phase1AuthorityBundleConfig {
@@ -227,6 +228,7 @@ export async function createPhase1ProductReviewRuntime(
     'TEAM_A',
     'TEAM_B',
     'TEAM_C',
+    'TEAM_D', 'TEAM_E', 'TEAM_F', 'TEAM_G',
   ] as const);
   let teamSlotIndex = 0;
   for (const configuredPlayerId of config.playerIds) {
@@ -307,6 +309,9 @@ export async function createPhase1ProductReviewRuntime(
 
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
+  const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
+    actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
+  }):null;
 
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
@@ -2129,6 +2134,7 @@ export async function createPhase1ProductReviewRuntime(
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
         await bundle.stepSolo();
+        colonyDepthOverlay?.render();
         updateGather(
           bundle.getLastGatherResult(config.localPlayerId),
         );
@@ -2182,6 +2188,12 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
+    if(action?.startsWith('open-'))colonyDepthOverlay?.close();
+    if(action==='inventory-transfer-one'||action==='inventory-transfer-stack'){
+      const selection=source.getInventoryActionSelection();
+      if(selection.stack!==null){source.adjustInventoryQuantity((action==='inventory-transfer-one'?1:selection.stack.quantity)-selection.quantity);transferSelectedInventoryQuantity();}
+      return;
+    }
     if (action === 'open-inventory' || action === 'open-map') {
       actionPanel = null; source.setPresentationPanel(null);
       source.togglePanel(action === 'open-map' ? 'map' : 'inventory'); return;
@@ -2263,6 +2275,7 @@ export async function createPhase1ProductReviewRuntime(
       root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
       controls.destroy();
+      colonyDepthOverlay?.destroy();
       presentation.destroy();
       worldRenderer.destroy();
       void bundle.destroy();

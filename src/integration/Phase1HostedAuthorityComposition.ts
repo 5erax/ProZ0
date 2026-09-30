@@ -51,6 +51,7 @@ function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
+  if(bundle.config.colonyDepthEnabled===true)values.push(Object.freeze({aggregateType:'colony-depth',aggregateId:'colony',revision:bundle.colonyDepth.read().revision,tombstone:false,state:asJson(bundle.colonyDepth.read())}));
   const colony = bundle.sustenance.read();
   values.push(Object.freeze({ aggregateType: 'colony-sustenance', aggregateId: 'colony',
     revision: colony.revision, tombstone: false,
@@ -289,7 +290,7 @@ export interface Phase1HostedAuthorityCompositionConfig
     Phase1AuthorityBundleConfig,
     'playerIds' | 'activatePlayersOnCreate'
   > {
-  readonly maxPlayers: 2 | 3 | 4;
+  readonly maxPlayers: 2 | 3 | 4 | 5 | 6 | 7 | 8;
   readonly persistence: HostedPersistencePort;
   readonly sessionId?: string;
   readonly sessionEpoch?: string;
@@ -318,6 +319,7 @@ export class Phase1HostedAuthorityComposition {
       worldId: config.worldId,
       worldSeed: config.worldSeed,
       playerIds,
+      ...(config.colonyDepthEnabled === undefined ? {} : { colonyDepthEnabled: config.colonyDepthEnabled }),
       interactionRangeWorldUnits:
         PHASE1_ORDINARY_INTERACTION_RANGE_WORLD_UNITS,
       spawnClearanceRadiusWorldUnits:
@@ -373,6 +375,7 @@ export class Phase1HostedAuthorityComposition {
       }),
       death: bundle.death,
       sustenance: bundle.sustenance,
+      ...(config.colonyDepthEnabled===true?{colonyDepth:bundle.colonyDepth}:{}),
       combat: bundle.combat,
       ruins: bundle,
       replication,

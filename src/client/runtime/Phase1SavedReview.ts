@@ -11,7 +11,7 @@ function validatedReviewUrl(target: Window, value: string): string | null {
     const url = new URL(value, current);
     if (url.origin !== current.origin || url.pathname !== current.pathname
       || url.hash !== ''
-      || url.searchParams.get('proz0Mode') !== 'phase1-product-review'
+      || !['phase1-product-review','phase2-colony-review'].includes(url.searchParams.get('proz0Mode')??'')
       || [...url.searchParams.keys()].some((key) =>
         !PARAMETERS.some((allowed) => allowed === key))) return null;
     if (PARAMETERS.some((key) =>

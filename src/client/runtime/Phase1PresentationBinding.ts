@@ -388,6 +388,8 @@ function teamIdentityPresentation(
       return TEAM_IDENTITY_PRESENTATION.TEAM_B;
     case 'TEAM_C':
       return TEAM_IDENTITY_PRESENTATION.TEAM_C;
+    case 'TEAM_D': case 'TEAM_E': case 'TEAM_F': case 'TEAM_G':
+      return Object.freeze({slot,order:slot.charCodeAt(5)-65,label:slot.replace('_',' '),markerShape:slot==='TEAM_D'||slot==='TEAM_G'?'circle' as const:slot==='TEAM_E'?'diamond' as const:'triangle' as const});
     case 'LOCAL':
     case 'UNASSIGNED':
       return null;
@@ -514,9 +516,9 @@ function containerPanel(
       ? null
       : Object.freeze({
           weightCurrent: container.totalWeightKg,
-          weightMax: storageCapacity.maxWeightKg,
+          weightMax: storageCapacity.maxWeightKg*(container.storageCapacityMultiplier??1),
           volumeCurrent: container.totalVolume,
-          volumeMax: storageCapacity.maxVolume,
+          volumeMax: storageCapacity.maxVolume*(container.storageCapacityMultiplier??1),
         }),
   });
 }

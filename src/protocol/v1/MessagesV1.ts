@@ -166,6 +166,10 @@ export type PresentationIdentitySlotV1 =
   | 'TEAM_A'
   | 'TEAM_B'
   | 'TEAM_C'
+  | 'TEAM_D'
+  | 'TEAM_E'
+  | 'TEAM_F'
+  | 'TEAM_G'
   | 'UNASSIGNED';
 
 export interface PlayerMotionViewV1 {

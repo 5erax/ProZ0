@@ -36,6 +36,26 @@ class NoopHostedPersistence implements HostedPersistencePort {
   }
 }
 
+it('Phase 2 admits eight real authority clients, rejects overflow and preserves seven distinct teammate slots after resume',async()=>{
+  const composition=await Phase1HostedAuthorityComposition.create({worldId:'world:p2-hosted-eight',worldSeed:'p1-world-golden',maxPlayers:8,colonyDepthEnabled:true,interactionRangeWorldUnits:1.25,spawnClearanceRadiusWorldUnits:1.25,requiredAccessRadiusWorldUnits:1.25,persistence:new NoopHostedPersistence(),sessionId:'session:p2-eight',sessionEpoch:'epoch:p2-eight'});
+  try{
+    const clients=Array.from({length:8},(_,i)=>join(composition,'transport:p2:'+String(i)));
+    expect(composition.bundle.getActivePlayerIds()).toHaveLength(8);
+    const full=composition.host.receiveText('transport:p2:overflow',JSON.stringify({protocolVersion:HOSTED_PROTOCOL_VERSION,messageType:'CLIENT_HELLO',clientMessageSeq:0,payload:helloPayload(composition)}));
+    expect(full[0]?.envelope).toMatchObject({messageType:'SESSION_REJECTED',payload:{reason:'SESSION_FULL'}});
+    const outbound=await composition.step();
+    const first=clients[0]!;
+    const slots=outbound.filter(m=>m.transportId===first.transportId&&m.envelope.messageType==='PLAYER_MOTION').map(m=>(m.envelope.payload as unknown as {presentationIdentitySlot:string}).presentationIdentitySlot);
+    expect(new Set(slots)).toEqual(new Set(['LOCAL','TEAM_A','TEAM_B','TEAM_C','TEAM_D','TEAM_E','TEAM_F','TEAM_G']));
+    composition.host.disconnect(clients[7]!.transportId);
+    const resumed=join(composition,'transport:p2:resume',clients[7]!.resumeCredential);
+    expect(resumed.playerId).toBe(clients[7]!.playerId);
+    const after=await composition.step();
+    expect(after.filter(m=>m.transportId===first.transportId&&m.envelope.messageType==='PLAYER_MOTION').map(m=>(m.envelope.payload as unknown as {presentationIdentitySlot:string}).presentationIdentitySlot)).toEqual(slots);
+    expect(composition.bundle.colonyDepth.read().discoveredBiomes).toEqual(['landing-grassland']);
+  }finally{await composition.destroy();}
+});
+
 function helloPayload(
   composition: Phase1HostedAuthorityComposition,
 ) {
@@ -47,6 +67,44 @@ function helloPayload(
       composition.bundle.getWorldCompatibility(),
   });
 }
+
+it('eight-player colony research resolves one competing transaction and replicates its shared revision to every client', async () => {
+  const c = await Phase1HostedAuthorityComposition.create({
+    worldId: 'world:p2-shared-research', worldSeed: 'p1-world-golden', maxPlayers: 8,
+    colonyDepthEnabled: true, interactionRangeWorldUnits: 1.25,
+    spawnClearanceRadiusWorldUnits: 1.25, requiredAccessRadiusWorldUnits: 1.25,
+    persistence: new NoopHostedPersistence(),
+  });
+  try {
+    const clients = Array.from({length:8}, (_,i) => join(c, 'p2:research:' + String(i)));
+    await c.step();
+    for (const client of clients.slice(0,2)) {
+      expect(c.bundle.items.commitColonyExchange({
+        operationId:'fixture:fund:'+client.playerId,playerId:client.playerId,
+        expectedInventoryRevision:c.bundle.items.getContainerView('inventory:'+client.playerId).revision,
+        inputs:[],outputs:[{itemDefinitionId:'item:plant-fiber',quantity:3},{itemDefinitionId:'item:stone',quantity:2}],
+      }).status).toBe('committed');
+    }
+    const command=(client:HostedClientHarness,operationId:string):GameplayCommandEnvelopeV1=>({
+      operationId,commandType:'colony.depth',expectedRevisions:[
+        {aggregateType:'colony-depth',aggregateId:'colony',revision:c.bundle.colonyDepth.read().revision},
+        {aggregateType:'container',aggregateId:'inventory:'+client.playerId,revision:c.bundle.items.getContainerView('inventory:'+client.playerId).revision},
+      ],payload:{action:'research',targetId:'field-survey'},
+    });
+    const first=command(clients[0]!,'p2:research:first');
+    const competing=command(clients[1]!,'p2:research:competing');
+    const uncharged=c.bundle.items.getContainerView('inventory:'+clients[1]!.playerId);
+    sendCommand(c.host,clients[0]!,first);sendCommand(c.host,clients[1]!,competing);
+    const outbound=await c.step();
+    expect(c.bundle.colonyDepth.read().researchIds).toEqual(['field-survey']);
+    expect(queryOperationStatus(c.host,clients[1]!,competing.operationId)?.envelope.payload).toMatchObject({state:'resolved',result:{status:'rejected',reason:'STALE_REVISION'}});
+    expect(c.bundle.items.getContainerView(uncharged.containerId)).toEqual(uncharged);
+    for(const client of clients) expect(outbound.some(message=>message.transportId===client.transportId&&JSON.stringify(message.envelope).includes('field-survey'))).toBe(true);
+    const ledger=c.bundle.items.exportLedgerSnapshot();
+    sendCommand(c.host,clients[0]!,first);await c.step();
+    expect(c.bundle.items.exportLedgerSnapshot()).toEqual(ledger);
+  } finally {await c.destroy();}
+});
 
 function join(
   composition: Phase1HostedAuthorityComposition,

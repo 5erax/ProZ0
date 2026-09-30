@@ -2,6 +2,7 @@ import type {
   PlayerMotionViewV1,
   PresentationIdentitySlotV1,
 } from '../../protocol';
+import { colonySurveySites } from '../../world/phase2/ColonyRegions';
 import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
@@ -383,6 +384,9 @@ function teammateAtlasIndex(
     case 'TEAM_A': return 1;
     case 'TEAM_B': return 2;
     case 'TEAM_C': return 3;
+    case 'TEAM_D': case 'TEAM_G': return 1;
+    case 'TEAM_E': return 2;
+    case 'TEAM_F': return 3;
     case 'LOCAL':
     case 'UNASSIGNED':
       return null;
@@ -391,11 +395,12 @@ function teammateAtlasIndex(
 
 function teammateIdentitySlot(
   slot: PresentationIdentitySlotV1,
-): 'TEAM_A' | 'TEAM_B' | 'TEAM_C' | null {
+): 'TEAM_A' | 'TEAM_B' | 'TEAM_C' | 'TEAM_D' | 'TEAM_E' | 'TEAM_F' | 'TEAM_G' | null {
   switch (slot) {
     case 'TEAM_A':
     case 'TEAM_B':
     case 'TEAM_C':
+    case 'TEAM_D': case 'TEAM_E': case 'TEAM_F': case 'TEAM_G':
       return slot;
     case 'LOCAL':
     case 'UNASSIGNED':
@@ -410,6 +415,7 @@ function teammateLabel(
     case 'TEAM_A': return 'TEAM A';
     case 'TEAM_B': return 'TEAM B';
     case 'TEAM_C': return 'TEAM C';
+    case 'TEAM_D': case 'TEAM_E': case 'TEAM_F': case 'TEAM_G': return slot.replace('_',' ');
     case 'LOCAL':
     case 'UNASSIGNED':
       return null;
@@ -499,6 +505,17 @@ export function projectPhase1ProductReviewMapPanel(
       markerIndex: 7,
       kind: 'death-cache' as const,
     }));
+  }
+
+  if (bundle.config.colonyDepthEnabled === true) {
+    for (const site of colonySurveySites(bundle.config.worldSeed)) {
+      if (!bundle.colonyDepth.read().inspectedSites.includes(site.id)) continue;
+      detailTargets.push(Object.freeze({
+        id: 'map:' + site.id, label: site.name.toUpperCase() + ' · SURVEYED',
+        worldX: site.position.x, worldY: site.position.y,
+        markerIndex: 6, kind: 'ruin' as const,
+      }));
+    }
   }
 
   const selectedIndex = normalizedSelection(
