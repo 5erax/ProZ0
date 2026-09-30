@@ -2918,7 +2918,8 @@ test('colony: builds a visible bed, plants, harvests once and reopens persistent
     expect(seeded.status).toBe('committed');
   });
   await openProductReview(page, base, 'colony-browser-db', 2, 'farmer');
-  await page.keyboard.press('n');
+  await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'false');
+  await page.keyboard.press('e');
   const panel = page.locator('[data-panel-kind="colony"]');
   await expect(panel).toContainText('CULTIVATION / HUSBANDRY');
   await page.locator('[data-review-action="colony:build-bed"]').click();

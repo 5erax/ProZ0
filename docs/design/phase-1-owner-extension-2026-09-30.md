@@ -4,7 +4,7 @@ Authority: Owner instructions in the recovery conversation on 2026-09-30, record
 
 ## Gameplay contract
 
-One shared cultivation bed at (-6,4), one shared grazer pen at (6,4), both near Landing. Open N for explicit actions, costs and remaining active-world growth time. Build/plant/harvest/care/fertilize require a living actor within 1.25 WU of the relevant site.
+One shared cultivation bed at (-6,4), one shared grazer pen at (6,4), both near Landing. Known bed/pen sites retain visible planning markers. Open N, or press E near a site, for explicit actions, costs and remaining active-world growth time. The panel docks beside the world rather than obscuring the work site. Build/plant/harvest/care/fertilize require a living actor within 1.25 WU of the relevant site.
 
 | Action | Cost | Result |
 | --- | --- | --- |

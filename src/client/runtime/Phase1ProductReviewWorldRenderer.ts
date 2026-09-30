@@ -1156,12 +1156,11 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     const colony = bundle.sustenance.read();
-    const showSites = root.querySelector('[data-panel-kind="colony"]') !== null;
     for (const site of [
       { id: 'cultivation-bed', position: CULTIVATION_POSITION, built: colony.bedBuilt },
       { id: 'grazer-pen', position: PEN_POSITION, built: colony.penBuilt },
     ]) {
-      if ((!site.built && !showSites) || !worldPositionKnown(bundle, site.position)) continue;
+      if (!worldPositionKnown(bundle, site.position)) continue;
       const pad = document.createElement('div');
       pad.dataset.worldRole = site.id;
       pad.dataset.built = String(site.built);
@@ -1183,7 +1182,7 @@ export function createPhase1ProductReviewWorldRenderer(
       pad.append(svg);
       pad.style.opacity = site.built ? '1' : '.45';
       const label = document.createElement('span');
-      label.textContent = site.id === 'cultivation-bed' ? 'BED' : 'PEN';
+      label.textContent = (site.id === 'cultivation-bed' ? 'BED' : 'PEN') + (site.built ? '' : ' · N');
       label.style.cssText = 'font:6px monospace;color:#d8e8db;position:absolute;bottom:1px;left:8px';
       pad.append(label); layer.append(pad);
       if (site.id === 'cultivation-bed' && colony.cropProgressTicks !== null) {

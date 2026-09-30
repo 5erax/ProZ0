@@ -1113,6 +1113,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-colony-status{padding:3px 0;}',
     '.p1-colony-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;}',
     '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
+    '.p1-panel[data-panel-kind="colony"]{left:8px;top:50px;width:250px;max-height:300px;transform:none;padding:6px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-craft-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;}',
     '.p1-panel[data-panel-kind="build"]{left:8px;top:54px;width:204px;max-height:252px;transform:none;padding:6px;}',

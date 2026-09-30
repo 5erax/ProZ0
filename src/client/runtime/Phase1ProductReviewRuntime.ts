@@ -1,6 +1,6 @@
 import type { PlayerId } from '../../foundation';
 import { phase1IsometricInput } from './Phase1IsometricProjection';
-import { GRAZER_CARE_TICKS, type ColonySustenanceAction }
+import { CULTIVATION_POSITION, PEN_POSITION, GRAZER_CARE_TICKS, type ColonySustenanceAction }
   from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
   PlayerMotionViewV1,
@@ -389,6 +389,12 @@ export async function createPhase1ProductReviewRuntime(
           candidate.cache.containerId,
         ).stacks.length > 0,
       )?.cache ?? null;
+  };
+
+  const colonySiteTarget = (): 'Cultivation bed' | 'Grazer pen' | null => {
+    if (distanceFromPlayerSquared(CULTIVATION_POSITION.x, CULTIVATION_POSITION.y) <= 1.25 ** 2) return 'Cultivation bed';
+    if (distanceFromPlayerSquared(PEN_POSITION.x, PEN_POSITION.y) <= 1.25 ** 2) return 'Grazer pen';
+    return null;
   };
 
   const worldDropTarget = () => bundle.world.exportSnapshot().drops
@@ -1479,6 +1485,12 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    const site = colonySiteTarget();
+    if (site !== null) {
+      source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'COLONY', target: site,
+        state: 'AVAILABLE', reason: null, progress: null }));
+      return;
+    }
     source.setInteraction(null);
   };
 
@@ -1500,6 +1512,7 @@ export async function createPhase1ProductReviewRuntime(
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
     if (interactWithWorkbench()) return;
+    if (colonySiteTarget() !== null) { actionPanel = 'colony'; refreshColonyPanel(); return; }
     beginGather();
   };
 
