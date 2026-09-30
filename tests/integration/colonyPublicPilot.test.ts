@@ -108,11 +108,18 @@ test.skipIf(!endpoint)(
       expect((await saved.json()).checkpoint).toBeGreaterThan(0);
     } finally {
       for (const ws of sockets) ws.close();
-      await new Promise((r) => setTimeout(r, 3500));
-      await fetch(endpoint + "/rooms/" + details.id, {
-        method: "DELETE",
-        headers: { Authorization: "Bearer " + details.ownerToken },
-      });
+      let removed = false;
+      for (let attempt = 0; attempt < 12 && !removed; attempt++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const response = await fetch(endpoint + "/rooms/" + details.id, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + details.ownerToken },
+        });
+        removed = response.ok;
+        if (!removed && response.status !== 409)
+          throw Error("Test room cleanup failed: " + response.status);
+      }
+      expect(removed).toBe(true);
     }
   },
   90000,

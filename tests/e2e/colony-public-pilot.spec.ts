@@ -86,12 +86,10 @@ test("three public browsers host/join, gather, save and reconnect through the pl
     let held: string[] = [];
     try {
       for (let n = 0; n < 240; n++) {
-        const p = await host
-          .locator("canvas")
-          .evaluate((e) => ({
-            x: Number(e.dataset.playerX),
-            y: Number(e.dataset.playerY),
-          }));
+        const p = await host.locator("canvas").evaluate((e) => ({
+          x: Number(e.dataset.playerX),
+          y: Number(e.dataset.playerY),
+        }));
         const dx = 18 - p.x,
           dy = 10 - p.y;
         if (Math.hypot(dx, dy) < 0.45) break;
@@ -195,11 +193,18 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   } finally {
     for (const context of contexts) await context.close();
     if (owner) {
-      await new Promise((r) => setTimeout(r, 3500));
-      await fetch(endpoint + "/rooms/" + owner.id, {
-        method: "DELETE",
-        headers: { Authorization: "Bearer " + owner.ownerToken },
-      });
+      let removed = false;
+      for (let attempt = 0; attempt < 12 && !removed; attempt++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const response = await fetch(endpoint + "/rooms/" + owner.id, {
+          method: "DELETE",
+          headers: { Authorization: "Bearer " + owner.ownerToken },
+        });
+        removed = response.ok;
+        if (!removed && response.status !== 409)
+          throw Error("Test room cleanup failed: " + response.status);
+      }
+      expect(removed).toBe(true);
     }
   }
 });

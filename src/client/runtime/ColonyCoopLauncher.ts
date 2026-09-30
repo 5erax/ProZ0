@@ -140,6 +140,42 @@ export function mountColonyCoopLauncher(parent: HTMLElement): () => void {
       resume.className = "p1-review-primary";
       resume.addEventListener("click", () => enter(endpoint, details));
       controls.append(resume);
+      if (details.ownerToken) {
+        const remove = document.createElement("button");
+        remove.textContent = "Delete room · " + details.id;
+        remove.className = "p1-review-primary";
+        remove.addEventListener("click", () => {
+          if (
+            !target.confirm(
+              "Delete this shared world permanently? Export a backup first and disconnect all players.",
+            )
+          )
+            return;
+          remove.disabled = true;
+          void fetch(endpoint + "/rooms/" + details.id, {
+            method: "DELETE",
+            headers: { Authorization: "Bearer " + details.ownerToken },
+          })
+            .then(async (response) => {
+              const result = await response.json();
+              if (!response.ok)
+                throw Error(result.error ?? "Unable to remove room");
+              for (const suffix of ["", ":resume", ":client"])
+                target.localStorage.removeItem(key + suffix);
+              resume.remove();
+              remove.remove();
+              status.textContent = "Shared room removed";
+            })
+            .catch((error) => {
+              status.textContent =
+                error instanceof Error
+                  ? error.message
+                  : "Unable to remove room";
+              remove.disabled = false;
+            });
+        });
+        controls.append(remove);
+      }
     } catch {
       /* Ignore invalid or obsolete local records. */
     }
