@@ -327,7 +327,7 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
   browser,
   page,
 }) => {
-  test.setTimeout(30_000);
+  test.setTimeout(90_000);
 
   await page.goto('/?proz0Mode=local-demo');
 
@@ -343,6 +343,16 @@ test('P0-BUG-001 retains browser/presentation P95 responsiveness evidence', asyn
   const directionSamples: Sample[] = [];
 
   for (let index = 0; index < SAMPLE_COUNT; index += 1) {
+    // Isolate samples at the canonical spawn. Remote round trips outside the
+    // measurement window can otherwise accumulate held-key movement until the
+    // actor hits a wall, turning a latency sample into a collision scenario.
+    // Sample count, phase offsets and the 50ms P95 budget remain unchanged.
+    if (index > 0) {
+      await page.reload();
+      await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+      await expect(canvas).toBeVisible();
+      await releaseMovementKeys(page);
+    }
     const startsRight = index % 2 === 0;
     const primaryCode = startsRight ? 'KeyD' : 'KeyA';
     const primaryDirection = startsRight ? 1 : -1;
