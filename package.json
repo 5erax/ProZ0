@@ -17,15 +17,21 @@
     "test:determinism": "vitest run tests/determinism --config vitest.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
     "test:e2e": "playwright test",
-    "ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:integration && npm run test:determinism && npm run build && npm run test:browser && npm run test:e2e"
+    "ci": "npm run typecheck && npm run lint && npm run test:unit && npm run test:integration && npm run test:determinism && npm run build && npm run test:browser && npm run test:e2e",
+    "build:vercel": "npm run build && vite build --ssr src/server/pilot/vercel.ts --outDir dist-server",
+    "build:pilot": "vite build --ssr src/server/pilot/main.ts --outDir dist-pilot",
+    "start:pilot": "node dist-pilot/main.js"
   },
   "dependencies": {
-    "pixi.js": "8.21.0"
+    "pixi.js": "8.21.0",
+    "redis": "6.3.0",
+    "ws": "8.22.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
     "@types/node": "24.13.6",
+    "@types/ws": "8.18.2",
     "@vitest/browser": "5.0.1",
     "@vitest/browser-playwright": "5.0.1",
     "eslint": "10.11.0",

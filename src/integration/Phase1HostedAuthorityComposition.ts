@@ -34,11 +34,14 @@ function capacityPlayerIds(maxPlayers: number): readonly string[] {
     ),
   );
 }
+const equipmentRevisions=new WeakMap<Phase1AuthorityBundle,Map<string,{signature:string;revision:number}>>();
 
 function aggregateVisibleToPlayer(
   playerId: string,
   view: RevisionedAggregateViewV1,
 ): boolean {
+  if(view.aggregateType==='colony-scene')return view.aggregateId===playerId;
+  if(view.aggregateType==='equipment')return view.aggregateId===playerId;
   if (
     view.aggregateType === 'container'
     && view.aggregateId.startsWith('inventory:')
@@ -52,6 +55,7 @@ function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
+  if(bundle.config.colonyDepthEnabled===true){let known=equipmentRevisions.get(bundle);if(!known){known=new Map();equipmentRevisions.set(bundle,known);}for(const playerId of bundle.getActivePlayerIds()){const state=bundle.equipment.reconcile(playerId),signature=JSON.stringify(state),previous=known.get(playerId),revision=previous?previous.revision+(signature!==previous.signature?1:0):0;known.set(playerId,{signature,revision});values.push({aggregateType:'equipment',aggregateId:playerId,revision,tombstone:false,state:asJson(state)});}}
   if(bundle.config.colonyDepthEnabled===true)values.push(Object.freeze({aggregateType:'colony-depth',aggregateId:'colony',revision:bundle.colonyDepth.read().revision,tombstone:false,state:asJson(bundle.colonyDepth.read())}));
   const colony = bundle.sustenance.read();
   values.push(Object.freeze({ aggregateType: 'colony-sustenance', aggregateId: 'colony',
@@ -296,6 +300,7 @@ export interface Phase1HostedAuthorityCompositionConfig
   readonly sessionId?: string;
   readonly sessionEpoch?: string;
   readonly reopen?: Phase1ReopenState;
+  readonly initialResumeBindings?: ReadonlyMap<string,string>;
 }
 
 export class Phase1HostedAuthorityComposition {
@@ -376,6 +381,7 @@ export class Phase1HostedAuthorityComposition {
         },
       }),
       death: bundle.death,
+      equipment:{set(playerId,slot,stackId,inventoryRevision){if(bundle.items.getContainerView('inventory:'+playerId).revision!==inventoryRevision)return {status:'rejected',reason:'STALE_REVISION'};return slot==='weapon'?bundle.equipWeapon(playerId,stackId):bundle.equipThermalWrap(playerId,stackId);}},
       sustenance: bundle.sustenance,
       ...(config.colonyDepthEnabled===true?{colonyDepth:bundle.colonyDepth}:{}),
       combat: bundle.combat,
@@ -389,6 +395,7 @@ export class Phase1HostedAuthorityComposition {
         maxPlayers: config.maxPlayers,
         contentCompatibility: bundle.getContentCompatibility(),
         worldCompatibility: bundle.getWorldCompatibility(),
+        ...(config.initialResumeBindings===undefined?{}:{initialResumeBindings:config.initialResumeBindings}),
         ...(config.sessionId === undefined
           ? {}
           : { sessionId: config.sessionId }),

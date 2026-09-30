@@ -1,4 +1,6 @@
 import type { ContentCatalogV1 } from '../../content';
+import {PHASE1_STRUCTURE_PLACEMENT_PROFILES} from '../building/Phase1BuildingWorld';
+import {colonyLandscapeTerrainAt} from '../phase2/ColonyRegions';
 import {
   createWorldPosition,
   type PlayerId,
@@ -117,6 +119,8 @@ export type Phase1RuinRewardClaimReservationResult =
     };
 
 export interface Phase1VerticalSliceWorldAdapterOptions {
+  readonly colonyTerrainRulesEnabled?: boolean;
+  readonly colonyWorldSeed?: string;
   readonly catalog: ContentCatalogV1;
   readonly store: Phase1WorldStore;
   readonly playerPositions: Phase1VerticalSlicePlayerPositionPort;
@@ -1002,6 +1006,7 @@ export class Phase1VerticalSliceWorldAdapter
       ),
     ];
 
+    if(this.options.colonyTerrainRulesEnabled)return samples.every(sample=>this.activeChunks.has(toChunkKey(fromWorldPosition(sample))));
     if (!samples.every((sample) => this.isPositionBuildable(sample))) {
       return false;
     }
@@ -1077,7 +1082,20 @@ export class Phase1VerticalSliceWorldAdapter
     ]);
   }
 
+  public getMovementSpeedMultiplier(position: WorldPosition): number {
+    if (!this.options.colonyTerrainRulesEnabled) return 1;
+    // Existing generated water stays shallow and traversable. Buildings keep their foundations.
+    for (const structure of this.options.structures()) {
+      const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId];
+      if(positionInsideFootprint(position,structure.position,profile,structure.orientationQuarterTurns))return 1;
+    }
+    const view=this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
+    if(!view)return 1;
+    return this.isPositionBuildable(position)?1:0.7;
+  }
+
   private isPositionBuildable(position: WorldPosition): boolean {
+    if(this.options.colonyTerrainRulesEnabled)for(const structure of this.options.structures())if(positionInsideFootprint(position,structure.position,PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],structure.orientationQuarterTurns))return true;
     const view = this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
     if (view === undefined) return false;
     const local = toChunkLocalPosition(position, view.base.coord);
@@ -1090,9 +1108,10 @@ export class Phase1VerticalSliceWorldAdapter
       view.base.terrain.cellsPerAxis - 1,
       Math.floor(local.y / cellSize),
     );
-    return view.base.terrain.cells[
+    const base=view.base.terrain.cells[
       cellY * view.base.terrain.cellsPerAxis + cellX
-    ] === 'ground';
+    ]!;
+    return (this.options.colonyTerrainRulesEnabled?colonyLandscapeTerrainAt(this.options.colonyWorldSeed!,position,base):base)==='ground';
   }
 
   private isPositionExplored(position: WorldPosition): boolean {

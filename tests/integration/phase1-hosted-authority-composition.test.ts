@@ -1247,6 +1247,26 @@ describe('Phase 1 hosted vertical-slice composition', () => {
 
 
 describe('hosted colony commands', () => {
+  it('equipment uses only the actor inventory, rejects stale revisions and does not consume the weapon', async () => {
+    const c = await Phase1HostedAuthorityComposition.create({ worldId:'world:equipment-pilot',worldSeed:'p1-world-golden',maxPlayers:2,colonyDepthEnabled:true,interactionRangeWorldUnits:1.25,spawnClearanceRadiusWorldUnits:1.25,requiredAccessRadiusWorldUnits:1.25,persistence:new NoopHostedPersistence() });
+    try {
+      const a=join(c,'equipment:a'), b=join(c,'equipment:b');
+      expect(c.bundle.items.commitColonyExchange({operationId:'fixture:materials',playerId:a.playerId,expectedInventoryRevision:0,inputs:[],outputs:[{itemDefinitionId:'item:timber',quantity:2},{itemDefinitionId:'item:stone',quantity:1},{itemDefinitionId:'item:cordage',quantity:1}]}).status).toBe('committed');
+      sendCommand(c.host,a,{operationId:'fixture:craft',commandType:'item.craft',expectedRevisions:[{aggregateType:'container',aggregateId:'inventory:'+a.playerId,revision:1}],payload:{inventoryContainerId:'inventory:'+a.playerId,recipeId:'recipe:basic-spear'}}); await c.step();
+      const inventory=c.bundle.items.getContainerView('inventory:'+a.playerId), stack=inventory.stacks.find(s=>s.itemDefinitionId==='item:basic-spear')!;
+      expect(stack).toBeDefined();
+      const equip=(client:HostedClientHarness,id:string,revision:number):GameplayCommandEnvelopeV1=>({operationId:id,commandType:'equipment.set',expectedRevisions:[{aggregateType:'container',aggregateId:'inventory:'+client.playerId,revision}],payload:{slot:'weapon',stackId:stack.stackId}});
+      sendCommand(c.host,a,equip(a,'equipment:stale',0)); await c.step();
+      expect(queryOperationStatus(c.host,a,'equipment:stale')?.envelope.payload).toMatchObject({state:'resolved',result:{status:'rejected',reason:'STALE_REVISION'}});
+      sendCommand(c.host,b,equip(b,'equipment:foreign',0)); await c.step();
+      expect(c.bundle.equipment.getView(b.playerId).equippedWeaponStackId).toBeNull();
+      sendCommand(c.host,a,equip(a,'equipment:own',inventory.revision)); await c.step();
+      expect(c.bundle.equipment.getView(a.playerId).equippedWeaponStackId).toBe(stack.stackId);
+      expect(c.bundle.items.getContainerView(inventory.containerId)).toEqual(inventory);
+      sendCommand(c.host,a,equip(a,'equipment:own',inventory.revision)); await c.step();
+      expect(c.bundle.equipment.getView(a.playerId).equippedWeaponStackId).toBe(stack.stackId);
+    } finally { await c.destroy(); }
+  });
   it('replicates cultivation, deduplicates retries and persists progress through reopen', async () => {
     const c = await Phase1HostedAuthorityComposition.create({ worldId: 'world:colony-host', worldSeed: 'p1-world-golden',
       maxPlayers: 2, interactionRangeWorldUnits: 2, spawnClearanceRadiusWorldUnits: 0,

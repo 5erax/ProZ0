@@ -98,8 +98,10 @@ export class PlayerMovementSystem {
     const directionScale = diagonal ? INV_SQRT_2 : 1;
     const directionX = moveX * directionScale;
     const directionY = moveY * directionScale;
-    const velocityX = directionX * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed;
-    const velocityY = directionY * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed;
+    const terrainSpeed = this.worldQuery.getMovementSpeedMultiplier?.(this.position) ?? 1;
+    if (!Number.isFinite(terrainSpeed) || terrainSpeed <= 0 || terrainSpeed > 1) throw new Error('Invalid terrain movement speed.');
+    const velocityX = directionX * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed;
+    const velocityY = directionY * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed;
     const desiredX = velocityX * dtSeconds;
     const desiredY = velocityY * dtSeconds;
 

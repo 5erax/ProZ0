@@ -1,3 +1,4 @@
+import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
 import { phase1IsometricInput, unprojectPhase1Isometric } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION, GRAZER_CARE_TICKS, type ColonySustenanceAction }
@@ -307,6 +308,9 @@ export async function createPhase1ProductReviewRuntime(
     worldRenderer.canvas,
     config.colonyDepthEnabled === true,
   );
+
+  let gatheredActions=0;
+  const playtestTools=config.colonyDepthEnabled===true?createColonyPlaytestTools(root,()=>{const p=bundle.getPlayerPosition(config.localPlayerId),c=bundle.items.getContainerView('inventory:'+config.localPlayerId),d=bundle.colonyDepth.read();return {tick:bundle.authorityTick,x:p.x,y:p.y,carrying:c.playerWeightState??'NORMAL',stacks:c.stacks.length,sites:d.inspectedSites.length,biomes:d.discoveredBiomes.length,facilities:bundle.buildings.exportSnapshot().foothold.structures.length,gatherActions:gatheredActions,toolCondition:c.stacks.find(stack=>stack.itemDefinitionId==='item:stone-field-tool')?.condition??null};}):null;
 
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
@@ -1546,6 +1550,7 @@ export async function createPhase1ProductReviewRuntime(
         }));
         return;
       case 'resolved': {
+        if(result.result.status==='committed')gatheredActions++;
         const targetName = activeGather.targetName;
         activeGather = null;
         source.setLocalCommandFeedback({
@@ -2195,6 +2200,14 @@ export async function createPhase1ProductReviewRuntime(
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
     if(action?.startsWith('open-'))colonyDepthOverlay?.close();
+    if(action==='inventory-stack'){
+      const selection=source.getInventoryActionSelection(),containerId=selection.source.containerId;
+      const view=bundle.items.getContainerView(containerId);let pair:null|[typeof view.stacks[number],typeof view.stacks[number]]=null;
+      for(const target of view.stacks)for(const from of view.stacks)if(from.stackId!==target.stackId&&from.itemDefinitionId===target.itemDefinitionId&&from.condition===target.condition&&from.quantity+target.quantity<=bundle.catalog.getAs(target.itemDefinitionId,'item').maxStack)pair??=[from,target];
+      if(!pair){presentInventoryGuard('STACK','STACK','NO_MATCHING_STACKS');return;}
+      const operationId=nextOperationId('stack');const result=bundle.executeItemCommand({type:'merge',operationId,playerId:config.localPlayerId,containerId,expectedRevision:view.revision,sourceStackId:pair[0].stackId,targetStackId:pair[1].stackId});
+      source.setLocalCommandFeedback({inputLabel:'STACK',operationId,status:result.status,reason:result.status==='rejected'?result.reason:'STACKS_COMBINED',verb:'STACK',target:'Matching items'});return;
+    }
     if(action==='inventory-transfer-one'||action==='inventory-transfer-stack'){
       const selection=source.getInventoryActionSelection();
       if(selection.stack!==null){source.adjustInventoryQuantity((action==='inventory-transfer-one'?1:selection.stack.quantity)-selection.quantity);transferSelectedInventoryQuantity();}
@@ -2285,6 +2298,7 @@ export async function createPhase1ProductReviewRuntime(
       root.removeEventListener('click', onPanelClick);
       root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
+      playtestTools?.destroy();
       controls.destroy();
       colonyDepthOverlay?.destroy();
       presentation.destroy();
