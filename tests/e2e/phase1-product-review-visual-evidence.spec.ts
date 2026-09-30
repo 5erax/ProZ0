@@ -1194,7 +1194,7 @@ test('P1-POLISH-001 isolates primary panels from contextual HUD at required inte
         await page.setViewportSize(layout.viewport);
         await expect(page.locator('#proz0-canvas')).toHaveAttribute(
           'data-display-scale',
-          String(layout.scale),
+          String(Math.min(layout.viewport.width / 640, layout.viewport.height / 360)),
         );
       }
 
@@ -2527,12 +2527,13 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   await page.setViewportSize({ width: 1363, height: 936 });
   await expect(page.locator('#proz0-canvas')).toHaveAttribute(
     'data-display-scale',
-    '2',
+    String(1363 / 640),
   );
-  await expect(page.locator('#proz0-canvas')).toHaveCSS('width', '1280px');
-  await expect(page.locator('#proz0-canvas')).toHaveCSS('height', '720px');
-  await captureViewport(page, 'polish-1363x936-centered-2x.png');
-  files.push('polish-1363x936-centered-2x.png');
+  await expect(page.locator('#proz0-canvas')).toHaveCSS('width', '1363px');
+  await expect.poll(async () => (await page.locator('#proz0-canvas').boundingBox())?.height)
+    .toBeCloseTo(1363 * 360 / 640, 1);
+  await captureViewport(page, 'polish-1363x936-fitted.png');
+  files.push('polish-1363x936-fitted.png');
 
   await openProductReview(
     page,
@@ -2799,7 +2800,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       polishFirstEntry2x: 'polish-first-entry-2x.png',
       polishExactTarget2x: 'polish-exact-target-2x.png',
       polishNormal1x: 'polish-normal-1x.png',
-      polish1363Centered2x: 'polish-1363x936-centered-2x.png',
+      polish1363Fitted: 'polish-1363x936-fitted.png',
       polishInventory2x: 'polish-inventory-2x.png',
       polishCraftHaveNeed1x: 'polish-craft-have-need-1x.png',
       polishCraftHaveNeed2x: 'polish-craft-have-need-2x.png',
@@ -2828,7 +2829,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
       saveV2Reopen: true,
       noQaWorldPreview: true,
       integerScale1x2x3x: true,
-      centered1363x936Uses2x: true,
+      centered1363x936FitsViewport: true,
       survivalControlsDoNotOverlap: true,
       craftShowsAllHaveNeedAndStation: true,
       craftUsesNativeItemIcons: true,
@@ -2849,4 +2850,58 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     JSON.stringify(manifest, null, 2) + '\n',
     'utf8',
   );
+});
+
+test('owner-reported player controls: pages, mouse equipment, pickup and fullscreen', async ({ page }) => {
+  test.setTimeout(90_000);
+  const evidence = await createInventoryLogisticsSave('world:player-controls-regression');
+  await openProductReview(page, evidence, 'proz0-player-controls-regression', 2);
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await expect(page.locator('canvas')).toHaveAttribute('data-display-scale', '2.5');
+  const bounds = await page.locator('canvas').boundingBox();
+  expect(bounds?.height).toBeCloseTo(900, 0);
+  expect(bounds?.width).toBeCloseTo(1600, 0);
+
+  await page.keyboard.press('c');
+  const craft = page.locator('[data-panel-kind="craft"]');
+  await expect(craft).toContainText('PAGE 1/2');
+  await page.getByRole('button', { name: 'Next page [PgDn]', exact: true }).click();
+  await expect(craft).toContainText('PAGE 2/2');
+  await page.keyboard.press('PageUp');
+  await expect(craft).toContainText('PAGE 1/2');
+  await page.keyboard.press(']');
+  await expect(craft).toContainText('PAGE 2/2');
+  await page.getByRole('button', { name: 'Previous page [PgUp]', exact: true }).click();
+  await expect(craft).toContainText('PAGE 1/2');
+  await craft.locator('.p1-craft-row').last().scrollIntoViewIfNeeded();
+  const lastVisible = await craft.locator('.p1-craft-row').last().evaluate((row) => {
+    const box = row.getBoundingClientRect();
+    const panel = row.closest('.p1-panel')!.getBoundingClientRect();
+    return box.bottom <= panel.bottom + 1 && box.top >= panel.top;
+  });
+  expect(lastVisible).toBe(true);
+
+  await page.keyboard.press('i');
+  await inventoryItemRow(page, 'player', 'Basic Spear').click();
+  await page.getByRole('button', { name: 'Equip / Unequip [X]', exact: true }).click();
+  await expect(page.locator('.p1-feedback')).toContainText('EQUIP · Basic Spear');
+  await page.keyboard.press('i');
+  await expect(page.locator('[data-equipment-slot="weapon"]')).toContainText('Basic Spear');
+  await page.keyboard.press('i');
+  await inventoryItemRow(page, 'player', 'Plant Fiber').click();
+  await page.keyboard.press(']');
+  await page.keyboard.press('g');
+  await expect(inventoryItemRow(page, 'player', 'Plant Fiber')).toContainText('×4');
+  await page.keyboard.press('i');
+  await expect(page.locator('.p1-interaction-main')).toContainText('PICK UP · Plant Fiber ×2');
+  await page.keyboard.press('e');
+  await expect(page.locator('[data-world-role="world-drop"]')).toHaveCount(0);
+  await page.keyboard.press('e');
+  await page.keyboard.press('i');
+  await expect(inventoryItemRow(page, 'player', 'Plant Fiber')).toContainText('×6');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Toggle fullscreen', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement?.id)).toBe('app');
+  await page.getByRole('button', { name: 'Toggle fullscreen', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
 });

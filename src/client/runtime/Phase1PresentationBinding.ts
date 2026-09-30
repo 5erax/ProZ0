@@ -440,10 +440,11 @@ function inventoryPanel(
     selectedItemId: selected?.stackId ?? null,
     detail: selected === undefined || selectedDefinition === null
       ? `Weight ${input.inventory.totalWeightKg.toFixed(1)} / ${PLAYER_MAX_WEIGHT_KG} kg · Volume ${input.inventory.totalVolume.toFixed(1)} / ${PLAYER_MAX_VOLUME}`
-      : `${selectedDefinition.displayName} · qty ${selected.quantity}${selected.condition === null ? '' : ` · condition ${selected.condition}/${selectedDefinition.conditionMax ?? 100}`}`,
+      : `${selectedDefinition.displayName} · qty ${selected.quantity}${selected.condition === null ? '' : ` · condition ${selected.condition}/${selectedDefinition.conditionMax ?? 100}`}`
+        + (selected.itemDefinitionId === 'item:stone-field-tool' ? ' · AUTO-USED WHEN GATHERING · NOT A WEAPON' : ''),
     quantity,
     controls:
-      '↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY '
+      'CLICK / ↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY '
       + String(quantity),
     feedback: feedback === null || feedback === undefined
       ? null

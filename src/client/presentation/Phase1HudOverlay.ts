@@ -38,6 +38,13 @@ function percent(value: number, max: number): number {
   return Math.round((value / max) * 100);
 }
 
+function actionButton(document: Document, label: string, action: string): HTMLButtonElement {
+  const button = createElement(document, 'button', 'p1-action', label);
+  button.type = 'button';
+  button.dataset.reviewAction = action;
+  return button;
+}
+
 function assetSprite(
   document: Document,
   className: string,
@@ -167,7 +174,10 @@ function itemRow(
   selected: boolean,
   compact = false,
 ): HTMLElement {
-  const row = createElement(document, 'div', 'p1-item-row');
+  const row = createElement(document, 'button', 'p1-item-row');
+  row.type = 'button';
+  row.setAttribute('aria-label', item.name);
+  row.dataset.reviewItem = item.id;
   row.dataset.itemId = item.id;
   row.dataset.selected = String(selected);
   row.dataset.available = String(item.available ?? item.condition !== 0);
@@ -277,6 +287,7 @@ function renderPanel(
 
   switch (panel.kind) {
     case 'inventory': {
+      root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
       root.dataset.inventoryActivePane = 'player';
       root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
@@ -330,6 +341,7 @@ function renderPanel(
     }
 
     case 'container': {
+      root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
       root.dataset.inventoryActivePane = panel.activePane;
       root.dataset.inventoryQuantity = String(panel.quantity);
       const panes = createElement(document, 'div', 'p1-container-panes');
@@ -434,6 +446,12 @@ function renderPanel(
     }
 
     case 'craft': {
+      const navigation = createElement(document, 'div', 'p1-craft-navigation');
+      navigation.append(
+        actionButton(document, 'Previous page [PgUp]', 'craft-previous'),
+        actionButton(document, 'Next page [PgDn]', 'craft-next'),
+      );
+      root.append(navigation);
       const list = createElement(document, 'div', 'p1-craft-list');
       for (const rowState of panel.rows) {
         const row = createElement(document, 'div', 'p1-craft-row');
@@ -1072,10 +1090,14 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-team{position:absolute;right:8px;top:50px;width:132px;display:grid;gap:2px;}',
     '.p1-teammate{display:flex;gap:4px;align-items:center;background:rgba(10,14,22,.84);padding:2px 4px;}',
     '.p1-teammate-marker{width:12px!important;height:12px!important;display:inline-block;image-rendering:pixelated;}',
-    '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:hidden;}',
+    '.p1-panel{position:absolute;left:50%;top:50%;width:520px;max-height:300px;transform:translate(-50%,-50%);padding:8px;overflow:auto;pointer-events:auto;}',
+    '.p1-action,.p1-item-row{font:inherit;color:inherit;text-shadow:inherit;text-align:left;background:#161e2a;cursor:pointer;}',
+    '.p1-action{border:1px solid #778094;padding:4px 6px;}',
+    '.p1-craft-navigation{display:flex;justify-content:space-between;margin-bottom:4px;}',
+    '.p1-action:focus-visible,.p1-item-row:focus-visible{outline:2px solid white;}',
     '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
-    '.p1-panel[data-panel-kind="craft"] .p1-craft-list{gap:1px;}',
+    '.p1-panel[data-panel-kind="craft"] .p1-craft-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;}',
     '.p1-panel[data-panel-kind="build"]{left:8px;top:54px;width:204px;max-height:252px;transform:none;padding:6px;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
@@ -1179,6 +1201,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private readonly layer: HTMLDivElement;
   private readonly canvas: HTMLCanvasElement;
   private currentState: Phase1PresentationState;
+  private panelSignature = '';
 
   public constructor(
     private readonly root: HTMLElement,
@@ -1225,9 +1248,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.layer.dataset.panelOpen = String(panelOpen);
     this.root.dataset.productReviewPanelOpen = String(panelOpen);
     const style = this.layer.querySelector('style');
-    this.layer.replaceChildren();
-    if (style !== null) {
-      this.layer.append(style);
+    const signature = JSON.stringify(state.panel);
+    for (const child of Array.from(this.layer.children)) {
+      if (child !== style && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
+        child.remove();
+      }
     }
 
     if (this.root.dataset.phase1QaMode !== 'none') {
@@ -1405,13 +1430,13 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       carry.append(weightIcon);
     }
     carry.append(
-      ' ' + String(state.carry.weightCurrent) + '/' + String(state.carry.weightMax) + ' kg ',
+      ' ' + state.carry.weightCurrent.toFixed(1) + '/' + String(state.carry.weightMax) + ' kg ',
     );
     if (volumeIcon !== null) {
       carry.append(volumeIcon);
     }
     carry.append(
-      ' ' + String(state.carry.volumeCurrent) + '/' + String(state.carry.volumeMax)
+      ' ' + state.carry.volumeCurrent.toFixed(1) + '/' + String(state.carry.volumeMax)
       + ' · ' + state.carry.stateLabel,
     );
 
@@ -1503,9 +1528,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       this.layer.append(interaction);
     }
 
-    if (state.panel !== null) {
+    if (state.panel !== null && signature !== this.panelSignature) {
       this.layer.append(renderPanel(this.document, state.panel));
     }
+    this.panelSignature = signature;
   }
 }
 
