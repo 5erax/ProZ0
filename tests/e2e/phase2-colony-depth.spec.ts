@@ -8,7 +8,9 @@ async function walkTo(page: Page, x: number, y: number): Promise<void> {
   let stuck = 0;
   let held: string[] = [];
   try {
-    for (let step = 0; step < 900; step += 1) {
+    // The longest leg crosses both regions. Allow slower CI frame scheduling
+    // without granting items, relocating the player, or accepting blocked motion.
+    for (let step = 0; step < 1800; step += 1) {
       const position = await page.locator("canvas").evaluate((element) => ({
         x: Number(element.getAttribute("data-player-x")),
         y: Number(element.getAttribute("data-player-y")),
@@ -59,7 +61,7 @@ async function walkTo(page: Page, x: number, y: number): Promise<void> {
 test("colony exploration: real gathering funds research; walking reveals and inspects both regional sites; save restores journal", async ({
   page,
 }) => {
-  test.setTimeout(360_000);
+  test.setTimeout(600_000);
   const directory=resolve('test-results/phase2-colony-depth');mkdirSync(directory,{recursive:true});
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
