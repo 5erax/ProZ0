@@ -89,6 +89,90 @@ test('bare production route launches canonical Phase 1 Product Review without qu
   expect(fatalErrors).toEqual([]);
 });
 
+test('player can return from the bare launcher to the last committed world, not an unsaved new world', async ({ page }) => {
+  await page.goto('/');
+  const resume = page.locator('[data-continue-phase1-review]');
+  await expect(resume).toHaveCount(0);
+  await page.locator('[data-start-phase1-review]').click();
+  const root = page.locator('[data-proz0-autoboot]');
+  const canvas = page.locator('#proz0-canvas');
+  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  const savedUrl = page.url();
+  await page.keyboard.down('s');
+  await expect.poll(async () => Number(await canvas.getAttribute('data-player-y')))
+    .toBeGreaterThan(1);
+  await page.keyboard.up('s');
+  await page.keyboard.press('i');
+  const save = page.locator('[data-product-review-save]');
+  await page.keyboard.press('l');
+  await expect(save).toHaveAttribute('data-save-state', 'success');
+  await expect(save.locator('[role="status"]')).toBeVisible();
+  await expect(save).toContainText('World saved');
+  const savedY = Number(await canvas.getAttribute('data-player-y'));
+  await page.goto('/');
+  await expect(resume).toHaveAttribute('href', savedUrl);
+  await resume.click();
+  await expect(root).toHaveAttribute('data-product-review-reopened', 'true');
+  expect(Number(await canvas.getAttribute('data-player-y'))).toBeCloseTo(savedY, 5);
+  await page.keyboard.down('s');
+  await expect.poll(async () => Number(await canvas.getAttribute('data-player-y')))
+    .toBeGreaterThan(savedY + 1);
+  await page.keyboard.up('s');
+  await page.keyboard.press('l');
+  await expect(save).toHaveAttribute('data-save-state', 'success');
+  const secondSavedY = Number(await canvas.getAttribute('data-player-y'));
+  await page.goto('/');
+  await resume.click();
+  await expect(root).toHaveAttribute('data-product-review-reopened', 'true');
+  expect(Number(await canvas.getAttribute('data-player-y'))).toBeCloseTo(secondSavedY, 5);
+  await page.goto('/');
+  await page.locator('[data-start-phase1-review]').click();
+  await expect(root).toHaveAttribute('data-runtime-status', 'ready');
+  expect(page.url()).not.toBe(savedUrl);
+  await expect(root).toHaveAttribute('data-product-review-reopened', 'false');
+  await page.evaluate(() => {
+    const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function (stores, mode, options) {
+      if (mode === 'readwrite') throw new DOMException('Test storage failure', 'QuotaExceededError');
+      return original.call(this, stores, mode, options);
+    };
+  });
+  await page.keyboard.press('i');
+  await page.keyboard.press('l');
+  await expect(save).toHaveAttribute('data-save-state', 'failure');
+  await expect(save.locator('[role="status"]')).toBeVisible();
+  await expect(save).toContainText('not durable');
+  await page.goto('/');
+  await expect(resume).toHaveAttribute('href', savedUrl);
+});
+
+test('blocked navigation storage does not turn a committed save into a failure', async ({ page }) => {
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = () => { throw new DOMException('Blocked', 'SecurityError'); };
+  });
+  await page.goto('/');
+  await page.locator('[data-start-phase1-review]').click();
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
+  await page.keyboard.press('l');
+  const save = page.locator('[data-product-review-save]');
+  await expect(save).toHaveAttribute('data-save-state', 'success');
+  await expect(save).toContainText('bookmark this page');
+  await page.reload();
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened', 'true');
+  await page.goto('/');
+  await expect(page.locator('[data-continue-phase1-review]')).toHaveCount(0);
+});
+
+test('launcher rejects malformed or off-site saved navigation records', async ({ page }) => {
+  await page.goto('/');
+  for (const value of ['not a review', 'https://example.com/?proz0Mode=phase1-product-review', 'javascript:alert(1)']) {
+    await page.evaluate((entry) => localStorage.setItem('proz0:last-saved-review:v1', entry), value);
+    await page.reload();
+    await expect(page.locator('[data-continue-phase1-review]')).toHaveCount(0);
+    await expect(page.locator('[data-start-phase1-review]')).toBeEnabled();
+  }
+});
+
 test('explicit QA Product Review query still bypasses the launcher', async ({ page }) => {
   const query = new URLSearchParams({
     proz0Mode: 'phase1-product-review',

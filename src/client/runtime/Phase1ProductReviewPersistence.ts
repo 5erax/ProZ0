@@ -35,6 +35,7 @@ import {
   createPhase1ProductReviewSaveControl,
   type Phase1ProductReviewSaveControl,
 } from './Phase1ProductReviewSaveControl';
+import { rememberSavedReview } from './Phase1SavedReview';
 
 export interface Phase1ProductReviewPersistenceOptions {
   readonly databaseName?: string;
@@ -162,6 +163,18 @@ export async function bootPersistedPhase1ProductReview(
     });
 
     const activeRuntime = runtime;
+    const targetWindow = root.ownerDocument.defaultView ?? window;
+    const rememberCheckpoint = (): void => {
+      root.dataset.savedReviewBookmark = rememberSavedReview(
+        targetWindow, config.worldId,
+      ) ? 'available' : 'unavailable';
+    };
+    if (reopen !== null) rememberCheckpoint();
+    const checkpoint = async (nowUtc: string): Promise<SaveResult<WorldManifestV2>> => {
+      const result = await activeRuntime.save(persistence.repository, nowUtc);
+      if (result.ok) rememberCheckpoint();
+      return result;
+    };
     const canvas =
       root.querySelector<HTMLCanvasElement>('#proz0-canvas');
     if (canvas === null) {
@@ -172,10 +185,7 @@ export async function bootPersistedPhase1ProductReview(
     saveControl = createPhase1ProductReviewSaveControl(
       root,
       canvas,
-      () => activeRuntime.save(
-        persistence.repository,
-        new Date().toISOString(),
-      ),
+      () => checkpoint(new Date().toISOString()),
     );
     const activeSaveControl = saveControl;
 
@@ -185,10 +195,7 @@ export async function bootPersistedPhase1ProductReview(
       checkpoint(
         nowUtc: string,
       ): Promise<SaveResult<WorldManifestV2>> {
-        return activeRuntime.save(
-          persistence.repository,
-          nowUtc,
-        );
+        return checkpoint(nowUtc);
       },
       destroy(): void {
         activeSaveControl.destroy();

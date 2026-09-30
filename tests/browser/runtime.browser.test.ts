@@ -774,6 +774,9 @@ describe('Phase 0 browser runtime', () => {
         cancelable: true,
       }));
       const failed = await waitForSaveState(root, 'failure');
+      root.dataset.productReviewPanelOpen = 'true';
+      expect(getComputedStyle(failed).display).not.toBe('none');
+      delete root.dataset.productReviewPanelOpen;
       expect(failed.textContent).toContain('Save failed');
       expect(failed.textContent).toContain('not durable');
       expect(failed.textContent).toContain('Retry Save');
