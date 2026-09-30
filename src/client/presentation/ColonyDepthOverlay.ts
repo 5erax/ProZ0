@@ -41,6 +41,7 @@ export function createColonyDepthOverlay(
   ] as const) {
     const button = document.createElement("button");
     button.textContent = label;
+    button.setAttribute('aria-label',label);button.title=label;
     button.dataset.colonyPanel = kind;
     button.addEventListener("click", () => {
       panel = panel === kind ? null : kind;
@@ -57,7 +58,7 @@ export function createColonyDepthOverlay(
   content.hidden = true;
   container.append(style, region, nav, content);
   root.append(container);
-  const audio = createColonyAudio(container);
+  const audio = createColonyAudio(root.querySelector<HTMLElement>('[data-colony-settings]') ?? container);
   const run = (
     action: ColonyDepthCommand["action"],
     targetId: string,
@@ -125,6 +126,7 @@ export function createColonyDepthOverlay(
       String(8 - pressure) +
       "/8";
     if (region.textContent !== text) region.textContent = text;
+    container.title = text;
     container.dataset.biome = weather.biomeId;
     container.dataset.colonyRevision = String(state.revision);
     const inventory = bundle.items.getContainerView("inventory:" + playerId);

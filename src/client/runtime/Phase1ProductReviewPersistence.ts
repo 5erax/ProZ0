@@ -2,6 +2,7 @@ import {
   createPhase1ContentCatalog,
   type ContentCatalogV1,
 } from '../../content';
+import {upgradeColonyEcosystem} from '../../persistence/migrations/ColonyEcosystemUpgrade';
 import {
   IndexedDbSaveRepositoryV2,
 } from '../../persistence/browser/IndexedDbSaveRepositoryV2';
@@ -24,6 +25,7 @@ import {
 } from '../../world/chunks/ChunkCoord';
 import {
   PHASE1_WORLD_GENERATION_VERSION,
+  COLONY_WORLD_GENERATION_VERSION,
   Phase1ChunkGenerator,
 } from '../../world/phase1/Phase1ChunkGenerator';
 import {
@@ -74,7 +76,7 @@ export function createPhase1ProductReviewPersistence(
   const catalog = options.catalog ?? createPhase1ContentCatalog();
   const compatibility = createPhase1SaveV2Compatibility(
     catalog,
-    Object.freeze([PHASE1_WORLD_GENERATION_VERSION]),
+    Object.freeze([PHASE1_WORLD_GENERATION_VERSION,COLONY_WORLD_GENERATION_VERSION]),
   );
   const generator = new Phase1ChunkGenerator(catalog);
   const repository = new IndexedDbSaveRepositoryV2({
@@ -87,7 +89,7 @@ export function createPhase1ProductReviewPersistence(
         generationVersion,
         coord,
       }) => {
-        if (generationVersion !== PHASE1_WORLD_GENERATION_VERSION) {
+        if (generationVersion !== PHASE1_WORLD_GENERATION_VERSION && generationVersion !== COLONY_WORLD_GENERATION_VERSION) {
           return null;
         }
         return generator.generate({
@@ -141,8 +143,10 @@ export async function bootPersistedPhase1ProductReview(
   let saveControl: Phase1ProductReviewSaveControl | null = null;
 
   try {
-    const reopen = await persistence.loadReopenState(config.worldId);
+    const loaded = await persistence.loadReopenState(config.worldId);
+    const reopen = loaded!==null && (config.colonyDepthEnabled===true || loaded.bundle.world.colonyDepth!==undefined) ? upgradeColonyEcosystem(loaded,persistence.catalog) : loaded;
     runtime = await createPhase1ProductReviewRuntime(root, {
+      worldGenerationVersion: reopen?.bundle.world.generationVersion ?? (config.colonyDepthEnabled===true ? COLONY_WORLD_GENERATION_VERSION : PHASE1_WORLD_GENERATION_VERSION),
       worldId: config.worldId,
       worldSeed: config.worldSeed,
       playerIds: config.playerIds,

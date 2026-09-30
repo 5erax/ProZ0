@@ -63,6 +63,7 @@ export const PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS = 6.25;
 export const PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS = 3.75;
 
 export interface Phase1WorldStoreConfig {
+  readonly generationVersion?: number;
   readonly worldSeed: string;
   readonly catalog: ContentCatalogV1;
   readonly persistence: Phase1WorldPersistencePort;
@@ -1020,7 +1021,7 @@ export class Phase1WorldStore {
       const base = this.generator.generate({
         worldSeed: this.config.worldSeed,
         coord: entry.meta.coord,
-        generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+        generationVersion: this.config.generationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       });
       const delta = record === null
         ? createInitialDelta(base, this.config.catalog)

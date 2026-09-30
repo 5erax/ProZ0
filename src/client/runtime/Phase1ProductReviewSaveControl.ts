@@ -135,6 +135,9 @@ export function createPhase1ProductReviewSaveControl(
     void triggerSave();
   };
   document.addEventListener('keydown', onKeyDown);
+  const settingsPanel=root.querySelector('[data-colony-settings]');
+  const saveButton=document.createElement('button');saveButton.type='button';saveButton.textContent='Save world [L]';
+  if(settingsPanel!==null){settingsPanel.append(saveButton,box);saveButton.addEventListener('click',()=>{void triggerSave();});}
 
   return Object.freeze({
     destroy(): void {
@@ -144,6 +147,8 @@ export function createPhase1ProductReviewSaveControl(
       document.removeEventListener('keydown', onKeyDown);
       targetWindow.removeEventListener('resize', applyScale);
       helpRow.remove();
+      saveButton.remove();
+      if(settingsPanel!==null)box.remove();
       layer.remove();
     },
   });

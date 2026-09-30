@@ -4,7 +4,7 @@ import {
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
 import { colonyBiomeAt, colonySurveySites, colonyWeatherAt } from '../../world/phase2/ColonyRegions';
-import { colonyTerrainSprite, colonySiteSprite } from '../presentation/ColonyRegionSprites';
+import { colonyTerrainSprite, colonySiteSprite, colonyTimberSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
@@ -257,6 +257,7 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
+      if(bundle.config.colonyDepthEnabled===true && entity.definitionId==='resource:timber-source')return colonyTimberSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),state?.depleted===true);
       return phase1ResourcePresentationSprite(
         entity.definitionId,
         state?.depleted === true,
@@ -623,6 +624,7 @@ export function createPhase1ProductReviewWorldRenderer(
       Math.min(
         targetWindow.innerWidth / INTERNAL_WIDTH,
         targetWindow.innerHeight / INTERNAL_HEIGHT,
+        root.dataset.displayLimit === undefined || root.dataset.displayLimit === 'auto' ? Infinity : Number(root.dataset.displayLimit),
       ),
     );
     canvas.style.width = String(INTERNAL_WIDTH * scale) + 'px';
@@ -1198,13 +1200,18 @@ export function createPhase1ProductReviewWorldRenderer(
         continue;
       }
 
-      renderSprite(
+      const rendered=renderSprite(
         entitySprite(bundle, entity),
         entity.position,
         camera,
         entity.type,
         entity.entityId,
       );
+      if(rendered!==null && entity.type==='resource' && bundle.config.colonyDepthEnabled===true){
+        const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
+        if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
+        if(rendered.getAttribute('aria-label')!==name){rendered.setAttribute('aria-label',name);rendered.title=name+' · approach to interact';}
+      }
 
       if (entity.type === 'ruin') {
         const ruin = bundle.worldStore.getRuinState(entity.entityId);

@@ -20,7 +20,6 @@ import {
   type WorldManifestV2,
 } from '../persistence';
 import {
-  PHASE1_WORLD_GENERATION_VERSION,
 } from '../world/phase1/Phase1ChunkGenerator';
 import {
   fromWorldPosition,
@@ -327,7 +326,7 @@ function composePhase1SaveV2AtRevision(
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
       ? { colonyDepth: bundle.colonyDepth.read() } : {}),
     worldSeed: bundle.config.worldSeed,
-    generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+    generationVersion: bundle.getWorldCompatibility().worldGenerationVersion,
     rngAlgorithmVersion: RNG_ALGORITHM_VERSION,
     seedDerivationVersion: SEED_DERIVATION_VERSION,
     contentCompatibility: bundle.catalog.compatibility,

@@ -3,6 +3,7 @@ import type {
   ContentCompatibilityIdentityV1,
   ContentId,
 } from '../../content';
+import {colonyBiomeAt} from '../phase2/ColonyRegions';
 import {
   DeterministicRng,
   RNG_ALGORITHM_VERSION,
@@ -37,6 +38,7 @@ import type {
 } from './Phase1WorldTypes';
 
 export const PHASE1_WORLD_GENERATION_VERSION = 3 as const;
+export const COLONY_WORLD_GENERATION_VERSION = 4 as const;
 // The Phase 1 generator-version identity is intentionally the same version.
 // Any intentional change to deterministic generated base/entity identity must
 // increment PHASE1_WORLD_GENERATION_VERSION.
@@ -639,6 +641,24 @@ function baseFingerprint(
   ].join(':');
 }
 
+function colonyResourceClusters(worldSeed:string,coord:ChunkCoord,catalog:ContentCatalogV1,legacy:readonly Phase1GeneratedWorldEntity[]):readonly Phase1GeneratedResourceEntity[]{
+  const rng=new DeterministicRng(deriveSeedState({worldSeed,namespace:'colony-ecosystem-v4',stableIdentifiers:[`coord:${coord.x}:${coord.y}`,catalog.compatibility.canonicalFingerprint]}));
+  const definitions=['resource:timber-source','resource:fiber-plant','resource:food-plant','resource:stone-outcrop','resource:metal-ore-node','resource:potable-water-source'] as const;
+  const patterns={'landing-grassland':[[0,1,2],[0,3,4],[0,1,5],[0,2,3]],'mist-marsh':[[0,1,2],[1,2,5],[0,1,3],[5,1,4]],'ochre-badlands':[[3,4,0],[4,3,1],[3,4,5],[0,3,2]]} as const;
+  const result:Phase1GeneratedResourceEntity[]=[];
+  // Four small groves per chunk. Nearby supplies stay useful without changing
+  // legacy generated IDs, anchor positions, or accepted generation-v3 worlds.
+  for(let grove=0;grove<4;grove++)for(let member=0;member<3;member++){
+    const position=createWorldPosition(coord.x*32+5+(grove%2)*16+member*2+(rng.nextUint32()%2000)/1000,coord.y*32+5+Math.floor(grove/2)*16+(member%2)*3+(rng.nextUint32()%2000)/1000);
+    if(Math.hypot(position.x,position.y)<12 || waterAt(position) || LOCAL_RESOURCE_ANCHORS.some(anchor=>Math.hypot(position.x-anchor.position.x,position.y-anchor.position.y)<5) || legacy.some(entity=>Math.hypot(position.x-entity.position.x,position.y-entity.position.y)<3))continue;
+    const biome=colonyBiomeAt(worldSeed,position);
+    const definitionId=definitions[patterns[biome][grove]![member]!]!;
+    catalog.getAs(definitionId,'resource');
+    result.push(Object.freeze({type:'resource',entityId:derivePhase1GeneratedEntityId({worldSeed,contentCompatibility:catalog.compatibility,kind:'resource',definitionId,coord,ordinal:`colony-v4:${grove}:${member}`}),definitionId,position}));
+  }
+  return Object.freeze(result);
+}
+
 export class Phase1ChunkGenerator implements ChunkGenerator {
   public constructor(
     private readonly catalog: ContentCatalogV1,
@@ -647,7 +667,7 @@ export class Phase1ChunkGenerator implements ChunkGenerator {
   public generate(
     request: ChunkGenerationRequest,
   ): Phase1GeneratedChunkBase {
-    if (request.generationVersion !== PHASE1_WORLD_GENERATION_VERSION) {
+    if (request.generationVersion !== PHASE1_WORLD_GENERATION_VERSION && request.generationVersion !== COLONY_WORLD_GENERATION_VERSION) {
       throw new RangeError(
         `Unsupported Phase 1 generation version ${request.generationVersion}; expected ${PHASE1_WORLD_GENERATION_VERSION}.`,
       );
@@ -675,15 +695,18 @@ export class Phase1ChunkGenerator implements ChunkGenerator {
     ]) as readonly [number, number, number, number];
 
     const terrain = generateTerrain(coord);
-    const entities = generateEntities(
+    const legacyEntities = generateEntities(
       request.worldSeed,
       coord,
       this.catalog,
     );
+    const entities=request.generationVersion===COLONY_WORLD_GENERATION_VERSION
+      ? Object.freeze([...legacyEntities,...colonyResourceClusters(request.worldSeed,coord,this.catalog,legacyEntities)].sort((a,b)=>a.entityId.localeCompare(b.entityId)))
+      : legacyEntities;
 
     return Object.freeze({
       coord,
-      generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      generationVersion: request.generationVersion,
       rngAlgorithmVersion: RNG_ALGORITHM_VERSION,
       seedDerivationVersion: SEED_DERIVATION_VERSION,
       generationSeed,

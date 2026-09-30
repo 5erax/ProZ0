@@ -1,3 +1,4 @@
+import { createColonySettings } from './ColonySettings';
 export interface Phase1ProductReviewControls {
   toggle(): void;
   close(): void;
@@ -22,9 +23,11 @@ function styleElement(document: Document): HTMLStyleElement {
 export function createPhase1ProductReviewControls(
   root: HTMLElement,
   canvas: HTMLCanvasElement,
+  colonyDepth = false,
 ): Phase1ProductReviewControls {
   const document = root.ownerDocument;
   const targetWindow = document.defaultView ?? window;
+  const settings=colonyDepth?createColonySettings(root):null;
   const layer = document.createElement('div');
   layer.className = 'p1-product-controls';
   layer.dataset.productReviewControls = 'closed';
@@ -55,7 +58,7 @@ export function createPhase1ProductReviewControls(
   };
   fullscreen.addEventListener('click', () => { void toggleFullscreen(); });
   document.addEventListener('fullscreenchange', updateFullscreen);
-  layer.append(fullscreen);
+  (root.querySelector('[data-colony-settings]') ?? layer).append(fullscreen);
 
   const panel = document.createElement('section');
   panel.className = 'p1-product-controls-panel';
@@ -117,6 +120,7 @@ export function createPhase1ProductReviewControls(
       setOpen(false);
     },
     destroy(): void {
+      settings?.destroy();
       document.removeEventListener('fullscreenchange', updateFullscreen);
       targetWindow.removeEventListener('resize', applyScale);
       delete root.dataset.productReviewHelpOpen;

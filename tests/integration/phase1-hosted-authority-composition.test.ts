@@ -106,7 +106,7 @@ it('eight-player colony research resolves one competing transaction and replicat
     const {composePhase1SaveV2,Phase1AuthorityBundle}=await import('../../src/integration');
     const {reconstructPhase1ReopenState,createPhase1SaveV2Compatibility}=await import('../../src/persistence');
     const request=composePhase1SaveV2(c.bundle,{nowUtc:'2026-09-30T00:00:00.000Z'});
-    const restored=reconstructPhase1ReopenState({...request,formatId:request.world.formatId,schemaVersion:request.world.schemaVersion,recordKind:'portable-bundle'},createPhase1SaveV2Compatibility(c.bundle.catalog,[3]));
+    const restored=reconstructPhase1ReopenState({...request,formatId:request.world.formatId,schemaVersion:request.world.schemaVersion,recordKind:'portable-bundle'},createPhase1SaveV2Compatibility(c.bundle.catalog,[3,4]));
     expect(restored.ok).toBe(true);if(!restored.ok)throw Error(restored.message);
     const reopened=await Phase1AuthorityBundle.create({...c.bundle.config,activatePlayersOnCreate:true,reopen:restored.value});
     try {
