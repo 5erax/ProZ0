@@ -360,6 +360,35 @@ export async function createPhase1ProductReviewRuntime(
       )?.cache ?? null;
   };
 
+  const worldDropTarget = () => bundle.world.exportSnapshot().drops
+    .filter((drop) => drop.available
+      && bundle.world.isWorldDropInInteractionRange(config.localPlayerId, drop.worldDropId))
+    .sort((a, b) => distanceFromPlayerSquared(a.position.x, a.position.y)
+      - distanceFromPlayerSquared(b.position.x, b.position.y)
+      || a.worldDropId.localeCompare(b.worldDropId))[0] ?? null;
+
+  const pickupWorldDrop = (): boolean => {
+    const drop = worldDropTarget();
+    if (drop === null) return false;
+    const inventory = bundle.items.getContainerView('inventory:' + config.localPlayerId);
+    const container = bundle.items.getContainerView(drop.containerId);
+    const result = bundle.executeItemCommand({
+      type: 'pickup', operationId: nextOperationId('pickup'),
+      playerId: config.localPlayerId,
+      inventoryContainerId: inventory.containerId,
+      expectedInventoryRevision: inventory.revision,
+      worldDropId: drop.worldDropId,
+      expectedWorldDropRevision: drop.revision,
+      expectedDropContainerRevision: container.revision,
+    });
+    source.setLocalCommandFeedback({
+      inputLabel: 'E', operationId: result.operationId, status: result.status,
+      ...(result.status === 'rejected' ? { reason: result.reason } : {}),
+      verb: 'PICK UP', target: 'Dropped items',
+    });
+    return true;
+  };
+
   const ruinTarget = () => {
     const entity = bundle.world.findGeneratedEntityByDefinition(
       'ruin:previous-civilization-ruin',
@@ -1304,6 +1333,18 @@ export async function createPhase1ProductReviewRuntime(
   const refreshContextInteraction = (): void => {
     if (activeGather !== null || activeConsume !== null) return;
 
+    const drop = worldDropTarget();
+    if (drop !== null) {
+      const stack = bundle.items.getContainerView(drop.containerId).stacks[0];
+      source.setInteraction(Object.freeze({
+        inputLabel: 'E', verb: 'PICK UP',
+        target: stack === undefined ? 'Dropped items'
+          : bundle.catalog.get(stack.itemDefinitionId).displayName + ' ×' + String(stack.quantity),
+        state: 'AVAILABLE', reason: null, progress: null,
+      }));
+      return;
+    }
+
     const cache = deathCacheTarget();
     if (cache !== null) {
       source.setInteraction(Object.freeze({
@@ -1409,6 +1450,7 @@ export async function createPhase1ProductReviewRuntime(
       refreshContextInteraction();
       return;
     }
+    if (pickupWorldDrop()) return;
     if (recoverDeathCache()) return;
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
@@ -1864,6 +1906,7 @@ export async function createPhase1ProductReviewRuntime(
           placeSelectedStructure();
         }
         break;
+      case 'PageUp':
       case 'BracketLeft':
         event.preventDefault();
         if (actionPanel === 'build') {
@@ -1872,6 +1915,7 @@ export async function createPhase1ProductReviewRuntime(
           changeCraftPage(-1);
         }
         break;
+      case 'PageDown':
       case 'BracketRight':
         event.preventDefault();
         if (actionPanel === 'build') {
@@ -2044,7 +2088,21 @@ export async function createPhase1ProductReviewRuntime(
     },
   });
 
+  const onPanelClick = (event: MouseEvent): void => {
+    if (!(event.target instanceof Element)) return;
+    const item = event.target.closest<HTMLElement>('[data-review-item]');
+    if (item !== null) {
+      source.selectInventoryItem(item.dataset.reviewItem ?? '');
+      return;
+    }
+    const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
+    if (action === 'craft-previous') changeCraftPage(-1);
+    if (action === 'craft-next') changeCraftPage(1);
+    if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
+  };
+
   input.start();
+  root.addEventListener('click', onPanelClick);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
   host.start();
   root.dataset.runtimeStatus = 'ready';
@@ -2077,6 +2135,7 @@ export async function createPhase1ProductReviewRuntime(
       destroyed = true;
       host.stop();
       input.stop();
+      root.removeEventListener('click', onPanelClick);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
       controls.destroy();
       presentation.destroy();

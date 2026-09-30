@@ -131,6 +131,21 @@ export class Phase1ProductReviewPresentationSource
     return this.panel === 'inventory';
   }
 
+  public selectInventoryItem(stackId: string): void {
+    if (!this.isInventoryOpen()) return;
+    const state = this.resolveInventoryState();
+    if (state.inventory.stacks.some((stack) => stack.stackId === stackId)) {
+      this.inventoryActivePane = 'player';
+      this.inventorySelectedStackId = stackId;
+    } else if (state.storage?.stacks.some((stack) => stack.stackId === stackId)) {
+      this.inventoryActivePane = 'storage';
+      this.storageSelectedStackId = stackId;
+    } else return;
+    this.inventoryQuantity = 1;
+    this.clearCommandFeedback();
+    this.refresh();
+  }
+
   public cycleInventorySelection(step: number): boolean {
     if (this.panel !== 'inventory') return false;
     const state = this.resolveInventoryState();

@@ -552,10 +552,10 @@ export function createPhase1ProductReviewWorldRenderer(
   const applyScale = (): void => {
     const scale = Math.max(
       1,
-      Math.floor(Math.min(
+      Math.min(
         targetWindow.innerWidth / INTERNAL_WIDTH,
         targetWindow.innerHeight / INTERNAL_HEIGHT,
-      )),
+      ),
     );
     canvas.style.width = String(INTERNAL_WIDTH * scale) + 'px';
     canvas.style.height = String(INTERNAL_HEIGHT * scale) + 'px';
