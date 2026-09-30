@@ -16,6 +16,6 @@ export default defineConfig({
     { name: 'functional', grepInvert: /full scene frame pacing:/ },
     // Timing a game while another worker launches/plays a second game measures
     // combined runner contention. Run the unchanged frame budget on one scene.
-    { name: 'frame-pacing', grep: /full scene frame pacing:/, dependencies: ['functional'] },
+    { name: 'frame-pacing', workers: 1, grep: /full scene frame pacing:/, dependencies: ['functional'] },
   ],
 });
