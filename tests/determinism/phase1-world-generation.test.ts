@@ -145,7 +145,7 @@ describe('Phase 1 world deterministic generation', () => {
     for (const resource of localResources) {
       const definition = catalog.getAs(resource.definitionId, 'resource');
       if (definition.maxGatherActions === null) continue;
-      const itemId = definition.output.itemDefinitionId;
+      const itemId = definition.output.itemId;
       potential.set(
         itemId,
         (potential.get(itemId) ?? 0)
