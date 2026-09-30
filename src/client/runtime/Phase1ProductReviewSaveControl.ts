@@ -21,7 +21,8 @@ function styleElement(document: Document): HTMLStyleElement {
     '.p1-product-save-box{position:absolute;left:8px;top:110px;max-width:260px;padding:3px 5px;background:rgba(10,14,22,.9);border:1px solid #778094;}',
     '.p1-product-save[data-save-state="pending"] .p1-product-save-box{border-style:solid;}',
     '.p1-product-save[data-save-state="failure"] .p1-product-save-box{border-style:double;}',
-    '[data-product-review-panel-open="true"] .p1-product-save{display:none!important;}',
+    '[data-product-review-panel-open="true"] .p1-product-save[data-save-state="idle"], [data-product-review-help-open="true"] .p1-product-save[data-save-state="idle"]{display:none!important;}',
+    '.p1-product-save:not([data-save-state="idle"]) .p1-product-save-box{left:50%;top:4px;transform:translateX(-50%);max-width:600px;width:max-content;box-sizing:border-box;}',
   ].join('');
   return style;
 }
@@ -41,6 +42,8 @@ export function createPhase1ProductReviewSaveControl(
 
   const box = document.createElement('div');
   box.className = 'p1-product-save-box';
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-live', 'polite');
   box.textContent = 'L · SAVE WORLD';
   layer.append(box);
   root.append(layer);
@@ -103,7 +106,9 @@ export function createPhase1ProductReviewSaveControl(
       if (destroyed) return;
       pending = false;
       if (result.ok) {
-        setState('success', 'World saved');
+        setState('success', root.dataset.savedReviewBookmark === 'unavailable'
+          ? 'World saved — bookmark this page to return; Continue is unavailable.'
+          : 'World saved');
         scheduleIdle(SAVE_SUCCESS_VISIBLE_MS);
         return;
       }

@@ -1,3 +1,5 @@
+import { lastSavedReviewUrl } from './Phase1SavedReview';
+
 export interface Phase1ProductReviewEntrypointHandle {
   destroy(): void;
 }
@@ -73,7 +75,7 @@ export function createPhase1ProductReviewEntrypoint(
     '.p1-review-entrypoint{width:min(720px,calc(100vw - 32px));box-sizing:border-box;padding:28px;font-family:monospace;color:#f4f6ef;background:#0a0e16;border:1px solid #d6dccd;box-shadow:0 16px 48px rgba(0,0,0,.45);}',
     '.p1-review-entrypoint h1{margin:0 0 10px;font-size:28px;line-height:1.1;}',
     '.p1-review-entrypoint p{margin:8px 0;line-height:1.5;color:#c8cfbf;}',
-    '.p1-review-entrypoint .p1-review-primary{margin-top:18px;padding:12px 18px;font:700 16px monospace;cursor:pointer;}',
+    '.p1-review-entrypoint .p1-review-primary{display:block;width:fit-content;margin-top:18px;padding:12px 18px;font:700 16px monospace;cursor:pointer;}',
     '.p1-review-entrypoint .p1-review-meta{margin-top:18px;padding-top:14px;border-top:1px solid #778094;font-size:12px;}',
     '.p1-review-entrypoint a{color:#f4f6ef;}',
   ].join('');
@@ -91,7 +93,14 @@ export function createPhase1ProductReviewEntrypoint(
 
   const persistence = document.createElement('p');
   persistence.textContent =
-    'This review uses the canonical Phase 1 runtime and a fresh browser-local review namespace.';
+    'Press L in the world to save. Continue restores your latest saved progress in this browser. Starting a new world keeps previous saves separate.';
+
+  const savedUrl = lastSavedReviewUrl(targetWindow);
+  const continueWorld = document.createElement('a');
+  continueWorld.dataset.continuePhase1Review = 'true';
+  continueWorld.className = 'p1-review-primary';
+  continueWorld.textContent = 'CONTINUE SAVED WORLD';
+  if (savedUrl !== null) continueWorld.href = savedUrl;
 
   const start = document.createElement('button');
   start.type = 'button';
@@ -118,7 +127,9 @@ export function createPhase1ProductReviewEntrypoint(
   };
   start.addEventListener('click', onStart);
 
-  panel.append(title, intro, persistence, start, meta);
+  panel.append(title, intro, persistence);
+  if (savedUrl !== null) panel.append(continueWorld);
+  panel.append(start, meta);
   root.append(style, panel);
 
   return Object.freeze({
