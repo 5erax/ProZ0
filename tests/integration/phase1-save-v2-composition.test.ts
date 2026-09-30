@@ -117,6 +117,16 @@ describe('Phase 1 Save V2 integration composition', () => {
         nowUtc: '2026-09-26T00:00:00.000Z',
       });
 
+      expect(PHASE1_WORLD_GENERATION_VERSION).toBe(3);
+      expect(request.world.generationVersion).toBe(
+        PHASE1_WORLD_GENERATION_VERSION,
+      );
+      expect(
+        request.chunks.every(
+          (chunk) =>
+            chunk.generationVersion === PHASE1_WORLD_GENERATION_VERSION,
+        ),
+      ).toBe(true);
       expect(request.world.worldRevision).toBe(0);
       expect(request.expectedPreviousWorldRevision).toBeNull();
       expect(request.world.authorityTick).toBe(original.authorityTick);
@@ -137,6 +147,29 @@ describe('Phase 1 Save V2 integration composition', () => {
         original.catalog,
         [PHASE1_WORLD_GENERATION_VERSION],
       );
+      const generationV2Bundle = Object.freeze({
+        ...portable,
+        world: Object.freeze({
+          ...portable.world,
+          generationVersion: 2,
+        }),
+        chunks: Object.freeze(portable.chunks.map((chunk) =>
+          Object.freeze({
+            ...chunk,
+            generationVersion: 2,
+          }),
+        )),
+      });
+      expect(
+        reconstructPhase1ReopenState(
+          generationV2Bundle,
+          compatibility,
+        ),
+      ).toMatchObject({
+        ok: false,
+        code: 'UNSUPPORTED_GENERATION_VERSION',
+      });
+
       const reconstructed = reconstructPhase1ReopenState(
         portable,
         compatibility,

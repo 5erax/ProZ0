@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
 import {
+  CHUNK_SPAN_WORLD_UNITS,
   createChunkCoord,
 } from '../../src/world/chunks/ChunkCoord';
 import {
@@ -51,6 +52,184 @@ describe('Phase 1 world deterministic generation', () => {
         position: { x: 18, y: 10 },
       },
     ]);
+  });
+
+  it('guarantees the accepted nine-node local field and Journey-A material budget', () => {
+    const generator = new Phase1ChunkGenerator(catalog);
+    const localResources = [];
+
+    for (let y = -3; y <= 2; y += 1) {
+      for (let x = -3; x <= 2; x += 1) {
+        const generated = generator.generate({
+          worldSeed: 'p1-world-golden',
+          coord: createChunkCoord(x, y),
+          generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+        });
+        for (const entity of generated.entities) {
+          if (entity.type !== 'resource') continue;
+          const distance = Math.hypot(
+            entity.position.x,
+            entity.position.y,
+          );
+          if (distance <= 68) {
+            localResources.push(entity);
+          }
+        }
+      }
+    }
+
+    expect(localResources).toHaveLength(9);
+    const counts = new Map<string, number>();
+    for (const resource of localResources) {
+      const distance = Math.hypot(
+        resource.position.x,
+        resource.position.y,
+      );
+      expect(distance).toBeGreaterThan(15);
+      expect(distance).toBeLessThanOrEqual(68);
+      counts.set(
+        resource.definitionId,
+        (counts.get(resource.definitionId) ?? 0) + 1,
+      );
+    }
+    expect(Object.fromEntries(counts)).toEqual({
+      'resource:fiber-plant': 2,
+      'resource:food-plant': 2,
+      'resource:potable-water-source': 1,
+      'resource:timber-source': 2,
+      'resource:stone-outcrop': 1,
+      'resource:metal-ore-node': 1,
+    });
+
+    const sectors = new Map<string, number>();
+    for (const resource of localResources) {
+      const sector = [
+        resource.position.x > 0 ? 'east' : 'west',
+        resource.position.y > 0 ? 'south' : 'north',
+      ].join('-');
+      sectors.set(sector, (sectors.get(sector) ?? 0) + 1);
+    }
+    expect(sectors.size).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...sectors.values())).toBeLessThanOrEqual(3);
+
+    for (const definitionId of [
+      'resource:fiber-plant',
+      'resource:food-plant',
+      'resource:timber-source',
+    ] as const) {
+      const duplicateSectors = new Set(
+        localResources
+          .filter((entry) => entry.definitionId === definitionId)
+          .map((entry) => [
+            entry.position.x > 0 ? 'east' : 'west',
+            entry.position.y > 0 ? 'south' : 'north',
+          ].join('-')),
+      );
+      expect(duplicateSectors.size).toBe(2);
+    }
+
+    const nearby = localResources
+      .map((entry) => ({
+        definitionId: entry.definitionId,
+        distance: Math.hypot(entry.position.x, entry.position.y),
+      }));
+    expect(Math.min(...nearby.map((entry) => entry.distance)))
+      .toBeLessThanOrEqual(24);
+    expect(new Set(
+      nearby
+        .filter((entry) => entry.distance <= 32)
+        .map((entry) => entry.definitionId),
+    ).size).toBeGreaterThanOrEqual(2);
+
+    const potential = new Map<string, number>();
+    for (const resource of localResources) {
+      const definition = catalog.getAs(resource.definitionId, 'resource');
+      if (definition.maxGatherActions === null) continue;
+      const itemId = definition.output.itemDefinitionId;
+      potential.set(
+        itemId,
+        (potential.get(itemId) ?? 0)
+          + definition.output.quantity * definition.maxGatherActions,
+      );
+    }
+
+    expect(potential.get('item:plant-fiber')).toBeGreaterThanOrEqual(16);
+    expect(potential.get('item:timber')).toBeGreaterThanOrEqual(10);
+    expect(potential.get('item:stone')).toBeGreaterThanOrEqual(8);
+    expect(potential.get('item:edible-plant')).toBeGreaterThanOrEqual(6);
+    expect(potential.get('item:metal-ore')).toBeGreaterThanOrEqual(6);
+    expect(
+      localResources.some(
+        (entry) =>
+          entry.definitionId === 'resource:potable-water-source',
+      ),
+    ).toBe(true);
+
+    // Storage + Workbench require 4 Cordage = 12 Fiber, 8 Timber, 4 Stone.
+    expect(potential.get('item:plant-fiber') ?? 0).toBeGreaterThanOrEqual(12);
+    expect(potential.get('item:timber') ?? 0).toBeGreaterThanOrEqual(8);
+    expect(potential.get('item:stone') ?? 0).toBeGreaterThanOrEqual(4);
+
+    // Habitat + Power + Machine still exceed the local field:
+    // 24 Fiber, 14 Timber, 6 Stone, 11 Ore after Cordage conversion.
+    expect(
+      (potential.get('item:plant-fiber') ?? 0) < 24
+      || (potential.get('item:timber') ?? 0) < 14
+      || (potential.get('item:stone') ?? 0) < 6
+      || (potential.get('item:metal-ore') ?? 0) < 11,
+    ).toBe(true);
+  });
+
+  it('keeps expedition resources inside 96–430 WU with 65–75% deterministic bearing density and 2–3 nodes', () => {
+    const generator = new Phase1ChunkGenerator(catalog);
+    let eligibleChunks = 0;
+    let resourceBearingChunks = 0;
+
+    for (let y = -14; y <= 13; y += 1) {
+      for (let x = -14; x <= 13; x += 1) {
+        const coord = createChunkCoord(x, y);
+        const centerX =
+          coord.x * CHUNK_SPAN_WORLD_UNITS
+          + CHUNK_SPAN_WORLD_UNITS / 2;
+        const centerY =
+          coord.y * CHUNK_SPAN_WORLD_UNITS
+          + CHUNK_SPAN_WORLD_UNITS / 2;
+        const centerDistance = Math.hypot(centerX, centerY);
+        if (centerDistance < 96 || centerDistance > 430) {
+          continue;
+        }
+        eligibleChunks += 1;
+
+        const generated = generator.generate({
+          worldSeed: 'p1-world-golden',
+          coord,
+          generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+        });
+        const expeditionResources = generated.entities.filter(
+          (entity) =>
+            entity.type === 'resource'
+            && Math.hypot(entity.position.x, entity.position.y) >= 96,
+        );
+
+        if (expeditionResources.length > 0) {
+          resourceBearingChunks += 1;
+          expect(expeditionResources.length).toBeGreaterThanOrEqual(2);
+          expect(expeditionResources.length).toBeLessThanOrEqual(3);
+        }
+        for (const resource of expeditionResources) {
+          const distance = Math.hypot(
+            resource.position.x,
+            resource.position.y,
+          );
+          expect(distance).toBeGreaterThanOrEqual(96);
+          expect(distance).toBeLessThanOrEqual(430);
+        }
+      }
+    }
+
+    const bearingRatio = resourceBearingChunks / eligibleChunks;
+    expect(bearingRatio).toBeGreaterThanOrEqual(0.65);
+    expect(bearingRatio).toBeLessThanOrEqual(0.75);
   });
 
   it('locks the one ruin fixture, stable ID, route, and base fingerprint', () => {

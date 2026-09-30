@@ -36,7 +36,7 @@ import type {
   Phase1WorldLandmarks,
 } from './Phase1WorldTypes';
 
-export const PHASE1_WORLD_GENERATION_VERSION = 2 as const;
+export const PHASE1_WORLD_GENERATION_VERSION = 3 as const;
 // The Phase 1 generator-version identity is intentionally the same version.
 // Any intentional change to deterministic generated base/entity identity must
 // increment PHASE1_WORLD_GENERATION_VERSION.
@@ -82,6 +82,18 @@ const LOCAL_RESOURCE_ANCHORS = Object.freeze([
     definitionId: 'resource:metal-ore-node',
     position: createWorldPosition(62, -20),
   }),
+  Object.freeze({
+    definitionId: 'resource:fiber-plant',
+    position: createWorldPosition(-44, -28),
+  }),
+  Object.freeze({
+    definitionId: 'resource:food-plant',
+    position: createWorldPosition(28, 44),
+  }),
+  Object.freeze({
+    definitionId: 'resource:timber-source',
+    position: createWorldPosition(14, -56),
+  }),
 ] as const);
 
 const EXPEDITION_RESOURCE_IDS = Object.freeze([
@@ -92,6 +104,13 @@ const EXPEDITION_RESOURCE_IDS = Object.freeze([
   'resource:stone-outcrop',
   'resource:metal-ore-node',
 ] as const);
+
+const EXPEDITION_RESOURCE_MINIMUM_DISTANCE_WORLD_UNITS = 96;
+const EXPEDITION_RESOURCE_MAXIMUM_DISTANCE_WORLD_UNITS = 430;
+const EXPEDITION_RESOURCE_CHANCE_PERCENT = 70;
+const EXPEDITION_RESOURCE_MIN_COUNT = 2;
+const EXPEDITION_RESOURCE_COUNT_SPAN = 2;
+const EXPEDITION_RESOURCE_POSITION_ATTEMPTS = 32;
 
 const LOCAL_WILDLIFE_POSITION = createWorldPosition(54, 36);
 
@@ -291,6 +310,83 @@ function generateTerrain(coord: ChunkCoord) {
   });
 }
 
+function isInsideExpeditionResourceBand(
+  position: WorldPosition,
+): boolean {
+  const distanceSquared = squaredDistanceFromOrigin(position);
+  return (
+    distanceSquared
+      >= EXPEDITION_RESOURCE_MINIMUM_DISTANCE_WORLD_UNITS ** 2
+    && distanceSquared
+      <= EXPEDITION_RESOURCE_MAXIMUM_DISTANCE_WORLD_UNITS ** 2
+  );
+}
+
+function expeditionResourcePosition(
+  rng: DeterministicRng,
+  coord: ChunkCoord,
+  definitionId: (typeof EXPEDITION_RESOURCE_IDS)[number],
+  ordinal: number,
+): WorldPosition {
+  for (
+    let attempt = 0;
+    attempt < EXPEDITION_RESOURCE_POSITION_ATTEMPTS;
+    attempt += 1
+  ) {
+    const localX = 4 + (rng.nextUint32() % 24000) / 1000;
+    const localY = 4 + (rng.nextUint32() % 24000) / 1000;
+    const position = createWorldPosition(
+      coord.x * CHUNK_SPAN_WORLD_UNITS + localX,
+      coord.y * CHUNK_SPAN_WORLD_UNITS + localY,
+    );
+
+    if (!isInsideExpeditionResourceBand(position)) {
+      continue;
+    }
+    if (
+      waterAt(position)
+      && definitionId !== 'resource:potable-water-source'
+    ) {
+      continue;
+    }
+    return position;
+  }
+
+  const center = chunkCenter(coord);
+  const fallbackOffsets = Object.freeze([
+    Object.freeze({ x: 0, y: 0 }),
+    Object.freeze({ x: 1, y: 0 }),
+    Object.freeze({ x: -1, y: 0 }),
+    Object.freeze({ x: 0, y: 1 }),
+    Object.freeze({ x: 0, y: -1 }),
+    Object.freeze({ x: 1, y: 1 }),
+    Object.freeze({ x: -1, y: -1 }),
+  ]);
+
+  for (let index = 0; index < fallbackOffsets.length; index += 1) {
+    const offset =
+      fallbackOffsets[(index + ordinal) % fallbackOffsets.length];
+    if (offset === undefined) continue;
+    const candidate = createWorldPosition(
+      center.x + offset.x,
+      center.y + offset.y,
+    );
+    if (!belongsToChunk(candidate, coord)) continue;
+    if (!isInsideExpeditionResourceBand(candidate)) continue;
+    if (
+      waterAt(candidate)
+      && definitionId !== 'resource:potable-water-source'
+    ) {
+      continue;
+    }
+    return candidate;
+  }
+
+  throw new Error(
+    'Expedition resource chunk has no deterministic in-band position.',
+  );
+}
+
 function expeditionResourceEntities(
   worldSeed: string,
   coord: ChunkCoord,
@@ -298,12 +394,11 @@ function expeditionResourceEntities(
 ): readonly Phase1GeneratedResourceEntity[] {
   const center = chunkCenter(coord);
   const distanceSquared = squaredDistanceFromOrigin(center);
-  const minimumDistance = 160;
-  const maximumDistance = 430;
-
   if (
-    distanceSquared < minimumDistance ** 2
-    || distanceSquared > maximumDistance ** 2
+    distanceSquared
+      < EXPEDITION_RESOURCE_MINIMUM_DISTANCE_WORLD_UNITS ** 2
+    || distanceSquared
+      > EXPEDITION_RESOURCE_MAXIMUM_DISTANCE_WORLD_UNITS ** 2
   ) {
     return Object.freeze([]);
   }
@@ -317,11 +412,16 @@ function expeditionResourceEntities(
     ]),
   }));
 
-  if ((rng.nextUint32() % 100) >= 45) {
+  if (
+    (rng.nextUint32() % 100)
+      >= EXPEDITION_RESOURCE_CHANCE_PERCENT
+  ) {
     return Object.freeze([]);
   }
 
-  const count = 1 + (rng.nextUint32() % 2);
+  const count =
+    EXPEDITION_RESOURCE_MIN_COUNT
+    + (rng.nextUint32() % EXPEDITION_RESOURCE_COUNT_SPAN);
   const entities: Phase1GeneratedResourceEntity[] = [];
 
   for (let ordinal = 0; ordinal < count; ordinal += 1) {
@@ -334,20 +434,12 @@ function expeditionResourceEntities(
     }
     catalog.getAs(definitionId, 'resource');
 
-    const localX = 4 + (rng.nextUint32() % 24000) / 1000;
-    let localY = 4 + (rng.nextUint32() % 24000) / 1000;
-    let position = createWorldPosition(
-      coord.x * CHUNK_SPAN_WORLD_UNITS + localX,
-      coord.y * CHUNK_SPAN_WORLD_UNITS + localY,
+    const position = expeditionResourcePosition(
+      rng,
+      coord,
+      definitionId,
+      ordinal,
     );
-
-    if (waterAt(position) && definitionId !== 'resource:potable-water-source') {
-      localY = (localY + 10) % 24 + 4;
-      position = createWorldPosition(
-        coord.x * CHUNK_SPAN_WORLD_UNITS + localX,
-        coord.y * CHUNK_SPAN_WORLD_UNITS + localY,
-      );
-    }
 
     entities.push(Object.freeze({
       type: 'resource',
