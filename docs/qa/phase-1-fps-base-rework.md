@@ -10,6 +10,8 @@ On Windows Chromium 154 at 1262 × 624, an eight-second idle sample of the old c
 
 The independent full-scene Playwright check measures three-second idle and normal-key movement samples in clear day, rainy day and rainy night. It requires at least 50 FPS, frame P95 no greater than 34 ms, actual authority advancement and actual movement. It writes viewport, browser, timing, authority ticks and scene churn to `test-results/p1-int-001-product-review/full-scene-fps.json`, with the exact source SHA supplied by CI. The existing input response gate remains separate.
 
+The timing project runs after functional tests so the measured game does not compete with another worker launching/playing a second game on the same runner. The first PR CI run recorded 48.18 FPS while the new-world journey was still running in another Chromium worker; it failed the 50 FPS gate. The gate was retained. Each sample is now written before its assertion so a failing sample also remains in the artifact.
+
 ## Visual controls and facilities
 
 Survival, equipment and ingredient displays use icons, quantities, condition bars and tooltips. A mouse action bar opens inventory, craft, build, map and colony; when a panel is open it moves below the panel so craft cannot obscure it. Names and status remain available for accessibility and failure reasons.

@@ -3127,6 +3127,11 @@ test('full scene frame pacing: clear and night rain stay responsive while idle a
   mkdirSync(EVIDENCE_DIR, { recursive: true });
   const base = await createBaseSave('world:full-scene-fps', [{ playerId: 'observer', x: 18, y: 10, facing: 'S' }]);
   const reports: unknown[] = [];
+  const retainReports = () => writeFileSync(resolve(EVIDENCE_DIR, 'full-scene-fps.json'), JSON.stringify({
+    sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? 'local-working-tree',
+    mode: 'canonical-product-review', sampleDurationMs: 3_000,
+    threshold: { fpsMinimum: 50, p95FrameMsMaximum: 34 }, samples: reports,
+  }, null, 2) + '\n', 'utf8');
   for (const scene of [{ name: 'clear-day', save: base }, { name: 'day-rain', save: withAuthorityTick(base, 152_000) },
     { name: 'night-rain', save: withAuthorityTick(base, 135_000) }]) {
     await openProductReview(page, scene.save, 'fps-' + scene.name, 2, 'observer');
@@ -3171,6 +3176,7 @@ test('full scene frame pacing: clear and night rain stay responsive while idle a
           over50Ms: intervals.filter(ms => ms > 50).length, nodes, added, removed };
       }, moving);
       reports.push({ scene: scene.name, moving, ...report });
+      retainReports();
       // A full game frame budget, independently of the existing input latency gate.
       expect(report.fps).toBeGreaterThanOrEqual(50);
       expect(report.p95Ms).toBeLessThanOrEqual(34);
@@ -3179,9 +3185,4 @@ test('full scene frame pacing: clear and night rain stay responsive while idle a
       if (!moving) expect(report.added + report.removed).toBeLessThan(report.nodes);
     }
   }
-  writeFileSync(resolve(EVIDENCE_DIR, 'full-scene-fps.json'), JSON.stringify({
-    sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? 'local-working-tree',
-    mode: 'canonical-product-review', sampleDurationMs: 3_000,
-    threshold: { fpsMinimum: 50, p95FrameMsMaximum: 34 }, samples: reports,
-  }, null, 2) + '\n', 'utf8');
 });

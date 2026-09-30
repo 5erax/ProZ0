@@ -12,4 +12,10 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
   },
   reporter: process.env.CI ? 'github' : 'list',
+  projects: [
+    { name: 'functional', grepInvert: /^full scene frame pacing:/ },
+    // Timing a game while another worker launches/plays a second game measures
+    // combined runner contention. Run the unchanged frame budget on one scene.
+    { name: 'frame-pacing', grep: /^full scene frame pacing:/, dependencies: ['functional'] },
+  ],
 });
