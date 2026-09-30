@@ -54,10 +54,17 @@ test.skipIf(!url)(
     };
     const a = await start(),
       b = await start();
-    const response = await fetch(a.endpoint + "/rooms", {
-      method: "POST",
-      body: JSON.stringify({ seed: "redis-coop-verification" }),
-    });
+    const creations = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        fetch(a.endpoint + "/rooms", {
+          method: "POST",
+          body: JSON.stringify({ seed: "redis-coop-verification" }),
+        }),
+      ),
+    );
+    expect(creations.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(creations.filter((r) => r.status === 429)).toHaveLength(2);
+    const response = creations.find((r) => r.status === 201)!;
     expect(response.status).toBe(201);
     const details = (await response.json()) as {
       id: string;
@@ -66,6 +73,15 @@ test.skipIf(!url)(
       contentCompatibility: ClientHelloV1["contentCompatibility"];
       worldCompatibility: ClientHelloV1["worldCompatibility"];
     };
+    const registry = createClient({ url: url! });
+    await registry.connect();
+    try {
+      expect(await registry.sMembers(namespace + ":rooms")).toEqual([
+        details.id,
+      ]);
+    } finally {
+      await registry.quit();
+    }
     const join = async (
       endpoint: string,
       client = randomBytes(24).toString("hex"),

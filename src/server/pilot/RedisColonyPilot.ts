@@ -366,7 +366,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         const id = randomBytes(8).toString("hex"),
           seed = input.seed ?? "colony-pilot";
         const reservation = await redis.eval(
-          "local ids=redis.call('SMEMBERS',KEYS[1]);for _,id in ipairs(ids) do if redis.call('EXISTS',ARGV[1]..':'..id..':record')==0 then redis.call('SREM',KEYS[1],id) end end;if redis.call('SCARD',KEYS[1])>=4 then return 0 end;if redis.call('SET',KEYS[2],'1','NX','EX',10)==false then return -1 end;redis.call('SADD',KEYS[1],ARGV[2]);return 1",
+          "local ids=redis.call('SMEMBERS',KEYS[1]);for _,id in ipairs(ids) do if redis.call('EXISTS',ARGV[1]..':'..id..':record',ARGV[1]..':'..id..':reservation')==0 then redis.call('SREM',KEYS[1],id) end end;if redis.call('SCARD',KEYS[1])>=4 then return 0 end;if redis.call('SET',KEYS[2],'1','NX','EX',10)==false then return -1 end;redis.call('SET',ARGV[1]..':'..ARGV[2]..':reservation','1','EX',60);redis.call('SADD',KEYS[1],ARGV[2]);return 1",
           {
             keys: [namespace + ":rooms", namespace + ":create-limit"],
             arguments: [namespace, id],
@@ -418,7 +418,19 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
             contentCompatibility: composition.bundle.getContentCompatibility(),
             worldCompatibility: composition.bundle.getWorldCompatibility(),
           };
-          await redis.set(key(id, "record"), JSON.stringify(record));
+          const published = await redis.eval(
+            "if redis.call('EXISTS',KEYS[1])==0 or redis.call('SISMEMBER',KEYS[2],ARGV[1])==0 then return 0 end;redis.call('SET',KEYS[3],ARGV[2]);redis.call('DEL',KEYS[1]);return 1",
+            {
+              keys: [
+                key(id, "reservation"),
+                namespace + ":rooms",
+                key(id, "record"),
+              ],
+              arguments: [id, JSON.stringify(record)],
+            },
+          );
+          if (published !== 1)
+            throw Error("Room reservation expired; try again");
           json(res, 201, {
             ...metadata(record),
             accessToken: record.accessToken,
@@ -426,6 +438,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           });
         } catch (error) {
           await redis.sRem(namespace + ":rooms", id);
+          await redis.del(key(id, "reservation"));
           throw error;
         } finally {
           await composition?.destroy();
