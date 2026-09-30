@@ -51,6 +51,17 @@ function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
+  const colony = bundle.sustenance.read();
+  values.push(Object.freeze({ aggregateType: 'colony-sustenance', aggregateId: 'colony',
+    revision: colony.revision, tombstone: false,
+    state: asJson({ bedBuilt: colony.bedBuilt, penBuilt: colony.penBuilt,
+      cropPlanted: colony.cropProgressTicks !== null, cropReady: colony.cropProgressTicks === colony.cropCycleTicks,
+      cropCycleTicks: colony.cropCycleTicks, animalEntityId: colony.animalEntityId,
+      careActive: colony.careProgressTicks !== null, fertilizer: colony.fertilizer }) }));
+  values.push(Object.freeze({ aggregateType: 'colony-growth', aggregateId: 'colony',
+    revision: bundle.authorityTick + colony.revision, tombstone: false,
+    state: asJson({ cropProgressTicks: colony.cropProgressTicks,
+      careProgressTicks: colony.careProgressTicks }) }));
 
   for (const container of bundle.items.exportLedgerSnapshot().containers) {
     values.push(Object.freeze({
@@ -361,6 +372,7 @@ export class Phase1HostedAuthorityComposition {
         },
       }),
       death: bundle.death,
+      sustenance: bundle.sustenance,
       combat: bundle.combat,
       ruins: bundle,
       replication,

@@ -7,6 +7,7 @@ import {
   type PlayerId,
   type WorldPosition,
 } from '../foundation';
+import { ColonySustenanceAuthority } from '../simulation/sustenance/ColonySustenanceAuthority';
 import {
   createPhase1ContentCatalog,
   type ContentCatalogV1,
@@ -386,6 +387,7 @@ export class Phase1AuthorityBundle {
   public readonly progression: Phase1ProgressionAuthority;
   public readonly buildingAuthority: Phase1BuildingAuthority;
   public readonly machines: Phase1CondenserAuthority;
+  public readonly sustenance: ColonySustenanceAuthority;
   public readonly combat: Phase1CombatAuthority;
   public readonly death: Phase1DeathAuthority;
 
@@ -429,6 +431,13 @@ export class Phase1AuthorityBundle {
     this.world = world;
     this.buildings = buildings;
     this.items = items;
+    this.sustenance = new ColonySustenanceAuthority(items,
+      (playerId) => ({ position: this.positions.get(playerId),
+        alive: survival.getPlayerState(playerId).healthMilli > 0 }),
+      (entityId) => {
+        const entity = world.getActiveGeneratedEntities().find((candidate) => candidate.entityId === entityId);
+        return entity?.type === 'passive-wildlife' ? entity.position : null;
+      }, config.reopen?.bundle.world.sustenance);
     this.equipment = equipment;
     this.survival = survival;
     this.progression = progression;
@@ -820,6 +829,7 @@ export class Phase1AuthorityBundle {
     }
 
     this.processPendingDeaths(authorityTick);
+    this.sustenance.tick();
 
     for (const structure of this.buildings.exportSnapshot().foothold.structures) {
       if (structure.definitionId === 'structure:atmospheric-water-condenser') {

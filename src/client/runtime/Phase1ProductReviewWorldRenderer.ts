@@ -3,6 +3,8 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
+import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
+import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
   PlayerMotionViewV1,
   PresentationIdentitySlotV1,
@@ -44,14 +46,15 @@ import {
 } from '../presentation/Phase1ProductionAssets';
 
 const INTERNAL_WIDTH = 640;
+const FOG_CLOUDS_URL = new URL('../../../assets/phase1/world/effects/fog_clouds_v1.svg', import.meta.url).href;
 const INTERNAL_HEIGHT = 360;
 const HALF_WIDTH = INTERNAL_WIDTH / 2;
 const HALF_HEIGHT = INTERNAL_HEIGHT / 2;
 const VISIBLE_MARGIN_PX = 96;
 const WORLD_HALF_WIDTH =
-  HALF_WIDTH / WORLD_PIXELS_PER_UNIT;
+  (HALF_WIDTH + HALF_HEIGHT * 2) / WORLD_PIXELS_PER_UNIT;
 const WORLD_HALF_HEIGHT =
-  HALF_HEIGHT / WORLD_PIXELS_PER_UNIT;
+  WORLD_HALF_WIDTH;
 const EXPLORATION_CELL_LOGICAL_PIXELS =
   PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS * WORLD_PIXELS_PER_UNIT;
 const EXPLORATION_CELL_RASTER_SCALE =
@@ -69,12 +72,16 @@ function stableDecorHash(x: number, y: number): number {
 }
 
 function decorativeFloraCell(gx: number, gy: number): boolean {
-  const clusterX = Math.floor(gx / 5);
-  const clusterY = Math.floor(gy / 5);
-  if (stableDecorHash(clusterX, clusterY) % 5 > 1) {
+  const distance = Math.hypot(gx * PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,
+    gy * PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS);
+  if (distance < 3) return false;
+  const clusterX = Math.floor(gx / 4);
+  const clusterY = Math.floor(gy / 4);
+  const density = distance <= 96 ? 3 : 2;
+  if (stableDecorHash(clusterX, clusterY) % 5 >= density) {
     return false;
   }
-  return stableDecorHash(gx, gy) % 4 === 0;
+  return stableDecorHash(gx, gy) % 3 === 0;
 }
 
 function withinDecorClearance(
@@ -138,14 +145,8 @@ function distancePx(
   world: WorldPosition,
   camera: WorldPosition,
 ): { readonly x: number; readonly y: number } {
-  return Object.freeze({
-    x: HALF_WIDTH + Math.round(
-      (world.x - camera.x) * WORLD_PIXELS_PER_UNIT,
-    ),
-    y: HALF_HEIGHT + Math.round(
-      (world.y - camera.y) * WORLD_PIXELS_PER_UNIT,
-    ),
-  });
+  const point = projectPhase1Isometric(world, camera);
+  return Object.freeze({ x: HALF_WIDTH + point.x, y: HALF_HEIGHT + point.y });
 }
 
 function setWorldAnchor(
@@ -170,7 +171,7 @@ function setWorldAnchor(
   element.style.left = String(raster.x - width / 2) + 'px';
   element.style.top = String(raster.y - height) + 'px';
   element.style.zIndex = String(
-    zIndex ?? Math.round(position.y * 1000),
+    zIndex ?? Math.round((position.x + position.y) * 1000),
   );
   return true;
 }
@@ -498,8 +499,9 @@ function styleElement(document: Document): HTMLStyleElement {
     '.p1-product-identity{z-index:930000!important;}',
     '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);z-index:910000!important;}',
     '.p1-product-night{position:absolute;inset:0;z-index:-50000;pointer-events:none;background:rgba(7,12,28,.48);mix-blend-mode:multiply;}',
-    '.p1-product-weather{position:absolute;inset:0;z-index:800000;pointer-events:none;opacity:.54;}',
+    '.p1-product-weather{position:absolute;inset:0;z-index:800000;pointer-events:none;opacity:.24;}',
     '.p1-product-build-preview{z-index:920000!important;opacity:.82;}',
+    '.p1-product-module-night{filter:drop-shadow(0 0 2px rgba(101,166,175,.42));}',
     '.p1-product-build-preview[data-placement-state="VALID"]{filter:drop-shadow(0 0 1px #d6e8ca);}',
     '.p1-product-build-preview[data-placement-state="INVALID"]{filter:drop-shadow(0 0 1px #ffe0a8) contrast(.82);}',
     '.p1-product-build-preview[data-placement-state="CONNECTOR"]{filter:drop-shadow(0 0 1px #c8dfff);}',
@@ -619,6 +621,7 @@ export function createPhase1ProductReviewWorldRenderer(
     camera: WorldPosition,
     authorityTick: number,
     night: boolean,
+    raining: boolean,
   ): void => {
     const knownGeneratedAnchors =
       bundle.world.getActiveGeneratedEntities()
@@ -632,16 +635,11 @@ export function createPhase1ProductReviewWorldRenderer(
           worldPositionKnown(bundle, structure.position),
         )
         .map((structure) => structure.position);
-    const playerAnchors = getPlayerMotions()
-      .map((motion) => motion.position);
-    const deathCacheAnchors =
-      bundle.world.exportSnapshot().deathCaches.caches
-        .map((cache) => cache.position);
     const decorClearanceAnchors = Object.freeze([
       ...knownGeneratedAnchors,
       ...knownStructureAnchors,
-      ...playerAnchors,
-      ...deathCacheAnchors,
+      ...(bundle.sustenance.read().bedBuilt ? [CULTIVATION_POSITION] : []),
+      ...(bundle.sustenance.read().penBuilt ? [PEN_POSITION] : []),
     ]);
 
     const cellSize = PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS;
@@ -667,7 +665,8 @@ export function createPhase1ProductReviewWorldRenderer(
           : 'ground';
         const variant = terrain === 'water'
           ? Math.floor(authorityTick / 15)
-          : Math.abs(gx * 31 + gy * 17);
+          : (stableDecorHash(Math.floor(gx / 3), Math.floor(gy / 3))
+            + (stableDecorHash(gx, gy) % 7 === 0 ? 1 : 0)) % 4;
         const tile = document.createElement('div');
         tile.className = 'p1-product-terrain';
         tile.dataset.worldRole = 'terrain';
@@ -682,14 +681,20 @@ export function createPhase1ProductReviewWorldRenderer(
         if (night) {
           tile.style.filter = 'brightness(.62) saturate(.72)';
         }
-        if (
+        if (known && terrain === 'ground' && explorationCellKnown(bundle, gx, gy + 1)
+          && terrainForCell(bundle, gx, gy + 1) === 'water') {
+          tile.style.boxShadow = '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e';
+          tile.style.zIndex = '-90000';
+          tile.dataset.terrainDepth = 'raised-shore';
+        }
+        if (known &&
           setWorldCenter(
             tile,
             position,
             camera,
             EXPLORATION_CELL_LOGICAL_PIXELS,
-            EXPLORATION_CELL_LOGICAL_PIXELS,
-            -100000,
+            EXPLORATION_CELL_LOGICAL_PIXELS / 2,
+            tile.dataset.terrainDepth === 'raised-shore' ? -90000 : -100000,
           )
         ) {
           layer.append(tile);
@@ -721,6 +726,13 @@ export function createPhase1ProductReviewWorldRenderer(
           );
         }
 
+        if (raining && known && terrain === 'ground' && stableDecorHash(gx, gy) % 5 === 0) {
+          renderSprite(coldRainSprite('GROUND_SPLASH',
+            ((Math.floor(authorityTick / 9) + stableDecorHash(gx, gy)) % 4) as 0 | 1 | 2 | 3),
+          position, camera, 'rain-splash', 'rain-splash:' + String(gx) + ':' + String(gy),
+          { zIndex: -40000, data: Object.freeze({ explorationState: 'EXPLORED' }) });
+        }
+
         if (!known) {
           const fog = document.createElement('div');
           fog.className = 'p1-product-fog';
@@ -733,13 +745,24 @@ export function createPhase1ProductReviewWorldRenderer(
             fogMaskSprite(mask),
             EXPLORATION_CELL_RASTER_SCALE,
           );
+          // Preserve the canonical reveal mask while replacing the hatch with layered pixel clouds.
+          fog.style.height = String(EXPLORATION_CELL_LOGICAL_PIXELS / 2) + 'px';
+          fog.style.clipPath = 'polygon(50% -.5%,100.5% 50%,50% 100.5%,-.5% 50%)';
+          fog.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
+          fog.style.backgroundSize = '128px 128px';
+          fog.style.backgroundRepeat = 'repeat';
+          const drift = Math.floor(authorityTick / 120);
+          fog.style.backgroundPosition = String(-(gx - gy) * EXPLORATION_CELL_LOGICAL_PIXELS / 2
+            + EXPLORATION_CELL_LOGICAL_PIXELS / 2 + drift) + 'px '
+            + String(-(gx + gy) * EXPLORATION_CELL_LOGICAL_PIXELS / 4) + 'px';
+          fog.dataset.fogTreatment = 'layered-pixel-clouds';
           if (
             setWorldCenter(
               fog,
               position,
               camera,
               EXPLORATION_CELL_LOGICAL_PIXELS,
-              EXPLORATION_CELL_LOGICAL_PIXELS,
+              EXPLORATION_CELL_LOGICAL_PIXELS / 2,
               700000,
             )
           ) {
@@ -807,7 +830,7 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     const frame = playerActorSprite(
-      movement.facing,
+      phase1IsometricFacing(movement.facing),
       state,
       playerFrameOrdinal(
         state,
@@ -839,7 +862,7 @@ export function createPhase1ProductReviewWorldRenderer(
     const equipment = bundle.equipment.getView(id);
     if (equipment.equippedThermalWrapStackId !== null) {
       const overlayFrame = thermalWrapActorSprite(
-        movement.facing,
+        phase1IsometricFacing(movement.facing),
         state,
         playerFrameOrdinal(
           state,
@@ -960,7 +983,7 @@ export function createPhase1ProductReviewWorldRenderer(
       ? Math.min(5, Math.floor(bundle.authorityTick / cadence))
       : Math.floor(bundle.authorityTick / cadence);
     const frame = predatorActorSprite(
-      facing,
+      phase1IsometricFacing(facing) ?? 'S',
       visualState,
       ordinal,
     );
@@ -1018,9 +1041,9 @@ export function createPhase1ProductReviewWorldRenderer(
     const pattern = buildPreviewPatternSprite(preview.state);
     const badgePosition = Object.freeze({
       x: preview.position.x
-        - sprite.cellWidth / WORLD_PIXELS_PER_UNIT / 2,
+        - sprite.cellWidth / 64 - sprite.cellHeight / 16,
       y: preview.position.y
-        - sprite.cellHeight / WORLD_PIXELS_PER_UNIT,
+        + sprite.cellWidth / 64 - sprite.cellHeight / 16,
     });
     const badge = renderSprite(
       pattern,
@@ -1054,6 +1077,7 @@ export function createPhase1ProductReviewWorldRenderer(
       camera,
       bundle.authorityTick,
       environment.dayPeriod === 'night',
+      environment.coldRainStatus === 'active',
     );
 
     if (environment.dayPeriod === 'night') {
@@ -1065,6 +1089,7 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     for (const entity of bundle.world.getActiveGeneratedEntities()) {
+      if (entity.type === 'passive-wildlife' && entity.entityId === bundle.sustenance.read().animalEntityId) continue;
       if (
         entity.type !== 'hostile'
         && !worldPositionKnown(bundle, entity.position)
@@ -1126,9 +1151,50 @@ export function createPhase1ProductReviewWorldRenderer(
         camera,
         'structure',
         structure.structureId,
+        { ...(environment.dayPeriod === 'night' ? { className: 'p1-product-module-night' } : {}) },
       );
     }
 
+    const colony = bundle.sustenance.read();
+    const showSites = root.querySelector('[data-panel-kind="colony"]') !== null;
+    for (const site of [
+      { id: 'cultivation-bed', position: CULTIVATION_POSITION, built: colony.bedBuilt },
+      { id: 'grazer-pen', position: PEN_POSITION, built: colony.penBuilt },
+    ]) {
+      if ((!site.built && !showSites) || !worldPositionKnown(bundle, site.position)) continue;
+      const pad = document.createElement('div');
+      pad.dataset.worldRole = site.id;
+      pad.dataset.built = String(site.built);
+      if (!setWorldCenter(pad, site.position, camera, 52, 36, Math.round((site.position.x + site.position.y) * 1000))) continue;
+      pad.style.width = '52px'; pad.style.height = '36px';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 52 36'); svg.setAttribute('shape-rendering', 'crispEdges');
+      svg.style.width = '52px'; svg.style.height = '36px';
+      const surfaces: [string, string][] = [
+        ['M0 16L26 30V35L0 21Z', '#263b42'], ['M26 30L52 16V21L26 35Z', '#182a32'],
+        ['M26 2L52 16L26 30L0 16Z', '#7e9898'],
+        ['M26 6L44 16L26 26L8 16Z', site.id === 'cultivation-bed' ? '#344735' : '#45585d'],
+      ];
+      if (site.id === 'grazer-pen') surfaces.push(['M2 15V6L26 0L50 6V15H48V8L26 2L4 8V15Z', '#a0b9b2']);
+      for (const [geometry, fill] of surfaces) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', geometry); path.setAttribute('fill', fill); svg.append(path);
+      }
+      pad.append(svg);
+      pad.style.opacity = site.built ? '1' : '.45';
+      const label = document.createElement('span');
+      label.textContent = site.id === 'cultivation-bed' ? 'BED' : 'PEN';
+      label.style.cssText = 'font:6px monospace;color:#d8e8db;position:absolute;bottom:1px;left:8px';
+      pad.append(label); layer.append(pad);
+      if (site.id === 'cultivation-bed' && colony.cropProgressTicks !== null) {
+        for (const offset of [-1, 0, 1]) renderSprite(PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor,
+          { x: site.position.x + offset, y: site.position.y }, camera, 'cultivated-crop', 'crop:' + String(offset));
+      }
+      if (site.id === 'grazer-pen' && colony.animalEntityId !== null) {
+        renderSprite(PHASE1_PRODUCTION_WORLD_SPRITES.passiveWildlife, site.position, camera,
+          'captive-grazer', colony.animalEntityId);
+      }
+    }
     const snapshot = bundle.world.exportSnapshot();
     for (const cache of snapshot.deathCaches.caches) {
       if (!worldPositionKnown(bundle, cache.position)) continue;
@@ -1260,22 +1326,26 @@ export function createPhase1ProductReviewWorldRenderer(
       const weather = document.createElement('div');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
-      const rain = coldRainSprite(
-        'RAIN_STREAK',
-        (Math.floor(bundle.authorityTick / 6) % 4) as 0 | 1 | 2 | 3,
-      );
-      weather.style.backgroundImage = 'url("' + rain.url + '")';
-      weather.style.backgroundSize =
-        String(rain.sourceWidth) + 'px '
-        + String(rain.sourceHeight) + 'px';
-      weather.style.backgroundPosition =
-        String(
-          -(rain.index % rain.columns) * rain.cellWidth,
-        ) + 'px '
-        + String(
-          -Math.floor(rain.index / rain.columns) * rain.cellHeight,
-        ) + 'px';
-      weather.style.imageRendering = 'pixelated';
+      for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {
+        for (let x = -32; x < INTERNAL_WIDTH; x += 48) {
+          const hash = stableDecorHash(x, y);
+          if (hash % 3 === 0) continue;
+          const streak = document.createElement('div');
+          applyProductionSprite(streak, coldRainSprite('RAIN_STREAK',
+            ((Math.floor(bundle.authorityTick / 6) + hash) % 4) as 0 | 1 | 2 | 3), 2);
+          streak.style.cssText += ';position:absolute;left:' + String(x + hash % 16)
+            + 'px;top:' + String(y) + 'px';
+          weather.append(streak);
+        }
+      }
+      const atmosphere = document.createElement('div');
+      atmosphere.dataset.weatherEffect = 'atmospheric-mass';
+      const drift = Math.floor(bundle.authorityTick / 90) % 64;
+      atmosphere.style.cssText = 'position:absolute;inset:-64px;z-index:790000;pointer-events:none;opacity:.12;'
+        + 'background-image:url("' + PHASE1_PRODUCTION_WORLD_SPRITES.weatherDither.url + '");'
+        + 'background-position:' + String(drift) + 'px ' + String(-drift) + 'px;'
+        + 'clip-path:polygon(0 0,42% 0,34% 18%,63% 34%,100% 12%,100% 52%,66% 70%,28% 48%,0 68%);';
+      layer.append(atmosphere);
       layer.append(weather);
     }
 
@@ -1286,6 +1356,7 @@ export function createPhase1ProductReviewWorldRenderer(
     canvas.dataset.dayPeriod = environment.dayPeriod;
     canvas.dataset.fogProjection = 'canonical-exploration';
     canvas.dataset.terrainProjection = 'accepted-raster';
+    canvas.dataset.worldPerspective = 'isometric-2-to-1';
     canvas.dataset.teammateCount = String(teammates.length);
   };
 

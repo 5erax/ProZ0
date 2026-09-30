@@ -1173,3 +1173,58 @@ describe('Phase 1 hosted vertical-slice composition', () => {
     }
   });
 });
+
+
+describe('hosted colony commands', () => {
+  it('replicates cultivation, deduplicates retries and persists progress through reopen', async () => {
+    const c = await Phase1HostedAuthorityComposition.create({ worldId: 'world:colony-host', worldSeed: 'p1-world-golden',
+      maxPlayers: 2, interactionRangeWorldUnits: 2, spawnClearanceRadiusWorldUnits: 0,
+      requiredAccessRadiusWorldUnits: 0, persistence: new NoopHostedPersistence() });
+    try {
+      const a = join(c, 'colony:a'); const b = join(c, 'colony:b');
+      for (const client of [a, b]) {
+        c.bundle.getRuntime(client.playerId).relocatePlayer({ x: -6, y: 4 });
+        expect(c.bundle.items.commitColonyExchange({ operationId: 'seed:' + client.playerId, playerId: client.playerId,
+          expectedInventoryRevision: 0, inputs: [], outputs: [
+            { itemDefinitionId: 'item:timber', quantity: 3 }, { itemDefinitionId: 'item:cordage', quantity: 1 },
+            { itemDefinitionId: 'item:edible-plant', quantity: 1 }, { itemDefinitionId: 'item:clean-water', quantity: 1 }] }).status).toBe('committed');
+      }
+      const command = (operationId: string, action: string, client: HostedClientHarness): GameplayCommandEnvelopeV1 => ({
+        operationId, commandType: 'colony.sustenance', expectedRevisions: [
+          { aggregateType: 'colony-sustenance', aggregateId: 'colony', revision: c.bundle.sustenance.read().revision },
+          { aggregateType: 'container', aggregateId: 'inventory:' + client.playerId,
+            revision: c.bundle.items.getContainerView('inventory:' + client.playerId).revision }], payload: { action } });
+      sendCommand(c.host, a, command('colony:build', 'build-bed', a)); await c.step();
+      expect(c.bundle.sustenance.read().bedBuilt).toBe(true);
+      const plant = command('colony:plant', 'plant', a);
+      const competing = command('colony:competing', 'plant', b);
+      sendCommand(c.host, a, plant); sendCommand(c.host, b, competing);
+      const outbound = await c.step();
+      expect(c.bundle.sustenance.read().cropProgressTicks).not.toBeNull();
+      expect(queryOperationStatus(c.host, b, competing.operationId)?.envelope.payload).toMatchObject({ state: 'resolved', result: { status: 'rejected', reason: 'STALE_REVISION' } });
+      const inventory = c.bundle.items.exportLedgerSnapshot();
+      sendCommand(c.host, a, plant); await c.step();
+      expect(c.bundle.items.exportLedgerSnapshot()).toEqual(inventory);
+      expect(outbound.some(entry => entry.transportId === b.transportId
+        && JSON.stringify(entry.envelope).includes('colony-sustenance'))).toBe(true);
+      const { composePhase1SaveV2 } = await import('../../src/integration');
+      const { reconstructPhase1ReopenState, createPhase1SaveV2Compatibility, SAVE_FORMAT_ID, SAVE_SCHEMA_VERSION_V2 } = await import('../../src/persistence');
+      const request = composePhase1SaveV2(c.bundle, { nowUtc: '2026-09-30T00:00:00.000Z' });
+      const reopened = reconstructPhase1ReopenState({ formatId: SAVE_FORMAT_ID, schemaVersion: SAVE_SCHEMA_VERSION_V2,
+        recordKind: 'portable-bundle', world: request.world, players: request.players, containers: request.containers,
+        chunks: request.chunks, footholds: request.footholds, structures: request.structures },
+        createPhase1SaveV2Compatibility(c.bundle.catalog, [3]));
+      expect(reopened.ok).toBe(true); if (!reopened.ok) throw Error(reopened.message);
+      const { Phase1AuthorityBundle } = await import('../../src/integration');
+      const resumed = await Phase1AuthorityBundle.create({ worldId: c.bundle.config.worldId, worldSeed: c.bundle.config.worldSeed,
+        playerIds: [a.playerId, b.playerId], interactionRangeWorldUnits: 2, spawnClearanceRadiusWorldUnits: 0,
+        requiredAccessRadiusWorldUnits: 0, reopen: reopened.value });
+      try {
+        expect(resumed.sustenance.read()).toEqual(c.bundle.sustenance.read());
+        const progress = resumed.sustenance.read().cropProgressTicks!;
+        await resumed.stepSolo();
+        expect(resumed.sustenance.read().cropProgressTicks).toBe(progress + 1);
+      } finally { await resumed.destroy(); }
+    } finally { await c.destroy(); }
+  });
+});

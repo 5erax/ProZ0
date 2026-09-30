@@ -1,4 +1,5 @@
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
+import { validateColonySustenanceState } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
@@ -189,6 +190,10 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if (record.sustenance !== undefined) {
+    try { validateColonySustenanceState(record.sustenance); }
+    catch { return saveFailure('CORRUPT_RECORD', 'Invalid colony production state.'); }
+  }
   if (!nonEmpty(record.worldId) || !nonEmpty(record.worldSeed)
     || !nonNegativeInt(record.worldRevision) || !nonNegativeInt(record.authorityTick)
     || !Number.isSafeInteger(record.generationVersion)

@@ -197,15 +197,15 @@ test('direct Product Review URL boots canonical persisted slice without console 
   await expect(starterInventory).toContainText('Stone Field Tool');
   await page.keyboard.press('Escape');
 
-  // Reach the canonical local Fiber Plant at (18, 10) using only normal
-  // player movement. Hold durations target the node center from the approved
-  // 2.8125 WU/s cardinal movement speed, avoiding poll-induced overshoot.
-  await page.keyboard.down('d');
-  await page.waitForTimeout(6_300);
-  await page.keyboard.up('d');
-
+  // Screen-down moves southeast in the isometric world. Then down-right
+  // moves along world-east to the canonical Fiber Plant at (18, 10).
   await page.keyboard.down('s');
-  await page.waitForTimeout(3_500);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-player-y')), { timeout: 15_000, intervals: [25] }).toBeGreaterThanOrEqual(9.8);
+  await page.keyboard.up('s');
+  await page.keyboard.down('s');
+  await page.keyboard.down('d');
+  await expect.poll(async () => Number(await canvas.getAttribute('data-player-x')), { timeout: 10_000, intervals: [25] }).toBeGreaterThanOrEqual(17.8);
+  await page.keyboard.up('d');
   await page.keyboard.up('s');
   await page.waitForTimeout(100);
 

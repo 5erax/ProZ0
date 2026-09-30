@@ -286,6 +286,21 @@ function renderPanel(
   root.append(panelTitle(document, panel.title));
 
   switch (panel.kind) {
+    case 'colony': {
+      const actions = [
+        ['Build cultivation bed · 3 Timber + 1 Cordage', 'build-bed'],
+        ['Plant + water · 1 Edible Plant + 1 Clean Water', 'plant'],
+        ['Harvest · 3 Edible Plant', 'harvest'],
+        ['Build grazer pen · 4 Timber + 2 Cordage', 'build-pen'],
+        ['Feed + water · 1 Edible Plant + 1 Clean Water', 'care'],
+        ['Fertilize crop · 1 Fertilizer', 'fertilize'],
+      ];
+      for (const line of panel.lines) root.append(createElement(document, 'div', 'p1-colony-status', line));
+      const controls = createElement(document, 'div', 'p1-colony-actions');
+      for (const [label, action] of actions) controls.append(actionButton(document, label!, 'colony:' + action!));
+      root.append(controls);
+      return root;
+    }
     case 'inventory': {
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
       root.dataset.inventoryActivePane = 'player';
@@ -1095,6 +1110,8 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-action{border:1px solid #778094;padding:4px 6px;}',
     '.p1-craft-navigation{display:flex;justify-content:space-between;margin-bottom:4px;}',
     '.p1-action:focus-visible,.p1-item-row:focus-visible{outline:2px solid white;}',
+    '.p1-colony-status{padding:3px 0;}',
+    '.p1-colony-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;}',
     '.p1-panel[data-panel-kind="craft"]{width:560px;max-height:300px;padding:6px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-craft-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;}',
@@ -1248,7 +1265,13 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.layer.dataset.panelOpen = String(panelOpen);
     this.root.dataset.productReviewPanelOpen = String(panelOpen);
     const style = this.layer.querySelector('style');
-    const signature = JSON.stringify(state.panel);
+    const signature = state.panel?.kind === 'colony' ? 'colony' : JSON.stringify(state.panel);
+    if (state.panel?.kind === 'colony') {
+      const lines = state.panel.lines;
+      this.layer.querySelectorAll('.p1-colony-status').forEach((element, index) => {
+        element.textContent = lines[index] ?? '';
+      });
+    }
     for (const child of Array.from(this.layer.children)) {
       if (child !== style && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
         child.remove();

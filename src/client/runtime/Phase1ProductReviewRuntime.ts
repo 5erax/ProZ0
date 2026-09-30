@@ -1,4 +1,7 @@
 import type { PlayerId } from '../../foundation';
+import { phase1IsometricInput } from './Phase1IsometricProjection';
+import { GRAZER_CARE_TICKS, type ColonySustenanceAction }
+  from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
   PlayerMotionViewV1,
   PresentationIdentitySlotV1,
@@ -259,7 +262,8 @@ export async function createPhase1ProductReviewRuntime(
   let attackPresentation: AttackPresentationState | null = null;
   let recoveredDeathCache:
     Phase1ProductReviewRecoveredDeathCache | null = null;
-  let actionPanel: 'craft' | 'build' | 'machine' | null = null;
+  let actionPanel: 'craft' | 'build' | 'machine' | 'colony' | null = null;
+  let colonyFeedback = '';
   let machineStructureId: string | null = null;
   let craftPage = 0;
   let buildIndex = 0;
@@ -302,6 +306,33 @@ export async function createPhase1ProductReviewRuntime(
 
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
+
+  const refreshColonyPanel = (): void => {
+    if (actionPanel !== 'colony') return;
+    const state = bundle.sustenance.read();
+    source.setPresentationPanel(Object.freeze({ kind: 'colony', title: 'COLONY · CULTIVATION / HUSBANDRY · N TO CLOSE',
+      lines: Object.freeze([
+        'BED · ' + (!state.bedBuilt ? 'BUILD NEAR THE BED SITE WEST OF LANDING' : state.cropProgressTicks === null ? 'EMPTY · PLANT AN EDIBLE CUTTING + WATER'
+          : state.cropProgressTicks >= state.cropCycleTicks ? 'READY TO HARVEST' : 'GROWING · ' + String(Math.ceil((state.cropCycleTicks - state.cropProgressTicks) / 60)) + 's'),
+        'PEN · ' + (!state.penBuilt ? 'BUILD NEAR THE PEN SITE EAST OF LANDING' : state.animalEntityId === null ? 'EMPTY · FIND A PASSIVE GRAZER AND PRESS E TO CAPTURE (1 CORDAGE)'
+          : state.careProgressTicks === null ? 'GRAZER · FEED + WATER FOR FERTILIZER' : 'CARED FOR · ' + String(Math.ceil((GRAZER_CARE_TICKS - state.careProgressTicks) / 60)) + 's'),
+        'FERTILIZER · ' + String(state.fertilizer) + '/4 · reduces current crop time by 25%',
+        'Growth runs only while this world is active. Build and care within reach of the site.',
+        colonyFeedback,
+      ]) }));
+  };
+
+  const colonyCommand = (action: ColonySustenanceAction, animalEntityId?: string): void => {
+    const inventory = bundle.items.getContainerView('inventory:' + config.localPlayerId);
+    const result = bundle.sustenance.execute({ operationId: nextOperationId('colony'), playerId: config.localPlayerId,
+      expectedRevision: bundle.sustenance.read().revision, expectedInventoryRevision: inventory.revision,
+      action, ...(animalEntityId === undefined ? {} : { animalEntityId }) });
+    colonyFeedback = result.status === 'committed' ? action.toUpperCase() + ' · DONE' : result.reason.replaceAll('_', ' ');
+    source.setLocalCommandFeedback({ inputLabel: 'N', operationId: result.operationId,
+      status: result.status, ...(result.status === 'rejected' ? { reason: result.reason } : {}),
+      verb: 'COLONY', target: action.toUpperCase() });
+    refreshColonyPanel();
+  };
 
   const playerPosition = () =>
     bundle.getPlayerPosition(config.localPlayerId);
@@ -1345,6 +1376,14 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    const nearbyAnimal = bundle.sustenance.read().penBuilt && bundle.sustenance.read().animalEntityId === null
+      ? bundle.world.getActiveGeneratedEntities().find((entity) => entity.type === 'passive-wildlife'
+        && distanceFromPlayerSquared(entity.position.x, entity.position.y) <= 1.25 ** 2) : undefined;
+    if (nearbyAnimal !== undefined) {
+      source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'CAPTURE', target: 'Grazer · 1 Cordage',
+        state: 'AVAILABLE', reason: null, progress: null }));
+      return;
+    }
     const cache = deathCacheTarget();
     if (cache !== null) {
       source.setInteraction(Object.freeze({
@@ -1451,6 +1490,12 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     if (pickupWorldDrop()) return;
+    if (bundle.sustenance.read().penBuilt && bundle.sustenance.read().animalEntityId === null) {
+      const animal = bundle.world.getActiveGeneratedEntities().find((entity) =>
+        entity.type === 'passive-wildlife'
+        && distanceFromPlayerSquared(entity.position.x, entity.position.y) <= 1.25 ** 2);
+      if (animal !== undefined) { colonyCommand('capture', animal.entityId); return; }
+    }
     if (recoverDeathCache()) return;
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
@@ -1854,6 +1899,11 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     switch (event.code) {
+      case 'KeyN':
+        event.preventDefault();
+        if (actionPanel === 'colony') { actionPanel = null; source.setPresentationPanel(null); }
+        else { actionPanel = 'colony'; refreshColonyPanel(); }
+        break;
       case 'KeyH':
         event.preventDefault();
         controls.toggle();
@@ -2062,7 +2112,7 @@ export async function createPhase1ProductReviewRuntime(
       const sampled = input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
-        bundle.submitInput(config.localPlayerId, sampled);
+        bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
         await bundle.stepSolo();
         updateGather(
           bundle.getLastGatherResult(config.localPlayerId),
@@ -2070,21 +2120,23 @@ export async function createPhase1ProductReviewRuntime(
         updateConsume(
           bundle.getLastConsumeResult(config.localPlayerId),
         );
-        source.refresh();
-        refreshCraftPanel();
-        refreshBuildPanel();
-        refreshMachinePanel();
-        refreshContextInteraction();
-        refreshWorldPresentationContext();
-        worldRenderer.render();
+        source.beginPresentationBatch();
+        try {
+          refreshCraftPanel();
+          refreshBuildPanel();
+          refreshMachinePanel();
+          refreshColonyPanel();
+          refreshContextInteraction();
+          refreshWorldPresentationContext();
+        } finally { source.endPresentationBatch(); }
       }).catch((error: unknown) => {
         root.dataset.runtimeStatus = 'failed';
         console.error('Phase 1 Product Review authority step failed.', error);
       });
     },
     onRender: () => {
-      // Canonical async authority ticks publish complete snapshots through
-      // the queued step above; presentation never predicts authority state.
+      // Present only the most recent completed authority state once per frame.
+      if (!destroyed) worldRenderer.render();
     },
   });
 
@@ -2099,6 +2151,9 @@ export async function createPhase1ProductReviewRuntime(
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
+    if (action?.startsWith('colony:') && actionPanel === 'colony') {
+      colonyCommand(action.slice(7) as ColonySustenanceAction);
+    }
   };
 
   input.start();
