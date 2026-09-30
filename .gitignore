@@ -4,3 +4,9 @@ playwright-report/
 test-results/
 .vitest/
 .DS_Store
+.vercel
+.env*
+
+dist-server/
+dist-pilot/
+pilot-data/

@@ -40,10 +40,11 @@ describe("Colony depth contracts and seeded regions", () => {
     for (const seed of ["one", "two", "three", "four", "p1-world-golden"]) {
       expect(colonyBiomeAt(seed, { x: 0, y: 0 })).toBe("landing-grassland");
       const sites = colonySurveySites(seed);
-      expect(sites.map((site) => colonyBiomeAt(seed, site.position))).toEqual([
+      expect(sites.slice(0,2).map((site) => colonyBiomeAt(seed, site.position))).toEqual([
         "mist-marsh",
         "ochre-badlands",
       ]);
+      expect(sites.slice(2).every(site=>colonyBiomeAt(seed,site.position)==='landing-grassland'&&Math.hypot(site.position.x,site.position.y)<60)).toBe(true);
       expect(colonySurveySites(seed)).toEqual(sites);
       for (const site of sites) {
         expect(colonyWeatherAt(seed, site.position, 7199).warning).toBe(false);

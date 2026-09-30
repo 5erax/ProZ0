@@ -534,6 +534,8 @@ export class Phase1AuthorityBundle {
     let buildings: Phase1BuildingWorld | null = null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
+      colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
+      colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
       playerPositions: positions,
@@ -685,7 +687,7 @@ export class Phase1AuthorityBundle {
     );
 
     if (!this.registeredSurvival.has(playerId)) {
-      this.survival.registerPlayer(playerId);
+      this.survival.registerPlayer(playerId, this.authorityTick);
       this.registeredSurvival.add(playerId);
     }
     // Progression is intentionally lazy internally, but an admitted gameplay

@@ -21,6 +21,8 @@ Trees and rocks are harvestable resource nodes. Decorative ground puddles/reeds 
 
 ## Recommended next improvements for Phase 2
 
+Historical proposals from PR #193. The Owner subsequently chose 2–3 players and Vercel; see [the implemented priority upgrades and current limitations](phase-2-priority-upgrades.md) for the current status.
+
 1. **A real co-op pilot before more progression systems.** Provide a small private hosted service with host/join UI, reconnect feedback and shared save ownership. Verify four real players first, then eight. Existing WebSocket checks prove authority/transport behavior but Pages is still solo. Deployment needs a selected hosting environment and budget; do not imply it exists today.
 2. **Exploration with reasons to travel.** Add several authored landmark families, regional routes and visible resource-rich pockets. Each site should offer a distinct observation or useful choice. Measure whether a ten-minute expedition finds at least three different interactions, rather than only more repeated nodes.
 3. **A consistent authored pixel atlas.** Replace remaining mismatched small icons/terrain decoration with a coherent tree/rock/shore/facility atlas, grounded silhouettes and biome accents. Preserve the 3/4 camera and evaluate screenshots at 1× and 3×, clear/rain/night. Avoid adding continuous filters or large particle layers before timing the complete scene.

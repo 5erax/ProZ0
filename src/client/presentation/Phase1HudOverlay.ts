@@ -302,13 +302,13 @@ function renderPanel(
       return root;
     }
     case 'inventory': {
-      root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
+      root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'),actionButton(document,'Stack matching items','inventory-stack'));
       root.append(actionButton(document,'Build storage crate','build-storage'));
       root.append(createElement(document,'div','p1-storage-tip','Store supplies near a crate: open Inventory [I] beside it. Build a crate with 4 Timber + 2 Cordage.'));
       root.dataset.inventoryActivePane = 'player';
       root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
-      for (const item of panel.items) {
+      for (const item of [...panel.items].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
         list.append(itemRow(
           document,
           item,
@@ -371,7 +371,7 @@ function renderPanel(
       left.dataset.inventoryPane = 'player';
       left.dataset.active = String(panel.activePane === 'player');
       left.append(createElement(document, 'div', 'p1-subtitle', 'PLAYER'));
-      for (const item of panel.playerItems) {
+      for (const item of [...panel.playerItems].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
         const selected = item.id === panel.selectedPlayerItemId;
         const row = itemRow(document, item, selected);
         left.append(row);
@@ -392,7 +392,7 @@ function renderPanel(
       right.dataset.inventoryPane = 'storage';
       right.dataset.active = String(panel.activePane === 'storage');
       right.append(createElement(document, 'div', 'p1-subtitle', panel.containerLabel));
-      for (const item of panel.containerItems) {
+      for (const item of [...panel.containerItems].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
         const selected = item.id === panel.selectedContainerItemId;
         const row = itemRow(document, item, selected);
         right.append(row);

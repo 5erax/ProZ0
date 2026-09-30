@@ -57,7 +57,10 @@ export interface ColonySurveySite {
   readonly name: string;
   readonly observation: string;
   readonly unresolved: string;
+  readonly family?: 'grove' | 'spring' | 'seam';
+  readonly resources?: readonly string[];
 }
+export const COLONY_SURVEY_SITE_IDS=['site:marsh-relay','site:badlands-array','site:windfall-grove','site:clear-spring','site:exposed-seam'] as const;
 export function colonySurveySites(seed: string): readonly ColonySurveySite[] {
   const undo = (4 - seedQuadrant(seed)) % 4;
   return Object.freeze(
@@ -80,12 +83,23 @@ export function colonySurveySites(seed: string): readonly ColonySurveySite[] {
           "Several matching plates face the same direction. Sand covers their lower edges.",
         unresolved: "What aligned these plates, and what once connected them?",
       },
+      {id:'site:windfall-grove',biomeId:'landing-grassland' as const,position:{x:-36,y:-10},name:'Windfall Grove',family:'grove' as const,resources:['resource:timber-source','resource:fiber-plant'],observation:'Mature trees and low plants form a sheltered resource pocket. Cut timber leaves a stump; renewed growth takes time.',unresolved:'Can a lighter harvest keep this pocket productive while the base grows?'},
+      {id:'site:clear-spring',biomeId:'landing-grassland' as const,position:{x:32,y:-18},name:'Clear Spring',family:'spring' as const,resources:['resource:potable-water-source'],observation:'Clear water collects below the grassy bank. The visible water source can be gathered; shallow water slows travel and cannot support a new building.',unresolved:'Which route brings water home with the least repeated travel?'},
+      {id:'site:exposed-seam',biomeId:'landing-grassland' as const,position:{x:48,y:26},name:'Exposed Seam',family:'seam' as const,resources:['resource:stone-outcrop','resource:metal-ore-node'],observation:'Broken rock exposes a mineral seam beside the stone outcrop. A field tool reduces the work needed for suitable deposits.',unresolved:'Would storage near the base make this heavier supply route easier?'},
     ].map((site) =>
       Object.freeze({ ...site, position: Object.freeze(site.position) }),
     ),
   );
 }
 export type ColonyWeather = "clear" | "mist-rain" | "dry-wind";
+/** Content-v2 surface rules are a separate overlay: generated v3/v4 bases and entity IDs stay unchanged. */
+export function colonyLandscapeTerrainAt(seed:string,point:WorldPosition,base:'ground'|'water'):'ground'|'water'{
+  if(base==='water'||colonyBiomeAt(seed,point)!=='mist-marsh'||Math.hypot(point.x,point.y)<110)return base;
+  const cell={x:Math.floor(point.x/4)*4+2,y:Math.floor(point.y/4)*4+2},oriented=rotate(cell,seedQuadrant(seed));
+  const bend=((Math.floor(oriented.y/32)%3)+3)%3;
+  const column=Math.floor((oriented.x+bend*4)/4);
+  return ((column%9)+9)%9===4?'water':'ground';
+}
 export function colonyWeatherAt(
   seed: string,
   point: WorldPosition,

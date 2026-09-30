@@ -288,14 +288,14 @@ export class Phase1SurvivalAuthority {
     }
   }
 
-  public registerPlayer(playerId: PlayerId): void {
-    if (playerId.length === 0 || this.players.has(playerId)) {
+  public registerPlayer(playerId: PlayerId, authorityTick = 0): void {
+    if (playerId.length === 0 || this.players.has(playerId) || !Number.isSafeInteger(authorityTick) || authorityTick < 0) {
       throw new Error('Invalid or duplicate player registration.');
     }
     this.players.set(playerId, {
       playerId,
       revision: 0,
-      tick: 0,
+      tick: authorityTick,
       healthMilli: 100000,
       foodMilli: 70000,
       waterMilli: 80000,

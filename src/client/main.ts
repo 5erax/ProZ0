@@ -41,6 +41,7 @@ import {
   createPhase1ProductReviewEntrypoint,
   shouldShowPhase1ProductReviewEntrypoint,
 } from './runtime/Phase1ProductReviewEntrypoint';
+import {bootColonyCoop} from './runtime/ColonyCoopRuntime';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -276,6 +277,7 @@ export async function bootAutoProZ0(
   if (mode === 'local-demo') {
     return bootProZ0(root, { mode: 'local-demo' });
   }
+  if(mode==='colony-coop')return bootColonyCoop(root,query);
 
   if (mode !== 'phase1-product-review' && mode !== 'phase2-colony-review') {
     throw new Error('Unsupported ProZ0 autoboot mode: ' + mode);

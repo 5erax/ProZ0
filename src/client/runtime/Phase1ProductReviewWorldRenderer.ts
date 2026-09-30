@@ -3,8 +3,8 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
-import { colonyBiomeAt, colonySurveySites, colonyWeatherAt } from '../../world/phase2/ColonyRegions';
-import { colonyTerrainSprite, colonySiteSprite, colonyTimberSprite } from '../presentation/ColonyRegionSprites';
+import { colonyBiomeAt, colonySurveySites, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
+import { colonyTerrainSprite, colonyLandmarkSprite, colonyResourceSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
@@ -257,7 +257,7 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
-      if(bundle.config.colonyDepthEnabled===true && entity.definitionId==='resource:timber-source')return colonyTimberSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),state?.depleted===true);
+      if(bundle.config.colonyDepthEnabled===true)return colonyResourceSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),entity.definitionId,state?.depleted===true);
       return phase1ResourcePresentationSprite(
         entity.definitionId,
         state?.depleted === true,
@@ -738,9 +738,10 @@ export function createPhase1ProductReviewWorldRenderer(
         const position = worldCell(gx, gy);
         if (!inViewport(position, camera)) continue;
         const known = explorationCellKnown(bundle, gx, gy);
-        const terrain = known
+        const baseTerrain = known
           ? terrainForCell(bundle, gx, gy)
           : 'ground';
+        const terrain=known&&bundle.config.colonyDepthEnabled===true?colonyLandscapeTerrainAt(bundle.config.worldSeed,position,baseTerrain):baseTerrain;
         const variant = terrain === 'water'
           ? Math.floor(authorityTick / 15)
           : (stableDecorHash(Math.floor(gx / 3), Math.floor(gy / 3))
@@ -1165,7 +1166,7 @@ export function createPhase1ProductReviewWorldRenderer(
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
       for(const site of colonySurveySites(bundle.config.worldSeed)){
         if(!worldPositionKnown(bundle,site.position))continue;
-        renderSprite(colonySiteSprite(site.biomeId),site.position,camera,'survey-site',site.id,{zIndex:700000,data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED'})});
+        renderSprite(colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:700000,data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED'})});
       }
     }
 
@@ -1242,7 +1243,7 @@ export function createPhase1ProductReviewWorldRenderer(
       if (!worldPositionKnown(bundle, structure.position)) {
         continue;
       }
-      renderSprite(
+      const structureElement=renderSprite(
         structureSprite(
           bundle,
           structure.structureId,
@@ -1254,6 +1255,12 @@ export function createPhase1ProductReviewWorldRenderer(
         structure.structureId,
         { ...(environment.dayPeriod === 'night' ? { className: 'p1-product-module-night' } : {}) },
       );
+      if(structureElement&&structure.containerId&&structure.definitionId==='structure:storage-crate'&&bundle.config.colonyDepthEnabled===true){
+        const container=bundle.items.getContainerView(structure.containerId),capacity=bundle.catalog.getAs(structure.definitionId,'structure').container!;
+        const multiplier=container.storageCapacityMultiplier??1,fill=Math.min(1,Math.max(container.totalWeightKg/(capacity.maxWeightKg*multiplier),container.totalVolume/(capacity.maxVolume*multiplier))),percent=Math.round(fill*100);
+        let indicator=structureElement.querySelector<HTMLElement>('[data-storage-fill]');if(!indicator){indicator=document.createElement('div');indicator.dataset.storageFill='';indicator.style.cssText='position:absolute;bottom:2px;left:8px;width:24px;height:3px;border:1px solid #a7b8ae;pointer-events:none';structureElement.append(indicator);}
+        if(indicator.dataset.storageFill!==String(percent)){indicator.dataset.storageFill=String(percent);indicator.style.background='linear-gradient(to right,'+(percent>=90?'#dda36b':'#8ac7a0')+' '+percent+'%,#21343a '+percent+'%)';structureElement.title='Storage '+percent+'% · open Inventory nearby';}
+      }
     }
 
     const colony = bundle.sustenance.read();

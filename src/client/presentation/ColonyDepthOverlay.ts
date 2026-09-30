@@ -14,6 +14,8 @@ import {
 } from "./Phase1ProductionAssets";
 import type { ColonyDepthCommand } from "../../simulation/colony/ColonyDepthAuthority";
 import { createColonyAudio } from "./ColonyAudio";
+import {fromWorldPosition,toChunkLocalPosition} from '../../world/chunks/ChunkCoord';
+import {isExplorationCellKnown,PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS} from '../../world/phase1/ExplorationGrid';
 
 export function createColonyDepthOverlay(
   root: HTMLElement,
@@ -238,18 +240,18 @@ export function createColonyDepthOverlay(
         content.append(row);
       }
     if (panel === "journal") {
+      const discovered=sites.filter(site=>{const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));});
+      for(const site of discovered){
+        const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
+        row.dataset.discoveredLandmark=site.id;row.append(site.name+' · '+distance+' m');
+        if(!state.inspectedSites.includes(site.id))addButton(row,'Inspect','inspect-site',site.id,Math.hypot(position.x-site.position.x,position.y-site.position.y)>1.25);
+        content.append(row);
+      }
       const regions = document.createElement("p");
       regions.textContent =
         "Visited: " +
         state.discoveredBiomes.map((id) => COLONY_BIOMES[id].name).join(" · ");
       content.append(regions);
-      if (nearSite !== undefined && !state.inspectedSites.includes(nearSite.id))
-        addButton(
-          content,
-          "Inspect " + nearSite.name,
-          "inspect-site",
-          nearSite.id,
-        );
       for (const site of sites.filter((s) =>
         state.inspectedSites.includes(s.id),
       )) {

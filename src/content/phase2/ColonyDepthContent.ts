@@ -1,4 +1,4 @@
-export const COLONY_DEPTH_CONTENT_VERSION = 1 as const;
+export const COLONY_DEPTH_CONTENT_VERSION = 2 as const;
 export type ColonyBiomeId =
   | "landing-grassland"
   | "mist-marsh"

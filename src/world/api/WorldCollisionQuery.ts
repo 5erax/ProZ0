@@ -17,5 +17,6 @@ export interface AxisSweepResult {
 }
 
 export interface WorldCollisionQuery {
+  getMovementSpeedMultiplier?(position: WorldPosition): number;
   sweepAabbAxis(request: AxisSweepRequest): AxisSweepResult;
 }

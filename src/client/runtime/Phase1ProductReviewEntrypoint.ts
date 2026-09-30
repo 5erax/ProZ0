@@ -1,4 +1,5 @@
 import { lastSavedReviewUrl } from './Phase1SavedReview';
+import {mountColonyCoopLauncher} from './ColonyCoopLauncher';
 
 export interface Phase1ProductReviewEntrypointHandle {
   destroy(): void;
@@ -73,7 +74,7 @@ export function createPhase1ProductReviewEntrypoint(
 
   const style = document.createElement('style');
   style.textContent = [
-    '.p1-review-entrypoint{width:min(720px,calc(100vw - 32px));box-sizing:border-box;padding:28px;font-family:monospace;color:#f4f6ef;background:#0a0e16;border:1px solid #d6dccd;box-shadow:0 16px 48px rgba(0,0,0,.45);}',
+    '.p1-review-entrypoint{width:min(720px,calc(100vw - 32px));box-sizing:border-box;max-height:92vh;overflow:auto;padding:28px;font-family:monospace;color:#f4f6ef;background:#0a0e16;border:1px solid #d6dccd;box-shadow:0 16px 48px rgba(0,0,0,.45);}',
     '.p1-review-entrypoint h1{margin:0 0 10px;font-size:28px;line-height:1.1;}',
     '.p1-review-entrypoint p{margin:8px 0;line-height:1.5;color:#c8cfbf;}',
     '.p1-review-entrypoint .p1-review-primary{display:block;width:fit-content;margin-top:18px;padding:12px 18px;font:700 16px monospace;cursor:pointer;}',
@@ -149,11 +150,13 @@ export function createPhase1ProductReviewEntrypoint(
 
   panel.append(title, intro, persistence);
   if (savedUrl !== null) panel.append(continueWorld, upgrade);
-  panel.append(startColony, start, meta);
+  panel.append(startColony, start);const advanced=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Advanced review tools';advanced.append(summary,meta);panel.append(advanced);
+  const destroyCoop=mountColonyCoopLauncher(panel);
   root.append(style, panel);
 
   return Object.freeze({
     destroy(): void {
+      destroyCoop();
       start.removeEventListener('click', onStart);
       startColony.removeEventListener('click', onStartColony);
       root.replaceChildren();

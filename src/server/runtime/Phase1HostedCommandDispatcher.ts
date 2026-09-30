@@ -91,6 +91,7 @@ export interface Phase1HostedCommandDispatcherOptions {
   readonly combat?: Phase1CombatAuthority;
   readonly sustenance?: Pick<ColonySustenanceAuthority, 'execute'>;
   readonly colonyDepth?: Pick<ColonyDepthAuthority,'execute'>;
+  readonly equipment?: {set(playerId:PlayerId,slot:'weapon'|'protection',stackId:string|null,inventoryRevision:number):{status:'committed'}|{status:'rejected';reason:string}};
   readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
 }
@@ -240,6 +241,12 @@ implements HostedCommandDispatcher {
     const payload = payloadObject(command);
 
     switch (command.commandType) {
+      case 'equipment.set': {
+        const slot=payload.slot,stackId=payload.stackId;
+        if(!this.options.equipment||!['weapon','protection'].includes(String(slot))||(stackId!==null&&typeof stackId!=='string')||command.expectedRevisions.length!==1)return {status:'rejected',reason:'INVALID_MESSAGE'};
+        const result=this.options.equipment.set(context.playerId,slot as 'weapon'|'protection',stackId as string|null,expectedRevision(command,'container','inventory:'+context.playerId));
+        return withReplication(this.options,command.commandType,context.playerId,result.status==='committed'?{status:'committed',resultingRevisions:[]}:{status:'rejected',reason:result.reason});
+      }
       case 'item.gather':
         return this.beginGather(context.playerId, command, payload);
 

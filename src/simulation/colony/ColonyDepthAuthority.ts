@@ -13,6 +13,7 @@ import {
 import {
   colonyBiomeAt,
   colonySurveySites,
+  COLONY_SURVEY_SITE_IDS,
 } from "../../world/phase2/ColonyRegions";
 import type { Phase1ItemAuthority } from "../items";
 
@@ -62,7 +63,7 @@ export function validateColonyDepthState(value: unknown): ColonyDepthState {
     list.every((id) => typeof id === "string") &&
     new Set(list).size === list.length;
   if (
-    state.contentVersion !== COLONY_DEPTH_CONTENT_VERSION ||
+    ![1,COLONY_DEPTH_CONTENT_VERSION].includes(state.contentVersion) ||
     !natural(state.revision) ||
     !unique(state.discoveredBiomes) ||
     state.discoveredBiomes.some((id) => !Object.hasOwn(COLONY_BIOMES, id)) ||
@@ -72,7 +73,7 @@ export function validateColonyDepthState(value: unknown): ColonyDepthState {
     ) ||
     !unique(state.inspectedSites) ||
     state.inspectedSites.some(
-      (id) => !["site:marsh-relay", "site:badlands-array"].includes(id),
+      (id) => !(COLONY_SURVEY_SITE_IDS as readonly string[]).includes(id),
     ) ||
     typeof state.professions !== "object" ||
     state.professions === null ||
@@ -132,6 +133,7 @@ export function validateColonyDepthState(value: unknown): ColonyDepthState {
     throw new Error("Invalid colony receipt.");
   return Object.freeze({
     ...state,
+    contentVersion: COLONY_DEPTH_CONTENT_VERSION,
     discoveredBiomes: Object.freeze([...state.discoveredBiomes]),
     inspectedSites: Object.freeze([...state.inspectedSites]),
     researchIds: Object.freeze([...state.researchIds]),
