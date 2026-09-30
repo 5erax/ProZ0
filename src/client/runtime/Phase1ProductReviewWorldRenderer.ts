@@ -1158,6 +1158,7 @@ export function createPhase1ProductReviewWorldRenderer(
     const environment = bundle.worldStore.getEnvironmentView();
     const context = getPresentationContext();
     const regionalWeather=bundle.config.colonyDepthEnabled===true?colonyWeatherAt(bundle.config.worldSeed,camera,bundle.authorityTick):null;
+    const raining = regionalWeather === null ? environment.coldRainStatus === 'active' : regionalWeather.weather === 'mist-rain';
     if(regionalWeather!==null){
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
       for(const site of colonySurveySites(bundle.config.worldSeed)){
@@ -1170,7 +1171,7 @@ export function createPhase1ProductReviewWorldRenderer(
       camera,
       bundle.authorityTick,
       environment.dayPeriod === 'night',
-      environment.coldRainStatus === 'active'||regionalWeather?.weather==='mist-rain',
+      raining,
     );
 
     if (environment.dayPeriod === 'night') {
@@ -1437,7 +1438,7 @@ export function createPhase1ProductReviewWorldRenderer(
     }
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
-    if (environment.coldRainStatus === 'active'||regionalWeather?.weather==='mist-rain') {
+    if (raining) {
       const weather = sceneElement('weather:rain');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
@@ -1482,7 +1483,7 @@ export function createPhase1ProductReviewWorldRenderer(
       const drift = Math.floor(bundle.authorityTick / 8) % 128;
       if (dust.dataset.drift !== String(drift)) {
         dust.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none;opacity:.22;'
-          + 'background-image:repeating-linear-gradient(172deg,transparent 0px,transparent 46px,#dfb575 47px,#dfb575 48px,transparent 49px,transparent 92px);'
+          + 'background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27128%27 height=%27128%27 shape-rendering=%27crispEdges%27%3E%3Cg fill=%27%23dfb575%27%3E%3Cpath d=%27M8 16h12v2H8zM60 38h7v1h-7zM92 74h16v2H92zM34 110h8v1h-8z%27/%3E%3C/g%3E%3C/svg%3E");'
           + 'background-position:' + String(drift) + 'px 0;image-rendering:pixelated;';
         dust.dataset.drift = String(drift);
       }
@@ -1501,7 +1502,7 @@ export function createPhase1ProductReviewWorldRenderer(
     canvas.dataset.playerX = camera.x.toFixed(6);
     canvas.dataset.playerY = camera.y.toFixed(6);
     canvas.dataset.authorityTick = String(bundle.authorityTick);
-    canvas.dataset.weatherState = environment.coldRainStatus;
+    canvas.dataset.weatherState = regionalWeather === null ? environment.coldRainStatus : regionalWeather.warning ? 'warning' : regionalWeather.weather === 'clear' ? 'clear' : 'active';
     canvas.dataset.dayPeriod = environment.dayPeriod;
     canvas.dataset.fogProjection = 'canonical-exploration';
     canvas.dataset.terrainProjection = 'accepted-raster';
