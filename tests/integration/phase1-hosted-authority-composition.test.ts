@@ -103,6 +103,19 @@ it('eight-player colony research resolves one competing transaction and replicat
     const ledger=c.bundle.items.exportLedgerSnapshot();
     sendCommand(c.host,clients[0]!,first);await c.step();
     expect(c.bundle.items.exportLedgerSnapshot()).toEqual(ledger);
+    const {composePhase1SaveV2,Phase1AuthorityBundle}=await import('../../src/integration');
+    const {reconstructPhase1ReopenState,createPhase1SaveV2Compatibility}=await import('../../src/persistence');
+    const request=composePhase1SaveV2(c.bundle,{nowUtc:'2026-09-30T00:00:00.000Z'});
+    const restored=reconstructPhase1ReopenState({...request,formatId:request.world.formatId,schemaVersion:request.world.schemaVersion,recordKind:'portable-bundle'},createPhase1SaveV2Compatibility(c.bundle.catalog,[3]));
+    expect(restored.ok).toBe(true);if(!restored.ok)throw Error(restored.message);
+    const reopened=await Phase1AuthorityBundle.create({...c.bundle.config,activatePlayersOnCreate:true,reopen:restored.value});
+    try {
+      expect(reopened.getActivePlayerIds()).toHaveLength(8);
+      expect(reopened.colonyDepth.read()).toEqual(c.bundle.colonyDepth.read());
+      expect(reopened.items.exportLedgerSnapshot()).toEqual(ledger);
+      await reopened.stepSolo();
+      expect(reopened.colonyDepth.read().researchIds).toEqual(['field-survey']);
+    } finally {await reopened.destroy();}
   } finally {await c.destroy();}
 });
 
