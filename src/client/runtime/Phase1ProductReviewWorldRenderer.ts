@@ -11,6 +11,7 @@ import type {
 } from '../../protocol';
 import {
   fromWorldPosition,
+  PHASE1_BUILD_ZONE_RADIUS_WU,
   toChunkLocalPosition,
   type Phase1StructureDefinitionId,
 } from '../../world';
@@ -156,17 +157,19 @@ function setWorldAnchor(
   width: number,
   height: number,
   zIndex?: number,
+  rasterOrigin: WorldPosition = camera,
 ): boolean {
-  const raster = distancePx(position, camera);
+  const visible = distancePx(position, camera);
   if (
-    raster.x < -VISIBLE_MARGIN_PX
-    || raster.x > INTERNAL_WIDTH + VISIBLE_MARGIN_PX
-    || raster.y < -VISIBLE_MARGIN_PX
-    || raster.y > INTERNAL_HEIGHT + VISIBLE_MARGIN_PX
+    visible.x < -VISIBLE_MARGIN_PX
+    || visible.x > INTERNAL_WIDTH + VISIBLE_MARGIN_PX
+    || visible.y < -VISIBLE_MARGIN_PX
+    || visible.y > INTERNAL_HEIGHT + VISIBLE_MARGIN_PX
   ) {
     return false;
   }
 
+  const raster = distancePx(position, rasterOrigin);
   element.style.position = 'absolute';
   element.style.left = String(raster.x - width / 2) + 'px';
   element.style.top = String(raster.y - height) + 'px';
@@ -183,16 +186,18 @@ function setWorldCenter(
   width: number,
   height: number,
   zIndex: number,
+  rasterOrigin: WorldPosition = camera,
 ): boolean {
-  const raster = distancePx(position, camera);
+  const visible = distancePx(position, camera);
   if (
-    raster.x < -VISIBLE_MARGIN_PX
-    || raster.x > INTERNAL_WIDTH + VISIBLE_MARGIN_PX
-    || raster.y < -VISIBLE_MARGIN_PX
-    || raster.y > INTERNAL_HEIGHT + VISIBLE_MARGIN_PX
+    visible.x < -VISIBLE_MARGIN_PX
+    || visible.x > INTERNAL_WIDTH + VISIBLE_MARGIN_PX
+    || visible.y < -VISIBLE_MARGIN_PX
+    || visible.y > INTERNAL_HEIGHT + VISIBLE_MARGIN_PX
   ) {
     return false;
   }
+  const raster = distancePx(position, rasterOrigin);
   element.style.position = 'absolute';
   element.style.left = String(raster.x - width / 2) + 'px';
   element.style.top = String(raster.y - height / 2) + 'px';
@@ -541,7 +546,36 @@ export function createPhase1ProductReviewWorldRenderer(
   layer.className = 'p1-product-world';
   layer.dataset.productReviewWorld = 'canonical';
   layer.dataset.productionAssetFoundation = 'p1-75-78';
+  // UNKNOWN content is never rendered. A single cloud backdrop fills the
+  // unrevealed area; only reveal-boundary cells need individual occluding masks.
+  layer.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
+  layer.style.backgroundSize = '128px 128px';
   layer.append(styleElement(document));
+  const worldStage = document.createElement('div');
+  worldStage.className = 'p1-product-world-stage';
+  worldStage.style.cssText = 'position:absolute;inset:0;will-change:transform;';
+  layer.append(worldStage);
+  const rasterOrigin = bundle.getPlayerPosition(playerId);
+  const rainFrames: string[] = [];
+  const rainAtlas = document.createElement('img');
+  rainAtlas.addEventListener('load', () => {
+    const frameCanvas = document.createElement('canvas');
+    frameCanvas.width = INTERNAL_WIDTH; frameCanvas.height = INTERNAL_HEIGHT;
+    const context = frameCanvas.getContext('2d');
+    if (context === null) return;
+    context.imageSmoothingEnabled = false;
+    for (let frame = 0; frame < 4; frame += 1) {
+      context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+      for (let y = -32; y < INTERNAL_HEIGHT; y += 48) for (let x = -32; x < INTERNAL_WIDTH; x += 48) {
+        const hash = stableDecorHash(x, y);
+        if (hash % 3 === 0) continue;
+        const index = (frame + hash) % 4;
+        context.drawImage(rainAtlas, index * 16, 0, 16, 16, x + hash % 16, y, 32, 32);
+      }
+      rainFrames.push(frameCanvas.toDataURL('image/png'));
+    }
+  }, { once: true });
+  rainAtlas.src = PHASE1_PRODUCTION_WORLD_SPRITES.coldRain.url;
 
   root.replaceChildren(canvas, layer);
 
@@ -550,6 +584,36 @@ export function createPhase1ProductReviewWorldRenderer(
   const playerDeathStartTick = new Map<string, number>();
   const previousPredatorHealth = new Map<string, number>();
   const predatorHurtStartTick = new Map<string, number>();
+  const retained = new Map<string, HTMLElement>();
+  const visibleKeys = new Set<string>();
+  const spriteKeys = new WeakMap<HTMLElement, string>();
+  const spriteDataKeys = new WeakMap<HTMLElement, readonly string[]>();
+  const sceneElement = (key: string): HTMLElement => {
+    visibleKeys.add(key);
+    let element = retained.get(key);
+    if (element === undefined) {
+      element = document.createElement('div');
+      retained.set(key, element);
+    }
+    return element;
+  };
+  const appendScene = (element: HTMLElement, screenSpace = false): void => {
+    const parent = screenSpace ? layer : worldStage;
+    if (element.parentElement !== parent) parent.append(element);
+  };
+  const applySprite = (element: HTMLElement, definition: Phase1ProductionSprite,
+    scale = 1, flipX = false): void => {
+    const key = [definition.url, definition.index, definition.cellWidth,
+      definition.cellHeight, definition.sourceWidth, definition.sourceHeight, scale, flipX].join(':');
+    if (spriteKeys.get(element) === key) return;
+    applyProductionSprite(element, definition, scale, flipX);
+    spriteKeys.set(element, key);
+  };
+  const inViewport = (position: WorldPosition, camera: WorldPosition): boolean => {
+    const point = distancePx(position, camera);
+    return point.x >= -VISIBLE_MARGIN_PX && point.x <= INTERNAL_WIDTH + VISIBLE_MARGIN_PX
+      && point.y >= -VISIBLE_MARGIN_PX && point.y <= INTERNAL_HEIGHT + VISIBLE_MARGIN_PX;
+  };
 
   const applyScale = (): void => {
     const scale = Math.max(
@@ -580,22 +644,30 @@ export function createPhase1ProductReviewWorldRenderer(
       readonly data?: Readonly<Record<string, string>>;
     } = {},
   ): HTMLElement | null => {
-    const element = document.createElement('div');
+    if (!inViewport(position, camera)) return null;
+    const element = sceneElement('sprite:' + role + ':' + id);
     element.className =
       'p1-product-sprite'
       + (options.className === undefined
         ? ''
         : ' ' + options.className);
-    if (id === getPresentationContext().focusedWorldTargetId) {
+    const focused = id === getPresentationContext().focusedWorldTargetId;
+    if (focused) {
       element.classList.add('p1-product-focused-target');
       element.dataset.focusedTarget = 'true';
     }
+    if (!focused) delete element.dataset.focusedTarget;
     element.dataset.worldRole = role;
     element.dataset.worldId = id;
-    for (const [key, value] of Object.entries(options.data ?? {})) {
+    const data = options.data ?? {};
+    for (const key of spriteDataKeys.get(element) ?? []) {
+      if (!(key in data)) delete element.dataset[key];
+    }
+    spriteDataKeys.set(element, Object.keys(data));
+    for (const [key, value] of Object.entries(data)) {
       element.dataset[key] = value;
     }
-    applyProductionSprite(
+    applySprite(
       element,
       spriteDefinition,
       1,
@@ -609,11 +681,12 @@ export function createPhase1ProductReviewWorldRenderer(
         spriteDefinition.cellWidth,
         spriteDefinition.cellHeight,
         options.zIndex,
+        rasterOrigin,
       )
     ) {
       return null;
     }
-    layer.append(element);
+    appendScene(element);
     return element;
   };
 
@@ -659,6 +732,7 @@ export function createPhase1ProductReviewWorldRenderer(
     for (let gy = minimumY; gy <= maximumY; gy += 1) {
       for (let gx = minimumX; gx <= maximumX; gx += 1) {
         const position = worldCell(gx, gy);
+        if (!inViewport(position, camera)) continue;
         const known = explorationCellKnown(bundle, gx, gy);
         const terrain = known
           ? terrainForCell(bundle, gx, gy)
@@ -667,20 +741,21 @@ export function createPhase1ProductReviewWorldRenderer(
           ? Math.floor(authorityTick / 15)
           : (stableDecorHash(Math.floor(gx / 3), Math.floor(gy / 3))
             + (stableDecorHash(gx, gy) % 7 === 0 ? 1 : 0)) % 4;
-        const tile = document.createElement('div');
+        if (known) {
+        const tile = sceneElement('terrain:' + String(gx) + ':' + String(gy));
         tile.className = 'p1-product-terrain';
         tile.dataset.worldRole = 'terrain';
         tile.dataset.terrainState = terrain;
         tile.dataset.explorationState =
           known ? 'EXPLORED' : 'UNEXPLORED';
-        applyProductionSprite(
+        applySprite(
           tile,
           terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
-        if (night) {
-          tile.style.filter = 'brightness(.78) saturate(.72)';
-        }
+        tile.style.filter = night ? 'brightness(.78) saturate(.72)' : '';
+        tile.style.boxShadow = '';
+        delete tile.dataset.terrainDepth;
         if (known && terrain === 'ground' && explorationCellKnown(bundle, gx, gy + 1)
           && terrainForCell(bundle, gx, gy + 1) === 'water') {
           tile.style.boxShadow = '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e';
@@ -695,9 +770,11 @@ export function createPhase1ProductReviewWorldRenderer(
             EXPLORATION_CELL_LOGICAL_PIXELS,
             EXPLORATION_CELL_LOGICAL_PIXELS / 2,
             tile.dataset.terrainDepth === 'raised-shore' ? -90000 : -100000,
+            rasterOrigin,
           )
         ) {
-          layer.append(tile);
+          appendScene(tile);
+        }
         }
 
         if (
@@ -734,13 +811,14 @@ export function createPhase1ProductReviewWorldRenderer(
         }
 
         if (!known) {
-          const fog = document.createElement('div');
+          const mask = fogAdjacencyMask(bundle, gx, gy);
+          if (mask === 15) continue;
+          const fog = sceneElement('fog:' + String(gx) + ':' + String(gy));
           fog.className = 'p1-product-fog';
           fog.dataset.worldRole = 'fog';
           fog.dataset.fogState = 'UNEXPLORED';
-          const mask = fogAdjacencyMask(bundle, gx, gy);
           fog.dataset.fogMask = String(mask);
-          applyProductionSprite(
+          applySprite(
             fog,
             fogMaskSprite(mask),
             EXPLORATION_CELL_RASTER_SCALE,
@@ -764,9 +842,10 @@ export function createPhase1ProductReviewWorldRenderer(
               EXPLORATION_CELL_LOGICAL_PIXELS,
               EXPLORATION_CELL_LOGICAL_PIXELS / 2,
               700000,
+              rasterOrigin,
             )
           ) {
-            layer.append(fog);
+            appendScene(fog);
           }
         }
       }
@@ -1065,11 +1144,14 @@ export function createPhase1ProductReviewWorldRenderer(
   };
 
   const render = (): void => {
-    const style = layer.querySelector('style');
-    layer.replaceChildren();
-    if (style !== null) layer.append(style);
+    visibleKeys.clear();
 
     const camera = bundle.getPlayerPosition(playerId);
+    const offset = projectPhase1Isometric(camera, rasterOrigin);
+    worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y) + 'px)';
+    // Atmospheric cloud drift is screen-space; camera motion must not repaint
+    // the full viewport backdrop on each simulation tick.
+    layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
     const environment = bundle.worldStore.getEnvironmentView();
     const context = getPresentationContext();
 
@@ -1081,11 +1163,11 @@ export function createPhase1ProductReviewWorldRenderer(
     );
 
     if (environment.dayPeriod === 'night') {
-      const night = document.createElement('div');
+      const night = sceneElement('night');
       night.className = 'p1-product-night';
       night.dataset.dayPeriod = 'NIGHT';
       night.dataset.nightTreatment = 'accepted-value-treatment';
-      layer.append(night);
+      appendScene(night, true);
     }
 
     for (const entity of bundle.world.getActiveGeneratedEntities()) {
@@ -1161,11 +1243,13 @@ export function createPhase1ProductReviewWorldRenderer(
       { id: 'grazer-pen', position: PEN_POSITION, built: colony.penBuilt },
     ]) {
       if (!worldPositionKnown(bundle, site.position)) continue;
-      const pad = document.createElement('div');
+      if (!inViewport(site.position, camera)) continue;
+      const pad = sceneElement('colony-site:' + site.id);
       pad.dataset.worldRole = site.id;
       pad.dataset.built = String(site.built);
-      if (!setWorldCenter(pad, site.position, camera, 52, 36, Math.round((site.position.x + site.position.y) * 1000))) continue;
+      if (!setWorldCenter(pad, site.position, camera, 52, 36, Math.round((site.position.x + site.position.y) * 1000), rasterOrigin)) continue;
       pad.style.width = '52px'; pad.style.height = '36px';
+      if (pad.childElementCount === 0) {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.setAttribute('viewBox', '0 0 52 36'); svg.setAttribute('shape-rendering', 'crispEdges');
       svg.style.width = '52px'; svg.style.height = '36px';
@@ -1180,11 +1264,15 @@ export function createPhase1ProductReviewWorldRenderer(
         path.setAttribute('d', geometry); path.setAttribute('fill', fill); svg.append(path);
       }
       pad.append(svg);
-      pad.style.opacity = site.built ? '1' : '.45';
       const label = document.createElement('span');
-      label.textContent = (site.id === 'cultivation-bed' ? 'BED' : 'PEN') + (site.built ? '' : ' · N');
       label.style.cssText = 'font:6px monospace;color:#d8e8db;position:absolute;bottom:1px;left:8px';
-      pad.append(label); layer.append(pad);
+      pad.append(label);
+      }
+      pad.style.opacity = site.built ? '1' : '.45';
+      const label = pad.querySelector('span')!;
+      const labelText = (site.id === 'cultivation-bed' ? 'BED' : 'PEN') + (site.built ? '' : ' · N');
+      if (label.textContent !== labelText) label.textContent = labelText;
+      appendScene(pad);
       if (site.id === 'cultivation-bed' && colony.cropProgressTicks !== null) {
         for (const offset of [-1, 0, 1]) renderSprite(PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor,
           { x: site.position.x + offset, y: site.position.y }, camera, 'cultivated-crop', 'crop:' + String(offset));
@@ -1244,6 +1332,8 @@ export function createPhase1ProductReviewWorldRenderer(
       ) {
         continue;
       }
+      const container = bundle.items.getContainerView(drop.containerId);
+      if (container.stacks.length === 0) continue;
       renderSprite(
         PHASE1_PRODUCTION_WORLD_SPRITES.worldDrop,
         drop.position,
@@ -1255,7 +1345,6 @@ export function createPhase1ProductReviewWorldRenderer(
           zIndex: 890000,
         },
       );
-      const container = bundle.items.getContainerView(drop.containerId);
       const stack = container.stacks[0];
       if (stack !== undefined) {
         const displayName =
@@ -1285,6 +1374,19 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     if (context.buildPreview !== null) {
+      for (const anchor of bundle.buildings.exportSnapshot().foothold.structures.filter(structure =>
+        (structure.definitionId === 'structure:landing-module' || structure.definitionId === 'structure:habitat-room')
+        && worldPositionKnown(bundle, structure.position))) {
+      const zone = sceneElement('build-zone:' + anchor.structureId);
+      zone.dataset.worldRole = 'build-zone';
+      const width = Math.round(PHASE1_BUILD_ZONE_RADIUS_WU * Math.SQRT2 * 32);
+      const height = Math.round(width / 2);
+      setWorldCenter(zone, anchor.position, camera, width, height, -30000, rasterOrigin);
+      zone.style.width = String(width) + 'px'; zone.style.height = String(height) + 'px';
+      zone.style.border = '1px dashed #b3d5c1'; zone.style.borderRadius = '50%';
+      zone.style.background = 'rgba(113,170,133,.06)';
+      appendScene(zone);
+      }
       renderBuildPreview(context.buildPreview, camera);
     }
 
@@ -1322,30 +1424,51 @@ export function createPhase1ProductReviewWorldRenderer(
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
     if (environment.coldRainStatus === 'active') {
-      const weather = document.createElement('div');
+      const weather = sceneElement('weather:rain');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
-      for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {
+      if (rainFrames.length === 4) {
+        const frame = Math.floor(bundle.authorityTick / 6) % 4;
+        if (spriteKeys.get(weather) !== 'rain-frame:' + String(frame)) {
+          weather.style.backgroundImage = 'url("' + rainFrames[frame]! + '")';
+          weather.style.backgroundSize = '640px 360px';
+          weather.style.backgroundRepeat = 'no-repeat';
+          spriteKeys.set(weather, 'rain-frame:' + String(frame));
+        }
+      } else for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {
         for (let x = -32; x < INTERNAL_WIDTH; x += 48) {
           const hash = stableDecorHash(x, y);
           if (hash % 3 === 0) continue;
-          const streak = document.createElement('div');
-          applyProductionSprite(streak, coldRainSprite('RAIN_STREAK',
+          const streak = sceneElement('weather:streak:' + String(x) + ':' + String(y));
+          applySprite(streak, coldRainSprite('RAIN_STREAK',
             ((Math.floor(bundle.authorityTick / 6) + hash) % 4) as 0 | 1 | 2 | 3), 2);
-          streak.style.cssText += ';position:absolute;left:' + String(x + hash % 16)
-            + 'px;top:' + String(y) + 'px';
-          weather.append(streak);
+          streak.style.position = 'absolute';
+          streak.style.left = String(x + hash % 16) + 'px';
+          streak.style.top = String(y) + 'px';
+          if (streak.parentElement !== weather) weather.append(streak);
         }
       }
-      const atmosphere = document.createElement('div');
+      const atmosphere = sceneElement('weather:atmosphere');
       atmosphere.dataset.weatherEffect = 'atmospheric-mass';
       const drift = Math.floor(bundle.authorityTick / 90) % 64;
+      if (atmosphere.dataset.drift !== String(drift)) {
       atmosphere.style.cssText = 'position:absolute;inset:-64px;z-index:790000;pointer-events:none;opacity:.12;'
         + 'background-image:url("' + PHASE1_PRODUCTION_WORLD_SPRITES.weatherDither.url + '");'
         + 'background-position:' + String(drift) + 'px ' + String(-drift) + 'px;'
         + 'clip-path:polygon(0 0,42% 0,34% 18%,63% 34%,100% 12%,100% 52%,66% 70%,28% 48%,0 68%);';
-      layer.append(atmosphere);
-      layer.append(weather);
+      atmosphere.dataset.drift = String(drift);
+      }
+      appendScene(atmosphere, true);
+      appendScene(weather, true);
+    }
+
+    // Remove only entities that actually leave the visible canonical scene.
+    // Repeated rendering preserves node/texture identity and does not churn DOM.
+    for (const [key, element] of retained) {
+      if (!visibleKeys.has(key)) {
+        element.remove();
+        retained.delete(key);
+      }
     }
 
     canvas.dataset.playerX = camera.x.toFixed(6);
@@ -1368,6 +1491,7 @@ export function createPhase1ProductReviewWorldRenderer(
     destroy(): void {
       targetWindow.removeEventListener('resize', applyScale);
       layer.remove();
+      retained.clear();
       canvas.remove();
     },
   });

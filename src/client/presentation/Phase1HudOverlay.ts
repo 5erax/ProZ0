@@ -134,7 +134,7 @@ function meter(
   if (icon !== null) {
     label.append(icon);
   }
-  label.append(presentation.label.toUpperCase());
+  label.append(createElement(document, 'span', 'p1-meter-label-copy', presentation.label.toUpperCase()));
 
   const track = createElement(document, 'div', 'p1-meter-track');
   const fill = createElement(document, 'div', 'p1-meter-fill');
@@ -493,9 +493,9 @@ function renderPanel(
             0.5,
           );
           if (outputIcon !== null) outputToken.append(outputIcon);
-          outputToken.append(
-            String(outputState.quantity) + '× ' + outputState.name,
-          );
+          outputToken.title = outputState.name;
+          outputToken.append(String(outputState.quantity) + '× ',
+            createElement(document, 'span', 'p1-visually-hidden', outputState.name));
           output.append(outputToken);
         }
         if ((rowState.outputs?.length ?? 0) === 0) {
@@ -530,9 +530,10 @@ function renderPanel(
               icon.setAttribute('aria-hidden', 'true');
               token.append(icon);
             }
+            token.title = ingredient.name;
+            token.append(createElement(document, 'span', 'p1-visually-hidden', ingredient.name + ' '));
             token.append(
-              ingredient.name
-              + ' '
+              ' '
               + String(ingredient.have)
               + '/'
               + String(ingredient.need),
@@ -563,6 +564,10 @@ function renderPanel(
           'p1-craft-state',
           rowState.reason ?? rowState.state,
         ));
+        const craft = actionButton(document, 'Craft', 'craft-recipe:' + rowState.id);
+        craft.setAttribute('aria-label', 'Craft ' + rowState.outputLabel);
+        craft.disabled = rowState.state !== 'AVAILABLE';
+        footer.append(craft);
         row.append(footer);
         list.append(row);
       }
@@ -579,9 +584,12 @@ function renderPanel(
       for (const entry of panel.catalogEntries ?? []) {
         const row = createElement(
           document,
-          'div',
+          'button',
           'p1-build-catalog-entry',
         );
+        row.setAttribute('type', 'button');
+        row.setAttribute('aria-label', 'Select ' + entry.name);
+        row.dataset.reviewAction = 'build-select:' + entry.structureId;
         row.dataset.structureId = entry.structureId;
         row.dataset.selected = String(entry.selected);
         row.dataset.buildCapState = entry.buildCapState;
@@ -632,12 +640,11 @@ function renderPanel(
             entry.sourceKitName
               + ' ×'
               + String(entry.availableKitCount)
-              + ' · CAP '
+              + ' · '
               + String(entry.builtCount)
               + '/'
               + String(entry.buildCap)
-              + ' · '
-              + entry.buildCapState,
+              + (entry.buildCapState === 'CAP REACHED' ? ' · FULL' : ''),
           ),
         );
         row.append(copy);
@@ -671,6 +678,14 @@ function renderPanel(
       if (panel.reason !== null) {
         root.append(createElement(document, 'div', 'p1-feedback', panel.reason));
       }
+      const actions = createElement(document, 'div', 'p1-build-actions');
+      const place = actionButton(document, 'Place [Enter]', 'build-place');
+      place.disabled = panel.placementState === 'INVALID';
+      actions.append(actionButton(document, 'Prepare kit', 'build-prepare'),
+        actionButton(document, 'Rotate [R]', 'build-rotate'),
+        actionButton(document, '← Connector', 'build-connector-previous'),
+        actionButton(document, 'Connector →', 'build-connector-next'), place);
+      root.append(actions);
       return root;
     }
 
@@ -1116,7 +1131,22 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel[data-panel-kind="colony"]{left:8px;top:50px;width:250px;max-height:300px;transform:none;padding:6px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-panel-title{margin-bottom:3px;}',
     '.p1-panel[data-panel-kind="craft"] .p1-craft-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;}',
-    '.p1-panel[data-panel-kind="build"]{left:8px;top:54px;width:204px;max-height:252px;transform:none;padding:6px;}',
+    '.p1-panel[data-panel-kind="build"]{left:8px;top:54px;width:204px;max-height:288px;transform:none;padding:6px;}',
+    '.p1-build-actions{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:4px;}',
+    '.p1-panel[data-panel-kind="build"]{display:flex;flex-direction:column;}',
+    '.p1-panel[data-panel-kind="build"] .p1-build-catalog{max-height:148px;overflow:auto;flex:1 1 auto;min-height:0;}',
+    '.p1-panel[data-panel-kind="build"] .p1-build-name{display:none;}',
+    '.p1-panel[data-panel-kind="build"] .p1-build-preview{width:48px;height:16px;margin:2px auto;flex-shrink:0;}',
+    '.p1-build-actions .p1-action{padding:2px;min-height:16px;}',
+    '.p1-build-actions .p1-action:last-child{grid-column:1/-1;}',
+    '.p1-build-catalog-entry{font:inherit;color:inherit;background:#111a22;text-align:left;cursor:pointer;}',
+    '.p1-action:disabled{opacity:.45;cursor:default;}',
+    '.p1-action-dock{position:absolute;right:8px;bottom:64px;display:flex;gap:3px;pointer-events:auto;}',
+    '.p1-ui[data-panel-open="true"] .p1-action-dock{bottom:4px;z-index:2;}',
+    '.p1-action-dock button{display:grid;place-items:center;width:28px;height:32px;padding:2px;background:#111a22;color:#d8e8db;border:1px solid #7d939b;cursor:pointer;font:7px monospace;}',
+    '.p1-survival .p1-meter-label-copy{display:none;}',
+    '.p1-survival{width:96px!important;}',
+    '.p1-survival .p1-meter{grid-template-columns:12px 42px 18px 8px;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
@@ -1220,6 +1250,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private readonly canvas: HTMLCanvasElement;
   private currentState: Phase1PresentationState;
   private panelSignature = '';
+  private displaySignature = '';
 
   public constructor(
     private readonly root: HTMLElement,
@@ -1262,6 +1293,24 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   private render(): void {
     const state = this.currentState;
+    // Meter text and bars are whole-unit pixels. Keep the exact diagnostic
+    // values current without rebuilding the HUD for subpixel survival changes.
+    const meters = [state.health, state.water, state.food, state.stamina, state.temperature];
+    this.layer.querySelectorAll<HTMLElement>('.p1-survival .p1-meter').forEach((element, index) => {
+      const value = String(meters[index]!.value);
+      if (element.dataset.value !== value) element.dataset.value = value;
+    });
+    const roundedMeter = (value: Phase1MeterPresentation) => ({ ...value, value: Math.round(value.value) });
+    const displaySignature = JSON.stringify({
+      ...state,
+      health: roundedMeter(state.health), water: roundedMeter(state.water),
+      food: roundedMeter(state.food), stamina: roundedMeter(state.stamina),
+      temperature: roundedMeter(state.temperature),
+      interaction: state.interaction === null ? null : { ...state.interaction,
+        progress: state.interaction.progress === null ? null : Math.round(state.interaction.progress * 100) / 100 },
+    });
+    if (displaySignature === this.displaySignature) return;
+    this.displaySignature = displaySignature;
     const panelOpen = state.panel !== null;
     this.layer.dataset.panelOpen = String(panelOpen);
     this.root.dataset.productReviewPanelOpen = String(panelOpen);
@@ -1363,7 +1412,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
           '[' + inputLabel + ']',
         ));
         if (slot === null) {
-          row.append(emptyLabel + ' · —');
+          row.title = emptyLabel + ' · none';
+          const emptyIcon = assetSprite(this.document, 'p1-asset-icon p1-equipment-icon',
+            itemIconSprite(key === 'weapon' ? 'Basic Spear' : 'Thermal Wrap'));
+          if (emptyIcon !== null) { emptyIcon.style.opacity = '.35'; row.append(emptyIcon); }
+          row.append(createElement(this.document, 'span', 'p1-visually-hidden', emptyLabel), '—');
         } else {
           const icon = assetSprite(
             this.document,
@@ -1385,7 +1438,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
                 + '/'
                 + String(slot.conditionMax));
           row.dataset.equipmentState = slot.stateLabel;
-          row.append(slot.name + conditionLabel);
+          row.append(createElement(this.document, 'span', 'p1-visually-hidden', slot.name), conditionLabel);
           if (
             slot.condition !== null
             && slot.conditionMax !== null
@@ -1497,14 +1550,35 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     this.layer.append(survival, world, equipment, carry, toasts, team);
+    const dock = createElement(this.document, 'nav', 'p1-action-dock');
+    dock.setAttribute('aria-label', 'Game actions');
+    for (const [label, key, action, sprite, scale] of [
+      ['Inventory', 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
+      ['Craft', 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
+      ['Build base', 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
+      ['Map', 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
+      ['Colony', 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
+    ] as const) {
+      const button = actionButton(this.document, '', action);
+      button.setAttribute('aria-label', label + ' [' + key + ']'); button.title = label + ' [' + key + ']';
+      const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
+      if (icon !== null) button.append(icon);
+      button.append(createElement(this.document, 'span', '', key)); dock.append(button);
+    }
+    this.layer.append(dock);
 
     if (state.firstActionCue !== undefined && state.firstActionCue !== null) {
       const firstAction = createElement(
         this.document,
         'div',
         'p1-first-action p1-context-hud',
-        state.firstActionCue,
       );
+      firstAction.title = state.firstActionCue;
+      firstAction.append(createElement(this.document, 'span', 'p1-visually-hidden', state.firstActionCue));
+      const cueIcon = assetSprite(this.document, 'p1-asset-icon', interactionSprite('GATHER'));
+      if (cueIcon !== null) firstAction.append(cueIcon);
+      firstAction.append(state.interaction?.verb === 'GATHER' && state.interaction.state === 'AVAILABLE'
+        ? ' E · Gather' : ' WASD · Move');
       firstAction.dataset.firstActionCue = 'visible';
       this.layer.append(firstAction);
     }

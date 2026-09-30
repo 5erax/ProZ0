@@ -969,7 +969,7 @@ async function openProductReview(
   await expect.poll(
     async () => root.getAttribute('data-runtime-status'),
     { timeout: 5_000 },
-  ).not.toBe('booting');
+  ).toMatch(/^(ready|failed)$/);
   const runtimeStatus = await root.getAttribute('data-runtime-status');
   page.off('console', onConsole);
   page.off('pageerror', onPageError);
@@ -1344,6 +1344,15 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
       '.p1-build-catalog-entry',
     );
     await expect(buildEntries).toHaveCount(5);
+    for (const action of ['build-prepare', 'build-rotate', 'build-connector-previous', 'build-connector-next', 'build-place']) {
+      const button = buildPanel.locator('[data-review-action="' + action + '"]');
+      await expect(button).toBeVisible();
+      expect(await button.evaluate(element => {
+        const bounds = element.getBoundingClientRect();
+        const panel = element.closest('.p1-panel')!.getBoundingClientRect();
+        return bounds.top >= panel.top && bounds.bottom <= panel.bottom + 1;
+      })).toBe(true);
+    }
     expect(await buildEntries.evaluateAll((entries) =>
       entries.map((entry) =>
         (entry as HTMLElement).dataset.structureId,
@@ -1369,7 +1378,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
         'data-build-cap',
         /[1-9][0-9]*/,
       );
-      await expect(entry).toContainText(/AVAILABLE|CAP REACHED/);
+      await expect(entry).toHaveAttribute('data-build-cap-state', /AVAILABLE|CAP REACHED/);
     }
     expect(await buildEntries.evaluateAll((entries) =>
       entries.filter((entry) =>
@@ -2611,8 +2620,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     3,
   );
   await page.keyboard.press('b');
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Tab');
+  await page.getByRole('button', { name: 'Select Habitat Room', exact: true }).click();
   await expect(
     page.locator('[data-world-role="build-preview"]'),
   ).toHaveAttribute('data-placement-state', 'CONNECTOR');
@@ -2981,10 +2989,15 @@ test('colony: harvests once and renders a persistent captive grazer with care fe
   await page.keyboard.press('Escape'); await page.keyboard.press('i');
   await expect(page.locator('[data-panel-kind="inventory"] .p1-item-row').filter({ hasText: 'Edible Plant' })).toContainText('×4');
   await page.keyboard.press('Escape');
-  await page.keyboard.down('s'); await page.keyboard.down('d');
-  await expect.poll(async () => Number(await page.locator('canvas').getAttribute('data-player-x')),
-    { timeout: 10_000, intervals: [25] }).toBeGreaterThanOrEqual(5.8);
-  await page.keyboard.up('s'); await page.keyboard.up('d');
+  // Release before observing so a slow browser cannot keep walking beyond the pen.
+  for (let step = 0; step < 100; step += 1) {
+    const x = Number(await page.locator('canvas').getAttribute('data-player-x'));
+    if (Math.abs(x - 6) <= .65) break;
+    const keys = x < 6 ? ['s', 'd'] : ['w', 'a'];
+    for (const key of keys) await page.keyboard.down(key);
+    await page.waitForTimeout(100);
+    for (const key of keys.toReversed()) await page.keyboard.up(key);
+  }
   await page.keyboard.press('n');
   await page.locator('[data-review-action="colony:care"]').click();
   await expect(panel).toContainText('CARE · DONE');
@@ -3017,6 +3030,164 @@ test('environment: isometric clear and rain day/night remain readable at 1x 2x 3
       await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x.png') });
       await page.locator('[data-proz0-autoboot]').evaluate(element => { (element as HTMLElement).style.filter = 'grayscale(1)'; });
       await page.screenshot({ path: resolve(EVIDENCE_DIR, 'environment-' + scene.name + '-' + String(scale) + 'x-gray.png') });
+    }
+  }
+});
+
+test('base facilities: mouse selection, real placement, kit consumption and saved reopen', async ({ page }) => {
+  test.setTimeout(90_000);
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+  const targets = [
+    { name: 'Storage Crate', id: 'structure:storage-crate', kit: 'item:storage-crate-kit', x: -3, y: 0 },
+    { name: 'Workbench', id: 'structure:workbench', kit: 'item:workbench-kit', x: 3, y: 0 },
+    { name: 'Compact Power Unit', id: 'structure:compact-power-unit', kit: 'item:power-unit-kit', x: 0, y: -4 },
+    { name: 'Atmospheric Water Condenser', id: 'structure:atmospheric-water-condenser', kit: 'item:machine-kit', x: 0, y: 4 },
+    { name: 'Habitat Room', id: 'structure:habitat-room', kit: 'item:habitat-kit', x: 0, y: 0 },
+  ];
+  for (const target of targets) {
+    // One validated kit per fixture respects the real carry cap. It isolates
+    // construction controls from gathering and never bypasses placement guards.
+    const base = await createBaseSave('world:base-controls-' + target.id, [{ playerId: 'builder', x: 0, y: 0, facing: 'E' }], authority => {
+      const inventory = authority.items.getContainerView('inventory:builder');
+      const result = authority.items.commitColonyExchange({ operationId: 'fixture:construction-kit', playerId: 'builder',
+        expectedInventoryRevision: inventory.revision, inputs: [], outputs: [{ itemDefinitionId: target.kit, quantity: 1 }] });
+      expect(result.status).toBe('committed');
+    });
+    await openProductReview(page, base, 'base-controls-' + target.id, 2, 'builder');
+    await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
+    await page.getByRole('button', { name: 'Select ' + target.name, exact: true }).click();
+    if (target.id === 'structure:habitat-room') {
+      for (let attempt = 0; attempt < 4 && await page.locator('.p1-build-preview').getAttribute('data-placement-state') === 'INVALID'; attempt += 1) {
+        await page.getByRole('button', { name: 'Connector →', exact: true }).click();
+      }
+      await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state', 'CONNECTOR');
+      await page.getByRole('button', { name: 'Place [Enter]', exact: true }).click();
+    } else {
+      const canvas = await page.locator('canvas').boundingBox();
+      if (canvas === null) throw new Error('Missing world canvas.');
+      const x = canvas.x + (320 + (target.x - target.y) * 16) * 2;
+      const y = canvas.y + (180 + (target.x + target.y) * 8) * 2;
+      await page.mouse.move(x, y);
+      await expect(page.locator('[data-world-role="build-preview"]')).toHaveAttribute('data-placement-state', 'VALID');
+      await page.mouse.click(x, y);
+    }
+    const entry = page.locator('[data-structure-id="' + target.id + '"]');
+    await expect(entry).toHaveAttribute('data-built-count', '1');
+    await expect(entry).toHaveAttribute('data-available-kit-count', '0');
+    await expect(page.locator('[data-world-role="structure"]')).toHaveCount(2);
+    await captureViewport(page, 'base-' + target.id.replace('structure:', '') + '-2x.png');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('l');
+    await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state', 'success');
+    await page.reload();
+    await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened', 'true');
+    await expect(page.locator('[data-world-role="structure"]')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
+    await expect(page.locator('[data-structure-id="' + target.id + '"]')).toHaveAttribute('data-built-count', '1');
+    await expect(page.locator('[data-structure-id="' + target.id + '"]')).toHaveAttribute('data-available-kit-count', '0');
+  }
+  await page.getByRole('button', { name: 'Select Storage Crate', exact: true }).click();
+  await page.getByRole('button', { name: 'Prepare kit', exact: true }).click();
+  await expect(page.locator('[data-panel-kind="craft"] .p1-craft-row').filter({ hasText: 'Storage Crate Kit' })).toBeVisible();
+});
+
+test('base starter loop: mouse crafts material into kits and places storage and workbench', async ({ page }) => {
+  // Raw material fixture; the game must craft and consume every intermediate item.
+  const base = await createBaseSave('world:base-starter-loop', [{ playerId: 'builder', x: 0, y: 0, facing: 'E' }], authority => {
+    const inventory = authority.items.getContainerView('inventory:builder');
+    const result = authority.items.commitColonyExchange({ operationId: 'fixture:raw-materials', playerId: 'builder',
+      expectedInventoryRevision: inventory.revision, inputs: [], outputs: [
+        { itemDefinitionId: 'item:timber', quantity: 8 }, { itemDefinitionId: 'item:stone', quantity: 4 },
+        { itemDefinitionId: 'item:plant-fiber', quantity: 12 },
+      ] });
+    expect(result.status).toBe('committed');
+  });
+  await openProductReview(page, base, 'base-starter-loop-db', 2, 'builder');
+  await page.getByRole('button', { name: 'Craft [C]', exact: true }).click();
+  for (let count = 0; count < 4; count += 1) await page.locator('[data-review-action="craft-recipe:recipe:cordage"]').click();
+  for (const target of [
+    { name: 'Storage Crate', id: 'structure:storage-crate', recipe: 'recipe:storage-crate-kit', x: -3 },
+    { name: 'Workbench', id: 'structure:workbench', recipe: 'recipe:workbench-kit', x: 3 },
+  ]) {
+    await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
+    await page.getByRole('button', { name: 'Select ' + target.name, exact: true }).click();
+    await page.getByRole('button', { name: 'Prepare kit', exact: true }).click();
+    const craft = page.locator('[data-review-action="craft-recipe:' + target.recipe + '"]');
+    await expect(craft).toBeEnabled();
+    await craft.click();
+    await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
+    await page.getByRole('button', { name: 'Select ' + target.name, exact: true }).click();
+    await page.mouse.move((320 + target.x * 16) * 2, (180 + target.x * 8) * 2);
+    await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state', 'VALID');
+    await page.getByRole('button', { name: 'Place [Enter]', exact: true }).click();
+    await expect(page.locator('[data-structure-id="' + target.id + '"]')).toHaveAttribute('data-built-count', '1');
+    await expect(page.locator('[data-structure-id="' + target.id + '"]')).toHaveAttribute('data-available-kit-count', '0');
+    await page.keyboard.press('Escape');
+  }
+  await expect(page.locator('[data-world-role="structure"]')).toHaveCount(3);
+});
+
+test('full scene frame pacing: clear and night rain stay responsive while idle and moving', async ({ page }) => {
+  test.setTimeout(90_000);
+  mkdirSync(EVIDENCE_DIR, { recursive: true });
+  const base = await createBaseSave('world:full-scene-fps', [{ playerId: 'observer', x: 18, y: 10, facing: 'S' }]);
+  const reports: unknown[] = [];
+  const retainReports = () => writeFileSync(resolve(EVIDENCE_DIR, 'full-scene-fps.json'), JSON.stringify({
+    sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? 'local-working-tree',
+    mode: 'canonical-product-review', sampleDurationMs: 3_000,
+    threshold: { fpsMinimum: 50, p95FrameMsMaximum: 34 }, samples: reports,
+  }, null, 2) + '\n', 'utf8');
+  for (const scene of [{ name: 'clear-day', save: base }, { name: 'day-rain', save: withAuthorityTick(base, 152_000) },
+    { name: 'night-rain', save: withAuthorityTick(base, 135_000) }]) {
+    await openProductReview(page, scene.save, 'fps-' + scene.name, 2, 'observer');
+    for (const moving of [false, true]) {
+      const report = await page.evaluate(async (move) => {
+        const world = document.querySelector('[data-product-review-world="canonical"]')!;
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+        const tickBefore = Number(canvas.dataset.authorityTick);
+        const origin = { x: Number(canvas.dataset.playerX), y: Number(canvas.dataset.playerY) };
+        let maximumDistance = 0;
+        const intervals: number[] = [];
+        let added = 0; let removed = 0;
+        const observer = new MutationObserver(records => {
+          for (const record of records) { added += record.addedNodes.length; removed += record.removedNodes.length; }
+        });
+        observer.observe(world, { childList: true, subtree: true });
+        const nodes = world.querySelectorAll('*').length;
+        const start = performance.now(); let previous = start; let key: string | null = null;
+        await new Promise<void>(resolveFrames => {
+          const frame = (now: number) => {
+            intervals.push(now - previous); previous = now;
+            maximumDistance = Math.max(maximumDistance, Math.hypot(
+              Number(canvas.dataset.playerX) - origin.x, Number(canvas.dataset.playerY) - origin.y));
+            if (move) {
+              const next = ['KeyD', 'KeyS', 'KeyA', 'KeyW'][Math.floor((now - start) / 500) % 4]!;
+              if (next !== key) {
+                if (key !== null) document.dispatchEvent(new KeyboardEvent('keyup', { code: key, bubbles: true }));
+                document.dispatchEvent(new KeyboardEvent('keydown', { code: next, bubbles: true })); key = next;
+              }
+            }
+            if (now - start < 3_000) requestAnimationFrame(frame); else resolveFrames();
+          };
+          requestAnimationFrame(frame);
+        });
+        if (key !== null) document.dispatchEvent(new KeyboardEvent('keyup', { code: key, bubbles: true }));
+        observer.disconnect();
+        const elapsed = previous - start;
+        const sorted = [...intervals].sort((a, b) => a - b);
+        return { fps: intervals.length * 1000 / elapsed, p95Ms: sorted[Math.floor(sorted.length * 0.95)]!,
+          frames: intervals.length, elapsedMs: elapsed, viewport: [innerWidth, innerHeight], userAgent: navigator.userAgent,
+          authorityTicks: Number(canvas.dataset.authorityTick) - tickBefore, maximumDistance,
+          over50Ms: intervals.filter(ms => ms > 50).length, nodes, added, removed };
+      }, moving);
+      reports.push({ scene: scene.name, moving, ...report });
+      retainReports();
+      // A full game frame budget, independently of the existing input latency gate.
+      expect(report.fps).toBeGreaterThanOrEqual(50);
+      expect(report.p95Ms).toBeLessThanOrEqual(34);
+      expect(report.authorityTicks).toBeGreaterThan(100);
+      if (moving) expect(report.maximumDistance).toBeGreaterThan(0.2);
+      if (!moving) expect(report.added + report.removed).toBeLessThan(report.nodes);
     }
   }
 });

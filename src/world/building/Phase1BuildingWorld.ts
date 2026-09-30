@@ -388,43 +388,31 @@ export class Phase1BuildingWorld {
     return this.isSheltered(position) ? 50 : null;
   }
 
-  public reservePlacement(request: {
-    readonly operationId: string;
-    readonly commandFingerprint: string;
-    readonly actorPlayerId: PlayerId;
-    readonly definitionId: Exclude<
-      Phase1StructureDefinitionId,
-      'structure:landing-module'
-    >;
-    readonly expectedBuildRevision: number;
-    readonly placement: PlacementIntent;
-  }): PlacementReservation | PlacementRejectionReason {
-    if (request.expectedBuildRevision !== this.buildRevision) {
-      return 'WORLD_STATE_CHANGED';
-    }
-    const existing = this.pendingPlacements.get(request.operationId);
-    if (existing !== undefined) return existing.reservation;
-
+  /** Read-only assessment shared by visible preview and placement command. */
+  public assessPlacement(
+    definitionId: Exclude<Phase1StructureDefinitionId, 'structure:landing-module'>,
+    placement: PlacementIntent,
+  ): Readonly<Pick<PlacementReservation, 'finalPosition' | 'orientationQuarterTurns' | 'targetConnectorId'>> | PlacementRejectionReason {
     if (
-      this.countDefinition(request.definitionId)
-      >= CAPS[request.definitionId]
+      this.countDefinition(definitionId)
+      >= CAPS[definitionId]
     ) {
       return 'BUILD_LIMIT_REACHED';
     }
 
     const profile = PHASE1_STRUCTURE_PLACEMENT_PROFILES[
-      request.definitionId
+      definitionId
     ];
     let finalPosition: WorldPosition;
     let orientation: QuarterTurn;
     let targetConnectorId: ConnectorId | null = null;
 
-    if (request.definitionId === 'structure:habitat-room') {
-      if (request.placement.mode !== 'connector') {
+    if (definitionId === 'structure:habitat-room') {
+      if (placement.mode !== 'connector') {
         return 'CONNECTOR_REQUIRED';
       }
       const connector = this.connectors.get(
-        request.placement.targetConnectorId,
+        placement.targetConnectorId,
       );
       if (
         connector === undefined
@@ -458,22 +446,47 @@ export class Phase1BuildingWorld {
         connector.localConnectorKey,
       );
     } else {
-      if (request.placement.mode !== 'free') {
+      if (placement.mode !== 'free') {
         return 'INVALID_CONNECTOR';
       }
       finalPosition = createWorldPosition(
-        request.placement.anchor.x,
-        request.placement.anchor.y,
+        placement.anchor.x,
+        placement.anchor.y,
       );
-      orientation = request.placement.orientationQuarterTurns;
+      orientation = placement.orientationQuarterTurns;
     }
 
     const spatialFailure = this.validateSpatial(
-      request.definitionId,
+      definitionId,
       finalPosition,
       orientation,
     );
     if (spatialFailure !== null) return spatialFailure;
+
+    return Object.freeze({ finalPosition, orientationQuarterTurns: orientation, targetConnectorId });
+  }
+
+  public reservePlacement(request: {
+    readonly operationId: string;
+    readonly commandFingerprint: string;
+    readonly actorPlayerId: PlayerId;
+    readonly definitionId: Exclude<
+      Phase1StructureDefinitionId,
+      'structure:landing-module'
+    >;
+    readonly expectedBuildRevision: number;
+    readonly placement: PlacementIntent;
+  }): PlacementReservation | PlacementRejectionReason {
+    if (request.expectedBuildRevision !== this.buildRevision) {
+      return 'WORLD_STATE_CHANGED';
+    }
+    const existing = this.pendingPlacements.get(request.operationId);
+    if (existing !== undefined) return existing.reservation;
+
+    const assessment = this.assessPlacement(request.definitionId, request.placement);
+    if (typeof assessment === 'string') return assessment;
+    const { finalPosition, orientationQuarterTurns: orientation, targetConnectorId } = assessment;
+    const profile = PHASE1_STRUCTURE_PLACEMENT_PROFILES[request.definitionId];
 
     const structureId = `structure-instance:${request.operationId}`;
     if (this.structures.has(structureId)) {

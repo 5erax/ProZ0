@@ -904,7 +904,7 @@ describe('Phase 0 browser runtime', () => {
     const panel =
       root.querySelector<HTMLElement>('[data-panel-kind="build"]');
     expect(panel).not.toBeNull();
-    expect(panel?.textContent).toContain('TAB STRUCTURE');
+    expect(panel?.querySelector('[data-review-action="build-select:structure:storage-crate"]')).not.toBeNull();
     expect(panel?.textContent).toContain('KIT UNAVAILABLE');
 
     document.dispatchEvent(new KeyboardEvent('keydown', {

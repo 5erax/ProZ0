@@ -1,5 +1,5 @@
-import type { PlayerId } from '../../foundation';
-import { phase1IsometricInput } from './Phase1IsometricProjection';
+import type { PlayerId, WorldPosition } from '../../foundation';
+import { phase1IsometricInput, unprojectPhase1Isometric } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION, GRAZER_CARE_TICKS, type ColonySustenanceAction }
   from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
@@ -269,6 +269,7 @@ export async function createPhase1ProductReviewRuntime(
   let buildIndex = 0;
   let buildConnectorIndex = 0;
   let buildOrientation: 0 | 1 | 2 | 3 = 0;
+  let buildAnchor: WorldPosition | null = null;
   let destroyed = false;
   let stepQueue = Promise.resolve();
   let worldPresentationContext:
@@ -399,6 +400,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const worldDropTarget = () => bundle.world.exportSnapshot().drops
     .filter((drop) => drop.available
+      && bundle.items.getContainerView(drop.containerId).stacks.length > 0
       && bundle.world.isWorldDropInInteractionRange(config.localPlayerId, drop.worldDropId))
     .sort((a, b) => distanceFromPlayerSquared(a.position.x, a.position.y)
       - distanceFromPlayerSquared(b.position.x, b.position.y)
@@ -691,7 +693,8 @@ export async function createPhase1ProductReviewRuntime(
       bundle.catalog
         .list('structure')
         .filter((definition) => definition.placeableByPlayer)
-        .sort((left, right) => left.id.localeCompare(right.id)),
+        .sort((left, right) => PHASE1_BUILD_CATALOG_ORDER.indexOf(placeableStructureDefinitionId(left.id))
+          - PHASE1_BUILD_CATALOG_ORDER.indexOf(placeableStructureDefinitionId(right.id))),
     );
 
   const buildCatalogDefinitions = () => {
@@ -731,6 +734,17 @@ export async function createPhase1ProductReviewRuntime(
     return definitions[buildIndex]!;
   };
 
+  const freeBuildPosition = (): WorldPosition => {
+    if (buildAnchor !== null) return buildAnchor;
+    const position = playerPosition();
+    return { x: position.x + 2, y: position.y };
+  };
+
+  const placementIntent = () => selectedBuildDefinition().id === 'structure:habitat-room'
+    ? { mode: 'connector' as const, targetConnectorId: landingConnectors()[buildConnectorIndex]?.connectorId
+      ?? 'connector:landing:east', requestedOrientationQuarterTurns: buildOrientation }
+    : { mode: 'free' as const, anchor: freeBuildPosition(), orientationQuarterTurns: buildOrientation };
+
   const buildPanel = (): Phase1BuildPanelPresentation => {
     const definition = selectedBuildDefinition();
     const inventory = bundle.items.getContainerView(
@@ -752,18 +766,19 @@ export async function createPhase1ProductReviewRuntime(
     const connector = connectors[buildConnectorIndex];
     const connectorRequired =
       definition.id === 'structure:habitat-room';
+    const spatial = bundle.buildings.assessPlacement(placeableStructureDefinitionId(definition.id), placementIntent());
     const reason = kit === undefined
       ? 'KIT UNAVAILABLE'
       : connectorRequired && connector === undefined
         ? 'NO LANDING CONNECTOR'
-        : null;
+        : typeof spatial === 'string' ? spatial : null;
 
     const structures =
       bundle.buildings.exportSnapshot().foothold.structures;
     return Object.freeze({
       kind: 'build',
       title:
-        'BUILD · TAB STRUCTURE · [ / ] CONNECTOR · R ROTATE · ENTER PLACE',
+        'BUILD BASE',
       selectedStructure: definition.displayName,
       sourceKitLabel:
         bundle.catalog.get(kitId).displayName
@@ -771,8 +786,8 @@ export async function createPhase1ProductReviewRuntime(
         + String(kit?.quantity ?? 0)
         + (connectorRequired
           ? ' · '
-            + (connector?.connectorId ?? 'NO CONNECTOR')
-          : ' · AT PLAYER · '
+            + (connector?.localConnectorKey.toUpperCase() ?? 'NO CONNECTOR')
+          : ' · PLACE IN WORLD · '
             + String(buildOrientation * 90)
             + '°'),
       placementState: reason !== null
@@ -822,7 +837,10 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     actionPanel = 'build';
-    buildIndex = 0;
+    const inventory = bundle.items.getContainerView('inventory:' + config.localPlayerId);
+    const ownedIndex = buildDefinitions().findIndex(definition => inventory.stacks.some(stack => stack.itemDefinitionId === definition.sourceKitItemId));
+    buildIndex = Math.max(0, ownedIndex);
+    buildAnchor = null;
     buildConnectorIndex = 0;
     buildOrientation = 0;
     source.clearCommandFeedback();
@@ -868,11 +886,6 @@ export async function createPhase1ProductReviewRuntime(
       (stack) => stack.itemDefinitionId === kitId,
     );
     const operationId = nextOperationId('build');
-    const connectorRequired =
-      definition.id === 'structure:habitat-room';
-    const connectors = landingConnectors();
-    const connector = connectors[buildConnectorIndex];
-    const position = playerPosition();
     const result = bundle.placeStructure({
       operationId,
       actorPlayerId: config.localPlayerId,
@@ -883,18 +896,7 @@ export async function createPhase1ProductReviewRuntime(
       inventoryContainerId: inventory.containerId,
       expectedInventoryRevision: inventory.revision,
       expectedBuildRevision: bundle.buildings.getBuildRevision(),
-      placement: connectorRequired
-        ? {
-            mode: 'connector',
-            targetConnectorId:
-              connector?.connectorId ?? 'connector:landing:east',
-            requestedOrientationQuarterTurns: buildOrientation,
-          }
-        : {
-            mode: 'free',
-            anchor: position,
-            orientationQuarterTurns: buildOrientation,
-          },
+      placement: placementIntent(),
     });
 
     source.setPresentationPanel(buildPanel());
@@ -2033,7 +2035,7 @@ export async function createPhase1ProductReviewRuntime(
     const connectors = landingConnectors();
     const connector = connectors[buildConnectorIndex];
 
-    let position = playerPosition();
+    let position = freeBuildPosition();
     let orientation = buildOrientation;
     if (connectorRequired && connector !== undefined) {
       const landing = bundle.buildings.getStructure(
@@ -2153,6 +2155,25 @@ export async function createPhase1ProductReviewRuntime(
     },
   });
 
+  const updateBuildPointer = (event: MouseEvent): boolean => {
+    if (actionPanel !== 'build' || !(event.target instanceof Element)
+      || event.target.closest('.p1-ui') !== null) return false;
+    const rect = worldRenderer.canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * 640 / rect.width;
+    const y = (event.clientY - rect.top) * 360 / rect.height;
+    if (x < 0 || x > 640 || y < 0 || y > 360) return false;
+    if (selectedBuildDefinition().id !== 'structure:habitat-room') {
+      const position = unprojectPhase1Isometric({ x: x - 320, y: y - 180 }, playerPosition());
+      const anchor = { x: Math.round(position.x * 4) / 4, y: Math.round(position.y * 4) / 4 };
+      if (buildAnchor?.x !== anchor.x || buildAnchor.y !== anchor.y) {
+        buildAnchor = anchor;
+        source.setPresentationPanel(buildPanel());
+        refreshWorldPresentationContext();
+      }
+    }
+    return true;
+  };
+
   const onPanelClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element)) return;
     const item = event.target.closest<HTMLElement>('[data-review-item]');
@@ -2161,16 +2182,51 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
+    if (action === 'open-inventory' || action === 'open-map') {
+      actionPanel = null; source.setPresentationPanel(null);
+      source.togglePanel(action === 'open-map' ? 'map' : 'inventory'); return;
+    }
+    if (action === 'open-craft') { source.setPanel(null); toggleCraftPanel(); return; }
+    if (action === 'open-build') { source.setPanel(null); toggleBuildPanel(); return; }
+    if (action === 'open-colony') {
+      source.setPanel(null);
+      if (actionPanel === 'colony') { actionPanel = null; source.setPresentationPanel(null); }
+      else { actionPanel = 'colony'; refreshColonyPanel(); }
+      return;
+    }
+    if (action?.startsWith('craft-recipe:') && actionPanel === 'craft') {
+      const index = craftRecipes().findIndex(recipe => recipe.id === action.slice(13));
+      if (index >= 0 && Math.floor(index / CRAFT_PAGE_SIZE) === craftPage) craftRecipeAtSlot(index % CRAFT_PAGE_SIZE);
+      return;
+    }
+    if (action?.startsWith('build-') && actionPanel === 'build') {
+      if (action.startsWith('build-select:')) {
+        const index = buildDefinitions().findIndex(definition => definition.id === action.slice(13));
+        if (index >= 0) { buildIndex = index; buildAnchor = null; source.clearCommandFeedback(); refreshBuildPanel(); }
+      } else if (action === 'build-place') placeSelectedStructure();
+      else if (action === 'build-rotate') rotateBuild();
+      else if (action === 'build-connector-previous') cycleBuildConnector(-1);
+      else if (action === 'build-connector-next') cycleBuildConnector(1);
+      else if (action === 'build-prepare') {
+        const kitId = selectedBuildDefinition().sourceKitItemId;
+        const index = craftRecipes().findIndex(recipe => recipe.outputs.some(output => output.itemId === kitId));
+        if (index >= 0) { actionPanel = 'craft'; craftPage = Math.floor(index / CRAFT_PAGE_SIZE); source.clearCommandFeedback(); refreshCraftPanel(); }
+      }
+      return;
+    }
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
     if (action?.startsWith('colony:') && actionPanel === 'colony') {
       colonyCommand(action.slice(7) as ColonySustenanceAction);
+      return;
     }
+    if (updateBuildPointer(event)) placeSelectedStructure();
   };
 
   input.start();
   root.addEventListener('click', onPanelClick);
+  root.addEventListener('pointermove', updateBuildPointer);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
   host.start();
   root.dataset.runtimeStatus = 'ready';
@@ -2204,6 +2260,7 @@ export async function createPhase1ProductReviewRuntime(
       host.stop();
       input.stop();
       root.removeEventListener('click', onPanelClick);
+      root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
       controls.destroy();
       presentation.destroy();

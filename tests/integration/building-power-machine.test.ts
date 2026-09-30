@@ -110,6 +110,22 @@ function placeFree(
 }
 
 describe('Phase 1 building placement', () => {
+  it('assesses the same spatial rules without reserving or consuming a kit', () => {
+    const ctx = setup([stack('preview-kit', 'item:storage-crate-kit')]);
+    const before = ctx.buildings.exportSnapshot();
+    const intent = { mode: 'free' as const, anchor: createWorldPosition(3, 3), orientationQuarterTurns: 0 as const };
+    expect(ctx.buildings.assessPlacement('structure:storage-crate', intent)).toMatchObject({ finalPosition: { x: 3, y: 3 } });
+    expect(ctx.buildings.exportSnapshot()).toEqual(before);
+    ctx.spatial.blocking = true;
+    expect(ctx.buildings.assessPlacement('structure:storage-crate', intent)).toBe('OBSTRUCTED');
+    const result = ctx.building.place({ operationId: 'blocked-preview', actorPlayerId: 'p1',
+      structureDefinitionId: 'structure:storage-crate', sourceKitStackId: 'preview-kit',
+      inventoryContainerId: 'inventory:p1', expectedInventoryRevision: 0,
+      expectedBuildRevision: ctx.buildings.getBuildRevision(), placement: intent });
+    expect(result).toMatchObject({ status: 'rejected', reason: 'OBSTRUCTED' });
+    expect(ctx.items.getContainerView('inventory:p1').stacks[0]?.quantity).toBe(1);
+    expect(ctx.buildings.exportSnapshot()).toEqual(before);
+  });
   it('starts with the canonical Landing Module and continuous world-space placement', () => {
     const ctx = setup([
       stack('crate-kit', 'item:storage-crate-kit'),

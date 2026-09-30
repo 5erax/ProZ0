@@ -21,6 +21,25 @@ describe('Phase 1 environmental projection', () => {
       renderer = createPhase1ProductReviewWorldRenderer(root, bundle, 'gardener'); renderer.render();
       const flora = root.querySelector<HTMLElement>('[data-world-role="flora-decor"]');
       expect(flora).not.toBeNull(); if (flora === null) throw Error('No known foliage fixture');
+      const terrain = root.querySelector('[data-world-role="terrain"]');
+      const fog = root.querySelector('[data-world-role="fog"]');
+      const mutations: MutationRecord[] = [];
+      const observer = new MutationObserver(records => mutations.push(...records));
+      observer.observe(root, { childList: true, subtree: true });
+      for (let frame = 0; frame < 8; frame++) renderer.render();
+      await Promise.resolve(); observer.disconnect();
+      expect(mutations).toHaveLength(0);
+      expect(root.querySelector('[data-world-role="flora-decor"]')).toBe(flora);
+      expect(root.querySelector('[data-world-role="terrain"]')).toBe(terrain);
+      expect(root.querySelector('[data-world-role="fog"]')).toBe(fog);
+      const terrainLeft = (terrain as HTMLElement).style.left;
+      const stage = root.querySelector<HTMLElement>('.p1-product-world-stage')!;
+      const previousTransform = stage.style.transform;
+      bundle.getRuntime('gardener').relocatePlayer({ x: .5, y: .5 });
+      renderer.render();
+      expect((terrain as HTMLElement).style.left).toBe(terrainLeft);
+      expect(stage.style.transform).not.toBe(previousTransform);
+      expect(root.querySelector('[data-world-role="fog"][data-fog-mask="15"]')).toBeNull();
       const identity = flora.dataset.worldId!;
       const [, gx, gy] = identity.split(':');
       const position = { x: (Number(gx) + .5) * PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,
