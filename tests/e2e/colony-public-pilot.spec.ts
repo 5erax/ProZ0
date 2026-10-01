@@ -22,6 +22,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   const pages = await Promise.all(contexts.map((c) => c.newPage())),
     host = pages[0]!,
     errors: string[] = [];
+  const admissions = [0, 0, 0], closes = [0, 0, 0];
   if (process.env.PILOT_ACCESS_COOKIE_FILE) {
     const cookies = readFileSync(process.env.PILOT_ACCESS_COOKIE_FILE, 'utf8').split(/\r?\n/)
       .filter(line => line && (!line.startsWith('#') || line.startsWith('#HttpOnly_')))
@@ -33,16 +34,21 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   }
   for (const page of pages) {
     page.on("pageerror", (error) => errors.push(error.message));
-    page.on('websocket', ws => ws.on('framereceived', frame => {
+    const index = pages.indexOf(page);
+    page.on('websocket', ws => {
+      ws.on('close', () => closes[index]!++);
+      ws.on('framereceived', frame => {
       try {
         const message = JSON.parse(frame.payload.toString());
+        if (message.messageType === 'SESSION_ACCEPTED') admissions[index]!++;
         if (message.messageType === 'SESSION_REJECTED') console.log('Admission reason:', message.payload.reason);
       } catch { /* Frames are checked by the game protocol. */ }
-    }));
+      });
+    });
   }
   const site = new URL(endpoint!).origin;
   let owner: { id: string; ownerToken: string } | null = null;
-  const directory = resolve("test-results/phase2-priority/public-coop");
+  const directory = resolve(process.env.PILOT_EVIDENCE_DIR ?? "test-results/phase2-priority/public-coop");
   mkdirSync(directory, { recursive: true });
   const ready = async (page: Page) =>
     expect(page.locator("[data-proz0-autoboot]")).toHaveAttribute(
@@ -182,12 +188,18 @@ test("three public browsers host/join, gather, save and reconnect through the pl
       id!,
     );
     const soakSeconds = Number(process.env.PILOT_SOAK_SECONDS ?? '0');
+    const identities = await Promise.all(pages.map(p => p.locator('[data-proz0-autoboot]').getAttribute('data-coop-player-id')));
+    const beforeSoak = [...admissions];
     if (soakSeconds > 0) {
       const tick = Number(await host.locator('canvas').getAttribute('data-authority-tick'));
       await host.waitForTimeout(soakSeconds * 1000);
       for (const p of pages) await ready(p);
       await expect(host.locator('canvas')).toHaveAttribute('data-teammate-count', '2', {timeout:20000});
       expect(Number(await host.locator('canvas').getAttribute('data-authority-tick'))).toBeGreaterThan(tick);
+      for (let i = 0; i < pages.length; i++) {
+        await expect(pages[i]!.locator('[data-proz0-autoboot]')).toHaveAttribute('data-coop-player-id', identities[i]!);
+        if (soakSeconds >= 250) expect(admissions[i]!).toBeGreaterThan(beforeSoak[i]!);
+      }
     }
     const frames = await host.evaluate(
       () =>
@@ -221,6 +233,14 @@ test("three public browsers host/join, gather, save and reconnect through the pl
         path: resolve(directory, "co-op-" + width + ".png"),
       });
     }
+    await host.getByRole('button', { name: 'Settings', exact: true }).click();
+    await host.getByRole('button', { name: 'Về sảnh', exact: true }).click();
+    const ownedRoom = host.locator('.lobby-room').filter({ hasText: roomName });
+    await ownedRoom.getByRole('button', { name: 'Quản lý', exact: true }).click({timeout:15000});
+    await host.getByLabel('Tên phòng', { exact: true }).fill(roomName + ' new');
+    await host.getByLabel('Mật mã mới (để trống nếu giữ nguyên)', { exact: true }).fill('room-new-secret');
+    await host.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
+    await expect(host.locator('.lobby-room').filter({hasText:roomName + ' new'})).toBeVisible();
     expect(errors).toEqual([]);
     writeFileSync(
       resolve(directory, "journey.json"),
@@ -228,7 +248,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
         {
           sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? "working-tree",
           players: 3,
-          namedRoom: true, usernamePassword: true, skins: true, soakSeconds,
+          namedRoom: true, usernamePassword: true, skins: true, soakSeconds, admissions, closes, identitiesRetained: true, ownerRenamePassword: true,
           hostJoin: "player UI",
           gather: "normal movement and real command",
           reconnect: "original colonist",
