@@ -7,7 +7,7 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { OrderedInputQueue } from "./OrderedInputQueue";
 import { RoomSocial, type SocialDelivery } from "./RoomSocial";
 import { createClient } from "redis";
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { Phase1HostedAuthorityComposition } from "../../integration/Phase1HostedAuthorityComposition";
 import { composePhase1SaveV2 } from "../../integration/Phase1SaveV2Composer";
 import {
@@ -81,6 +81,9 @@ interface Authority {
   stepped: number;
   sceneTick: number;
   localEvents: Inbound[];
+  remoteEvents: string[];
+  remoteRead?: Promise<void>;
+  remoteError?: unknown;
   social: RoomSocial;
 }
 export interface RedisPilotOptions {
@@ -128,6 +131,8 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     electing = new Map<string, Promise<void>>(),
     sockets = new Map<string, WebSocket>(),
     socketRooms = new Map<string, string>();
+  const socketPongs = new Map<string, number>();
+  let lastSocketPing = 0;
   const saves = new Map<
     string,
     { resolve: (n: number) => void; reject: () => void }
@@ -375,6 +380,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           stepped: Date.now(),
           sceneTick: -1,
           localEvents: [],
+          remoteEvents: [],
           social: new RoomSocial(),
         };
         authorities.set(id, authority);
@@ -718,6 +724,8 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         const transport = token();
         sockets.set(transport, ws);
         socketRooms.set(transport, id);
+        socketPongs.set(transport, Date.now());
+        ws.on("pong", () => socketPongs.set(transport, Date.now()));
         const queue = new OrderedInputQueue<Inbound>(
           (event) => enqueue(id, event),
           () => ws.close(1011, "World store unavailable"),
@@ -765,6 +773,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         ws.on("close", () => {
           sockets.delete(transport);
           socketRooms.delete(transport);
+          socketPongs.delete(transport);
           const close: Inbound = { kind: "close", transport, gateway, client };
           if (queue.isFailed()) void enqueue(id, close).catch(() => {});
           else queue.push(close);
@@ -777,6 +786,14 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     if (running || stopped || !redis.isReady) return;
     running = true;
     try {
+      if (Date.now() - lastSocketPing >= 5000) {
+        lastSocketPing = Date.now();
+        for (const [transport, ws] of sockets) {
+          if (Date.now() - (socketPongs.get(transport) ?? 0) > 15000)
+            ws.terminate();
+          else if (ws.readyState === WebSocket.OPEN) ws.ping();
+        }
+      }
       const heartbeat = Date.now() - lastHeartbeat >= 1000;
       if (heartbeat) {
         await redis.set(key(gateway, "live"), "1", { EX: 10 });
@@ -813,10 +830,19 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
                     authority.social.leave(transport),
                   );
                 }
-        const events = (await redis.eval(drain, {
-          keys: [key(id, "in")],
-          arguments: [],
-        })) as string[];
+        if (authority.remoteError) throw authority.remoteError;
+        // Poll remote input ahead of the simulation. A Redis round trip must not
+        // stall leader-local movement; one bounded read preserves remote order.
+        if (!authority.remoteRead && !authority.remoteEvents.length) {
+          authority.remoteRead = redis.eval(drain, {
+            keys: [key(id, "in")], arguments: [],
+          }).then(events => {
+            authority.remoteEvents = events as string[];
+          }).catch(error => {
+            authority.remoteError = error;
+          }).finally(() => { delete authority.remoteRead; });
+        }
+        const events = authority.remoteEvents.splice(0);
         events.push(
           ...authority.localEvents
             .splice(0)

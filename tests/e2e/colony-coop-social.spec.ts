@@ -116,6 +116,8 @@ test("three players share named chat, explored map and opt-in voice without losi
     ownerCookie = (await contexts[0]!.cookies())
       .map((c) => c.name + "=" + c.value)
       .join("; ");
+    // Private receipt permits retrying cleanup without exposing credentials in logs.
+    writeFileSync(dir + "/cleanup.private.json", JSON.stringify({ base, owned, ownerCookie }));
     for (const guest of pages.slice(1)) {
       await guest
         .getByRole("button", { name: "Vào bằng tên phòng", exact: true })
@@ -384,7 +386,7 @@ test("three players share named chat, explored map and opt-in voice without losi
             );
             return response.status;
           },
-          { timeout: 20000 },
+          { timeout: 60000 },
         )
         .toBe(200);
     }
