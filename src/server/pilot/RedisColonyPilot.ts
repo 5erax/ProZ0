@@ -86,6 +86,12 @@ interface Authority {
   remoteError?: unknown;
   renewal?: Promise<void>;
   renewalError?: unknown;
+  remoteOutbound: { gateway: string; text: string; bytes: number }[];
+  remoteOutboundBytes: number;
+  delivery?: Promise<void>;
+  deliveryError?: unknown;
+  peerRead?: Promise<void>;
+  deadGateways: string[];
   social: RoomSocial;
 }
 export interface RedisPilotOptions {
@@ -233,6 +239,36 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     else if (ws.bufferedAmount > 1024 * 1024) ws.close(4008, "Slow connection");
     else if (ws.readyState === 1) ws.send(event.text!);
   };
+  const queueRemote = (authority: Authority, remoteGateway: string, message: Outbound) => {
+    const text = JSON.stringify(message), bytes = Buffer.byteLength(text);
+    if (authority.remoteOutboundBytes + bytes > 1024 * 1024)
+      throw Error("Remote output backlog limit");
+    authority.remoteOutbound.push({ gateway: remoteGateway, text, bytes });
+    authority.remoteOutboundBytes += bytes;
+    startRemoteDelivery(authority);
+  };
+  function startRemoteDelivery(authority: Authority) {
+    if (!authority.delivery && !authority.deliveryError && authority.remoteOutbound.length) {
+      authority.delivery = (async () => {
+        while (authority.remoteOutbound.length) {
+          const batch = authority.remoteOutbound.splice(0), grouped = new Map<string, string[]>();
+          for (const item of batch) {
+            authority.remoteOutboundBytes -= item.bytes;
+            const texts = grouped.get(item.gateway) ?? [];
+            texts.push(item.text); grouped.set(item.gateway, texts);
+          }
+          const tx = redis.multi();
+          for (const [remote, texts] of grouped)
+            tx.rPush(key(remote, "out"), texts).expire(key(remote, "out"), 60);
+          await tx.exec();
+        }
+      })().catch(error => { authority.deliveryError = error; })
+        .finally(() => {
+          delete authority.delivery;
+          startRemoteDelivery(authority);
+        });
+    }
+  }
   const deliver = async (
     authority: Authority,
     messages: readonly HostedOutboundMessage[],
@@ -263,8 +299,6 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       // A reconnect can recover even if the accepted frame never reached the browser.
       await checkpoint(authority);
     }
-    const tx = redis.multi();
-    let count = 0;
     for (const message of messages) {
       const peer = authority.peers.get(message.transportId);
       if (!peer) continue;
@@ -277,25 +311,13 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         dispatch(outbound);
         continue;
       }
-      tx.rPush(
-        key(peer.gateway, "out"),
-        JSON.stringify({
-          transport: message.transportId,
-          kind: "text",
-          text: serializeServerEnvelopeV1(message.envelope),
-        }),
-      );
-      tx.expire(key(peer.gateway, "out"), 60);
-      count++;
+      queueRemote(authority, peer.gateway, outbound);
     }
-    if (count) await tx.exec();
   };
   const socialDeliver = async (
     authority: Authority,
     deliveries: SocialDelivery[],
   ) => {
-    const tx = redis.multi();
-    let count = 0;
     for (const item of deliveries) {
       const peer = authority.peers.get(item.transport);
       if (!peer) continue;
@@ -305,20 +327,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         text: JSON.stringify(item.message),
       };
       if (peer.gateway === gateway) dispatch(event);
-      else {
-        tx.rPush(key(peer.gateway, "out"), JSON.stringify(event)).expire(
-          key(peer.gateway, "out"),
-          60,
-        );
-        count++;
-      }
+      else queueRemote(authority, peer.gateway, event);
     }
-    if (count) await tx.exec();
   };
   const retire = async (authority: Authority) => {
     authorities.delete(authority.record.id);
     await authority.renewal;
     await authority.remoteRead;
+    await authority.peerRead;
+    while (authority.delivery) await authority.delivery;
     const pending = authority.remoteEvents.splice(0);
     pending.push(...authority.localEvents.splice(0).map(event => JSON.stringify(event)));
     if (pending.length) {
@@ -394,6 +411,9 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           sceneTick: -1,
           localEvents: [],
           remoteEvents: [],
+          remoteOutbound: [],
+          remoteOutboundBytes: 0,
+          deadGateways: [],
           social: new RoomSocial(),
         };
         authorities.set(id, authority);
@@ -817,7 +837,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       }
       for (const authority of [...authorities.values()]) {
         const id = authority.record.id;
-        if (authority.remoteError || authority.renewalError) {
+        if (authority.remoteError || authority.renewalError || authority.deliveryError) {
           // Release a failed read-ahead owner before renewing its lease so
           // another gateway can recover instead of pinning a broken room.
           await retire(authority);
@@ -844,11 +864,17 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           // renewal cannot authorize simulation or durable writes indefinitely.
           continue;
         }
-        if (heartbeat)
-          for (const remote of new Set(
-            [...authority.peers.values()].map((p) => p.gateway),
-          ))
-            if (remote !== gateway && !(await redis.get(key(remote, "live"))))
+        if (heartbeat && !authority.peerRead) {
+          const remotes = [...new Set([...authority.peers.values()].map(p => p.gateway))]
+            .filter(remote => remote !== gateway);
+          authority.peerRead = Promise.all(remotes.map(async remote => ({
+            remote, live: await redis.get(key(remote, "live")),
+          }))).then(values => {
+            authority.deadGateways.push(...values.filter(value => !value.live).map(value => value.remote));
+          }).catch(error => { authority.remoteError = error; })
+            .finally(() => { delete authority.peerRead; });
+        }
+        for (const remote of authority.deadGateways.splice(0))
               for (const [transport, peer] of authority.peers)
                 if (peer.gateway === remote) {
                   authority.composition.host.disconnect(transport);
@@ -1028,7 +1054,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       // Detect a dead leader on any gateway and make all clients reconnect together.
       if (heartbeat)
         for (const id of new Set(socketRooms.values()))
-          if (!(await redis.get(key(id, "lease"))))
+          if (!authorities.has(id) && !(await redis.get(key(id, "lease"))))
             for (const [transport, room] of socketRooms)
               if (room === id)
                 sockets.get(transport)?.close(1012, "Authority restarting");

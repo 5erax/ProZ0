@@ -159,14 +159,13 @@ test("three players share named chat, explored map and opt-in voice without losi
       await page.keyboard.press("Escape");
     }
     await host.screenshot({ path: dir + "/hud.png" });
-    const latency: number[] = [], rtt: number[] = [];
+    const latency: number[] = [], rtt: number[] = [], movementSamples: unknown[] = [];
     for (let n = 0; n < 10; n++) {
       rtt.push(Number(await host.locator('[data-runtime-mode=colony-coop]').getAttribute('data-coop-rtt-ms')));
       // Wait for the prior key-up to reach authority before measuring a new
       // start. Otherwise a delayed prior movement can look like a 5-ms reply.
       await expect(host.locator(".coop-stage canvas")).toHaveAttribute("data-player-locomotion", "IDLE");
-      latency.push(
-        await host.evaluate(
+      const sample = await host.evaluate(
           async (key) => {
             const canvas =
                 document.querySelector<HTMLCanvasElement>(
@@ -195,11 +194,15 @@ test("three players share named chat, explored map and opt-in voice without losi
             document.dispatchEvent(
               new KeyboardEvent("keyup", { code: key, bubbles: true }),
             );
-            return performance.now() - start;
+            return { ms: performance.now() - start, key, x, y,
+              endX: Number(canvas.dataset.playerX), endY: Number(canvas.dataset.playerY),
+              locomotion: canvas.dataset.playerLocomotion,
+              status: document.querySelector<HTMLElement>('[data-runtime-mode=colony-coop]')?.dataset.runtimeStatus };
           },
           n % 2 ? "KeyA" : "KeyD",
-        ),
-      );
+        );
+      latency.push(sample.ms);
+      movementSamples.push(sample);
       await host.waitForTimeout(200);
     }
     const frames = await host.evaluate(async () => {
@@ -223,7 +226,7 @@ test("three players share named chat, explored map and opt-in voice without losi
     });
     writeFileSync(
       dir + "/latency-frames.json",
-      JSON.stringify({ players: 3, latencyMs: latency, rttMs: rtt, frames }, null, 2),
+      JSON.stringify({ players: 3, latencyMs: latency, rttMs: rtt, movementSamples, frames }, null, 2),
     );
     expect(Math.max(...latency)).toBeLessThan(350);
     expect(frames.fps).toBeGreaterThanOrEqual(50);

@@ -22,6 +22,8 @@ Each Vercel gateway holds sockets while a fenced Redis room lease elects one can
 
 Commands/accepted identities are checkpointed before acknowledgement. Explicit owner save waits for a durable result; automatic checkpoint cadence is about five seconds. Reconnect recovers private colonist identity; uncertain operations are queried, never blindly replayed. A crash may roll back uncheckpointed movement. Queue/storage/checkpoint failure closes affected sockets for safe reconnect. Authority rotates before the function limit, preserving saved bindings. Same-gateway bypass does not weaken checkpoint fencing, admission, input ordering or ownership.
 
+Cross-gateway output has one ordered batch writer per authority, with at most 1 MiB queued plus one bounded batch in flight. Gameplay and social delivery share its ordering; remote output and peer-liveness reads do not block movement ticks. Rotation waits for the writer to finish before closing the previous connections. A failed writer retires its authority; acknowledged gameplay still requires the preceding fenced checkpoint.
+
 ## Communication extension
 
 The existing protocol-v1 envelope/sequence remains unchanged. Only accepted sessions that send `{proz0Social:1,type:"subscribe"}` receive the optional ephemeral social channel on the same authenticated socket. Old clients are not sent unknown social envelopes. Frontend intercepts social frames before the gameplay decoder.
