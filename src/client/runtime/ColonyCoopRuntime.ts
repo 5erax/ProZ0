@@ -32,6 +32,7 @@ import {
 } from "../presentation/ColonyRegionSprites";
 import { colonySurveySites } from "../../world/phase2/ColonyRegions";
 import { createColonySettings } from "./ColonySettings";
+import {playerSkinFilter} from './PlayerProfile';
 
 interface Inventory {
   stacks: {
@@ -125,7 +126,8 @@ export async function bootColonyCoop(
   const credentialKey = storageKey + ":resume";
   let resume = localStorage.getItem(credentialKey);
   const clientKey = storageKey + ":client";
-  let client = localStorage.getItem(clientKey);
+  let client = details.clientKey ?? localStorage.getItem(clientKey);
+  if(details.clientKey)localStorage.setItem(clientKey,details.clientKey);
   if (!client) {
     client = Array.from(crypto.getRandomValues(new Uint8Array(24)), (n) =>
       n.toString(16).padStart(2, "0"),
@@ -272,9 +274,20 @@ export async function bootColonyCoop(
   const saveStatus = document.createElement("p");
   saveStatus.setAttribute("role", "status");
   settingsPanel.append(saveStatus);
+  makeButton(settingsPanel, "Về sảnh", () => {
+    void (async () => {
+      if (details.ownerToken) {
+        const saved = await fetch(endpoint + "/rooms/" + id + "/save", {
+          method: "POST", headers: { Authorization: "Bearer " + details.ownerToken }, credentials: "include",
+        });
+        if (!saved.ok) throw Error("Save failed");
+      }
+      location.assign(location.pathname + "?proz0Lobby=multiplayer");
+    })().catch(() => { saveStatus.textContent = "Chưa lưu được; thử lại trước khi rời phòng"; });
+  });
   makeButton(settingsPanel, "Copy invitation", () => {
     const url = new URL(location.href);
-    url.hash = new URLSearchParams({
+    if(details.roomName){url.search=new URLSearchParams({proz0Lobby:'multiplayer',room:details.roomName}).toString();url.hash='';}else url.hash = new URLSearchParams({
       invitation: details.accessToken,
     }).toString();
     void navigator.clipboard
@@ -698,7 +711,7 @@ export async function bootColonyCoop(
             }
           }
         } else if (connection?.getState() === "RESYNC_REQUIRED") {
-          current.close(1012, "Resync");
+          current.close(4000, "Resync");
         } else if (connection?.getState() === "CLOSED") {
           feedback =
             "Room full or saved identity rejected. Rejoin with your original invitation.";
@@ -717,7 +730,7 @@ export async function bootColonyCoop(
           envelope.messageType === "SESSION_REJECTED" &&
           envelope.payload.reason === "PLAYER_ALREADY_CONNECTED"
         ) {
-          current.close(1012, "Previous connection closing");
+          current.close(4000, "Previous connection closing");
           return;
         }
       } catch {
@@ -974,6 +987,9 @@ export async function bootColonyCoop(
         ? "scaleX(-1)"
         : "";
       nodes.get(motion.playerId)!.title = motion.playerId;
+      const skin=scene.playerSkins?.[motion.playerId]??'pioneer';
+      nodes.get(motion.playerId)!.style.filter=playerSkinFilter(skin);
+      nodes.get(motion.playerId)!.dataset.skin=skin;
     }
     for (const [key, node] of nodes)
       if (!used.has(key)) {

@@ -21,6 +21,7 @@ import {
 export function colonyHostedScene(
   bundle: Phase1AuthorityBundle,
   playerId: string,
+  skins:Record<string,string>={},
 ): ColonySceneV1 {
   const position = bundle.getPlayerPosition(playerId);
   const views = new Map(
@@ -135,6 +136,7 @@ export function colonyHostedScene(
     version: 1,
     worldSeed: bundle.config.worldSeed,
     tick: bundle.authorityTick,
+    playerSkins:skins,
     terrain,
     entities,
     sites: colonySurveySites(bundle.config.worldSeed)

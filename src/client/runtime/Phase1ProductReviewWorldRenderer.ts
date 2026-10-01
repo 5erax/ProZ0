@@ -1,3 +1,4 @@
+import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import {
   WORLD_PIXELS_PER_UNIT,
   type WorldPosition,
@@ -943,6 +944,7 @@ export function createPhase1ProductReviewWorldRenderer(
       },
     );
     if (player === null) return;
+    if(local){player.style.filter=playerSkinFilter(selectedPlayerSkin());player.dataset.skin=selectedPlayerSkin();}
 
     const equipment = bundle.equipment.getView(id);
     if (equipment.equippedThermalWrapStackId !== null) {

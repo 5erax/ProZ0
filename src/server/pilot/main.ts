@@ -3,6 +3,7 @@ if (!process.env.REDIS_URL)
   throw Error("Set REDIS_URL for the shared world store");
 const pilot = createRedisColonyPilot({
   url: process.env.REDIS_URL,
+  ...(process.env.PROZ0_NAMESPACE ? { namespace: process.env.PROZ0_NAMESPACE } : {}),
   allowedOrigins: (
     process.env.PROZ0_ALLOWED_ORIGINS ??
     "http://127.0.0.1:4173,http://127.0.0.1:5173,https://5erax.github.io"
