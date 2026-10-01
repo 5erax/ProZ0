@@ -159,8 +159,9 @@ test("three players share named chat, explored map and opt-in voice without losi
       await page.keyboard.press("Escape");
     }
     await host.screenshot({ path: dir + "/hud.png" });
-    const latency: number[] = [];
+    const latency: number[] = [], rtt: number[] = [];
     for (let n = 0; n < 10; n++) {
+      rtt.push(Number(await host.locator('[data-runtime-mode=colony-coop]').getAttribute('data-coop-rtt-ms')));
       // Wait for the prior key-up to reach authority before measuring a new
       // start. Otherwise a delayed prior movement can look like a 5-ms reply.
       await expect(host.locator(".coop-stage canvas")).toHaveAttribute("data-player-locomotion", "IDLE");
@@ -222,7 +223,7 @@ test("three players share named chat, explored map and opt-in voice without losi
     });
     writeFileSync(
       dir + "/latency-frames.json",
-      JSON.stringify({ players: 3, latencyMs: latency, frames }, null, 2),
+      JSON.stringify({ players: 3, latencyMs: latency, rttMs: rtt, frames }, null, 2),
     );
     expect(Math.max(...latency)).toBeLessThan(350);
     expect(frames.fps).toBeGreaterThanOrEqual(50);

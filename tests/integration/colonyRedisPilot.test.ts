@@ -185,6 +185,18 @@ test.skipIf(!url)(
       headers: { Authorization: "Bearer " + details.accessToken },
     });
     expect(denied.status).toBe(403);
+    // Revoke only this test room's lease. A read-ahead renewal must retire the
+    // old authority and recover its checkpoint rather than renewing blindly.
+    await registry.connect();
+    await registry.del(namespace + ":" + details.id + ":lease");
+    await registry.quit();
+    await wait(() => [rejoined, threeRestored, recovered]
+      .every(peer => peer.ws.readyState === WebSocket.CLOSED));
+    const leaseRecovered = await join(b.endpoint, one.client, resume);
+    expect(leaseRecovered.connection.getPlayerId()).toBe(id);
+    expect(leaseRecovered.connection.getState()).toBe("READY");
+    leaseRecovered.ws.close();
+    await new Promise((r) => setTimeout(r, 250));
     await a.service.close();
     await new Promise<void>((done) => a.service.server.close(() => done()));
     services.splice(services.indexOf(a.service), 1);

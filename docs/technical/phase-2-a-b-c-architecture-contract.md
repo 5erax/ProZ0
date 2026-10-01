@@ -8,6 +8,8 @@ Direct Owner-authorized reconciliation, 2026-10-01; not an A-TL approval. Base p
 
 `Phase1HostedAuthorityComposition` projects canonical aggregates. Personal inventory and equipment are filtered by player ID. Shared aggregates include structures, resources, research, sustenance, ruins and accessible world containers. `colony-scene` and `colony-map` are selected for the recipient, and scene/map projection includes only explored cells and nearby visible entities. Map revisions follow exploration changes independently from the 10 Hz scene refresh. The map is bounded to active streamed chunks; it is not a global hidden-world catalogue.
 
+Admission records the aggregate revisions sent in the initial baseline. After the client acknowledges it, newly changed visible aggregates catch up that peer. Publications made while it was syncing cannot leave a research or inventory revision permanently stale. Catch-up uses the same private-state filter and sends no unchanged duplicate views.
+
 ## Time, content and saved data
 
 Active time uses 60 Hz fixed steps. Seed/generation/content versions define deterministic terrain, resources, region classification, sites and weather; no client generation supplies canonical state. Accepted generation-v3 saves explicitly acquire generation-v4 ecosystem extensions while retaining legacy fingerprints/deltas. Colony content v1 migrates to v2. Corrupt/future/incompatible data fails validation; generation-v2 migration remains absent.
@@ -16,7 +18,7 @@ Save V2 captures authority tick/environment, players, inventory/container receip
 
 ## Gateways and failure handling
 
-Each Vercel gateway holds sockets while a fenced Redis room lease elects one canonical simulation leader. Same-gateway inputs/deliveries avoid Redis loopback; cross-gateway input/outbound queues remain bounded. Lease renewal is amortized at 500 ms; checkpoints still compare the lease token atomically before durable write. Wall-clock catch-up advances at most twelve fixed ticks per gateway pass; it never pretends an arbitrarily stalled server simulated offline time. Scene refresh is tick-distance based to survive uneven scheduling.
+Each Vercel gateway holds sockets while a fenced Redis room lease elects one canonical simulation leader. Same-gateway inputs/deliveries avoid Redis loopback; cross-gateway input/outbound queues remain bounded. One lease renewal runs ahead at a time, normally every 500 ms; its confirmed validity is counted conservatively from request start. Stepping stops after half the ten-second lease interval without confirmation, and renewal failure retires the authority. Gateway liveness writes also run ahead. Checkpoints still compare the lease token atomically before durable write. Wall-clock catch-up advances at most twelve fixed ticks per gateway pass; it never pretends an arbitrarily stalled server simulated offline time. Scene refresh is tick-distance based to survive uneven scheduling.
 
 Commands/accepted identities are checkpointed before acknowledgement. Explicit owner save waits for a durable result; automatic checkpoint cadence is about five seconds. Reconnect recovers private colonist identity; uncertain operations are queried, never blindly replayed. A crash may roll back uncheckpointed movement. Queue/storage/checkpoint failure closes affected sockets for safe reconnect. Authority rotates before the function limit, preserving saved bindings. Same-gateway bypass does not weaken checkpoint fencing, admission, input ordering or ownership.
 

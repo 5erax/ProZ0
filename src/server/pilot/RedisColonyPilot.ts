@@ -84,6 +84,8 @@ interface Authority {
   remoteEvents: string[];
   remoteRead?: Promise<void>;
   remoteError?: unknown;
+  renewal?: Promise<void>;
+  renewalError?: unknown;
   social: RoomSocial;
 }
 export interface RedisPilotOptions {
@@ -118,6 +120,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     stopped = false,
     running = false,
     lastHeartbeat = 0;
+  let heartbeatWrite: Promise<void> | undefined, heartbeatError: unknown;
   const ready = async () => {
     if (!redis.isOpen)
       connecting ??= redis.connect().finally(() => {
@@ -314,6 +317,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
   };
   const retire = async (authority: Authority) => {
     authorities.delete(authority.record.id);
+    await authority.renewal;
     await authority.remoteRead;
     const pending = authority.remoteEvents.splice(0);
     pending.push(...authority.localEvents.splice(0).map(event => JSON.stringify(event)));
@@ -795,6 +799,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     if (running || stopped || !redis.isReady) return;
     running = true;
     try {
+      if (heartbeatError) throw heartbeatError;
       if (Date.now() - lastSocketPing >= 5000) {
         lastSocketPing = Date.now();
         for (const [transport, ws] of sockets) {
@@ -804,38 +809,46 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         }
       }
       const heartbeat = Date.now() - lastHeartbeat >= 1000;
-      if (heartbeat) {
-        await redis.set(key(gateway, "live"), "1", { EX: 10 });
+      if (heartbeat && !heartbeatWrite) {
+        heartbeatWrite = redis.set(key(gateway, "live"), "1", { EX: 10 })
+          .then(() => {}).catch(error => { heartbeatError = error; })
+          .finally(() => { heartbeatWrite = undefined; });
         lastHeartbeat = Date.now();
       }
       for (const authority of [...authorities.values()]) {
         const id = authority.record.id;
-        if (authority.remoteError) {
+        if (authority.remoteError || authority.renewalError) {
           // Release a failed read-ahead owner before renewing its lease so
           // another gateway can recover instead of pinning a broken room.
           await retire(authority);
           continue;
         }
-        const needsRenewal = Date.now() - authority.renewed >= 500;
-        const renewed = !needsRenewal
-          ? 1
-          : await redis.eval(
+        if (!authority.renewal && Date.now() - authority.renewed >= 500) {
+          const renewalStarted = Date.now();
+          authority.renewal = redis.eval(
               "if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end;redis.call('PEXPIRE',KEYS[1],ARGV[2]);return 1",
               {
                 keys: [key(id, "lease")],
                 arguments: [authority.token, String(leaseTTL)],
               },
-            );
-        if (renewed !== 1) {
-          await retire(authority);
+            ).then(result => {
+              if (result !== 1) throw Error("Authority lease lost");
+              // Count from request start, never from a delayed reply. Keep a
+              // conservative validity window while renewal runs ahead.
+              authority.renewed = renewalStarted;
+            }).catch(error => { authority.renewalError = error; })
+            .finally(() => { delete authority.renewal; });
+        }
+        if (Date.now() - authority.renewed >= leaseTTL / 2) {
+          // Stop stepping before the last confirmed lease can expire. A stuck
+          // renewal cannot authorize simulation or durable writes indefinitely.
           continue;
         }
-        if (needsRenewal) authority.renewed = Date.now();
         if (heartbeat)
           for (const remote of new Set(
             [...authority.peers.values()].map((p) => p.gateway),
           ))
-            if (!(await redis.get(key(remote, "live"))))
+            if (remote !== gateway && !(await redis.get(key(remote, "live"))))
               for (const [transport, peer] of authority.peers)
                 if (peer.gateway === remote) {
                   authority.composition.host.disconnect(transport);
@@ -1042,6 +1055,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       for (const ws of sockets.values()) ws.close(1001, "Server restart");
       for (const save of saves.values()) save.reject();
       wss.close();
+      await heartbeatWrite;
       if (redis.isOpen) await redis.quit();
     },
   };
