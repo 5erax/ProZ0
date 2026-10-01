@@ -1065,7 +1065,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       running = false;
     }
   };
-  const timer = setInterval(() => void tick(), 50);
+  const timer = setInterval(() => void tick(), 16);
   timer.unref();
   return {
     server: api,

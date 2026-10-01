@@ -1315,18 +1315,12 @@ export async function bootColonyCoop(
     });
   }
   let lastPing = 0;
-  const inputTimer = setInterval(() => {
+  const sendMovement = () => {
     if (
       connection?.getState() !== "READY" ||
       socket?.readyState !== WebSocket.OPEN
     )
       return;
-    if (performance.now() - lastPing > 2000) {
-      lastPing = performance.now();
-      connection.ping("coop:" + crypto.randomUUID());
-    }
-    const rtt = connection.getRttMs();
-    if (rtt !== null) root.dataset.coopRttMs = String(rtt);
     const active =
       panelKind === null &&
       root.dataset.colonySettingsOpen !== "true" &&
@@ -1341,6 +1335,16 @@ export async function bootColonyCoop(
       left: up || left,
       right: down || right,
     });
+  };
+  const inputTimer = setInterval(() => {
+    if (connection?.getState() !== "READY" || socket?.readyState !== WebSocket.OPEN) return;
+    if (performance.now() - lastPing > 2000) {
+      lastPing = performance.now();
+      connection.ping("coop:" + crypto.randomUUID());
+    }
+    const rtt = connection.getRttMs();
+    if (rtt !== null) root.dataset.coopRttMs = String(rtt);
+    sendMovement();
   }, 50);
   const keyDown = (event: KeyboardEvent) => {
     if (
@@ -1354,7 +1358,9 @@ export async function bootColonyCoop(
     }
     if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) {
       event.preventDefault();
+      const changed = !pressed.has(event.code);
       pressed.add(event.code);
+      if (changed) sendMovement();
     }
     if (root.dataset.colonySettingsOpen === "true") return;
     if (!event.repeat) {
@@ -1390,10 +1396,13 @@ export async function bootColonyCoop(
       }
     }
   };
-  const keyUp = (event: KeyboardEvent) => pressed.delete(event.code),
+  const keyUp = (event: KeyboardEvent) => {
+    if (pressed.delete(event.code)) sendMovement();
+  },
     blur = () => {
       pressed.clear();
       panelPointers.clear();
+      sendMovement();
     };
   document.addEventListener("keydown", keyDown);
   document.addEventListener("keyup", keyUp);
