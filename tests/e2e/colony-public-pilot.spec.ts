@@ -48,6 +48,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   }
   const site = new URL(endpoint!).origin;
   let owner: { id: string; ownerToken: string } | null = null;
+  let ownerCookie: string | undefined;
   const directory = resolve(process.env.PILOT_EVIDENCE_DIR ?? "test-results/phase2-priority/public-coop");
   mkdirSync(directory, { recursive: true });
   const ready = async (page: Page) =>
@@ -87,6 +88,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
       );
       return JSON.parse(localStorage.getItem(entry!)!);
     });
+    ownerCookie = (await contexts[0]!.cookies(site)).map(c => c.name + '=' + c.value).join('; ');
     const id = await host
       .locator("[data-proz0-autoboot]")
       .getAttribute("data-coop-player-id");
@@ -131,8 +133,10 @@ test("three public browsers host/join, gather, save and reconnect through the pl
     await host.bringToFront();
     // Reach the canonical nearby fiber source through normal movement.
     let held: string[] = [];
+    let previous = { x: Infinity, y: Infinity }, stuck = 0, escapeSteps = 0, escapes = 0;
+    let escapeKeys: string[] = [];
     try {
-      for (let n = 0; n < 1200; n++) {
+      for (let n = 0; n < 600; n++) {
         const p = await host.locator("canvas").evaluate((e) => ({
           x: Number(e.dataset.playerX),
           y: Number(e.dataset.playerY),
@@ -140,7 +144,20 @@ test("three public browsers host/join, gather, save and reconnect through the pl
         const dx = 18 - p.x,
           dy = 10 - p.y;
         if (Math.hypot(dx, dy) < 0.45) break;
-        const next =
+        stuck = Math.hypot(p.x - previous.x, p.y - previous.y) < .02 ? stuck + 1 : 0;
+        previous = p;
+        if (stuck >= 12 && escapeSteps === 0) {
+          // A random grove can obstruct a straight route. Walk around it using normal input.
+          escapes++;
+          escapeKeys = Math.abs(dx) >= Math.abs(dy)
+            ? escapes % 2 ? ['s', 'a'] : ['w', 'd']
+            : escapes % 2 ? ['s', 'd'] : ['w', 'a'];
+          escapeSteps = 12;
+          stuck = 0;
+        }
+        const escaping = escapeSteps > 0;
+        if (escaping) escapeSteps--;
+        const next = escaping ? escapeKeys :
           Math.abs(dx) >= Math.abs(dy)
             ? dx > 0
               ? ["s", "d"]
@@ -158,6 +175,7 @@ test("three public browsers host/join, gather, save and reconnect through the pl
     } finally {
       for (const key of held) await host.keyboard.up(key);
     }
+    await expect.poll(async () => host.locator('canvas').evaluate(e => Math.hypot(18 - Number(e.dataset.playerX), 10 - Number(e.dataset.playerY))), { timeout: 5000 }).toBeLessThan(1.1);
     const resource = host.locator(
       '[data-world-role="resource"][data-world-x="18"][data-world-y="10"]',
     );
@@ -261,9 +279,8 @@ test("three public browsers host/join, gather, save and reconnect through the pl
       ),
     );
   } finally {
-    const ownerCookie = (await contexts[0]!.cookies(site)).map(c => c.name + '=' + c.value).join('; ');
-    for (const context of contexts) await context.close();
-    if (owner) {
+    for (const context of contexts) await context.close().catch(() => {});
+    if (owner && ownerCookie) {
       let removed = false;
       for (let attempt = 0; attempt < 12 && !removed; attempt++) {
         await new Promise((r) => setTimeout(r, 1500));
