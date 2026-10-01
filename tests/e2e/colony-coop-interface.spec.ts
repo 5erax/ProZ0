@@ -101,6 +101,12 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     );
     const root = page.locator("[data-runtime-mode=colony-coop]");
     await expect(root).toHaveAttribute("data-runtime-status", "ready");
+    await page.setViewportSize({ width: 640, height: 360 });
+    await expect.poll(async () => {
+      const region = await page.locator(".coop-region").boundingBox();
+      return region ? region.y + region.height : Infinity;
+    }).toBeLessThan(130);
+    await page.setViewportSize({ width: 1280, height: 720 });
     const playerId = (await root.getAttribute("data-coop-player-id"))!,
       inventory = "inventory:" + playerId;
     const fund = (
