@@ -2,12 +2,16 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/pilot/auth/me', route => route.fulfill({ json: { account: null } }));
+});
+
 const EVIDENCE_DIR = resolve(
   process.cwd(),
   'test-results/p1-qa-002-entrypoint',
 );
 
-test('bare production route launches canonical Phase 1 Product Review without query knowledge', async ({ page }) => {
+test('bare lobby launches a new solo colony with a skippable arrival', async ({ page }) => {
   test.setTimeout(60_000);
   mkdirSync(EVIDENCE_DIR, { recursive: true });
 
@@ -21,16 +25,16 @@ test('bare production route launches canonical Phase 1 Product Review without qu
   await page.goto('/');
 
   const root = page.locator('[data-proz0-autoboot]');
-  const entrypoint = page.locator('[data-phase1-review-entrypoint="ready"]');
-  const start = page.locator('[data-start-phase1-review="true"]');
+  const entrypoint = page.locator('[data-game-lobby="ready"]');
+  const start = page.locator('[data-start-phase2-review="true"]');
 
   await expect(root).toHaveAttribute(
     'data-runtime-mode',
-    'phase1-review-entrypoint',
+    'game-lobby',
   );
   await expect(root).toHaveAttribute('data-runtime-status', 'entrypoint');
   await expect(entrypoint).toBeVisible();
-  await expect(start).toHaveText('START PHASE 1 REVIEW');
+  await expect(start).toHaveText('Bắt đầu thế giới mới');
   await expect(page.locator('#proz0-canvas')).toHaveCount(0);
   await page.screenshot({
     path: resolve(EVIDENCE_DIR, '01-bare-route-entrypoint.png'),
@@ -38,15 +42,16 @@ test('bare production route launches canonical Phase 1 Product Review without qu
 
   await Promise.all([
     page.waitForURL((url) =>
-      url.searchParams.get('proz0Mode') === 'phase1-product-review'
+      url.searchParams.get('proz0Mode') === 'phase2-colony-review'
       && url.searchParams.get('proz0Player') === 'review-player'
       && url.searchParams.get('proz0Players') === 'review-player'
-      && url.searchParams.get('proz0WorldSeed') === 'phase1-product-review'
-      && (url.searchParams.get('proz0WorldId')?.startsWith('review-world-') ?? false)
-      && (url.searchParams.get('proz0SaveDb')?.startsWith('proz0-review-') ?? false),
+      && !!url.searchParams.get('proz0WorldSeed')
+      && (url.searchParams.get('proz0WorldId')?.startsWith('world-') ?? false)
+      && (url.searchParams.get('proz0SaveDb')?.startsWith('proz0-world-') ?? false),
     ),
     start.click(),
   ]);
+  await page.getByRole('button', { name: 'Bỏ qua', exact: true }).click();
 
   await expect(root).toHaveAttribute('data-runtime-status', 'ready', {
     timeout: 15_000,
@@ -93,7 +98,8 @@ test('player can return from the bare launcher to the last committed world, not 
   await page.goto('/');
   const resume = page.locator('[data-continue-phase1-review]');
   await expect(resume).toHaveCount(0);
-  await page.locator('[data-start-phase1-review]').click();
+  await page.locator('[data-start-phase2-review]').click();
+  await page.getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   const root = page.locator('[data-proz0-autoboot]');
   const canvas = page.locator('#proz0-canvas');
   await expect(root).toHaveAttribute('data-runtime-status', 'ready');
@@ -106,8 +112,10 @@ test('player can return from the bare launcher to the last committed world, not 
   const save = page.locator('[data-product-review-save]');
   await page.keyboard.press('l');
   await expect(save).toHaveAttribute('data-save-state', 'success');
-  await expect(save.locator('[role="status"]')).toBeVisible();
-  await expect(save).toContainText('World saved');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.locator('.p1-product-save-box')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.p1-product-save-box')).toContainText('World saved');
   const savedY = Number(await canvas.getAttribute('data-player-y'));
   await page.goto('/');
   await expect(resume).toHaveAttribute('href', savedUrl);
@@ -126,7 +134,8 @@ test('player can return from the bare launcher to the last committed world, not 
   await expect(root).toHaveAttribute('data-product-review-reopened', 'true');
   expect(Number(await canvas.getAttribute('data-player-y'))).toBeCloseTo(secondSavedY, 5);
   await page.goto('/');
-  await page.locator('[data-start-phase1-review]').click();
+  await page.locator('[data-start-phase2-review]').click();
+  await page.getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await expect(root).toHaveAttribute('data-runtime-status', 'ready');
   expect(page.url()).not.toBe(savedUrl);
   await expect(root).toHaveAttribute('data-product-review-reopened', 'false');
@@ -140,8 +149,10 @@ test('player can return from the bare launcher to the last committed world, not 
   await page.keyboard.press('i');
   await page.keyboard.press('l');
   await expect(save).toHaveAttribute('data-save-state', 'failure');
-  await expect(save.locator('[role="status"]')).toBeVisible();
-  await expect(save).toContainText('not durable');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.locator('.p1-product-save-box')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.p1-product-save-box')).toContainText('not durable');
   await page.goto('/');
   await expect(resume).toHaveAttribute('href', savedUrl);
 });
@@ -151,12 +162,13 @@ test('blocked navigation storage does not turn a committed save into a failure',
     Storage.prototype.setItem = () => { throw new DOMException('Blocked', 'SecurityError'); };
   });
   await page.goto('/');
-  await page.locator('[data-start-phase1-review]').click();
+  await page.locator('[data-start-phase2-review]').click();
+  await page.getByRole('button', { name: 'Bỏ qua', exact: true }).click();
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
   await page.keyboard.press('l');
   const save = page.locator('[data-product-review-save]');
   await expect(save).toHaveAttribute('data-save-state', 'success');
-  await expect(save).toContainText('bookmark this page');
+  await expect(page.locator('.p1-product-save-box')).toContainText('bookmark this page');
   await page.reload();
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened', 'true');
   await page.goto('/');
@@ -169,7 +181,39 @@ test('launcher rejects malformed or off-site saved navigation records', async ({
     await page.evaluate((entry) => localStorage.setItem('proz0:last-saved-review:v1', entry), value);
     await page.reload();
     await expect(page.locator('[data-continue-phase1-review]')).toHaveCount(0);
-    await expect(page.locator('[data-start-phase1-review]')).toBeEnabled();
+    await expect(page.locator('[data-start-phase2-review]')).toBeEnabled();
+  }
+});
+
+test('skin reaches the solo world, keyboard completes arrival, and save-and-exit returns to a usable lobby', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Skin', exact: true }).click();
+  await page.getByRole('button', { name: 'Azure', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Azure', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Single Player', exact: true }).click();
+  await page.locator('[data-start-phase2-review]').click();
+  await expect(page.getByRole('dialog', { name: 'Đặt chân đến ProZ0' })).toBeVisible();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Enter');
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
+  await expect(page.locator('[data-skin="azure"]')).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Lưu và về sảnh', exact: true }).click();
+  await expect(page.locator('[data-game-lobby="ready"]')).toBeVisible();
+  await page.locator('[data-continue-phase1-review]').click();
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened', 'true');
+  await expect(page.locator('.proz0-arrival')).toHaveCount(0);
+});
+
+test('lobby navigation and sign-in remain accessible on small and wide displays', async ({ page }) => {
+  for (const width of [640, 1280, 1920]) {
+    await page.setViewportSize({ width, height: width === 640 ? 360 : 720 });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Multiplayer', exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+    await expect(page.getByLabel('Tên đăng nhập', { exact: true })).toBeVisible();
+    await page.screenshot({ path: resolve(EVIDENCE_DIR, 'lobby-login-' + width + '.png'), fullPage: true });
   }
 });
 
@@ -194,6 +238,6 @@ test('explicit QA Product Review query still bypasses the launcher', async ({ pa
     'phase1-product-review',
   );
   await expect(
-    page.locator('[data-phase1-review-entrypoint]'),
+    page.locator('[data-game-lobby]'),
   ).toHaveCount(0);
 });

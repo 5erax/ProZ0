@@ -138,6 +138,19 @@ export function createPhase1ProductReviewSaveControl(
   const settingsPanel=root.querySelector('[data-colony-settings]');
   const saveButton=document.createElement('button');saveButton.type='button';saveButton.textContent='Save world [L]';
   if(settingsPanel!==null){settingsPanel.append(saveButton,box);saveButton.addEventListener('click',()=>{void triggerSave();});}
+  const leaveButton = document.createElement('button');
+  leaveButton.type = 'button';
+  leaveButton.textContent = 'Lưu và về sảnh';
+  leaveButton.addEventListener('click', () => {
+    if (pending) return;
+    leaveButton.disabled = true;
+    void triggerSave().then(() => {
+      if (layer.dataset.saveState === 'success' && root.dataset.savedReviewBookmark !== 'unavailable')
+        targetWindow.location.assign(targetWindow.location.pathname);
+      else if (layer.dataset.saveState === 'success') box.textContent = 'World saved — bookmark this page before leaving.';
+    }).finally(() => { leaveButton.disabled = false; });
+  });
+  settingsPanel?.append(leaveButton);
 
   return Object.freeze({
     destroy(): void {
@@ -148,6 +161,7 @@ export function createPhase1ProductReviewSaveControl(
       targetWindow.removeEventListener('resize', applyScale);
       helpRow.remove();
       saveButton.remove();
+      leaveButton.remove();
       if(settingsPanel!==null)box.remove();
       layer.remove();
     },

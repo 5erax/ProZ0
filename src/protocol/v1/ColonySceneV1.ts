@@ -3,6 +3,7 @@ export interface ColonySceneV1 {
   readonly version: 1;
   readonly worldSeed: string;
   readonly tick: number;
+  readonly playerSkins?:Readonly<Record<string,string>>;
   readonly terrain: readonly {
     readonly x: number;
     readonly y: number;

@@ -42,6 +42,7 @@ import {
   shouldShowPhase1ProductReviewEntrypoint,
 } from './runtime/Phase1ProductReviewEntrypoint';
 import {bootColonyCoop} from './runtime/ColonyCoopRuntime';
+import {playArrivalCutscene} from './runtime/ArrivalCutscene';
 
 const LOCAL_PLAYER_ID = 'local-player' satisfies PlayerId;
 
@@ -269,6 +270,7 @@ export async function bootAutoProZ0(
   search = window.location.search,
 ): Promise<RuntimeHandle> {
   const query = new URLSearchParams(search);
+  await playArrivalCutscene(root,query);
   const mode =
     root.dataset.proz0Mode?.trim()
     || query.get('proz0Mode')?.trim()

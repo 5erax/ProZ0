@@ -4,6 +4,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
+import { OrderedInputQueue } from "./OrderedInputQueue";
 import { createClient } from "redis";
 import { WebSocketServer, type WebSocket } from "ws";
 import { Phase1HostedAuthorityComposition } from "../../integration/Phase1HostedAuthorityComposition";
@@ -18,6 +19,8 @@ import {
   type JsonValue,
 } from "../../protocol";
 import type { HostedOutboundMessage } from "../runtime/ServerAuthorityHost";
+import { LobbyAccounts, LobbyError, type LobbySkin } from "./LobbyAccounts";
+import { LobbyRooms, type LobbyRoomDetails } from "./LobbyRooms";
 
 interface RecordV1 {
   version: 1;
@@ -29,6 +32,8 @@ interface RecordV1 {
   clients: Record<string, string>;
   save: unknown;
   checkpoint: number;
+  roomByteLimit?: number;
+  skins?: Record<string, LobbySkin>;
   contentCompatibility: unknown;
   worldCompatibility: unknown;
 }
@@ -39,6 +44,8 @@ interface Inbound {
   client: string;
   text?: string;
   request?: string;
+  skin?: LobbySkin;
+  accountBound?: boolean;
 }
 interface Outbound {
   transport: string;
@@ -51,7 +58,7 @@ interface Authority {
   record: RecordV1;
   token: string;
   composition: Phase1HostedAuthorityComposition;
-  peers: Map<string, { gateway: string; client: string }>;
+  peers: Map<string, { gateway: string; client: string; skin?: LobbySkin }>;
   lastSave: number;
   started: number;
 }
@@ -60,6 +67,7 @@ export interface RedisPilotOptions {
   namespace?: string;
   allowedOrigins: readonly string[];
   creationKey?: string;
+  secureCookies?: boolean;
 }
 const token = () => randomBytes(24).toString("hex");
 const equal = (a: string, b: string) =>
@@ -158,7 +166,10 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       checkpoint: authority.record.checkpoint + 1,
     };
     const data = JSON.stringify(record);
-    if (Buffer.byteLength(data) > 4 * 1024 * 1024)
+    if (
+      Buffer.byteLength(data) >
+      (authority.record.roomByteLimit ?? 4 * 1024 * 1024)
+    )
       throw Error("Room storage limit");
     const result = await redis.eval(
       "if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end;redis.call('SET',KEYS[2],ARGV[2]);return 1",
@@ -194,9 +205,13 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           const peer = authority.peers.get(message.transportId),
             payload = message.envelope.payload as unknown as {
               resumeCredential?: string;
+              playerId: string;
             };
-          if (peer && payload.resumeCredential)
+          if (peer && payload.resumeCredential) {
             authority.record.clients[peer.client] = payload.resumeCredential;
+            (authority.record.skins ??= {})[payload.playerId] =
+              peer.skin ?? "pioneer";
+          }
         }
       // A reconnect can recover even if the accepted frame never reached the browser.
       await checkpoint(authority);
@@ -307,15 +322,125 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     );
     if (result !== 1) throw Error("Input backlog limit");
   };
+  const makeRoom = async (seed: string): Promise<LobbyRoomDetails> => {
+    const id = randomBytes(8).toString("hex");
+    const reservation = await redis.eval(
+      "local ids=redis.call('SMEMBERS',KEYS[1]);for _,id in ipairs(ids) do if redis.call('EXISTS',ARGV[1]..':'..id..':record',ARGV[1]..':'..id..':reservation')==0 then redis.call('SREM',KEYS[1],id) end end;if redis.call('SCARD',KEYS[1])>=8 then return 0 end;if redis.call('SET',KEYS[2],'1','NX','EX',10)==false then return -1 end;redis.call('SET',ARGV[1]..':'..ARGV[2]..':reservation','1','EX',60);redis.call('SADD',KEYS[1],ARGV[2]);return 1",
+      {
+        keys: [namespace + ":rooms", namespace + ":create-limit"],
+        arguments: [namespace, id],
+      },
+    );
+    if (reservation !== 1)
+      throw new LobbyError(
+        429,
+        reservation === 0
+          ? "Số thế giới đang đạt giới hạn; hãy tiếp tục phòng đã lưu"
+          : "Chờ vài giây trước khi tạo phòng tiếp theo",
+      );
+    let composition: Phase1HostedAuthorityComposition | undefined;
+    try {
+      composition = await Phase1HostedAuthorityComposition.create({
+        worldId: "pilot:" + id,
+        worldSeed: seed,
+        maxPlayers: 3,
+        colonyDepthEnabled: true,
+        interactionRangeWorldUnits: 1.25,
+        spawnClearanceRadiusWorldUnits: 1.25,
+        requiredAccessRadiusWorldUnits: 1.25,
+        persistence: {
+          async save() {
+            throw Error("Creation cannot save before room is stored");
+          },
+        },
+      });
+      const request = composePhase1SaveV2(composition.bundle, {
+        nowUtc: new Date().toISOString(),
+      });
+      const record: RecordV1 = {
+        version: 1,
+        id,
+        seed,
+        accessToken: token(),
+        ownerToken: token(),
+        bindings: [],
+        clients: {},
+        checkpoint: 0,
+        roomByteLimit: 2 * 1024 * 1024,
+        save: {
+          ...request,
+          formatId: request.world.formatId,
+          schemaVersion: request.world.schemaVersion,
+          recordKind: "portable-bundle",
+        },
+        contentCompatibility: composition.bundle.getContentCompatibility(),
+        worldCompatibility: composition.bundle.getWorldCompatibility(),
+      };
+      const published = await redis.eval(
+        "if redis.call('EXISTS',KEYS[1])==0 or redis.call('SISMEMBER',KEYS[2],ARGV[1])==0 then return 0 end;redis.call('SET',KEYS[3],ARGV[2]);redis.call('DEL',KEYS[1]);return 1",
+        {
+          keys: [
+            key(id, "reservation"),
+            namespace + ":rooms",
+            key(id, "record"),
+          ],
+          arguments: [id, JSON.stringify(record)],
+        },
+      );
+      if (published !== 1) throw Error("Room reservation expired; try again");
+      return {
+        ...metadata(record),
+        accessToken: record.accessToken,
+        ownerToken: record.ownerToken,
+      };
+    } catch (error) {
+      await redis.sRem(namespace + ":rooms", id);
+      await redis.del(key(id, "reservation"));
+      throw error;
+    } finally {
+      await composition?.destroy();
+    }
+  };
+  const accounts = new LobbyAccounts(
+    redis,
+    namespace,
+    options.secureCookies === true,
+  );
+  const removeRoom = async (id: string) => {
+    if (await redis.get(key(id, "lease")))
+      throw new LobbyError(
+        409,
+        "Mọi người cần rời phòng trước khi xóa; chờ khoảng mười giây rồi thử lại",
+      );
+    await redis.del(key(id, "record"));
+    await redis.sRem(namespace + ":rooms", id);
+  };
+  const directory = new LobbyRooms(
+    redis,
+    namespace,
+    accounts,
+    () => makeRoom("colony-world:" + randomBytes(8).toString("hex")),
+    async (id) => {
+      const r = await read(id);
+      return {
+        ...metadata(r),
+        accessToken: r.accessToken,
+        ownerToken: r.ownerToken,
+      };
+    },
+    removeRoom,
+  );
   const api = createServer((req, res) => {
     void (async () => {
       if (!originAllowed(req)) {
         json(res, 403, { error: "Origin not allowed" });
         return;
       }
-      if (req.headers.origin) {
-        res.setHeader("Access-Control-Allow-Origin", req.headers.origin);
+      const acceptedOrigin = options.allowedOrigins.find(origin => origin === req.headers.origin);
+      if (acceptedOrigin) {
+        res.setHeader("Access-Control-Allow-Origin", acceptedOrigin);
         res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
       }
       if (req.method === "OPTIONS") {
         res.setHeader(
@@ -324,7 +449,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         );
         res.setHeader(
           "Access-Control-Allow-Methods",
-          "GET, POST, DELETE, OPTIONS",
+          "GET, POST, PATCH, DELETE, OPTIONS",
         );
         res.writeHead(204);
         res.end();
@@ -335,6 +460,18 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         req.url ?? "/",
         "https://pilot.local",
       ).pathname.replace(/^\/api\/pilot/, "");
+      if (path.startsWith("/auth/")) {
+        json(res, 200, await accounts.route(req, res, path));
+        return;
+      }
+      if (path.startsWith("/lobby/")) {
+        json(
+          res,
+          path === "/lobby/rooms" && req.method === "POST" ? 201 : 200,
+          await directory.route(req, path),
+        );
+        return;
+      }
       if (path === "/health") {
         await redis.ping();
         json(res, 200, {
@@ -363,91 +500,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
             input.seed.length > 128)
         )
           throw Error("Invalid seed");
-        const id = randomBytes(8).toString("hex"),
-          seed = input.seed ?? "colony-pilot";
-        const reservation = await redis.eval(
-          "local ids=redis.call('SMEMBERS',KEYS[1]);for _,id in ipairs(ids) do if redis.call('EXISTS',ARGV[1]..':'..id..':record',ARGV[1]..':'..id..':reservation')==0 then redis.call('SREM',KEYS[1],id) end end;if redis.call('SCARD',KEYS[1])>=4 then return 0 end;if redis.call('SET',KEYS[2],'1','NX','EX',10)==false then return -1 end;redis.call('SET',ARGV[1]..':'..ARGV[2]..':reservation','1','EX',60);redis.call('SADD',KEYS[1],ARGV[2]);return 1",
-          {
-            keys: [namespace + ":rooms", namespace + ":create-limit"],
-            arguments: [namespace, id],
-          },
-        );
-        if (reservation !== 1) {
-          json(res, 429, {
-            error:
-              reservation === 0
-                ? "Pilot capacity reached · use an existing room"
-                : "Please wait before creating another room",
-          });
-          return;
-        }
-        let composition: Phase1HostedAuthorityComposition | undefined;
-        try {
-          composition = await Phase1HostedAuthorityComposition.create({
-            worldId: "pilot:" + id,
-            worldSeed: seed,
-            maxPlayers: 3,
-            colonyDepthEnabled: true,
-            interactionRangeWorldUnits: 1.25,
-            spawnClearanceRadiusWorldUnits: 1.25,
-            requiredAccessRadiusWorldUnits: 1.25,
-            persistence: {
-              async save() {
-                throw Error("Creation cannot save before room is stored");
-              },
-            },
-          });
-          const request = composePhase1SaveV2(composition.bundle, {
-            nowUtc: new Date().toISOString(),
-          });
-          const record: RecordV1 = {
-            version: 1,
-            id,
-            seed,
-            accessToken: token(),
-            ownerToken: token(),
-            bindings: [],
-            clients: {},
-            checkpoint: 0,
-            save: {
-              ...request,
-              formatId: request.world.formatId,
-              schemaVersion: request.world.schemaVersion,
-              recordKind: "portable-bundle",
-            },
-            contentCompatibility: composition.bundle.getContentCompatibility(),
-            worldCompatibility: composition.bundle.getWorldCompatibility(),
-          };
-          const published = await redis.eval(
-            "if redis.call('EXISTS',KEYS[1])==0 or redis.call('SISMEMBER',KEYS[2],ARGV[1])==0 then return 0 end;redis.call('SET',KEYS[3],ARGV[2]);redis.call('DEL',KEYS[1]);return 1",
-            {
-              keys: [
-                key(id, "reservation"),
-                namespace + ":rooms",
-                key(id, "record"),
-              ],
-              arguments: [id, JSON.stringify(record)],
-            },
-          );
-          if (published !== 1)
-            throw Error("Room reservation expired; try again");
-          json(res, 201, {
-            ...metadata(record),
-            accessToken: record.accessToken,
-            ownerToken: record.ownerToken,
-          });
-        } catch (error) {
-          await redis.sRem(namespace + ":rooms", id);
-          await redis.del(key(id, "reservation"));
-          throw error;
-        } finally {
-          await composition?.destroy();
-        }
+        json(res, 201, await makeRoom(input.seed ?? "colony-pilot"));
         return;
       }
       const match = path.match(/^\/rooms\/([a-f0-9]{16})(\/(?:save|export))?$/);
       if (match) {
         const record = await read(match[1]!);
+        await directory.authorize(req, record.id);
+        if (req.method === "DELETE" || match[2] === "/save" || match[2] === "/export")
+          await directory.authorizeOwner(req, record.id);
         if (req.method === "DELETE" && !match[2]) {
           if (!equal(bearer(req), record.ownerToken)) {
             json(res, 403, { error: "Only room owner may remove this room" });
@@ -461,6 +522,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           }
           await redis.del(key(record.id, "record"));
           await redis.sRem(namespace + ":rooms", record.id);
+          await directory.unlink(record.id);
           json(res, 200, { removed: true });
           return;
         }
@@ -520,8 +582,13 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         return;
       }
       json(res, 404, { error: "Not found" });
-    })().catch(() =>
-      json(res, 503, { error: "Shared world unavailable · retry shortly" }),
+    })().catch((error: unknown) =>
+      json(res, error instanceof LobbyError ? error.status : 503, {
+        error:
+          error instanceof LobbyError
+            ? error.message
+            : "Yêu cầu thất bại, hãy thử lại",
+      }),
     );
   });
   api.on("upgrade", (req, socket, head) => {
@@ -542,6 +609,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       }
       await ready();
       const record = await read(id);
+      const account = await directory.authorize(req, id, client);
       if (!equal(access, record.accessToken)) {
         socket.destroy();
         return;
@@ -559,7 +627,14 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         const transport = token();
         sockets.set(transport, ws);
         socketRooms.set(transport, id);
-        let queue = enqueue(id, { kind: "open", transport, gateway, client });
+        const queue = new OrderedInputQueue<Inbound>(event => enqueue(id, event), () => ws.close(1011, "World store unavailable"));
+        queue.push({
+          kind: "open",
+          transport,
+          gateway,
+          client,
+          skin: account?.skin ?? "pioneer",
+        });
         ws.on("message", (data, isBinary) => {
           if (Date.now() - windowStart >= 1000) {
             windowStart = Date.now();
@@ -573,26 +648,24 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
             ws.close(1003, "Text required");
             return;
           }
-          queue = queue
-            .then(() =>
-              enqueue(id, {
+          const text = data.toString();
+          let movement = false;
+          try { movement = JSON.parse(text).messageType === "MOVEMENT_INPUT"; } catch { /* Protocol validation rejects malformed frames. */ }
+          queue.push({
                 kind: "text",
                 transport,
                 gateway,
                 client,
-                text: data.toString(),
-              }),
-            )
-            .catch(() => ws.close(1011, "World store unavailable"));
+                text,
+                accountBound: account !== null,
+              }, movement);
         });
         ws.on("close", () => {
           sockets.delete(transport);
           socketRooms.delete(transport);
-          void queue
-            .then(() =>
-              enqueue(id, { kind: "close", transport, gateway, client }),
-            )
-            .catch(() => {});
+          const close: Inbound = { kind: "close", transport, gateway, client };
+          if (queue.isFailed()) void enqueue(id, close).catch(() => {});
+          else queue.push(close);
         });
         ws.on("error", () => ws.close(1011, "Connection failed"));
       });
@@ -640,6 +713,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
             authority.peers.set(event.transport, {
               gateway: event.gateway,
               client: event.client,
+              skin: event.skin ?? "pioneer",
             });
           if (event.kind === "close") {
             authority.composition.host.disconnect(event.transport);
@@ -660,14 +734,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           if (event.kind === "text" && authority.peers.has(event.transport)) {
             let text = event.text!;
             const recovered = authority.record.clients[event.client];
-            if (recovered) {
+            if (recovered || event.accountBound) {
               try {
                 const parsed = JSON.parse(text);
                 if (
                   parsed.messageType === "CLIENT_HELLO" &&
-                  !parsed.payload.resumeCredential
+                  (event.accountBound || !parsed.payload.resumeCredential)
                 ) {
-                  parsed.payload.resumeCredential = recovered;
+                  if (recovered) parsed.payload.resumeCredential = recovered;
+                  else delete parsed.payload.resumeCredential;
                   text = JSON.stringify(parsed);
                 }
               } catch {
@@ -695,6 +770,7 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
                   state: colonyHostedScene(
                     authority.composition.bundle,
                     playerId,
+                    authority.record.skins,
                   ) as unknown as JsonValue,
                 }),
               );

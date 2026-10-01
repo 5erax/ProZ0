@@ -7,7 +7,7 @@ function restricted(patterns) {
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
+    ignores: ['dist/**', 'dist-pilot/**', 'dist-server/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

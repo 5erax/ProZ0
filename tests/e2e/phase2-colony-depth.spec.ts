@@ -167,7 +167,7 @@ test("accepted Phase 1 world upgrades from the launcher while keeping its saved 
   page,
 }) => {
   await page.goto("/");
-  await page.locator("[data-start-phase1-review]").click();
+  await page.goto('/?' + new URLSearchParams({proz0Mode:'phase1-product-review',proz0WorldId:'legacy-upgrade',proz0WorldSeed:'phase1-product-review',proz0Players:'review-player',proz0Player:'review-player',proz0SaveDb:'legacy-upgrade'}).toString());
   await expect(page.locator("[data-proz0-autoboot]")).toHaveAttribute(
     "data-runtime-status",
     "ready",

@@ -7,6 +7,9 @@ export interface ColonyRoomDetails {
   contentCompatibility: unknown;
   worldCompatibility: unknown;
   checkpoint: number;
+  roomName?:string;
+  clientKey?:string;
+  skin?:string;
 }
 export function normalizePilotEndpoint(value: string): string {
   const url = new URL(value);
