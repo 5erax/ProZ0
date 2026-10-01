@@ -5,11 +5,15 @@ import {
 } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { OrderedInputQueue } from "./OrderedInputQueue";
+import { RoomSocial, type SocialDelivery } from "./RoomSocial";
 import { createClient } from "redis";
 import { WebSocketServer, type WebSocket } from "ws";
 import { Phase1HostedAuthorityComposition } from "../../integration/Phase1HostedAuthorityComposition";
 import { composePhase1SaveV2 } from "../../integration/Phase1SaveV2Composer";
-import { colonyHostedScene } from "../../integration/ColonyHostedScene";
+import {
+  colonyHostedScene,
+  colonyHostedMap,
+} from "../../integration/ColonyHostedScene";
 import { createPhase1ContentCatalog } from "../../content";
 import { reconstructPhase1ReopenState } from "../../persistence/integration/Phase1ReopenState";
 import { createPhase1SaveV2Compatibility } from "../../persistence/validation/SaveValidatorV2";
@@ -34,6 +38,7 @@ interface RecordV1 {
   checkpoint: number;
   roomByteLimit?: number;
   skins?: Record<string, LobbySkin>;
+  names?: Record<string, string>;
   contentCompatibility: unknown;
   worldCompatibility: unknown;
 }
@@ -46,6 +51,7 @@ interface Inbound {
   request?: string;
   skin?: LobbySkin;
   accountBound?: boolean;
+  displayName?: string;
 }
 interface Outbound {
   transport: string;
@@ -58,9 +64,24 @@ interface Authority {
   record: RecordV1;
   token: string;
   composition: Phase1HostedAuthorityComposition;
-  peers: Map<string, { gateway: string; client: string; skin?: LobbySkin }>;
+  peers: Map<
+    string,
+    {
+      gateway: string;
+      client: string;
+      skin?: LobbySkin;
+      displayName?: string;
+      playerId?: string;
+      socialSubscribed?: boolean;
+    }
+  >;
   lastSave: number;
   started: number;
+  renewed: number;
+  stepped: number;
+  sceneTick: number;
+  localEvents: Inbound[];
+  social: RoomSocial;
 }
 export interface RedisPilotOptions {
   url: string;
@@ -183,11 +204,26 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     authority.lastSave = Date.now();
   };
   const send = async (peer: { gateway: string }, message: Outbound) => {
+    if (peer.gateway === gateway) {
+      dispatch(message);
+      return;
+    }
     await redis
       .multi()
       .rPush(key(peer.gateway, "out"), JSON.stringify(message))
       .expire(key(peer.gateway, "out"), 60)
       .exec();
+  };
+  const dispatch = (event: Outbound) => {
+    if (event.kind === "saved") {
+      saves.get(event.request!)?.resolve(event.checkpoint!);
+      return;
+    }
+    const ws = sockets.get(event.transport);
+    if (!ws) return;
+    if (event.kind === "close") ws.close(1012, "Shared world reconnect");
+    else if (ws.bufferedAmount > 1024 * 1024) ws.close(4008, "Slow connection");
+    else if (ws.readyState === 1) ws.send(event.text!);
   };
   const deliver = async (
     authority: Authority,
@@ -208,9 +244,12 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
               playerId: string;
             };
           if (peer && payload.resumeCredential) {
+            peer.playerId = payload.playerId;
             authority.record.clients[peer.client] = payload.resumeCredential;
             (authority.record.skins ??= {})[payload.playerId] =
               peer.skin ?? "pioneer";
+            (authority.record.names ??= {})[payload.playerId] =
+              peer.displayName ?? payload.playerId;
           }
         }
       // A reconnect can recover even if the accepted frame never reached the browser.
@@ -221,6 +260,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     for (const message of messages) {
       const peer = authority.peers.get(message.transportId);
       if (!peer) continue;
+      const outbound: Outbound = {
+        transport: message.transportId,
+        kind: "text",
+        text: serializeServerEnvelopeV1(message.envelope),
+      };
+      if (peer.gateway === gateway) {
+        dispatch(outbound);
+        continue;
+      }
       tx.rPush(
         key(peer.gateway, "out"),
         JSON.stringify({
@@ -231,6 +279,31 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       );
       tx.expire(key(peer.gateway, "out"), 60);
       count++;
+    }
+    if (count) await tx.exec();
+  };
+  const socialDeliver = async (
+    authority: Authority,
+    deliveries: SocialDelivery[],
+  ) => {
+    const tx = redis.multi();
+    let count = 0;
+    for (const item of deliveries) {
+      const peer = authority.peers.get(item.transport);
+      if (!peer) continue;
+      const event: Outbound = {
+        transport: item.transport,
+        kind: "text",
+        text: JSON.stringify(item.message),
+      };
+      if (peer.gateway === gateway) dispatch(event);
+      else {
+        tx.rPush(key(peer.gateway, "out"), JSON.stringify(event)).expire(
+          key(peer.gateway, "out"),
+          60,
+        );
+        count++;
+      }
     }
     if (count) await tx.exec();
   };
@@ -298,6 +371,11 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           peers: new Map(),
           lastSave: Date.now(),
           started: Date.now(),
+          renewed: Date.now(),
+          stepped: Date.now(),
+          sceneTick: -1,
+          localEvents: [],
+          social: new RoomSocial(),
         };
         authorities.set(id, authority);
       } catch (error) {
@@ -316,6 +394,13 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
     }
   };
   const enqueue = async (id: string, event: Inbound) => {
+    const authority = authorities.get(id);
+    if (authority && event.gateway === gateway) {
+      if (authority.localEvents.length >= 128)
+        throw Error("Input backlog limit");
+      authority.localEvents.push(event);
+      return;
+    }
     const result = await redis.eval(
       "if redis.call('LLEN',KEYS[1])>=128 then return 0 end;redis.call('RPUSH',KEYS[1],ARGV[1]);redis.call('EXPIRE',KEYS[1],30);return 1",
       { keys: [key(id, "in")], arguments: [JSON.stringify(event)] },
@@ -436,7 +521,9 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         json(res, 403, { error: "Origin not allowed" });
         return;
       }
-      const acceptedOrigin = options.allowedOrigins.find(origin => origin === req.headers.origin);
+      const acceptedOrigin = options.allowedOrigins.find(
+        (origin) => origin === req.headers.origin,
+      );
       if (acceptedOrigin) {
         res.setHeader("Access-Control-Allow-Origin", acceptedOrigin);
         res.setHeader("Vary", "Origin");
@@ -507,7 +594,11 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       if (match) {
         const record = await read(match[1]!);
         await directory.authorize(req, record.id);
-        if (req.method === "DELETE" || match[2] === "/save" || match[2] === "/export")
+        if (
+          req.method === "DELETE" ||
+          match[2] === "/save" ||
+          match[2] === "/export"
+        )
           await directory.authorizeOwner(req, record.id);
         if (req.method === "DELETE" && !match[2]) {
           if (!equal(bearer(req), record.ownerToken)) {
@@ -627,13 +718,17 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         const transport = token();
         sockets.set(transport, ws);
         socketRooms.set(transport, id);
-        const queue = new OrderedInputQueue<Inbound>(event => enqueue(id, event), () => ws.close(1011, "World store unavailable"));
+        const queue = new OrderedInputQueue<Inbound>(
+          (event) => enqueue(id, event),
+          () => ws.close(1011, "World store unavailable"),
+        );
         queue.push({
           kind: "open",
           transport,
           gateway,
           client,
           skin: account?.skin ?? "pioneer",
+          displayName: account?.displayName ?? account?.username ?? "Colonist",
         });
         ws.on("message", (data, isBinary) => {
           if (Date.now() - windowStart >= 1000) {
@@ -650,15 +745,22 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           }
           const text = data.toString();
           let movement = false;
-          try { movement = JSON.parse(text).messageType === "MOVEMENT_INPUT"; } catch { /* Protocol validation rejects malformed frames. */ }
-          queue.push({
-                kind: "text",
-                transport,
-                gateway,
-                client,
-                text,
-                accountBound: account !== null,
-              }, movement);
+          try {
+            movement = JSON.parse(text).messageType === "MOVEMENT_INPUT";
+          } catch {
+            /* Protocol validation rejects malformed frames. */
+          }
+          queue.push(
+            {
+              kind: "text",
+              transport,
+              gateway,
+              client,
+              text,
+              accountBound: account !== null,
+            },
+            movement,
+          );
         });
         ws.on("close", () => {
           sockets.delete(transport);
@@ -682,17 +784,21 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       }
       for (const authority of [...authorities.values()]) {
         const id = authority.record.id;
-        const renewed = await redis.eval(
-          "if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end;redis.call('PEXPIRE',KEYS[1],ARGV[2]);return 1",
-          {
-            keys: [key(id, "lease")],
-            arguments: [authority.token, String(leaseTTL)],
-          },
-        );
+        const needsRenewal = Date.now() - authority.renewed >= 500;
+        const renewed = !needsRenewal
+          ? 1
+          : await redis.eval(
+              "if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end;redis.call('PEXPIRE',KEYS[1],ARGV[2]);return 1",
+              {
+                keys: [key(id, "lease")],
+                arguments: [authority.token, String(leaseTTL)],
+              },
+            );
         if (renewed !== 1) {
           await retire(authority);
           continue;
         }
+        if (needsRenewal) authority.renewed = Date.now();
         if (heartbeat)
           for (const remote of new Set(
             [...authority.peers.values()].map((p) => p.gateway),
@@ -702,11 +808,20 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
                 if (peer.gateway === remote) {
                   authority.composition.host.disconnect(transport);
                   authority.peers.delete(transport);
+                  await socialDeliver(
+                    authority,
+                    authority.social.leave(transport),
+                  );
                 }
         const events = (await redis.eval(drain, {
           keys: [key(id, "in")],
           arguments: [],
         })) as string[];
+        events.push(
+          ...authority.localEvents
+            .splice(0)
+            .map((event) => JSON.stringify(event)),
+        );
         for (const raw of events) {
           const event = JSON.parse(raw) as Inbound;
           if (event.kind === "open")
@@ -714,10 +829,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
               gateway: event.gateway,
               client: event.client,
               skin: event.skin ?? "pioneer",
+              displayName: event.displayName ?? "Colonist",
             });
           if (event.kind === "close") {
             authority.composition.host.disconnect(event.transport);
             authority.peers.delete(event.transport);
+            await socialDeliver(
+              authority,
+              authority.social.leave(event.transport),
+            );
           }
           if (event.kind === "save") {
             await checkpoint(authority);
@@ -733,6 +853,34 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           }
           if (event.kind === "text" && authority.peers.has(event.transport)) {
             let text = event.text!;
+            try {
+              const social = JSON.parse(text);
+              if (social.proz0Social === 1) {
+                const peer = authority.peers.get(event.transport)!;
+                if (
+                  social.type === "subscribe" &&
+                  peer.playerId &&
+                  !peer.socialSubscribed
+                ) {
+                  peer.socialSubscribed = true;
+                  await socialDeliver(
+                    authority,
+                    authority.social.join(
+                      event.transport,
+                      peer.playerId,
+                      authority.record.names?.[peer.playerId] ?? peer.playerId,
+                    ),
+                  );
+                } else
+                  await socialDeliver(
+                    authority,
+                    authority.social.receive(event.transport, social),
+                  );
+                continue;
+              }
+            } catch {
+              /* Protocol decoder handles malformed text. */
+            }
             const recovered = authority.record.clients[event.client];
             if (recovered || event.accountBound) {
               try {
@@ -757,10 +905,31 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         }
         if (authority.peers.size) {
           const messages: HostedOutboundMessage[] = [];
-          for (let n = 0; n < 3; n++)
+          const now = Date.now();
+          const steps = Math.min(
+            12,
+            Math.floor(((now - authority.stepped) * 60) / 1000),
+          );
+          authority.stepped =
+            steps === 12 ? now : authority.stepped + (steps * 1000) / 60;
+          for (let n = 0; n < steps; n++)
             messages.push(...(await authority.composition.step()));
-          if (authority.composition.bundle.authorityTick % 6 === 0)
-            for (const playerId of authority.composition.bundle.getActivePlayerIds())
+          if (
+            authority.composition.bundle.authorityTick - authority.sceneTick >=
+            6
+          ) {
+            authority.sceneTick = authority.composition.bundle.authorityTick;
+            for (const playerId of authority.composition.bundle.getActivePlayerIds()) {
+              const map = colonyHostedMap(authority.composition.bundle);
+              messages.push(
+                ...authority.composition.host.publishAggregate({
+                  aggregateType: "colony-map",
+                  aggregateId: playerId,
+                  revision: map.revision,
+                  tombstone: false,
+                  state: { cells: map.cells } as unknown as JsonValue,
+                }),
+              );
               messages.push(
                 ...authority.composition.host.publishAggregate({
                   aggregateType: "colony-scene",
@@ -771,11 +940,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
                     authority.composition.bundle,
                     playerId,
                     authority.record.skins,
+                    authority.record.names,
+                    false,
                   ) as unknown as JsonValue,
                 }),
               );
+            }
+          }
           await deliver(authority, messages);
-        }
+        } else authority.stepped = Date.now();
         if (Date.now() - authority.lastSave > 5000) await checkpoint(authority);
         // A leader stays alive through its own socket. Rotate before Vercel's 300s limit.
         if (
@@ -787,29 +960,25 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
           await retire(authority);
         }
       }
-      const outgoing = (await redis.eval(drain, {
-        keys: [key(gateway, "out")],
-        arguments: [],
-      })) as string[];
+      const outgoing =
+        saves.size ||
+        [...socketRooms.values()].some((id) => !authorities.has(id))
+          ? ((await redis.eval(drain, {
+              keys: [key(gateway, "out")],
+              arguments: [],
+            })) as string[])
+          : [];
       for (const raw of outgoing) {
         const event = JSON.parse(raw) as Outbound;
-        if (event.kind === "saved") {
-          saves.get(event.request!)?.resolve(event.checkpoint!);
-          continue;
-        }
-        const ws = sockets.get(event.transport);
-        if (!ws) continue;
-        if (event.kind === "close") ws.close(1012, "Shared world reconnect");
-        else if (ws.bufferedAmount > 1024 * 1024)
-          ws.close(4008, "Slow connection");
-        else if (ws.readyState === 1) ws.send(event.text!);
+        dispatch(event);
       }
       // Detect a dead leader on any gateway and make all clients reconnect together.
-      for (const id of new Set(socketRooms.values()))
-        if (!(await redis.get(key(id, "lease"))))
-          for (const [transport, room] of socketRooms)
-            if (room === id)
-              sockets.get(transport)?.close(1012, "Authority restarting");
+      if (heartbeat)
+        for (const id of new Set(socketRooms.values()))
+          if (!(await redis.get(key(id, "lease"))))
+            for (const [transport, room] of socketRooms)
+              if (room === id)
+                sockets.get(transport)?.close(1012, "Authority restarting");
     } catch {
       for (const ws of sockets.values())
         ws.close(1011, "Shared world store interrupted");

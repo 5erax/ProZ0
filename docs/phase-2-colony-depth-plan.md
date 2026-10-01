@@ -6,7 +6,7 @@ Execution stays in the current recovery chat. Task records use direct execution,
 
 ## Product outcome
 
-Develop a sustainable colony worth revisiting: discover visually distinct outer regions, prepare for their weather, bring resources home, invest them in shared research and useful specialization, improve storage and production, and continue the same world alone or with eight hosted players.
+Develop a sustainable colony worth revisiting: discover visually distinct outer regions, prepare for their weather, bring resources home, invest them in shared research and useful specialization, improve storage and production, and continue the same world alone or in an account-bound private room of **2–3 players**. The Owner reduced the public concurrency target after the initial eight-client authority baseline; eight-client tests remain subsystem evidence, not the public capacity promise.
 
 This is the roadmap's Colony depth phase. Industry, conveyors, vehicles, NPC survivors and civilization/endgame choices remain later phases. Evidence observations must preserve the accepted mystery canon; a journal records discoveries without a quest rail or truth inference.
 
@@ -48,7 +48,7 @@ Research, specialization, ecology and observations are authority-owned. Commands
 1. Start or continue an accepted world; understand available exploration/colony actions through visual controls.
 2. Prepare and walk into both new outer regions; distinguish region and weather, discover/inspect sites and record only observed evidence; return using known map/base information.
 3. Gather, invest actual materials in research, earn/select a profession, demonstrate its effect and improved storage/production, then save and reopen with the same state.
-4. Admit eight hosted clients; execute shared actions, duplicate/stale requests and concurrent transfers, disconnect/rejoin and checkpoint/reopen; all clients converge without item loss/duplication.
+4. Admit three public players through the real lobby; execute shared actions, duplicate/stale requests and concurrent transfers, disconnect/rejoin and checkpoint/reopen; all clients converge without item loss/duplication. Preserve the existing eight-client authority regression independently.
 5. Observe full-scene idle/moving clear/rain/night performance, with actual authority advancement and recorded browser/viewport/SHA. Preserve the existing `>=50 FPS`, frame P95 `<=34 ms` and input response gates; no scene-free proxy or threshold reduction.
 
 Subsystem checkboxes require evidence. A plan, fixture-only assertion or icon without working mechanics cannot close a gameplay issue. Release requires exact-main CI/security, Pages run/job/artifact/digest and public fresh-world plus accepted-save flows. Automated tests are labeled as such; #187 closes only on a real Owner decision after the integrated build is available.

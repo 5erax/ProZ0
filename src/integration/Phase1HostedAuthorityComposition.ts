@@ -40,7 +40,7 @@ function aggregateVisibleToPlayer(
   playerId: string,
   view: RevisionedAggregateViewV1,
 ): boolean {
-  if(view.aggregateType==='colony-scene')return view.aggregateId===playerId;
+  if(view.aggregateType==='colony-scene'||view.aggregateType==='colony-map')return view.aggregateId===playerId;
   if(view.aggregateType==='equipment')return view.aggregateId===playerId;
   if (
     view.aggregateType === 'container'
@@ -96,6 +96,7 @@ function aggregateViews(
     tombstone: false,
     state: asJson({
       structureIds: building.structures.map((entry) => entry.structureId),
+      connectors: building.connectors,
       connections: building.connections.map((entry) => ({
         connectionId: entry.connectionId,
         a: entry.a,
@@ -188,6 +189,10 @@ function aggregateViews(
     }
   }
 
+  for (const drop of bundle.world.exportSnapshot().drops) {
+    if(!drop.available)continue;
+    values.push({aggregateType:'world-drop',aggregateId:drop.worldDropId,revision:drop.revision,tombstone:false,state:asJson({containerId:drop.containerId,available:true})});
+  }
   for (const cache of bundle.world.exportSnapshot().deathCaches.caches) {
     values.push(Object.freeze({
       aggregateType: 'death-cache',
