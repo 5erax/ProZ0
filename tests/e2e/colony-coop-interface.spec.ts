@@ -31,8 +31,10 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
   const server = createServer(),
     wsServer = new WebSocketServer({ server }),
     peers = new Map<string, WebSocket>();
+  const submitted: unknown[] = [], results: unknown[] = [];
   const flush = (messages: readonly HostedOutboundMessage[]) => {
     for (const m of messages) {
+      if (m.envelope.messageType === "COMMAND_RESULT") results.push(m.envelope.payload);
       const ws = peers.get(m.transportId);
       if (ws?.readyState === WebSocket.OPEN)
         ws.send(serializeServerEnvelopeV1(m.envelope));
@@ -44,6 +46,8 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     ws.on("message", (raw) => {
       const text = raw.toString();
       if (JSON.parse(text).proz0Social === 1) return;
+      const message = JSON.parse(text);
+      if (message.messageType === "GAMEPLAY_COMMAND") submitted.push(message.payload);
       flush(colony.host.receiveText(id, text));
     });
     ws.on("close", () => {
@@ -321,6 +325,14 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
       .some(s => s.definitionId === "structure:habitat-room")).toBe(true);
     expect(colony.bundle.buildings.exportSnapshot().foothold.connectors
       .find(c => c.connectorId === "connector:landing:north")?.occupiedByConnectionId).not.toBeNull();
+  } catch (error) {
+    console.error("Co-op authority UI failure", JSON.stringify({
+      submitted: submitted.slice(-5), results: results.slice(-5),
+      feedback: await page.locator(".coop-context").textContent().catch(() => "Unavailable"),
+      colony: colony.bundle.colonyDepth.read(),
+      containers: colony.bundle.items.exportSnapshot().containers,
+    }));
+    throw error;
   } finally {
     clearInterval(timer);
     while (stepping) await new Promise((resolve) => setTimeout(resolve, 10));
