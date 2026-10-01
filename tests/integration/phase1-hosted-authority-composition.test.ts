@@ -119,6 +119,48 @@ it('eight-player colony research resolves one competing transaction and replicat
   } finally {await c.destroy();}
 });
 
+it('catches up a delayed baseline acknowledgement without revealing teammate inventories', async () => {
+  const c = await Phase1HostedAuthorityComposition.create({
+    worldId: 'world:delayed-baseline', worldSeed: 'p1-world-golden', maxPlayers: 3,
+    colonyDepthEnabled: true, persistence: new NoopHostedPersistence(),
+    interactionRangeWorldUnits: 1.25, spawnClearanceRadiusWorldUnits: 1.25,
+    requiredAccessRadiusWorldUnits: 1.25,
+  });
+  try {
+    const transportId = 'transport:delayed-baseline';
+    const hello = c.host.receiveText(transportId, JSON.stringify({
+      protocolVersion: HOSTED_PROTOCOL_VERSION, messageType: 'CLIENT_HELLO',
+      clientMessageSeq: 0, payload: helloPayload(c),
+    }));
+    const metadata = hello.find(m => m.envelope.messageType === 'SESSION_ACCEPTED')!
+      .envelope.payload as unknown as SessionAcceptedV1;
+    const baseline = hello.find(m => m.envelope.messageType === 'BASELINE_SNAPSHOT')!
+      .envelope.payload as unknown as { aggregates: { aggregateType: string; revision: number }[] };
+    expect(baseline.aggregates.find(v => v.aggregateType === 'colony-depth')?.revision).toBe(0);
+    await c.step();
+    expect(c.bundle.colonyDepth.read().revision).toBe(1);
+    expect(c.bundle.items.commitColonyExchange({
+      operationId: 'fixture:baseline-fund', playerId: metadata.playerId,
+      expectedInventoryRevision: 0, inputs: [],
+      outputs: [{ itemDefinitionId: 'item:plant-fiber', quantity: 1 }],
+    }).status).toBe('committed');
+    join(c, 'transport:baseline-teammate');
+    c.publishSharedState();
+    const catchup = c.host.receiveText(transportId, JSON.stringify({
+      protocolVersion: HOSTED_PROTOCOL_VERSION, messageType: 'BASELINE_APPLIED',
+      clientMessageSeq: 1, sessionId: c.host.getSessionId(),
+      connectionId: metadata.connectionId, payload: { snapshotId: metadata.snapshotId },
+    }));
+    const views = catchup.map(m => m.envelope.payload as unknown as {
+      aggregateType: string; aggregateId: string; revision: number;
+    });
+    expect(catchup.every(m => m.transportId === transportId && m.envelope.messageType === 'AGGREGATE_UPDATE')).toBe(true);
+    expect(views.find(v => v.aggregateType === 'colony-depth')?.revision).toBe(1);
+    expect(views.filter(v => v.aggregateType === 'container' && v.aggregateId.startsWith('inventory:'))
+      .map(v => v.aggregateId)).toEqual(['inventory:' + metadata.playerId]);
+  } finally { await c.destroy(); }
+});
+
 function join(
   composition: Phase1HostedAuthorityComposition,
   transportId: string,

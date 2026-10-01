@@ -25,6 +25,7 @@ interface Account {
   password: string;
   recovery: string;
   skin: LobbySkin;
+  displayName?: string;
   revision: number;
   authVersion?: string;
 }
@@ -69,6 +70,20 @@ export class LobbyError extends Error {
     super(message);
   }
 }
+export function validateDisplayName(value: unknown): string {
+  if (typeof value !== "string") throw new LobbyError(400, "Nhập tên hiển thị");
+  const name = value.normalize("NFC").trim();
+  if (
+    Array.from(name).length < 2 ||
+    Array.from(name).length > 24 ||
+    /[\p{C}]/u.test(name)
+  )
+    throw new LobbyError(
+      400,
+      "Tên hiển thị cần 2–24 ký tự, không dùng ký tự điều khiển",
+    );
+  return name;
+}
 export async function readLobbyBody(
   req: IncomingMessage,
 ): Promise<Record<string, unknown>> {
@@ -101,7 +116,12 @@ export class LobbyAccounts {
     return this.namespace + ":account:" + kind + ":" + id;
   }
   private public(account: Account) {
-    return { id: account.id, username: account.username, skin: account.skin };
+    return {
+      id: account.id,
+      username: account.username,
+      skin: account.skin,
+      displayName: account.displayName ?? account.username,
+    };
   }
   async rate(req: IncomingMessage, subject: string) {
     const ip = (
@@ -139,8 +159,10 @@ export class LobbyAccounts {
     if (!session) return null;
     const binding = JSON.parse(session) as { id: string; authVersion: string };
     const raw = await this.store.get(this.key("user", binding.id));
-    const account = raw ? JSON.parse(raw) as Account : null;
-    return account && (account.authVersion ?? "legacy") === binding.authVersion ? account : null;
+    const account = raw ? (JSON.parse(raw) as Account) : null;
+    return account && (account.authVersion ?? "legacy") === binding.authVersion
+      ? account
+      : null;
   }
   async require(req: IncomingMessage) {
     const account = await this.current(req);
@@ -169,7 +191,14 @@ export class LobbyAccounts {
     if (old.length >= 8) {
       await this.revoke(account);
     }
-    await this.store.set(key, JSON.stringify({ id: account.id, authVersion: account.authVersion ?? "legacy" }), { EX: 86400 });
+    await this.store.set(
+      key,
+      JSON.stringify({
+        id: account.id,
+        authVersion: account.authVersion ?? "legacy",
+      }),
+      { EX: 86400 },
+    );
     await this.store.sAdd(this.key("sessions", account.id), key);
     await this.store.expire(this.key("sessions", account.id), 86400);
     res.setHeader("Set-Cookie", this.cookieHeader(token, 86400));
@@ -200,15 +229,24 @@ export class LobbyAccounts {
     if (path === "/auth/profile" && req.method === "POST") {
       const a = await this.require(req);
       const previous = JSON.stringify(a);
-      if (!LOBBY_SKINS.includes(data.skin as LobbySkin))
+      if (
+        data.skin !== undefined &&
+        !LOBBY_SKINS.includes(data.skin as LobbySkin)
+      )
         throw new LobbyError(400, "Skin không hợp lệ");
-      a.skin = data.skin as LobbySkin;
+      if (data.skin !== undefined) a.skin = data.skin as LobbySkin;
+      if (data.displayName !== undefined)
+        a.displayName = validateDisplayName(data.displayName);
       a.revision++;
       const updated = await this.store.eval(
         "if redis.call('GET',KEYS[1])~=ARGV[1] then return 0 end;redis.call('SET',KEYS[1],ARGV[2]);return 1",
-        { keys: [this.key("user", a.id)], arguments: [previous, JSON.stringify(a)] },
+        {
+          keys: [this.key("user", a.id)],
+          arguments: [previous, JSON.stringify(a)],
+        },
       );
-      if (updated !== 1) throw new LobbyError(409, "Thông tin đã thay đổi, hãy thử lại");
+      if (updated !== 1)
+        throw new LobbyError(409, "Thông tin đã thay đổi, hãy thử lại");
       return { account: this.public(a) };
     }
     if (
@@ -287,7 +325,7 @@ export class LobbyAccounts {
     const encoded = a?.password ?? "0".repeat(32) + ":" + "0".repeat(64);
     if (!(await verifyLobbyPassword(password, encoded)) || !a)
       throw new LobbyError(401, "Tên đăng nhập hoặc mật khẩu không đúng");
-    if (await this.store.get(this.key("user", id)) !== raw)
+    if ((await this.store.get(this.key("user", id))) !== raw)
       throw new LobbyError(409, "Thông tin đã thay đổi, hãy thử lại");
     return { account: await this.login(res, a) };
   }

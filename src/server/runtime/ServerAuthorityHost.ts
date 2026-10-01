@@ -142,6 +142,7 @@ function actorMismatch(payload: JsonValue, playerId: string): boolean {
 }
 
 export class ServerAuthorityHost {
+  private readonly syncingRevisions = new Map<string, Map<string, number>>();
   private readonly session: HostedSession;
   private readonly replication = new ReplicationCoordinator();
   private readonly operations = new OperationResultCache();
@@ -266,13 +267,16 @@ export class ServerAuthorityHost {
           maxPlayers: this.session.getMaxPlayers(),
         }),
       );
+      const baselineState = this.buildBaseline(
+        joined.connection.playerId, joined.connection.snapshotId,
+      );
+      this.syncingRevisions.set(transportId, new Map(baselineState.aggregates.map(
+        view => [revisionKey(view), view.revision],
+      )));
       const baseline = this.envelope(
         transportId,
         'BASELINE_SNAPSHOT',
-        asJson(this.buildBaseline(
-          joined.connection.playerId,
-          joined.connection.snapshotId,
-        )),
+        asJson(baselineState),
       );
       return Object.freeze(
         [accepted, baseline].filter(
@@ -301,7 +305,18 @@ export class ServerAuthorityHost {
         )) {
           return this.singleConnectionError(transportId, 'RESYNC_REQUIRED');
         }
-        return Object.freeze([]);
+        // The authority keeps running while the baseline crosses the network.
+        // Publications made during SYNCING are cached but cannot be delivered
+        // to this peer yet. Catch up its visible state once admission is READY.
+        const connection = this.requireConnection(transportId);
+        const sentRevisions = this.syncingRevisions.get(transportId);
+        this.syncingRevisions.delete(transportId);
+        return Object.freeze(this.buildBaseline(
+          connection.playerId, applied.value.snapshotId,
+        ).aggregates.filter(view => view.revision > (sentRevisions?.get(revisionKey(view)) ?? -1))
+        .map((view) => this.envelope(
+          transportId, 'AGGREGATE_UPDATE', asJson(view),
+        )).filter((message): message is HostedOutboundMessage => message !== null));
       }
 
       case 'MOVEMENT_INPUT': {
@@ -405,6 +420,7 @@ export class ServerAuthorityHost {
   }
 
   public disconnect(transportId: string): void {
+    this.syncingRevisions.delete(transportId);
     const connection = this.session.disconnect(transportId);
     if (connection === null) return;
     const runtime = this.runtimes.get(connection.playerId);

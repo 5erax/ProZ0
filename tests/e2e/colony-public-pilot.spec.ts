@@ -34,6 +34,12 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   }
   for (const page of pages) {
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("response", async response => {
+      if (response.url().includes("/api/pilot/") && !response.ok()) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        console.log("Pilot HTTP failure:", response.status(), body.error ?? "Unknown failure");
+      }
+    });
     const index = pages.indexOf(page);
     page.on('websocket', ws => {
       ws.on('close', () => closes[index]!++);
@@ -143,7 +149,9 @@ test("three public browsers host/join, gather, save and reconnect through the pl
         }));
         const dx = 18 - p.x,
           dy = 10 - p.y;
-        if (Math.hypot(dx, dy) < 0.45) break;
+        // Gather within the authority's 1.25-unit interaction range. Walking
+        // into the resource's solid footprint is not a reachable destination.
+        if (Math.hypot(dx, dy) < 1.05) break;
         stuck = Math.hypot(p.x - previous.x, p.y - previous.y) < .02 ? stuck + 1 : 0;
         previous = p;
         if (stuck >= 12 && escapeSteps === 0) {

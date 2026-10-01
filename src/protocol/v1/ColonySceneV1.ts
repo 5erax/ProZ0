@@ -3,7 +3,13 @@ export interface ColonySceneV1 {
   readonly version: 1;
   readonly worldSeed: string;
   readonly tick: number;
-  readonly playerSkins?:Readonly<Record<string,string>>;
+  readonly playerSkins?: Readonly<Record<string, string>>;
+  readonly playerNames?: Readonly<Record<string, string>>;
+  readonly map?: readonly {
+    x: number;
+    y: number;
+    terrain: "ground" | "water";
+  }[];
   readonly terrain: readonly {
     readonly x: number;
     readonly y: number;
@@ -17,6 +23,7 @@ export interface ColonySceneV1 {
     readonly y: number;
     readonly revision: number;
     readonly depleted: boolean;
+    readonly containerId?: string;
   }[];
   readonly sites: readonly {
     readonly id: string;
@@ -29,5 +36,8 @@ export interface ColonySceneV1 {
     readonly health: number;
     readonly food: number;
     readonly water: number;
+    readonly stamina?: number;
+    readonly temperature?: number;
+    readonly lifeState?: string;
   };
 }

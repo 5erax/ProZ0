@@ -1,5 +1,9 @@
 import { lastSavedReviewUrl } from "./Phase1SavedReview";
-import { normalizePilotEndpoint, roomStorageKey, type ColonyRoomDetails } from "./ColonyCoopLauncher";
+import {
+  normalizePilotEndpoint,
+  roomStorageKey,
+  type ColonyRoomDetails,
+} from "./ColonyCoopLauncher";
 import {
   PLAYER_SKINS,
   playerSkinFilter,
@@ -15,6 +19,7 @@ interface Account {
   id: string;
   username: string;
   skin: PlayerSkin;
+  displayName?: string;
 }
 interface Room {
   id: string;
@@ -164,7 +169,7 @@ export function createGameLobby(root: HTMLElement) {
     input.type = type;
     input.value = value;
     input.autocomplete = type === "password" ? "current-password" : "off";
-    input.addEventListener("keydown", event => {
+    input.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" || event.isComposing) return;
       event.preventDefault();
       view.querySelector<HTMLButtonElement>(".lobby-actions button")?.click();
@@ -220,18 +225,33 @@ export function createGameLobby(root: HTMLElement) {
       for (let i = 0; i < target.localStorage.length; i++) {
         const key = target.localStorage.key(i)!;
         if (!key.startsWith("proz0:coop:")) continue;
-        const details = JSON.parse(target.localStorage.getItem(key)!) as ColonyRoomDetails;
-        if (details.roomName || !/^[a-f0-9]{16}$/.test(details.id) || !/^[a-f0-9]{48}$/.test(details.accessToken)) continue;
-        const server = normalizePilotEndpoint(key.slice("proz0:coop:".length, -(details.id.length + 1)));
+        const details = JSON.parse(
+          target.localStorage.getItem(key)!,
+        ) as ColonyRoomDetails;
+        if (
+          details.roomName ||
+          !/^[a-f0-9]{16}$/.test(details.id) ||
+          !/^[a-f0-9]{48}$/.test(details.accessToken)
+        )
+          continue;
+        const server = normalizePilotEndpoint(
+          key.slice("proz0:coop:".length, -(details.id.length + 1)),
+        );
         const url = new URL(location.href);
-        url.search = new URLSearchParams({ proz0Mode: "colony-coop", proz0Server: server, proz0Room: details.id }).toString();
+        url.search = new URLSearchParams({
+          proz0Mode: "colony-coop",
+          proz0Server: server,
+          proz0Room: details.id,
+        }).toString();
         url.hash = "";
         const link = doc.createElement("a");
         link.href = url.href;
         link.textContent = "Tiếp tục thế giới co-op đã lưu";
         view.append(link);
       }
-    } catch { /* Optional saved invitations must never block the lobby. */ }
+    } catch {
+      /* Optional saved invitations must never block the lobby. */
+    }
   };
   const updateProfile = () => {
     user.textContent = account ? account.username : "Đăng nhập";
@@ -529,7 +549,9 @@ export function createGameLobby(root: HTMLElement) {
         link.dataset.continuePhase1Review = "true";
         actions.append(link);
         const upgraded = new URL(saved);
-        if (upgraded.searchParams.get("proz0Mode") === "phase1-product-review") {
+        if (
+          upgraded.searchParams.get("proz0Mode") === "phase1-product-review"
+        ) {
           upgraded.searchParams.set("proz0Mode", "phase2-colony-review");
           const upgrade = doc.createElement("a");
           upgrade.href = upgraded.href;
@@ -610,6 +632,24 @@ export function createGameLobby(root: HTMLElement) {
       }
     } else if (kind === "profile") {
       title(account!.username, "Tài khoản của bạn");
+      const name = field(
+        "displayName",
+        "Tên hiển thị trong phòng",
+        "text",
+        account!.displayName ?? account!.username,
+      );
+      name.maxLength = 48;
+      button(view, "Lưu tên hiển thị", () =>
+        run(async () => {
+          const result = await call("/auth/profile", "POST", {
+            displayName: name.value,
+          });
+          account = result.account as Account;
+          updateProfile();
+          status.textContent =
+            "Đã lưu tên hiển thị; áp dụng khi vào lại phòng.";
+        }),
+      );
       button(view, "Chọn skin", () => show("skins"));
       button(view, "Đăng xuất", () =>
         run(async () => {
