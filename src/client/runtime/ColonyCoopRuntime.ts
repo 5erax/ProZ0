@@ -1414,6 +1414,7 @@ export async function bootColonyCoop(
       "px)";
     canvas.dataset.playerX = String(local.position.x);
     canvas.dataset.playerY = String(local.position.y);
+    canvas.dataset.playerLocomotion = local.locomotionState;
     canvas.dataset.authorityTick = String(
       connection.replication.getAuthorityTick(),
     );

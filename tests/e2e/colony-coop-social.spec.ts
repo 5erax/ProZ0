@@ -161,6 +161,9 @@ test("three players share named chat, explored map and opt-in voice without losi
     await host.screenshot({ path: dir + "/hud.png" });
     const latency: number[] = [];
     for (let n = 0; n < 10; n++) {
+      // Wait for the prior key-up to reach authority before measuring a new
+      // start. Otherwise a delayed prior movement can look like a 5-ms reply.
+      await expect(host.locator(".coop-stage canvas")).toHaveAttribute("data-player-locomotion", "IDLE");
       latency.push(
         await host.evaluate(
           async (key) => {
