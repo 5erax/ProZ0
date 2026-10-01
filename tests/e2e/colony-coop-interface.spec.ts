@@ -109,9 +109,10 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await page.setViewportSize({ width: 1280, height: 720 });
     const playerId = (await root.getAttribute("data-coop-player-id"))!,
       inventory = "inventory:" + playerId;
-    const fund = (
+    const fund = async (
       outputs: { itemDefinitionId: string; quantity: number }[],
     ) => {
+      await expect(root).not.toHaveAttribute("data-coop-action", "pending");
       const result = colony.bundle.items.commitColonyExchange({
         operationId: "fixture:" + randomUUID(),
         playerId,
@@ -122,9 +123,11 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
       });
       expect(result).toMatchObject({ status: "committed" });
       flush(colony.publishSharedState());
+      await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-inventory-revision",
+        String(colony.bundle.items.getContainerView(inventory).revision));
     };
     // Explicit material/position fixture isolates UI-to-authority wiring. Natural gathering is tested separately.
-    fund([
+    await fund([
       { itemDefinitionId: "item:cordage", quantity: 1 },
       { itemDefinitionId: "item:stone", quantity: 2 },
       { itemDefinitionId: "item:storage-crate-kit", quantity: 1 },
@@ -229,7 +232,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
             .stacks.find((s) => s.itemDefinitionId === "item:timber")?.quantity,
       )
       .toBe(4);
-    fund([{ itemDefinitionId: "item:stone", quantity: 1 }]);
+    await fund([{ itemDefinitionId: "item:stone", quantity: 1 }]);
     await page.keyboard.press("u");
     await page
       .locator(".coop-panel article")
@@ -275,7 +278,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await expect(page.locator(".coop-map")).toBeVisible();
     await page.keyboard.press("Escape");
 
-    fund([{ itemDefinitionId: "item:machine-kit", quantity: 1 }]);
+    await fund([{ itemDefinitionId: "item:machine-kit", quantity: 1 }]);
     colony.bundle.getRuntime(playerId).relocatePlayer({ x: 3, y: 1 });
     await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-player-x", "3");
     await page.keyboard.press("b");
@@ -308,7 +311,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await expect.poll(() => colony.bundle.items.getContainerView(inventory).stacks
       .some(s => s.itemDefinitionId === "item:machine-kit")).toBe(false);
     await page.keyboard.press("Escape");
-    fund([{ itemDefinitionId: "item:habitat-kit", quantity: 1 }]);
+    await fund([{ itemDefinitionId: "item:habitat-kit", quantity: 1 }]);
     colony.bundle.getRuntime(playerId).relocatePlayer({ x: 0, y: -1.2 });
     await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-player-x", "0");
     await page.keyboard.press("b");

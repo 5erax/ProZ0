@@ -239,6 +239,9 @@ export async function bootColonyCoop(
     }
     if (lastOperation !== null) return;
     lastOperation = "coop:" + crypto.randomUUID();
+    root.dataset.coopAction = "pending";
+    for (const button of panel.querySelectorAll<HTMLButtonElement>("button"))
+      if (button.textContent !== "Close") button.disabled = true;
     feedback = "Working…";
     signature = "";
     connection.sendGameplayCommand({
@@ -1166,6 +1169,9 @@ export async function bootColonyCoop(
             ? feedback
             : "";
     panel.append(status);
+    if (lastOperation)
+      for (const button of panel.querySelectorAll<HTMLButtonElement>("button"))
+        if (button.textContent !== "Close") button.disabled = true;
   }
   function connect() {
     if (destroyed) return;
@@ -1415,6 +1421,7 @@ export async function bootColonyCoop(
     canvas.dataset.playerX = String(local.position.x);
     canvas.dataset.playerY = String(local.position.y);
     canvas.dataset.playerLocomotion = local.locomotionState;
+    canvas.dataset.inventoryRevision = String(containerRef().revision);
     canvas.dataset.authorityTick = String(
       connection.replication.getAuthorityTick(),
     );
