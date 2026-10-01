@@ -944,7 +944,7 @@ export function createPhase1ProductReviewWorldRenderer(
       },
     );
     if (player === null) return;
-    if(local){const skin=selectedPlayerSkin();player.style.filter=(skin==='pioneer'?'':playerSkinFilter(skin)+' ')+'drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef)';player.dataset.skin=skin;}
+    if(local){const skin=selectedPlayerSkin();if(player.dataset.skin!==skin){player.style.filter=skin==='pioneer'?'':playerSkinFilter(skin)+' drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef)';player.dataset.skin=skin;}}
 
     const equipment = bundle.equipment.getView(id);
     if (equipment.equippedThermalWrapStackId !== null) {
