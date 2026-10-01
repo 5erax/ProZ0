@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from 'node:crypto';
 import { resolve } from "node:path";
 const endpoint = process.env.PILOT_PUBLIC_URL;
@@ -22,6 +22,15 @@ test("three public browsers host/join, gather, save and reconnect through the pl
   const pages = await Promise.all(contexts.map((c) => c.newPage())),
     host = pages[0]!,
     errors: string[] = [];
+  if (process.env.PILOT_ACCESS_COOKIE_FILE) {
+    const cookies = readFileSync(process.env.PILOT_ACCESS_COOKIE_FILE, 'utf8').split(/\r?\n/)
+      .filter(line => line && (!line.startsWith('#') || line.startsWith('#HttpOnly_')))
+      .map(line => {
+        const [domain, , path, secure, expires, name, value] = line.replace(/^#HttpOnly_/, '').split('\t');
+        return { domain: domain!, path: path!, secure: secure === 'TRUE', expires: Number(expires), name: name!, value: value!, httpOnly: line.startsWith('#HttpOnly_') };
+      });
+    for (const context of contexts) await context.addCookies(cookies);
+  }
   for (const page of pages) {
     page.on("pageerror", (error) => errors.push(error.message));
     page.on('websocket', ws => ws.on('framereceived', frame => {
