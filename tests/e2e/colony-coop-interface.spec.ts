@@ -330,7 +330,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
       submitted: submitted.slice(-5), results: results.slice(-5),
       feedback: await page.locator(".coop-context").textContent().catch(() => "Unavailable"),
       colony: colony.bundle.colonyDepth.read(),
-      containers: colony.bundle.items.exportSnapshot().containers,
+      containers: colony.bundle.items.exportLedgerSnapshot().containers,
     }));
     throw error;
   } finally {
