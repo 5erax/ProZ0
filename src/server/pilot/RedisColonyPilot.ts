@@ -810,6 +810,12 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       }
       for (const authority of [...authorities.values()]) {
         const id = authority.record.id;
+        if (authority.remoteError) {
+          // Release a failed read-ahead owner before renewing its lease so
+          // another gateway can recover instead of pinning a broken room.
+          await retire(authority);
+          continue;
+        }
         const needsRenewal = Date.now() - authority.renewed >= 500;
         const renewed = !needsRenewal
           ? 1
@@ -839,7 +845,6 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
                     authority.social.leave(transport),
                   );
                 }
-        if (authority.remoteError) throw authority.remoteError;
         // Poll remote input ahead of the simulation. A Redis round trip must not
         // stall leader-local movement; one bounded read preserves remote order.
         if (!authority.remoteRead && !authority.remoteEvents.length) {

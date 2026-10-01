@@ -267,6 +267,51 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await page.keyboard.press("Escape");
     await page.keyboard.press("m");
     await expect(page.locator(".coop-map")).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    fund([{ itemDefinitionId: "item:machine-kit", quantity: 1 }]);
+    colony.bundle.getRuntime(playerId).relocatePlayer({ x: 3, y: 1 });
+    await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-player-x", "3");
+    await page.keyboard.press("b");
+    await page.locator(".coop-panel article").filter({ hasText: "Atmospheric Water Condenser" })
+      .getByRole("button", { name: "Place", exact: true }).click();
+    await page.waitForTimeout(150);
+    const machineStage = await page.locator(".coop-stage").boundingBox();
+    if (!machineStage) throw Error("Missing stage");
+    await page.mouse.click(machineStage.x + machineStage.width / 2 + machineStage.width * 16 / 640,
+      machineStage.y + machineStage.height / 2 + machineStage.height * 8 / 360);
+    await expect.poll(() => colony.bundle.buildings.exportSnapshot().foothold.structures
+      .some(s => s.definitionId === "structure:atmospheric-water-condenser")).toBe(true);
+    await page.locator('[aria-label="structure:atmospheric-water-condenser"]').click();
+    await page.getByRole("button", { name: "Tắt máy", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Bật máy", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Bật máy", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Tắt máy", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Tháo dỡ · thu hồi kit", exact: true }).click();
+    await expect.poll(() => colony.bundle.buildings.exportSnapshot().foothold.structures
+      .some(s => s.definitionId === "structure:atmospheric-water-condenser")).toBe(false);
+    expect(colony.bundle.items.getContainerView(inventory).stacks
+      .some(s => s.itemDefinitionId === "item:machine-kit")).toBe(true);
+
+    await page.keyboard.press("Escape");
+    colony.bundle.getRuntime(playerId).relocatePlayer({ x: 4, y: 0 });
+    await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-player-x", "4");
+    await page.locator('[aria-label="structure:storage-crate"]').click();
+    await page.locator(".coop-panel article").filter({ hasText: "Machine Kit ×1" })
+      .getByRole("button", { name: "Cất", exact: true }).click();
+    await expect.poll(() => colony.bundle.items.getContainerView(inventory).stacks
+      .some(s => s.itemDefinitionId === "item:machine-kit")).toBe(false);
+    await page.keyboard.press("Escape");
+    fund([{ itemDefinitionId: "item:habitat-kit", quantity: 1 }]);
+    colony.bundle.getRuntime(playerId).relocatePlayer({ x: 0, y: -1.2 });
+    await expect(page.locator(".coop-stage canvas")).toHaveAttribute("data-player-x", "0");
+    await page.keyboard.press("b");
+    await page.locator(".coop-panel article").filter({ hasText: "Habitat Room" })
+      .getByRole("button", { name: "Nối · north", exact: true }).click();
+    await expect.poll(() => colony.bundle.buildings.exportSnapshot().foothold.structures
+      .some(s => s.definitionId === "structure:habitat-room")).toBe(true);
+    expect(colony.bundle.buildings.exportSnapshot().foothold.connectors
+      .find(c => c.connectorId === "connector:landing:north")?.occupiedByConnectionId).not.toBeNull();
   } finally {
     clearInterval(timer);
     while (stepping) await new Promise((resolve) => setTimeout(resolve, 10));

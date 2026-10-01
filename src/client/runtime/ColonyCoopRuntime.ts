@@ -212,6 +212,15 @@ export async function bootColonyCoop(
         COOLDOWN: "Chờ thao tác hồi lại",
         STALE_REVISION: "Dữ liệu đã thay đổi; thử lại",
         CAPACITY_EXCEEDED: "Túi đầy; cất đồ vào hòm",
+        OUTSIDE_BASE_BUILD_ZONE: "Chọn vị trí gần Landing Module hoặc Habitat để mở rộng căn cứ",
+        OBSTRUCTED: "Vị trí bị chắn; chọn khoảng đất trống",
+        INVALID_CONNECTOR: "Điểm nối không còn hợp lệ; chọn điểm nối khác",
+        CONNECTOR_OCCUPIED: "Điểm nối đã được sử dụng; chọn điểm nối khác",
+        KIT_UNAVAILABLE: "Cần kit xây dựng trong túi; mở Craft [C] để chế tạo",
+        SOURCE_MISSING: "Vật phẩm hoặc đối tượng đã thay đổi; mở lại bảng để chọn lại",
+        RESEARCH_PREREQUISITE: "Hoàn thành nghiên cứu trước đó để mở khóa",
+        ALREADY_RESEARCHED: "Nghiên cứu đã hoàn thành cho cả phòng",
+        WORKBENCH_REQUIRED: "Đến gần Workbench để chế tạo công thức này",
         NOT_READY: "Chờ kết nối lại",
       }) as Record<string, string>
     )[reason] ?? reason.replaceAll("_", " ");
