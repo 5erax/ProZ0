@@ -26,6 +26,7 @@ interface Account {
   recovery: string;
   skin: LobbySkin;
   revision: number;
+  authVersion?: string;
 }
 const digest = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -136,10 +137,10 @@ export class LobbyAccounts {
     if (!token) return null;
     const session = await this.store.get(this.key("session", digest(token)));
     if (!session) return null;
-    const binding = JSON.parse(session) as { id: string; credential: string };
+    const binding = JSON.parse(session) as { id: string; authVersion: string };
     const raw = await this.store.get(this.key("user", binding.id));
     const account = raw ? JSON.parse(raw) as Account : null;
-    return account && digest(account.password) === binding.credential ? account : null;
+    return account && (account.authVersion ?? "legacy") === binding.authVersion ? account : null;
   }
   async require(req: IncomingMessage) {
     const account = await this.current(req);
@@ -168,7 +169,7 @@ export class LobbyAccounts {
     if (old.length >= 8) {
       await this.revoke(account);
     }
-    await this.store.set(key, JSON.stringify({ id: account.id, credential: digest(account.password) }), { EX: 86400 });
+    await this.store.set(key, JSON.stringify({ id: account.id, authVersion: account.authVersion ?? "legacy" }), { EX: 86400 });
     await this.store.sAdd(this.key("sessions", account.id), key);
     await this.store.expire(this.key("sessions", account.id), 86400);
     res.setHeader("Set-Cookie", this.cookieHeader(token, 86400));
@@ -239,6 +240,7 @@ export class LobbyAccounts {
           recovery: digest(recovery),
           skin: "pioneer",
           revision: 0,
+          authVersion: randomBytes(16).toString("hex"),
         };
       const created = await this.store.eval(
         "if redis.call('SCARD',KEYS[1])>=500 then return 0 end;if redis.call('SET',KEYS[2],ARGV[2],'NX')==false then return 0 end;redis.call('SADD',KEYS[1],ARGV[1]);return 1",
@@ -269,6 +271,7 @@ export class LobbyAccounts {
       const a = JSON.parse(raw) as Account,
         newRecovery = randomBytes(24).toString("hex");
       a.password = await hashLobbyPassword(password);
+      a.authVersion = randomBytes(16).toString("hex");
       a.recovery = digest(newRecovery);
       a.revision++;
       const updated = await this.store.eval(

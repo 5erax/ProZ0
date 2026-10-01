@@ -15,7 +15,7 @@ Owner scope: #201, #202 and #194. Direct implementation in the current chat. Thi
 
 ## Authority and storage
 
-Account/session data lives in Redis. Passwords use random salts and asynchronous scrypt (N=131072, r=8, p=1); comparisons are constant time. Opaque browser sessions are HttpOnly, SameSite=Lax, 24 hours, and Secure with a __Host- prefix on Vercel. A session is bound to the password fingerprint so password recovery invalidates it even across concurrent login/recovery. Profile and password updates compare the previous record atomically. Authentication and room-entry attempts are bounded per address and subject.
+Account/session data lives in Redis. Passwords use random salts and asynchronous scrypt (N=131072, r=8, p=1); comparisons are constant time. Opaque browser sessions are HttpOnly, SameSite=Lax, 24 hours, and Secure with a __Host- prefix on Vercel. A session is bound to a random credential version so password recovery invalidates it even across concurrent login/recovery. Profile and password updates compare the previous record atomically. Authentication and room-entry attempts are bounded per address and subject. Credentialed CORS replies use an origin selected from the configured allowlist.
 
 Named-room metadata is separate from world checkpoints. Ownership is validated against the session account. Each account receives its own persistent private colonist key per room; the authority uses that binding rather than a supplied resume credential to prevent another account's character being claimed. Scene replication includes cosmetic skins; inventory and commands retain existing server authority rules.
 

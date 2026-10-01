@@ -436,8 +436,9 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
         json(res, 403, { error: "Origin not allowed" });
         return;
       }
-      if (req.headers.origin) {
-        res.setHeader("Access-Control-Allow-Origin", req.headers.origin);
+      const acceptedOrigin = options.allowedOrigins.find(origin => origin === req.headers.origin);
+      if (acceptedOrigin) {
+        res.setHeader("Access-Control-Allow-Origin", acceptedOrigin);
         res.setHeader("Vary", "Origin");
         res.setHeader("Access-Control-Allow-Credentials", "true");
       }
