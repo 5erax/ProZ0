@@ -247,7 +247,10 @@ export async function bootColonyCoop(
     connection.sendGameplayCommand({
       operationId: lastOperation,
       commandType,
-      expectedRevisions: refs,
+      expectedRevisions: refs.map((ref) => ({
+        ...ref,
+        revision: aggregate(ref.aggregateType, ref.aggregateId)?.revision ?? ref.revision,
+      })),
       payload: payload as JsonValue,
     });
   };
@@ -528,12 +531,31 @@ export async function bootColonyCoop(
       saveStatus.textContent = "Backup failed · retry shortly";
     });
   }).disabled = !details.ownerToken;
+  const panelPointers = new Set<number>();
+  const panelPointerDown = (event: PointerEvent) => {
+    if (event.target instanceof Node && panel.contains(event.target))
+      panelPointers.add(event.pointerId);
+  };
+  const panelPointerEnd = (event: PointerEvent) => {
+    panelPointers.delete(event.pointerId);
+  };
+  document.addEventListener("pointerdown", panelPointerDown, true);
+  document.addEventListener("pointerup", panelPointerEnd, true);
+  document.addEventListener("pointercancel", panelPointerEnd, true);
+  function closePanel() {
+    panelKind = null;
+    panel.hidden = true;
+    signature = "";
+  }
   function renderPanel() {
     if (panelKind === null) {
       panel.hidden = true;
       signature = "";
       return;
     }
+    // Preserve the pressed DOM node until its click is dispatched. Replication
+    // can arrive between pointerdown and pointerup on slower clients.
+    if (panelPointers.size) return;
     const next = JSON.stringify([
       panelKind,
       connection?.replication
@@ -566,8 +588,7 @@ export async function bootColonyCoop(
     title.textContent = panelKind.toUpperCase();
     panel.append(title);
     makeButton(panel, "Close", () => {
-      panelKind = null;
-      signature = "";
+      closePanel();
     });
     const inv = containerRef();
     const local = connection
@@ -1014,7 +1035,7 @@ export async function bootColonyCoop(
           );
           const button = makeButton(row, "Place", () => {
             placing = { definitionId: definition.id, stackId: kit!.stackId };
-            panelKind = null;
+            closePanel();
             feedback = "Click nearby ground to place " + definition.displayName;
             signature = "";
           });
@@ -1329,8 +1350,7 @@ export async function bootColonyCoop(
     )
       return;
     if (event.code === "Escape") {
-      panelKind = null;
-      signature = "";
+      closePanel();
     }
     if (["KeyW", "KeyA", "KeyS", "KeyD"].includes(event.code)) {
       event.preventDefault();
@@ -1371,7 +1391,10 @@ export async function bootColonyCoop(
     }
   };
   const keyUp = (event: KeyboardEvent) => pressed.delete(event.code),
-    blur = () => pressed.clear();
+    blur = () => {
+      pressed.clear();
+      panelPointers.clear();
+    };
   document.addEventListener("keydown", keyDown);
   document.addEventListener("keyup", keyUp);
   window.addEventListener("blur", blur);
@@ -1658,6 +1681,9 @@ export async function bootColonyCoop(
       socket?.close();
       document.removeEventListener("keydown", keyDown);
       document.removeEventListener("keyup", keyUp);
+      document.removeEventListener("pointerdown", panelPointerDown, true);
+      document.removeEventListener("pointerup", panelPointerEnd, true);
+      document.removeEventListener("pointercancel", panelPointerEnd, true);
       window.removeEventListener("blur", blur);
       audio.destroy();
       settings.destroy();

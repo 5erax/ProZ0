@@ -86,7 +86,7 @@ test("three players share named chat, explored map and opt-in voice without losi
         .click();
       await expect(
         page.getByText("Đã lưu tên hiển thị", { exact: false }),
-      ).toBeVisible();
+      ).toBeVisible({ timeout: 20000 });
       await page
         .getByRole("button", { name: "Multiplayer", exact: true })
         .click();

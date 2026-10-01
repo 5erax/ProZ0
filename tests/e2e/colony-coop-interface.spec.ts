@@ -238,11 +238,17 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
       .toBe(4);
     await fund([{ itemDefinitionId: "item:stone", quantity: 1 }]);
     await page.keyboard.press("u");
-    await page
+    const researchButton = page
       .locator(".coop-panel article")
       .filter({ hasText: "Field Survey" })
-      .getByRole("button", { name: "Research", exact: true })
-      .click();
+      .getByRole("button", { name: "Research", exact: true });
+    await researchButton.hover();
+    await page.mouse.down();
+    // A real replicated inventory revision arrives while the pointer is held.
+    // The control must survive until click and submit the current revision.
+    await fund([{ itemDefinitionId: "item:plant-fiber", quantity: 1 }]);
+    await expect(researchButton).toBeVisible();
+    await page.mouse.up();
     await expect
       .poll(() =>
         colony.bundle.colonyDepth.read().researchIds.includes("field-survey"),
@@ -288,7 +294,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await page.keyboard.press("b");
     await page.locator(".coop-panel article").filter({ hasText: "Atmospheric Water Condenser" })
       .getByRole("button", { name: "Place", exact: true }).click();
-    await page.waitForTimeout(150);
+    await expect(page.locator(".coop-panel")).toBeHidden();
     const machineStage = await page.locator(".coop-stage").boundingBox();
     if (!machineStage) throw Error("Missing stage");
     await page.mouse.click(machineStage.x + machineStage.width / 2 + machineStage.width * 16 / 640,
