@@ -507,6 +507,8 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
       if (match) {
         const record = await read(match[1]!);
         await directory.authorize(req, record.id);
+        if (req.method === "DELETE" || match[2] === "/save" || match[2] === "/export")
+          await directory.authorizeOwner(req, record.id);
         if (req.method === "DELETE" && !match[2]) {
           if (!equal(bearer(req), record.ownerToken)) {
             json(res, 403, { error: "Only room owner may remove this room" });

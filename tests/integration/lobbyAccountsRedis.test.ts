@@ -20,10 +20,11 @@ test.skipIf(!redisUrl)('real accounts protect named rooms, survive re-login, and
     if (!address || typeof address === 'string') throw Error('Missing address');
     const base = 'http://127.0.0.1:' + address.port;
     let requestId = 0;
-    const request = async (path: string, method = 'GET', data?: unknown, cookie = '', origin = 'http://localhost:4173') => {
+    const request = async (path: string, method = 'GET', data?: unknown, cookie = '', origin = 'http://localhost:4173', authorization = '') => {
       const response = await fetch(base + path, { method, headers: {
         'Content-Type': 'application/json', Cookie: cookie, Origin: origin,
         'X-Forwarded-For': '192.0.2.' + (++requestId),
+        Authorization: authorization,
       }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
       return { status: response.status, data: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] ?? '', header: response.headers.get('set-cookie') ?? '' };
     };
@@ -52,6 +53,10 @@ test.skipIf(!redisUrl)('real accounts protect named rooms, survive re-login, and
     expect(joined.status).toBe(200);
     expect(joined.data.ownerToken).toBeUndefined();
     expect(joined.data.clientKey).not.toBe(created.data.clientKey);
+    const stolenOwnerToken = 'Bearer ' + created.data.ownerToken;
+    // Named-room owner APIs require the owner account even if a bearer token was copied.
+    for (const [suffix, method] of [['/save', 'POST'], ['/export', 'GET'], ['', 'DELETE']] as const)
+      expect((await request('/rooms/' + roomId + suffix, method, undefined, guest.cookie, 'http://localhost:4173', stolenOwnerToken)).status).toBe(403);
     const connect = async (details: typeof created.data, cookie: string, resumeCredential?: string) => {
       const ws = new WebSocket(base.replace('http:', 'ws:') + '/rooms/' + roomId + '/socket',
         ['proz0.access.' + details.accessToken, 'proz0.client.' + details.clientKey],

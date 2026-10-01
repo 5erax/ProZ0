@@ -106,6 +106,12 @@ export class LobbyRooms {
       },
     );
   }
+  async authorizeOwner(req: IncomingMessage, id: string) {
+    const room = await this.read(id);
+    if (!room) return;
+    const account = await this.accounts.require(req);
+    if (account.id !== room.owner) throw new LobbyError(403, "Chỉ chủ phòng có thể quản lý");
+  }
   async route(req: IncomingMessage, path: string): Promise<unknown> {
     const a = await this.accounts.require(req);
     if (path === "/lobby/rooms" && req.method === "GET") {
