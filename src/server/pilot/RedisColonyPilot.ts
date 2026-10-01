@@ -314,6 +314,15 @@ export function createRedisColonyPilot(options: RedisPilotOptions) {
   };
   const retire = async (authority: Authority) => {
     authorities.delete(authority.record.id);
+    await authority.remoteRead;
+    const pending = authority.remoteEvents.splice(0);
+    pending.push(...authority.localEvents.splice(0).map(event => JSON.stringify(event)));
+    if (pending.length) {
+      // These inputs were read but not processed. Keep them ahead of newer
+      // queued inputs when rotating, especially admission and save requests.
+      await redis.multi().lPush(key(authority.record.id, "in"), pending.reverse())
+        .expire(key(authority.record.id, "in"), 30).exec();
+    }
     for (const [transport, peer] of authority.peers)
       await send(peer, { transport, kind: "close" });
     await authority.composition.destroy();
