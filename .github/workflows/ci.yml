@@ -54,6 +54,9 @@ jobs:
       - name: Browser tests
         run: npm run test:browser
 
+      - name: Co-op interaction stability
+        run: npm run test:e2e -- tests/e2e/colony-coop-interface.spec.ts --project=functional --repeat-each=3 --workers=1 --max-failures=1
+
       - name: E2E smoke
         env:
           P0_TEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
