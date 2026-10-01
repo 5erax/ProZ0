@@ -1,6 +1,6 @@
 # Phase 2 A+B+C — as-built gameplay contract
 
-Direct Owner-authorized reconciliation, 2026-10-01. Records delivered behavior, not retroactive A-GD approval of earlier proposals. The Owner prioritizes exploration, visuals and co-op, with public private rooms of 2–3 people. Use the [traceability map](../technical/phase-2-a-b-c-traceability-acceptance-map.md) for source/evidence and open acceptance gates.
+Direct Owner-authorized reconciliation, 2026-10-01. Records delivered behavior, not retroactive A-GD approval of earlier proposals. The Owner prioritizes exploration, visuals and co-op, with public private rooms of 2–3 people. Use the [co-op corrections traceability](../technical/phase-2-coop-corrections-traceability.md) for source/evidence and open acceptance gates. The broader current-main baseline is delivered separately by PR #207 / #165.
 
 ## Player loop and rules
 

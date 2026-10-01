@@ -1,6 +1,6 @@
 # Phase 2 — as-built authority, save, network and content
 
-Direct Owner-authorized reconciliation, 2026-10-01; not an A-TL approval. Base public release is PR #203/main `05491d17a088f0bd74fbb43e7260924b3e92801f`, extended by the linked #204–#206 PR. See [traceability](phase-2-a-b-c-traceability-acceptance-map.md) and [gameplay contract](../design/phase-2-a-b-c-master-gameplay.md).
+Direct Owner-authorized reconciliation, 2026-10-01; not an A-TL approval. Base public release is PR #203/main `05491d17a088f0bd74fbb43e7260924b3e92801f`, extended by the linked #204–#206 PR. See [co-op corrections traceability](phase-2-coop-corrections-traceability.md) and [gameplay contract](../design/phase-2-a-b-c-master-gameplay.md). The broader baseline traceability remains PR #207 / #165.
 
 ## State ownership and commands
 
