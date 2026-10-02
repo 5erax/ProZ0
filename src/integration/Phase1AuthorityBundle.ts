@@ -462,7 +462,7 @@ export class Phase1AuthorityBundle {
     this.livingWorld=this.expedition?new LivingWorldAuthority(items,this.expedition,{
       seed:config.worldSeed,tick:()=>this.authorityTick,players:()=>this.getActivePlayerIds(),
       actor:id=>{const p=positions.get(id);return {...p,alive:survival.getPlayerState(id).lifeState.type==='alive'};},
-      ground:(x,y)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
+      ground:(x,y,ignore)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>f.id!==ignore&&Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
       plotGround:(x,y)=>{const r=buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true);return typeof r==='string'?r:null;},
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
       weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&s.itemDefinitionId==='item:basic-spear'&&(s.condition??0)>0);},

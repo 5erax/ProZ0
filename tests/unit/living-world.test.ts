@@ -51,6 +51,7 @@ function animal(
     product: 0,
     productTicks: 0,
     attackTick: 0,
+    shearTick: 0,
   };
 }
 function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
@@ -471,4 +472,36 @@ it('strict living saves reject NaN, unknown species, duplicate IDs and over-cap 
       animals: Array.from({ length: 97 }, (_, i) => animal('a' + i)),
     }),
   ).toThrow();
+});
+
+it('failed unexplored spawn points retry later without duplicating hunted animals, and male chickens do not lay eggs', () => {
+  const f = fixture();
+  let explored = false,
+    tick = 0;
+  const services = {
+    ...f.services,
+    players: () => ['solo'],
+    tick: () => tick,
+    ground: () => explored,
+  };
+  const authority = new LivingWorldAuthority(f.items, f.expedition, services);
+  tick = 60;
+  authority.tick();
+  expect(authority.read().animals).toHaveLength(0);
+  explored = true;
+  tick = 120;
+  authority.tick();
+  const state = authority.read();
+  expect(state.animals).toHaveLength(5);
+  expect(state.forage).toHaveLength(6);
+  expect(state.spawned).toHaveLength(5);
+  tick = 180;
+  authority.tick();
+  expect(authority.read().animals).toHaveLength(5);
+  expect(authority.read().forage).toHaveLength(6);
+  const rooster = fixture({
+    animals: [animal('rooster', 'chicken', 1, 'livestock-pen')],
+  });
+  rooster.advance(120);
+  expect(rooster.authority.read().animals[0]!.product).toBe(0);
 });

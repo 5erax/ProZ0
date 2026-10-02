@@ -1,3 +1,4 @@
+import {soilAt} from '../../content/livingworld/LivingWorldContent';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import {
   WORLD_PIXELS_PER_UNIT,
@@ -752,6 +753,7 @@ export function createPhase1ProductReviewWorldRenderer(
         tile.className = 'p1-product-terrain';
         tile.dataset.worldRole = 'terrain';
         tile.dataset.terrainState = terrain;
+        if(bundle.livingWorld && terrain!=='water' && !tile.dataset.soil)tile.dataset.soil=soilAt(bundle.config.worldSeed,position).id;
         if(bundle.config.colonyDepthEnabled===true)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
         tile.dataset.explorationState =
           known ? 'EXPLORED' : 'UNEXPLORED';

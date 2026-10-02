@@ -53,3 +53,6 @@ Làm trong chat này, commit từng increment sau kiểm tra phù hợp. Không 
 ### Giới hạn rõ ràng
 
 Mùa dựa 60 Hz active tick; 12 phút/mùa, 48 phút/năm. Không catch-up khi đóng game. Đây là hệ sinh thái hữu hạn với quy tắc, seed và feedback môi trường; không tự sáng tạo species/terrain/genetics ngoài catalog. Giới hạn 256 plots, 96 animals, 128 vùng spawn, 768 forage, 64 stations và tối đa 64 marker DOM nhìn thấy. Di dời habitat vẫn giữ kết nối lab; field cabin độc lập có thể đặt ngoài base. Co-op không được gán các authority mới trong lần này. #204 đo hiệu năng máy Owner và co-op vẫn mở; không tuyên bố 60 FPS mọi thiết bị.
+
+- LW-06: 39d204e — panel Homestead [F], E contextual/world markers, 10 sprite công trình và 29 icon vật phẩm. Craft details và scroll giữ ổn định qua refresh; soil tint cache theo tile, snow/leaves drift theo active clock và camera.
+- Rà soát sinh học bổ sung: trứng/sữa chỉ do con cái sản xuất; shearing có cooldown riêng, không dùng chung breedTick. Giới tính migration không phụ thuộc parity loài. Vật nuôi di chuyển trong pen với collision của pen được bỏ qua riêng; không bỏ qua công trình khác. Bricks dùng xây cabin; bone compost bổ sung, tổng 15 recipes mới. Spawn khi chưa khám phá phải retry; lịch sử spawn tránh nhân đôi sau săn.

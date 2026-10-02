@@ -353,6 +353,7 @@ export const LIVING_FACILITIES = [
       ['item:timber', 6],
       ['item:plant-fiber', 4],
       ['item:cordage', 1],
+      ['item:brick', 2],
     ],
     purpose:
       'Independent shelter and safe rest anywhere on suitable explored ground.',
@@ -410,6 +411,17 @@ export const LIVING_RECIPES: readonly {
     name: 'Compost',
     costs: [
       ['item:edible-plant', 2],
+      ['item:plant-fiber', 2],
+    ],
+    output: 'item:compost',
+    quantity: 2,
+    station: 'compost-bin',
+  },
+  {
+    id: 'bone-compost',
+    name: 'Bone Compost',
+    costs: [
+      ['item:bone', 1],
       ['item:plant-fiber', 2],
     ],
     output: 'item:compost',

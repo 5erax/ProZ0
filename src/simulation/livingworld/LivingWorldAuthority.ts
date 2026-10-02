@@ -25,7 +25,7 @@ export interface LivingServices {
   tick(): number;
   actor(id: string): ExpeditionActor;
   players(): readonly string[];
-  ground(x: number, y: number): boolean;
+  ground(x: number, y: number, ignoreFacility?: string): boolean;
   plotGround(x: number, y: number): string | null;
   weather(x: number, y: number): string;
   weapon(id: string): boolean;
@@ -143,7 +143,9 @@ export class LivingWorldAuthority {
     return Math.max(0, Math.min(100, base + this.season().thermalOffset));
   }
   public renewal(point: { x: number; y: number }, id: string) {
-    return id === 'resource:fiber-plant' || id === 'resource:food-plant' || id==='resource:timber-source'
+    return id === 'resource:fiber-plant' ||
+      id === 'resource:food-plant' ||
+      id === 'resource:timber-source'
       ? Math.max(
           0.4,
           Math.min(
@@ -216,7 +218,13 @@ export class LivingWorldAuthority {
       if (!this.state.spawned.includes(spawn) && this.services.ground(x, y)) {
         this.state.spawned.push(spawn);
         this.state.animals.push(
-          this.animal(sp.id, x, y, (i % 2) as 0 | 1, true),
+          this.animal(
+            sp.id,
+            x,
+            y,
+            (i === 4 ? (h >>> 14) % 2 : i % 2) as 0 | 1,
+            true,
+          ),
         );
       }
     }
@@ -247,6 +255,7 @@ export class LivingWorldAuthority {
       pen: null,
       owner: null,
       attackTick: 0,
+      shearTick: 0,
     };
   }
   public tick() {
@@ -414,7 +423,7 @@ export class LivingWorldAuthority {
       if (dist > 0.1) {
         const x = a.x + ((tx - a.x) / dist) * Math.min(speed, dist),
           y = a.y + ((ty - a.y) / dist) * Math.min(speed, dist);
-        if (this.services.ground(x, y)) {
+        if (this.services.ground(x, y, a.pen ?? undefined)) {
           a.x = x;
           a.y = y;
         }
@@ -436,7 +445,8 @@ export class LivingWorldAuthority {
         a.age >= d.matureSeconds * 60 &&
         a.energy > 3000 &&
         a.thirst > 3000 &&
-        d.product
+        d.product &&
+        a.sex === 0
       ) {
         a.productTicks += delta;
         if (a.productTicks >= d.productSeconds * 60) {
@@ -520,7 +530,7 @@ export class LivingWorldAuthority {
             d = SPECIES[h % 6]!;
           if (this.services.ground(x, y))
             this.state.animals.push(
-              this.animal(d.id, x, y, (h % 2) as 0 | 1, true),
+              this.animal(d.id, x, y, ((h >>> 12) % 2) as 0 | 1, true),
             );
         }
       }
@@ -787,11 +797,11 @@ export class LivingWorldAuthority {
             if (
               a.species !== 'goat' ||
               a.age < d.matureSeconds * 60 ||
-              this.services.tick() < a.breedTick
+              this.services.tick() < a.shearTick
             )
               return reject('NOT_READY');
             produce('item:wool', 2);
-            a.breedTick = this.services.tick() + 18000;
+            a.shearTick = this.services.tick() + 18000;
             message = 'SHEARED';
           } else return reject('INVALID_ACTION');
         }

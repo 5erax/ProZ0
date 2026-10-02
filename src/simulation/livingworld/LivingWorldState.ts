@@ -33,6 +33,7 @@ export interface LivingAnimal {
   anchorX: number;
   anchorY: number;
   attackTick: number;
+  shearTick: number;
 }
 export interface LivingForage {
   id: string;
@@ -147,6 +148,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
         a.product,
         a.productTicks,
         a.attackTick,
+        a.shearTick,
       ].every(n) ||
       a.health > d.health ||
       a.energy > 10000 ||

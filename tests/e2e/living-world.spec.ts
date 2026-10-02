@@ -21,6 +21,7 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   page,
 }) => {
   test.setTimeout(360000);
+  page.setDefaultTimeout(30000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const url =
@@ -93,8 +94,13 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
     .getByRole('button', { name: 'Craft Field Hoe', exact: true })
     .click();
   await expect(panel.getByRole('status')).toContainText('crafted');
-  // Open crafting again after authority changes rebuild the bounded panel.
-  await panel.locator('summary').click();
+  // Crafting details stay open across authority updates.
+  if (
+    !(await panel
+      .locator('details')
+      .evaluate((e) => (e as HTMLDetailsElement).open))
+  )
+    await panel.locator('summary').click();
   await panel
     .getByRole('button', { name: 'Craft Prepare Root Seeds', exact: true })
     .click();
@@ -137,11 +143,11 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   ).toBeVisible();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page
-    .getByRole('button', { name: 'Save world now', exact: true })
+    .getByRole('button', { name: 'Save world [L]', exact: true })
     .click();
-  await expect(page.locator('[data-region="save-status"]')).toHaveAttribute(
-    'data-status',
-    'SAVED',
+  await expect(page.locator('[data-product-review-save]')).toHaveAttribute(
+    'data-save-state',
+    'success',
     { timeout: 15000 },
   );
   await page.reload();
