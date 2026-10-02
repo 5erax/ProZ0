@@ -1,3 +1,6 @@
+import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
+import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
+import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
 import { validateColonySustenanceState } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import { validateColonyDepthState } from '../../simulation/colony/ColonyDepthAuthority';
@@ -191,6 +194,7 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.colonyDepth !== undefined) {
     try { validateColonyDepthState(record.colonyDepth); }
     catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported colony-depth state.'); }
@@ -959,6 +963,19 @@ function globalCrossReferences(
     );
   }
 
+  const expedition = bundle.world.singlePlayerExpedition;
+  if (expedition) {
+    if(players.size !== 1 || [...expedition.plans,...expedition.facilities].some(p=>!players.has(p.owner)) || expedition.supplyClaimed.some(p=>!players.has(p)) || Object.keys(expedition.restCooldown).some(p=>!players.has(p))) {
+      return saveFailure('CORRUPT_RECORD','Expedition state references an absent player or multiplayer session.');
+    }
+    for(const facility of expedition.facilities) {
+      if(facility.canonicalStructureId===null)continue;
+      const structure=structures.get(facility.canonicalStructureId);
+      if(!structure || structure.structureDefinitionId!==expeditionFacility(facility.definitionId)?.canonical || structure.placedByPlayerId!==facility.owner || structure.position.x!==facility.x || structure.position.y!==facility.y || structure.orientationQuarterTurns!==facility.orientation) {
+        return saveFailure('CORRUPT_RECORD','Expedition facility does not match its canonical structure.');
+      }
+    }
+  }
   const allStacks = new Map<
     string,
     { container: ContainerRecordV2; itemDefinitionId: string }
@@ -1168,7 +1185,7 @@ function globalCrossReferences(
     }
     for (const [definitionId, count] of definitionCounts) {
       const definition = policy.catalog.getAs(definitionId, 'structure');
-      if (count > definition.phase1WorldCap) {
+      if (count > (bundle.world.singlePlayerExpedition?expeditionStructureCap(definitionId as Phase1StructureDefinitionId):definition.phase1WorldCap)) {
         return saveFailure(
           'CROSS_REFERENCE_FAILURE',
           `Structure cap exceeded for ${definitionId}.`,

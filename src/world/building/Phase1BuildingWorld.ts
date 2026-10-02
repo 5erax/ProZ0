@@ -1,3 +1,4 @@
+import {expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import {
   createWorldPosition,
   type PlayerId,
@@ -205,6 +206,7 @@ function defaultLandingConnectors(): readonly ConnectorState[] {
 }
 
 export class Phase1BuildingWorld {
+  public structureCap(id: Phase1StructureDefinitionId): number { return this.expeditionEnabled ? expeditionStructureCap(id) : CAPS[id]; }
   private readonly structures = new Map<StructureId, MutableStructure>();
   private readonly condensers = new Map<StructureId, MutableCondenser>();
   private readonly connectors = new Map<ConnectorId, ConnectorState>();
@@ -220,6 +222,7 @@ export class Phase1BuildingWorld {
   public constructor(
     private readonly spatial: BuildingSpatialQuery,
     snapshot?: BuildingWorldSnapshot,
+    private readonly expeditionEnabled = false,
   ) {
     if (snapshot === undefined) {
       this.structures.set('structure-instance:landing-module', {
@@ -392,11 +395,12 @@ export class Phase1BuildingWorld {
   public assessPlacement(
     definitionId: Exclude<Phase1StructureDefinitionId, 'structure:landing-module'>,
     placement: PlacementIntent,
+    ignoreDefinitionCap = false,
   ): Readonly<Pick<PlacementReservation, 'finalPosition' | 'orientationQuarterTurns' | 'targetConnectorId'>> | PlacementRejectionReason {
-    if (
+    if (!ignoreDefinitionCap && (
       this.countDefinition(definitionId)
-      >= CAPS[definitionId]
-    ) {
+      >= this.structureCap(definitionId)
+    )) {
       return 'BUILD_LIMIT_REACHED';
     }
 
@@ -919,7 +923,7 @@ export class Phase1BuildingWorld {
         structure.definitionId === 'structure:landing-module'
         || structure.definitionId === 'structure:habitat-room',
     );
-    if (!anchors.some(
+    if (!this.expeditionEnabled && !anchors.some(
       (anchor) =>
         squaredDistance(position, anchor.position)
           <= PHASE1_BUILD_ZONE_RADIUS_WU ** 2,
@@ -1017,7 +1021,7 @@ export class Phase1BuildingWorld {
     }
 
     for (const id of Object.keys(CAPS) as Phase1StructureDefinitionId[]) {
-      if (this.countDefinition(id) > CAPS[id]) {
+      if (this.countDefinition(id) > this.structureCap(id)) {
         throw new Error(`Structure cap exceeded for ${id}.`);
       }
     }

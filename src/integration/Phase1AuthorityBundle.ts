@@ -1,3 +1,5 @@
+import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
+import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
 import { EXPEDITION_PLAYER_CARRY } from '../simulation/items/ItemCapacity';
 import {
   RNG_ALGORITHM_VERSION,
@@ -396,6 +398,7 @@ export class Phase1AuthorityBundle {
   public readonly machines: Phase1CondenserAuthority;
   public readonly sustenance: ColonySustenanceAuthority;
   public readonly colonyDepth: ColonyDepthAuthority;
+  public readonly expedition: ExpeditionAuthority|null;
   public readonly combat: Phase1CombatAuthority;
   public readonly death: Phase1DeathAuthority;
 
@@ -442,6 +445,7 @@ export class Phase1AuthorityBundle {
     }
     this.buildings = buildings;
     this.items = items;
+    this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
@@ -490,6 +494,9 @@ export class Phase1AuthorityBundle {
       throw new Error('Phase 1 vertical-slice player identities are invalid.');
     }
 
+    if ((config.singlePlayerExpeditionEnabled === true && playerIds.length !== 1) || (config.reopen?.bundle.world.singlePlayerExpedition && config.singlePlayerExpeditionEnabled !== true)) {
+      throw new Error('Expedition saves require an explicitly enabled single-player session.');
+    }
     const catalog = config.catalog ?? createPhase1ContentCatalog();
     const reopen = config.reopen;
     if (
@@ -534,6 +541,7 @@ export class Phase1AuthorityBundle {
       value: reopen?.bundle.world.authorityTick ?? 0,
     };
     let buildings: Phase1BuildingWorld | null = null;
+    let expedition: ExpeditionAuthority|null = null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
@@ -546,7 +554,7 @@ export class Phase1AuthorityBundle {
       spawnClearanceRadiusWorldUnits: config.spawnClearanceRadiusWorldUnits,
       requiredAccessRadiusWorldUnits: config.requiredAccessRadiusWorldUnits,
       structures: () =>
-        buildings?.exportSnapshot().foothold.structures ?? Object.freeze([]),
+        [...(buildings?.exportSnapshot().foothold.structures ?? []),...(expedition?.read().facilities.filter(f=>f.canonicalStructureId===null).map(f=>({structureId:f.id,definitionId:expeditionFacility(f.definitionId)!.shape,revision:0,position:createWorldPosition(f.x,f.y),orientationQuarterTurns:f.orientation,placedByPlayerId:f.owner,containerId:null,placementOperationFingerprint:null})) ?? [])],
       playerIds: () => Object.freeze([...playerIds]),
       playerInsideStructure: (playerId, structureId) => {
         const structure = buildings?.getStructure(structureId) ?? null;
@@ -566,6 +574,7 @@ export class Phase1AuthorityBundle {
     buildings = new Phase1BuildingWorld(
       world,
       buildingSnapshot(reopen),
+      config.singlePlayerExpeditionEnabled===true,
     );
     const itemWorld = new BuildingItemWorldAdapter(world, buildings);
     const reopenedProgression = progressionSnapshot(reopen);
@@ -643,6 +652,7 @@ export class Phase1AuthorityBundle {
       death,
     );
     capacityAuthority=bundle.colonyDepth;
+    expedition=bundle.expedition;
 
     if (config.activatePlayersOnCreate !== false) {
       for (const playerId of playerIds) {
