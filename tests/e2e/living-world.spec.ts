@@ -105,6 +105,17 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
     .getByRole('button', { name: 'Craft Prepare Root Seeds', exact: true })
     .click();
   await expect(panel.getByRole('status')).toContainText('crafted');
+  await panel
+    .getByRole('button', { name: 'Till a new plot', exact: true })
+    .click();
+  await expect(page.locator('.lw-ghost')).toBeVisible();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.locator('.lw-ghost')).toBeHidden();
+  await expect(page.locator('[data-colony-settings]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: 'Homestead farming and wildlife' })
+    .click();
   let planted = false;
   for (const [x, y] of [
     [46, 22],
@@ -128,12 +139,10 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
       .click();
   }
   expect(planted, 'Natural explored soil near the stone outcrop').toBe(true);
-  const plantedPoint = await page
-    .locator('.lw-ghost')
-    .evaluate((e) => ({
-      x: Number((e as HTMLElement).dataset.x),
-      y: Number((e as HTMLElement).dataset.y),
-    }));
+  const plantedPoint = await page.locator('.lw-ghost').evaluate((e) => ({
+    x: Number((e as HTMLElement).dataset.x),
+    y: Number((e as HTMLElement).dataset.y),
+  }));
   const row = panel.locator('[data-living-row^="plot:"]').first();
   await row
     .getByRole('button', { name: 'Plant Root Vegetables', exact: true })

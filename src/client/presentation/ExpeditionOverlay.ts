@@ -748,7 +748,7 @@ export function createExpeditionOverlay(
       !placement ||
       !(event.target instanceof Element) ||
       event.target.closest(
-        '.p1-ui,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
+        '.p1-ui,.p2-settings,.p2-colony-controls,.lw-menu,.sp-expedition-panel,[data-colony-settings]',
       )
     )
       return;
