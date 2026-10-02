@@ -56,8 +56,21 @@ Sau vòng này ưu tiên đo chuyến solo 20–30 phút: thời gian travel/gat
 ## Sổ thực hiện
 | Task | Trạng thái | Commit / bằng chứng |
 |---|---|---|
-| SC-01 | COMMITTED cùng kế hoạch | Audit baseline fbad288; các gaps nêu trên có source đối chiếu |
-| SC-02 | VERIFIED / COMMITTED cùng increment | assessPreview/previewFootprint read-only; custom dismantle/refund; 8 construction/completion tests PASS, typecheck/lint PASS |
-| SC-03 | PLANNED | Chờ asset/UI/preview |
-| SC-04 | PLANNED | Chờ contextual state |
-| SC-05 | PLANNED | Chờ CI/public delivery |
+| SC-01 | COMMITTED | `1a5616f`; audit baseline fbad288 và hợp đồng thực hiện |
+| SC-02 | VERIFIED / COMMITTED | `402f977`; assessPreview/previewFootprint read-only; custom dismantle/refund; 8 construction/completion tests PASS, typecheck/lint PASS |
+| SC-03 | VERIFIED / COMMITTED | `d8e069a`; atlas 7 hình riêng, preview footprint/rotation, have/required, marker focus; natural journey PASS |
+| SC-04 | VERIFIED / COMMITTED | `5349a40`; HUD renewing, storage guidance, 3 E2E PASS (natural journey, seeds, depletion) |
+| SC-05 | IN PROGRESS | Full CI đang chạy; sau đó exact-head CI/CodeQL, PR, main và public verification |
+
+## Đường code cho nhân sự tiếp nhận
+
+| Hệ thống | Nguồn / điểm mở rộng | Kiểm tra chính |
+|---|---|---|
+| Carry/item transactions | src/simulation/items/ItemLedger.ts, ItemTransactionAuthority.ts; src/content/singleplayer/ExpeditionContent.ts | tests/unit/single-player-carry.test.ts; inventory/storage integration |
+| Plans/facilities/rest | src/simulation/expedition/ExpeditionAuthority.ts, ExpeditionState.ts; src/integration/Phase1AuthorityBundle.ts | tests/unit/single-player-construction.test.ts, single-player-completion.test.ts, single-player-facilities.test.ts |
+| UI/art/placement | src/client/presentation/ExpeditionOverlay.ts, ExpeditionAssets.ts; assets/singleplayer/expedition_facilities.svg; Phase1HudOverlay.ts | tests/e2e/single-player-expedition.spec.ts (keyboard/gather thật, không teleport/cấp đồ) |
+| Generation/renewal/events | src/content/world, src/content/singleplayer/ExpeditionEcology.ts; world store integration | tests/determinism; single-player ecology/renewal integration |
+| AI/rain/HUD runtime | src/client/runtime/Phase1ProductReviewRuntime.ts; Phase1ProductReviewWorldRenderer.ts và compositor liên quan | predator/combat/save integration; phase2 frame pacing A/B rain |
+| Save compatibility | src/persistence và src/integration/Phase1SaveV2Composer.ts; optional ExpeditionState trong Save V2 | single-player save/reopen; save upgrades và future-clock validation |
+
+Đọc thêm [nghiệp vụ, bảng giá và hành vi cụ thể](single-player-expedition-handoff.vi.md) cùng [kế hoạch SP-01–SP-10](single-player-expedition-plan.md). Các tài liệu đó ghi lịch sử trước khi merge #210; vòng hiện tại bổ sung UX/thu hồi công trình và xác nhận lại toàn bộ phạm vi. Chạy rg --files trước khi giao task để đối chiếu đường file chính xác, không sửa tên giả định.
