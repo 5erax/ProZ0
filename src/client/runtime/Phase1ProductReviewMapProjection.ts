@@ -213,7 +213,7 @@ function chunkKnowledge(
 
     const generated = generator.generate({
       worldSeed: bundle.config.worldSeed,
-      generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      generationVersion: bundle.config.reopen?.bundle.world.generationVersion ?? bundle.config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       coord,
     });
     if (
