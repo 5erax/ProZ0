@@ -52,6 +52,7 @@ function plant(kind: string, stage: number): string {
   if (kind === 'empty') return '';
   if (kind === 'dead') return '<path fill="#a78e61" d="M21 34h3v13h-3zM33 31h3v16h-3zM41 37h3v10h-3zM19 33h8v3h-8zM31 29h8v3h-8z"/>';
   if (stage === 0) return '<path fill="#486747" d="M22 41h3v7h-3zM34 38h3v10h-3zM42 42h3v6h-3z"/><path fill="#8faa68" d="M17 39h7v4h-7zM35 35h7v5h-7zM43 39h5v4h-5z"/>';
+  if (kind === 'wild-grass') return '<path fill="#496a50" d="M13 45v-8h3v-9h3v20h-6zM24 48V24h3v11h4v13zM36 47V30h3v-9h3v26zM45 48V34h3v-6h3v20z"/><path fill="#87a875" d="M16 37h3v10h-3zM26 29h2v12h-2zM40 26h2v15h-2zM47 37h2v8h-2z"/>';
   if (kind === 'root') return `<path fill="#688954" d="M17 32h10v5H17zM23 24h5v18h-5zM29 28h7v15h-7zM36 23h6v18h-6zM42 31h9v6h-9z"/><path fill="#98ad69" d="M18 29h6v3h-6zM29 24h5v8h-5zM39 21h4v9h-4z"/>${stage === 2 ? '<path fill="#bf9580" d="M21 42h9v6h-9zM36 41h9v8h-9z"/><path fill="#e0ba94" d="M22 42h4v3h-4zM37 41h4v3h-4z"/>' : ''}`;
   if (kind === 'herb' || kind === 'wild-herbs') return `<path fill="#426855" d="M14 33h12v7H14zM20 22h9v12h-9zM31 27h15v9H31zM39 19h7v14h-7zM22 39h23v6H22z"/><path fill="#89a77a" d="M16 30h9v4h-9zM22 24h5v5h-5zM33 28h9v5h-9zM41 20h4v5h-4zM26 37h12v4H26z"/>${stage === 2 ? '<path fill="#b49abb" d="M23 19h4v4h-4zM41 16h5v4h-5zM33 24h4v4h-4z"/>' : ''}`;
   if (kind === 'flax' || kind === 'wild-flax') return `<path fill="#608561" d="M20 24h2v24h-2zM30 15h2v33h-2zM42 20h2v28h-2zM16 30h6v3h-6zM31 22h7v3h-7zM38 32h6v3h-6zM25 36h7v3h-7z"/>${stage === 2 ? '<path fill="#78adbf" d="M17 21h8v4h-8zM28 12h7v5h-7zM39 17h8v4h-8z"/><path fill="#d4d9a0" d="M20 22h2v2h-2zM30 13h2v2h-2zM42 18h2v2h-2z"/>' : '<path fill="#90aa73" d="M18 22h5v4h-5zM29 14h5v4h-5z"/>'}`;
@@ -61,7 +62,7 @@ function plant(kind: string, stage: number): string {
 
 const cache = new Map<string, LivingArt>();
 export function livingArt(role: string, kind: string, progress: number, young = false, dead = false): LivingArt {
-  const stageKey = Math.min(2, Math.floor(Math.max(0, progress) * 3));
+  const stageKey = progress >= 1 ? 2 : progress >= .5 ? 1 : 0;
   const key = [role, kind, stageKey, young, dead].join(':');
   const cached = cache.get(key);
   if (cached) return cached;
@@ -75,7 +76,9 @@ export function livingArt(role: string, kind: string, progress: number, young = 
     body = dead ? `<g transform="translate(0 70) scale(1 -.45)">${a.body}</g>` : a.body;
   } else if (kind === 'berry-bush') {
     width = 42; height = 38;
-    body = '<path fill="#82674d" d="M29 29h5v22h-5zM23 39h12v4H23zM33 36h10v4H33z"/><path fill="#3e604b" d="M9 27h6v-9h14v-6h13v7h10v19H17v-4H9z"/><path fill="#628452" d="M16 19h12v7H16zM30 15h10v7H30zM36 24h13v8H36zM19 30h12v6H19z"/><path fill="#87a469" d="M18 19h7v3h-7zM31 15h6v3h-6zM39 24h6v3h-6z"/>' + (dead ? '' : '<path fill="#b7797b" d="M18 26h4v4h-4zM22 29h4v4h-4zM37 22h4v4h-4zM41 25h4v4h-4zM30 34h4v4h-4z"/><path fill="#e0ada0" d="M18 26h2v2h-2zM37 22h2v2h-2z"/>');
+    body = '<path fill="#82674d" d="M29 29h5v22h-5zM23 39h12v4H23zM33 36h10v4H33z"/><path fill="#3e604b" d="M9 27h6v-9h14v-6h13v7h10v19H17v-4H9z"/><path fill="#628452" d="M16 19h12v7H16zM30 15h10v7H30zM36 24h13v8H36zM19 30h12v6H19z"/><path fill="#87a469" d="M18 19h7v3h-7zM31 15h6v3h-6zM39 24h6v3h-6z"/>' + (dead || stageKey < 2 ? '' : '<path fill="#b7797b" d="M18 26h4v4h-4zM22 29h4v4h-4zM37 22h4v4h-4zM41 25h4v4h-4zM30 34h4v4h-4z"/><path fill="#e0ada0" d="M18 26h2v2h-2zM37 22h2v2h-2z"/>');
+    if (stageKey === 0) body = '<path fill="#82674d" d="M29 39h5v12h-5zM22 39h11v4H22zM33 37h9v4h-9z"/><path fill="#739363" d="M20 36h7v4h-7zM38 34h6v4h-6z"/>';
+    else if (stageKey === 1) body = '<g transform="translate(8 12.5) scale(.75)">' + body + '</g>';
   } else if (kind === 'clay-bank') {
     width = 40; height = 26;
     body = '<path fill="#785e4f" d="m5 45 8-22h26l14 16-9 12H14z"/><path fill="#b28465" d="M14 24h23l9 13H10z"/><path fill="#c99f7b" d="M15 24h16v4H15zM11 33h25v4H11z"/><path fill="#997056" d="M10 39h37v5H10zM19 29h21v3H19z"/><path fill="#5c5749" d="M17 44h4v5h-4zM36 34h3v6h-3z"/>';
@@ -83,8 +86,8 @@ export function livingArt(role: string, kind: string, progress: number, young = 
     width = 34; height = 29;
     body = '<path fill="#688b89" d="m9 46 5-11h32l8 11-21 8z"/><path fill="#bdd1c3" d="M15 24h9v23h-9zM28 12h12v35H28zM43 27h7v18h-7z"/><path fill="#e3e6ce" d="M15 24h4v17h-4zM28 12h5v26h-5zM43 27h3v12h-3z"/><path fill="#92b4ae" d="M35 17h5v30h-5zM21 29h3v17h-3z"/>';
   } else {
-    const stage = role === 'plot' ? Math.min(2, Math.floor(Math.max(0, progress) * 3)) : dead ? 0 : 2;
-    body = (role === 'plot' ? '<path fill="#62563f" d="m5 46 27-13 27 13-27 14z"/><path fill="#8d7751" d="m13 45 20 10 17-9m-29-6 21 10"/>' : '') + plant(kind, stage);
+    const stage = dead ? 0 : stageKey;
+    body = (role === 'plot' ? '<path fill="var(--plot-soil-color,#62563f)" d="m5 46 27-13 27 13-27 14z"/><path fill="#8d7751" opacity=".6" d="m13 45 20 10 17-9m-29-6 21 10"/>' : '') + plant(kind, stage);
     if (kind === 'empty') { width = 40; height = 22; }
   }
   const result = Object.freeze({ width, height, markup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges" aria-hidden="true">${shadow}${body}</svg>` });

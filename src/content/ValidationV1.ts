@@ -1,4 +1,5 @@
 import {LIVING_ITEMS} from './livingworld/LivingWorldContent';
+import {LIVING_ROOT_ITEMS} from './livingworld/LivingRootContent';
 import {
   CONTENT_FORMAT_ID,
   CONTENT_SCHEMA_VERSION,
@@ -1873,7 +1874,7 @@ function collectPhase1SemanticErrors(
   }
 
   for (const definition of pack.definitions) {
-    if (!required.has(definition.id) && !(definition.kind === 'item' && LIVING_ITEMS.some(i=>i.id===definition.id))) {
+    if (!required.has(definition.id) && !(definition.kind === 'item' && [...LIVING_ITEMS,...LIVING_ROOT_ITEMS].some(i=>i.id===definition.id))) {
       errors.push({
         code: 'INVALID_CROSS_REFERENCE',
         definitionId: definition.id,

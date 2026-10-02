@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
 import { createLegacyPhase1ContentCatalog } from '../../src/content/phase1/Phase1Catalog';
+import { LIVING_ROOT_ITEMS } from '../../src/content/livingworld/LivingRootContent';
 import {
   LIVING_ITEMS,
   SEASON_TICKS,
@@ -178,10 +179,10 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
     noWeapon: () => (weapon = false),
   };
 }
-it('adds 29 catalog items while preserving every V3/V4 generated entity and seed', () => {
+it('adds living and root items while preserving every V3/V4 generated entity and seed', () => {
   const old = createLegacyPhase1ContentCatalog(),
     active = createPhase1ContentCatalog();
-  expect(active.size - old.size).toBe(29);
+  expect(active.size - old.size).toBe(29 + LIVING_ROOT_ITEMS.length);
   expect(LIVING_ITEMS.every((i) => active.has(i.id))).toBe(true);
   expect(active.compatibility.canonicalFingerprint).not.toBe(
     old.compatibility.canonicalFingerprint,
@@ -504,17 +505,83 @@ it('failed unexplored spawn points retry later without duplicating hunted animal
   authority.tick();
   const state = authority.read();
   expect(state.animals).toHaveLength(5);
-  expect(state.forage).toHaveLength(6);
+  expect(state.forage).toHaveLength(7);
   expect(state.spawned).toHaveLength(5);
   tick = 180;
   authority.tick();
   expect(authority.read().animals).toHaveLength(5);
-  expect(authority.read().forage).toHaveLength(6);
+  expect(authority.read().forage).toHaveLength(7);
   const rooster = fixture({
     animals: [animal('rooster', 'chicken', 1, 'livestock-pen')],
   });
   rooster.advance(120);
   expect(rooster.authority.read().animals[0]!.product).toBe(0);
+});
+
+it('plant harvest resets growth, roots transplant once, and full bags or blocked ground preserve both sides of the transaction', () => {
+  const plant = { id: 'forage:berry', kind: 'berry-bush', x: 100, y: 103, readyTick: 0, cleared: false, growth: { version: 1 as const, progress: 10800, moisture: 8000, dryTicks: 0, cut: false } };
+  const f = fixture({ forage: [plant] });
+  expect(f.authority.execute(f.command('uproot', plant.id)).message).toBe('HARVEST_MATURE_PLANT_FIRST');
+  const harvest = f.command('forage', plant.id);
+  expect(f.authority.execute(harvest).status).toBe('committed');
+  expect(f.authority.forageStatus(plant.id)?.stage).toBe('early');
+  expect(f.authority.execute(f.command('forage', plant.id)).message).toBe('RENEWING');
+  const uproot = f.command('uproot', plant.id);
+  expect(f.authority.execute(uproot).message).toBe('ROOT_UPROOTED');
+  expect(f.authority.execute(uproot).message).toBe('ROOT_UPROOTED');
+  expect(f.items.getContainerView('inventory:solo').stacks.find(s => s.itemDefinitionId === 'item:root-berry-bush')?.quantity).toBe(1);
+  const place = f.command('replant', 'item:root-berry-bush', { x: 99, y: 102 });
+  expect(f.authority.execute(place).message).toBe('ROOT_REPLANTED');
+  expect(f.authority.execute(place).message).toBe('ROOT_REPLANTED');
+  expect(f.authority.read().forage).toHaveLength(2);
+  const replanted = f.authority.read().forage.find(e => e.id !== plant.id)!;
+  expect(replanted.growth?.progress).toBe(0);
+  expect(replanted.lineage).toBe('item:root-berry-bush');
+  const saved = validateLivingWorld(f.authority.read());
+  expect(new LivingWorldAuthority(f.items, f.expedition, f.services, saved).read()).toEqual(saved);
+  f.wet(true); f.advance(90);
+  expect(f.authority.forageStatus(replanted.id)?.fraction).toBeGreaterThan(.5);
+  expect(f.authority.forageStatus(replanted.id)?.fraction).toBeLessThan(1);
+  const partial = f.command('forage', replanted.id);
+  expect(f.authority.execute(partial).status).toBe('committed');
+  expect(f.authority.read().forage.find(e => e.id === replanted.id)!.growth?.cut).toBe(false);
+
+  const full = fixture({ forage: [{ ...plant, growth: { ...plant.growth, progress: 0, cut: true } }] }, true);
+  expect(full.items.commitColonyExchange({ operationId: 'fixture-fill-last-space', playerId: 'solo', expectedInventoryRevision: full.items.getContainerView('inventory:solo').revision, inputs: [], outputs: [{ itemDefinitionId: 'item:plant-fiber', quantity: 1 }] }).status).toBe('committed');
+  const before = full.authority.read(), bag = full.items.exportLedgerSnapshot();
+  expect(full.authority.execute(full.command('uproot', plant.id)).status).toBe('rejected');
+  expect(full.authority.read()).toEqual(before); expect(full.items.exportLedgerSnapshot()).toEqual(bag);
+  const blocked = fixture(); blocked.block();
+  expect(blocked.authority.execute(blocked.command('replant', 'item:root-berry-bush', { x: 99, y: 102 })).message).toBe('OBSTRUCTED');
+  expect(blocked.items.exportLedgerSnapshot().containers[0]!.revision).toBe(0);
+});
+
+it('grass yields fiber, moisture pauses/restarts plant growth, and mineral deposits retain their legacy renewal timer', () => {
+  const f = fixture({ forage: [
+    { id: 'grass', kind: 'wild-grass', x: 100, y: 103, readyTick: 0, cleared: false, growth: { version: 1, progress: 5400, moisture: 0, dryTicks: 60, cut: false } },
+    { id: 'salt', kind: 'salt-stone', x: 99, y: 100, readyTick: 9000, cleared: false },
+  ] });
+  const fibers = () => f.items.getContainerView('inventory:solo').stacks.find(s => s.itemDefinitionId === 'item:plant-fiber')!.quantity;
+  const before = fibers();
+  expect(f.authority.execute(f.command('forage', 'grass')).status).toBe('committed');
+  expect(fibers()).toBe(before + 3);
+  f.advance(10); expect(f.authority.read().forage[0]!.growth?.progress).toBe(0);
+  expect(f.authority.forageStatus('grass')?.nextStageSeconds).toBeNull();
+  expect(f.authority.execute(f.command('water-forage', 'grass')).message).toBe('WATERED');
+  f.advance(10); expect(f.authority.read().forage[0]!.growth?.progress).toBeGreaterThan(0);
+  expect(f.authority.execute(f.command('forage', 'salt')).message).toBe('RENEWING');
+  expect(f.authority.read().forage[1]!.readyTick).toBe(9000);
+  expect(() => validateLivingWorld({ ...f.authority.read(), forage: [{ ...f.authority.read().forage[0], growth: { version: 2 } }] })).toThrow();
+});
+
+it('tilling pays biological growth even before the legacy timer, without duplicate payment', () => {
+  const f = fixture({ forage: [{ id: 'growing-grass', kind: 'wild-grass', x: 100, y: 103, readyTick: 9000, cleared: false, growth: { version: 1, progress: 3000, moisture: 8000, dryTicks: 0, cut: false } }] });
+  const fibers = () => f.items.getContainerView('inventory:solo').stacks.find(s => s.itemDefinitionId === 'item:plant-fiber')!.quantity;
+  const before = fibers(), command = f.command('till', 'ground', { x: 100, y: 103 });
+  expect(f.authority.execute(command).message).toBe('SOIL_TILLED');
+  expect(fibers()).toBe(before + 1);
+  expect(f.authority.execute(command).message).toBe('SOIL_TILLED');
+  expect(fibers()).toBe(before + 1);
 });
 
 it('tilling clears wild plants and pays remaining forage once; a full bag preserves soil and plants across saved commands', () => {

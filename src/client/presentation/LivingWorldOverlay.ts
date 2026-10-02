@@ -9,6 +9,8 @@ import {
 } from '../../content/livingworld/LivingWorldContent';
 import { livingArt } from './LivingWorldArt';
 import { LivingMotion } from './LivingMotion';
+import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
+import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
 import type { LivingCommand } from '../../simulation/livingworld/LivingWorldAuthority';
 import {
@@ -50,7 +52,7 @@ export function createLivingWorldOverlay(
   hint.className = 'lw-hint';
   hint.hidden = true;
   style.textContent =
-    '.p1-product-terrain[data-soil]::after{content:"";position:absolute;left:42%;top:48%;width:9px;height:3px;opacity:.3;pointer-events:none;background:var(--soil-color)}.p1-product-terrain[data-soil=loam]{--soil-color:#9d9a71}.p1-product-terrain[data-soil=sand]{--soil-color:#d1b679}.p1-product-terrain[data-soil=clay]{--soil-color:#b28471}.p1-product-terrain[data-soil=peat]{--soil-color:#537161}.p1-product-terrain[data-soil=rocky]{--soil-color:#acb4aa}[data-living-season=winter] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #aec9ca44}[data-living-season=autumn] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #d0a66d33}.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:58px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:50px}.lw-season{top:95px}}';
+    '.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:110px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:110px}.lw-season{top:95px}}';
   const worldStage = root.querySelector<HTMLElement>('.p1-product-world-stage');
   if (!worldStage) throw new Error('Living presentation requires the canonical world stage.');
   const rasterOrigin = { x: Number(worldStage.dataset.rasterOriginX), y: Number(worldStage.dataset.rasterOriginY) };
@@ -64,6 +66,7 @@ export function createLivingWorldOverlay(
     feedback = '',
     focus = '',
     signature = '',
+    placementRoot: string | null = null,
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -164,10 +167,14 @@ export function createLivingWorldOverlay(
   menu.onclick = () => open();
   const startPlot = () => {
     close();
+    placementRoot = null;
     placing = true;
     hint.hidden = false;
     hint.textContent = 'Click explored dry ground within 4 m · Escape cancel';
   };
+  const growthText = (v: ReturnType<typeof forageGrowthView>) => v.stage === 'mature'
+    ? 'Maximum growth reached · best yield ' + v.maximumYield + ' · ' + (v.condition === 'normal' ? 'Normal' : 'Needs water')
+    : (v.stage === 'early' ? 'Early growth' : 'Growing') + ' · ' + (v.nextStageSeconds === null ? 'Growth paused: water needed' : 'Next stage ≈ ' + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? 'Needs water' : 'Normal') + ' · yield ' + v.harvestYield + '/' + v.maximumYield;
   const render = () => {
     const now = performance.now();
     if (root.dataset.colonySettingsOpen === 'true') {
@@ -223,8 +230,8 @@ export function createLivingWorldOverlay(
           e,
           role: 'forage',
           kind: e.kind,
-          progress: 0,
-          dead: e.readyTick > bundle.authorityTick,
+          progress: renewablePlant(e.kind) ? forageGrowthView(e, bundle.authorityTick, 1).fraction : 1,
+          dead: !renewablePlant(e.kind) && e.readyTick > bundle.authorityTick,
           young: false, anchor: '',
         })),
       ...state.animals.map((e) => ({
@@ -263,7 +270,7 @@ export function createLivingWorldOverlay(
         objectNodes.set(e.id, b);
         markers.append(b);
       }
-      const key = [role, kind, Math.min(2, Math.floor(progress * 3)), young, dead].join(':');
+      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead].join(':');
       const definition = livingArt(role, kind, progress, young, dead);
       if (b.dataset.art !== key) {
         b.innerHTML = definition.markup;
@@ -284,7 +291,17 @@ export function createLivingWorldOverlay(
             ? speciesDefinition(kind)!.name
             : forageDefinition(kind)!.name,
       );
-      b.title = b.getAttribute('aria-label') ?? '';
+      if (Math.hypot(e.x - p.x, e.y - p.y) <= 4 && role === 'forage' && renewablePlant(kind)) {
+        const growth = authority.forageStatus(e.id)!;
+        const label = (b.getAttribute('aria-label') ?? '') + ' · ' + growthText(growth);
+        if (b.title !== label) b.title = label;
+      } else b.title = b.getAttribute('aria-label') ?? '';
+      if (role === 'plot') {
+        const plot = state.plots.find(plot => plot.id === e.id)!;
+        b.dataset.moisture = moistureState(plot.moisture);
+        const soilColor = plot.moisture < 2500 ? '#998466' : plot.moisture >= 7000 ? '#4b4837' : '#736348';
+        b.style.setProperty('--plot-soil-color', soilColor);
+      }
       const raster = projectPhase1Isometric(displayed, rasterOrigin);
       // Foot pivot at 50/64 of the authored canvas, shared with terrain's raster origin.
       const hitWidth = Math.max(24, definition.width), hitHeight = Math.max(24, definition.height);
@@ -317,7 +334,7 @@ export function createLivingWorldOverlay(
     }
     if (!opened) return;
     const next = JSON.stringify([
-      Math.floor(state.lastTick / 300),
+      Math.floor(state.lastTick / 60),
       inventory.revision,
       Math.floor(p.x),
       Math.floor(p.y),
@@ -344,6 +361,11 @@ export function createLivingWorldOverlay(
         'Spring +35% growth · Summer: water regularly · Autumn +25% harvest · Winter: fire and shelter. Each season lasts 12 active minutes.',
       ),
     );
+    const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
+    for (const rootItem of roots) panel.append(button('Replant ' + rootItem.displayName, () => {
+      close(); placing = true; placementRoot = rootItem.id; hint.hidden = false;
+      hint.textContent = 'Replant on explored ground within 4 m · Escape / right-click cancel';
+    }));
     const soil = soilAt(bundle.config.worldSeed, p);
     panel.append(
       text(
@@ -388,6 +410,8 @@ export function createLivingWorldOverlay(
                 '%',
         ),
       );
+      const growth = authority.plotStatus(plot.id);
+      if (growth && !plot.dead) a.append(text('p', growthText(growth)));
       if (!plot.crop)
         for (const c of CROPS)
           a.append(
@@ -465,16 +489,22 @@ export function createLivingWorldOverlay(
       .filter((f) => !f.cleared)
       .filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus)) {
       const a = row(f.id, forageDefinition(f.kind)!.name);
+      const growth = authority.forageStatus(f.id)!;
+      if (renewablePlant(f.kind)) a.append(text('p', growthText(growth)));
       a.append(
         button(
-          f.readyTick > bundle.authorityTick
-            ? 'Regrowing · ' +
+          (f.growth ? growth.harvestYield === 0 : f.readyTick > bundle.authorityTick)
+            ? f.growth ? growth.nextStageSeconds === null ? 'Water needed · growth paused' : 'Early growth · ≈ ' + growth.nextStageSeconds + 's' : 'Regrowing · ' +
                 Math.ceil((f.readyTick - bundle.authorityTick) / 60) +
                 's'
             : 'Gather',
           () => execute('forage', f.id),
         ),
       );
+      if (f.growth) {
+        a.append(button('Water roots · 1 clean water', () => execute('water-forage', f.id)));
+        if (f.growth.cut) a.append(text('p', 'Uprooting removes this patch permanently; replant the root elsewhere.'), button('Uproot · Field Hoe', () => execute('uproot', f.id)));
+      }
     }
     for (const f of bundle
       .expedition!.read()
@@ -514,11 +544,11 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + LIVING_RECIPES.length + ' recipes',
+        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length) + ' recipes',
       ),
     );
     panel.append(craft);
-    for (const r of LIVING_RECIPES) {
+    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
       craft.append(a);
       const icon = document.createElement('span'),
@@ -579,7 +609,7 @@ export function createLivingWorldOverlay(
     signature = '';
     render();
     if (
-      execute('till', 'ground', {
+      execute(placementRoot ? 'replant' : 'till', placementRoot ?? 'ground', {
         x: Number(ghost.dataset.x),
         y: Number(ghost.dataset.y),
       })

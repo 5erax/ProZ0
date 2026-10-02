@@ -1,4 +1,5 @@
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
+import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
 const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
 export interface Phase1ProductionSprite {
@@ -259,6 +260,12 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
+  const root = LIVING_ROOT_ITEMS.findIndex(i => i.id === name || i.displayName === name);
+  if (root >= 0) {
+    const leaves = ['#6e9165','#b9b472','#83a5b5','#a994b5','#799467'][root]!;
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges"><path fill="' + leaves + '" d="M5 4h6v4H5zM13 2h5v7h-5zM10 6h4v7h-4z"/><path fill="#a68c65" d="M10 12h4v5h-4zM7 16h3v6H7zM14 16h3v5h-3zM10 19h3v4h-3z"/><path fill="#d2b78b" d="M11 12h2v4h-2z"/></svg>';
+    return { assetPath: 'living:root:' + root, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup), cellWidth: 24, cellHeight: 24, sourceWidth: 24, sourceHeight: 24, columns: 1, index: 0 };
+  }
   const living=LIVING_ITEMS.findIndex(i=>i.id===name||i.displayName===name);
   if(living>=0)return {assetPath:'assets/livingworld/items.svg',url:LIVING_ITEM_URL,cellWidth:24,cellHeight:24,sourceWidth:696,sourceHeight:24,columns:29,index:living};
   const byId=PHASE1_ITEM_IDS.indexOf(name as (typeof PHASE1_ITEM_IDS)[number]);

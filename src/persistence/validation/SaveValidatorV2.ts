@@ -1,6 +1,7 @@
 import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
-import {acceptsLegacyCatalog} from '../../content/phase1/Phase1Catalog';
+import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog} from '../../content/phase1/Phase1Catalog';
+import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
@@ -158,7 +159,7 @@ function sameContentIdentity(
   if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
-  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint)) {
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint)) {
     return saveFailure('CONTENT_FINGERPRINT_MISMATCH', 'Saved content fingerprint does not match the active catalog.');
   }
   return null;
@@ -951,7 +952,8 @@ function globalCrossReferences(
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
   const living=bundle.world.livingWorld;
-  if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>LIVING_ITEMS.some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
+  if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ITEMS,...LIVING_ROOT_ITEMS].some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
+  if(acceptsPreviousLivingCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && bundle.containers.some(c=>c.stacks.some(s=>LIVING_ROOT_ITEMS.some(i=>i.id===s.itemDefinitionId)))) return saveFailure('CORRUPT_RECORD', 'Prior living catalog cannot contain newly introduced roots.');
   if(living&&(living.plots.some(p=>!players.has(p.owner))||living.animals.some(a=>a.owner&&!players.has(a.owner))||living.stations.some(s=>!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===s.id))||living.animals.some(a=>a.pen&&!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===a.pen))))return saveFailure('CORRUPT_RECORD','Invalid living-world references.');
   const containers = new Map(
     bundle.containers.map((entry) => [entry.containerId, entry]),

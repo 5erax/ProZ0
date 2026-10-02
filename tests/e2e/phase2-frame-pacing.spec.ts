@@ -52,6 +52,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       worldSeed: "p1-world-golden",
       playerIds: ["observer"],
       colonyDepthEnabled: true,
+      singlePlayerExpeditionEnabled: true,
       interactionRangeWorldUnits: 1.25,
       spawnClearanceRadiusWorldUnits: 1.25,
       requiredAccessRadiusWorldUnits: 1.25,
@@ -75,15 +76,12 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
         ...request.world,
         authorityTick: scene.tick,
         environment: { ...request.world.environment, activeTick: scene.tick },
+        singlePlayerExpedition: { ...request.world.singlePlayerExpedition!, nextEventTick: scene.tick + 7200 },
       },
     };
     // A labeled scene fixture accelerates weather setup; all measurements run the real game and authority.
-    expect(
-      validatePortableSaveBundleV2(
-        save,
-        createPhase1SaveV2Compatibility(bundle.catalog, [3]),
-      ).ok,
-    ).toBe(true);
+    const validated = validatePortableSaveBundleV2(save, createPhase1SaveV2Compatibility(bundle.catalog, [request.world.generationVersion]));
+    expect(validated.ok, JSON.stringify(validated)).toBe(true);
     await page.goto("/");
     await page.evaluate(
       async ({ name, save }) => {
@@ -164,7 +162,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       await expect(page.locator('[data-region="world"]')).toContainText('DRY WIND');
     }
     if(scene.weather==='mist-rain'){
-      const rain=page.locator('[data-weather-effect="cold-rain"]');await expect(rain).toBeVisible();const before=await rain.getAttribute('data-rain-motion-phase');const transform=await rain.evaluate(e=>e.style.transform);await page.screenshot({path:resolve(directory,scene.name+'-rain-A.png')});await page.waitForTimeout(200);expect(await rain.getAttribute('data-rain-motion-phase')).not.toBe(before);expect(await rain.evaluate(e=>e.style.transform)).not.toBe(transform);await page.screenshot({path:resolve(directory,scene.name+'-rain-B.png')});
+      const rain=page.locator('[data-weather-effect="cold-rain"]');await expect(rain).toBeVisible();const before=await rain.getAttribute('data-rain-motion-phase');const pixels=await rain.screenshot();await page.screenshot({path:resolve(directory,scene.name+'-rain-A.png')});await page.waitForTimeout(200);expect(await rain.getAttribute('data-rain-motion-phase')).not.toBe(before);expect(await rain.screenshot()).not.toEqual(pixels);await page.screenshot({path:resolve(directory,scene.name+'-rain-B.png')});
     }
     await page.waitForTimeout(500);
     await page.screenshot({ path: resolve(directory, scene.name + ".png") });
