@@ -39,6 +39,7 @@ export function worldSliceChunkToRecordV2(
     predatorStates: Object.freeze((extras.predatorStates ?? []).map((entry) => Object.freeze({
       ...entry,
       encounterAnchor: Object.freeze({ ...entry.encounterAnchor }),
+      ...(entry.position?{position:Object.freeze({...entry.position})}:{}),
     }))),
     landmarkStates: Object.freeze(slice.ruinStates.map((entry) => Object.freeze({ ...entry }))),
     exploration: Object.freeze({

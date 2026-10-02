@@ -107,6 +107,8 @@ function predatorRecords(
     bundle.world.exportSnapshot().predators.map((predator) =>
       Object.freeze({
         entityId: predator.entityId,
+        position:Object.freeze({...predator.position}),
+        outsideLeashTicks:predator.outsideLeashTicks,
         revision: predator.revision,
         health: predator.health,
         state: predator.state,

@@ -1458,12 +1458,16 @@ export function createPhase1ProductReviewWorldRenderer(
       const weather = sceneElement('weather:rain');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
+      const rainTime=targetWindow.performance.now();const worldOffset=projectPhase1Isometric(camera,{x:0,y:0});
+      const driftX=Math.floor((rainTime*.012-worldOffset.x*.25)%32),driftY=Math.floor((rainTime*.07-worldOffset.y*.25)%48);
+      weather.style.inset='-48px';weather.style.transform='translate3d('+String(driftX)+'px,'+String(driftY)+'px,0)';weather.style.willChange='transform';
+      weather.dataset.rainMotionPhase=String(driftX)+':'+String(driftY);
       if (rainFrames.length === 4) {
-        const frame = Math.floor(bundle.authorityTick / 6) % 4;
+        const frame = Math.floor(rainTime / 80) % 4;
         if (spriteKeys.get(weather) !== 'rain-frame:' + String(frame)) {
           weather.style.backgroundImage = 'url("' + rainFrames[frame]! + '")';
           weather.style.backgroundSize = '640px 360px';
-          weather.style.backgroundRepeat = 'no-repeat';
+          weather.style.backgroundRepeat = 'repeat';
           spriteKeys.set(weather, 'rain-frame:' + String(frame));
         }
       } else for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {

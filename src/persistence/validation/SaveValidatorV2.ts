@@ -771,7 +771,9 @@ export function validateChunkRecordV2(
         && !nonEmpty(predator.targetPlayerId))
       || !nullableTick(predator.stateUntilTick)
       || !finite(predator.encounterAnchor?.x)
-      || !finite(predator.encounterAnchor?.y)) {
+      || !finite(predator.encounterAnchor?.y)
+      || (predator.position!==undefined&&(!finite(predator.position.x)||!finite(predator.position.y)||Math.hypot(predator.position.x-predator.encounterAnchor.x,predator.position.y-predator.encounterAnchor.y)>32))
+      || (predator.outsideLeashTicks!==undefined&&!nonNegativeInt(predator.outsideLeashTicks))) {
       return saveFailure('CORRUPT_RECORD', 'Chunk predator state is invalid.');
     }
     predatorIds.add(predator.entityId);

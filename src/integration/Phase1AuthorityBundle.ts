@@ -287,10 +287,10 @@ function initialWorldSnapshot(
         state: predator.state,
         targetPlayerId: predator.targetPlayerId,
         stateUntilTick: predator.stateUntilTick,
-        outsideLeashTicks: 0,
+        outsideLeashTicks: predator.outsideLeashTicks ?? 0,
         position: createWorldPosition(
-          predator.encounterAnchor.x,
-          predator.encounterAnchor.y,
+          predator.position?.x ?? predator.encounterAnchor.x,
+          predator.position?.y ?? predator.encounterAnchor.y,
         ),
         encounterAnchor: createWorldPosition(
           predator.encounterAnchor.x,
@@ -554,6 +554,8 @@ export class Phase1AuthorityBundle {
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
+      expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
+      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>f.definitionId==='camp-bed'&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
       colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
@@ -926,6 +928,14 @@ export class Phase1AuthorityBundle {
     this.processPendingDeaths(authorityTick);
     this.processPendingRespawns(authorityTick);
     this.expedition?.tick();
+    if(this.expedition && predator){const state=this.world.getPredator(predator.entityId);
+      if(state?.state==='chase'&&state.targetPlayerId)this.world.movePredatorToward(state.entityId,this.getPlayerPosition(state.targetPlayerId),2.1);
+      else if(state?.state==='return')this.world.movePredatorToward(state.entityId,state.encounterAnchor,2.4);
+      else if(state?.state==='idle'||state?.state==='patrol'){
+        const phase=Math.floor(authorityTick/240)%8,angle=phase*Math.PI/4,radius=this.expedition.currentEvent(state.position)==='wildlife-drift'?2.6:1.5;
+        this.world.movePredatorToward(state.entityId,createWorldPosition(state.encounterAnchor.x+Math.cos(angle)*radius,state.encounterAnchor.y+Math.sin(angle)*radius),1.1);
+      }
+    }
   }
 
   public getLastGatherResult(

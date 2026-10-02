@@ -9,6 +9,9 @@ it('reopens solo construction escrow and rejects multiplayer or foreign-owner ex
   // Placement is a labelled subsystem fixture; natural exploration is verified separately.
   let placed=false;for(const [x,y] of [[3,0],[-3,0],[0,3],[0,-3],[2,2],[-2,-2]]){
   const plan=bundle.expedition!.execute({id:'plan',playerId:'solo',expectedRevision:0,expectedInventoryRevision:bundle.items.getContainerView('inventory:solo').revision,action:'plan',target:'supply-cache',x:x!,y:y!});if(plan.status==='committed'){placed=true;break;}}expect(placed,JSON.stringify(bundle.expedition!.read())).toBe(true);
+  expect(bundle.items.commitColonyExchange({operationId:'fixture-materials',playerId:'solo',expectedInventoryRevision:bundle.items.getContainerView('inventory:solo').revision,inputs:[],outputs:[{itemDefinitionId:'item:timber',quantity:10},{itemDefinitionId:'item:timber',quantity:5},{itemDefinitionId:'item:stone',quantity:20},{itemDefinitionId:'item:plant-fiber',quantity:2}]}).status).toBe('committed');
+  expect(bundle.expedition!.execute({id:'deposit',playerId:'solo',expectedRevision:bundle.expedition!.read().revision,expectedInventoryRevision:bundle.items.getContainerView('inventory:solo').revision,action:'deposit',target:'plan:plan'}).status).toBe('committed');
+  expect(bundle.items.getContainerView('inventory:solo').totalWeightKg).toBeGreaterThan(25);
   const request=composePhase1SaveV2(bundle,{nowUtc:'2026-10-02T00:00:00.000Z'});
   const portable={formatId:SAVE_FORMAT_ID,schemaVersion:SAVE_SCHEMA_VERSION_V2,recordKind:'portable-bundle' as const,world:request.world,players:request.players,containers:request.containers,chunks:request.chunks,footholds:request.footholds,structures:request.structures};
   const compatibility=createPhase1SaveV2Compatibility(bundle.catalog,[request.world.generationVersion]);

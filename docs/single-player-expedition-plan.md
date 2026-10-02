@@ -132,5 +132,6 @@ Prioritize split-stack/quick-transfer storage, discovered outpost map naming, li
 | SP-04 | COMMITTED | `a6f8c9c`; 15 targeted construction/items/colony tests PASS; typecheck/lint | Custom facility functions and browser journey pending SP-05/SP-10 |
 | SP-05 | COMMITTED | `dc089c7`; 9 targeted facilities/rest/save/colony tests PASS; typecheck/lint | Rest does not skip night; transient rest cancels on reload; buffer/cooldown/claimed supplies persist |
 | SP-06 | COMMITTED | `a5f6eb5`; 7 generation determinism tests PASS; typecheck/lint | Starter landmarks remain intentional; no generator-version change or old-world terrain reroll |
-| SP-07/SP-08 | IMPLEMENTED; verification in progress | Solo renewal factors and saved bounded regional events | Event combinations affect resource renewal; old depleted-node deadlines remain valid, offline time stays paused; wildlife movement effect integrated in SP-09 |
-| SP-09–SP-10 | PLANNED | No implementation claimed | Execute dependency order; update ledger in each meaningful commit |
+| SP-07/SP-08 | COMMITTED | `e7d4ba4`; 9 targeted ecology/renewal/world-store tests PASS; typecheck/lint | Event combinations affect resource renewal; old depleted-node deadlines remain valid, offline time stays paused; wildlife movement effect integrated in SP-09 |
+| SP-09 | IMPLEMENTED; verification in progress | Real patrol/chase/return with land/facility checks; optional persisted predator position; time/camera rain drift | 22 targeted combat/save tests PASS; browser rain/performance pending SP-10 |
+| SP-10 | IN PROGRESS | Integration and browser evidence pending | Full required checks before release; preserve co-op/human gates |

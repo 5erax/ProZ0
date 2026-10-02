@@ -12,7 +12,7 @@ export function createExpeditionOverlay(root:HTMLElement,canvas:HTMLCanvasElemen
  const layer=document.createElement('section');layer.className='sp-expedition';layer.setAttribute('aria-label','Expedition construction');
  const markers=document.createElement('div'),panel=document.createElement('section'),hint=document.createElement('div');panel.className='sp-expedition-panel';hint.className='sp-placement-hint';panel.hidden=true;hint.hidden=true;layer.append(style,markers,panel,hint);root.append(layer);
  let opened=false,feedback='',signature='',placement:{definition:string;planId?:string;orientation:0|1|2|3}|null=null;
- const close=()=>{opened=false;panel.hidden=true;root.dataset.expeditionPanelOpen='false';};
+ const close=()=>{authority.cancelRest(playerId);opened=false;panel.hidden=true;root.dataset.expeditionPanelOpen='false';};
  const button=(label:string,run:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.addEventListener('click',e=>{e.stopPropagation();run();});return b;};
  const text=(tag:'p'|'h2'|'small',value:string)=>{const e=document.createElement(tag);e.textContent=value;return e;};
  const run=(action:ExpeditionCommand['action'],target:string,extra:Partial<ExpeditionCommand>={})=>{
