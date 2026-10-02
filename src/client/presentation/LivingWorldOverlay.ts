@@ -9,6 +9,7 @@ import {
 } from '../../content/livingworld/LivingWorldContent';
 import { livingArt } from './LivingWorldArt';
 import { LivingMotion } from './LivingMotion';
+import { worldDepthOrder } from './WorldDepth';
 import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
@@ -282,7 +283,7 @@ export function createLivingWorldOverlay(
       b.dataset.livingRole = role;
       b.dataset.livingKind = kind;
       b.dataset.livingYoung = String(young);
-      b.style.zIndex = String(Math.round((displayed.x + displayed.y) * 1000));
+      b.style.zIndex = worldDepthOrder(displayed);
       b.setAttribute(
         'aria-label',
         role === 'plot'

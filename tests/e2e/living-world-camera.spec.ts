@@ -11,6 +11,7 @@ test('living plants share the terrain raster anchor through continuous camera mo
   const before = await retained.evaluate(element => ({ left: (element as HTMLElement).style.left, top: (element as HTMLElement).style.top, stage: !!element.closest('.p1-product-world-stage') }));
   expect(before.stage).toBe(true);
   const cameraBefore = await page.locator('.p1-product-world-stage').evaluate(element => (element as HTMLElement).style.transform);
+  await expect(page.locator('[data-world-role="player"]')).toHaveCSS('z-index', '100000');
   for (const direction of ['d', 's', 'a', 'w']) {
     await page.keyboard.down(direction);
     const anchors = await retained.evaluate(async element => {
@@ -25,6 +26,18 @@ test('living plants share the terrain raster anchor through continuous camera mo
     await page.keyboard.up(direction);
     expect(new Set(anchors)).toEqual(new Set([before.left + ':' + before.top]));
   }
+  const stableOrder = await page.locator('.p1-product-world-stage').evaluate(async stage => {
+    const plant = stage.querySelector<HTMLElement>('.lw-object[data-living-role="forage"]');
+    const lab = stage.querySelector<HTMLElement>('[data-world-role="structure"][data-world-id="structure-instance:landing-module"]');
+    if (!plant || !lab) throw Error('Missing static plant/lab anchors');
+    const differences: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      differences.push(Number(getComputedStyle(plant).zIndex) - Number(getComputedStyle(lab).zIndex));
+    }
+    return differences;
+  });
+  expect(new Set(stableOrder).size).toBe(1);
   await page.keyboard.down('d');
   await page.keyboard.down('s');
   await page.waitForTimeout(250);
