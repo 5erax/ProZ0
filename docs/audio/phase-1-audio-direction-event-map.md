@@ -1,5 +1,7 @@
 # P1-AUD-001 — Phase 1 Audio Direction and Event Map
 
+> Runtime policy update (Owner, 2026-10-02): this is a historical handoff. Its event map no longer authorizes live game cues. Requirements19–20 / #233–234 disable existing ambience/SFX; only the supplied rain OGG is currently approved. See assets/phase2/audio/README.md and docs/phase2-rain-audio-handoff.vi.md. Opt-in player voice chat remains communication.
+
 **Task:** P1-AUD-001  
 **Source Issue:** #79  
 **Role:** Audio Designer / Composer  

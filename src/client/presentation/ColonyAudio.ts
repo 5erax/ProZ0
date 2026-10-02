@@ -1,109 +1,111 @@
-import type { ColonyBiomeId } from "../../content/phase2/ColonyDepthContent";
-const urls = Object.freeze({
-  "landing-grassland": new URL(
-    "../../../assets/phase2/audio/landing.wav",
-    import.meta.url,
-  ).href,
-  "mist-marsh": new URL(
-    "../../../assets/phase2/audio/marsh.wav",
-    import.meta.url,
-  ).href,
-  "ochre-badlands": new URL(
-    "../../../assets/phase2/audio/badlands.wav",
-    import.meta.url,
-  ).href,
-  research: new URL(
-    "../../../assets/phase2/audio/research.wav",
-    import.meta.url,
-  ).href,
-  inspect: new URL("../../../assets/phase2/audio/inspect.wav", import.meta.url)
-    .href,
-});
+import type { ColonyWeather } from '../../world/phase2/ColonyRegions';
+
+// Owner policy: silence except this explicitly supplied rain loop.
+// Do not restore biome/UI/action cues without a new sound-design request.
+const rainUrl = new URL(
+  '../../../assets/phase2/audio/owner-rain-loop.ogg',
+  import.meta.url,
+).href;
 export function createColonyAudio(parent: HTMLElement): {
-  region(biome: ColonyBiomeId): void;
-  cue(kind: "research" | "inspect"): void;
+  weather(weather: ColonyWeather): void;
   destroy(): void;
 } {
   const document = parent.ownerDocument;
-  const target = document.defaultView!;
-  const ambience = new target.Audio(),
-    cue = new target.Audio();
-  ambience.loop = true;
-  ambience.preload = "none";
-  cue.preload = "none";
-  let enabled = false,
-    volume = 0.35,
-    current: ColonyBiomeId = "landing-grassland",
-    destroyed = false;
-  const controls = document.createElement("div");
-  controls.className = "p2-audio-controls";
-  const button = document.createElement("button");
-  button.textContent = "Enable sound";
-  button.setAttribute("aria-pressed", "false");
-  const slider = document.createElement("input");
-  slider.type = "range";
-  slider.min = "0";
-  slider.max = "1";
-  slider.step = ".05";
+  const rain = new document.defaultView!.Audio();
+  rain.loop = true;
+  rain.preload = 'none';
+  rain.dataset.colonyRainAudio = '';
+  let enabled = false;
+  let raining = false;
+  let volume = 0.35;
+  let destroyed = false;
+  let generation = 0;
+  const controls = document.createElement('div');
+  controls.className = 'p2-audio-controls';
+  const button = document.createElement('button');
+  button.type = 'button';
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = '1';
+  slider.step = '.05';
   slider.value = String(volume);
-  slider.setAttribute("aria-label", "Sound volume");
-  slider.style.width = "80px";
+  slider.setAttribute('aria-label', 'Sound volume');
+  slider.style.width = '80px';
+  const status = document.createElement('span');
+  status.setAttribute('role', 'status');
+  status.dataset.rainAudioStatus = '';
   const update = (): void => {
-    ambience.volume = enabled ? volume * 0.45 : 0;
-    cue.volume = enabled ? volume : 0;
-    button.textContent = enabled ? "Mute sound" : "Enable sound";
-    button.setAttribute("aria-pressed", String(enabled));
+    rain.volume = enabled && raining ? volume : 0;
+    button.textContent = enabled ? 'Mute sound' : 'Enable sound';
+    button.setAttribute('aria-pressed', String(enabled));
+    controls.dataset.rainActive = String(enabled && raining);
+  };
+  const stop = (): void => {
+    generation++;
+    rain.pause();
+    rain.currentTime = 0;
+  };
+  const unavailable = (request: number): void => {
+    if (destroyed || request !== generation) return;
+    enabled = false;
+    stop();
+    update();
+    status.textContent = 'Rain audio unavailable. Enable sound to retry.';
   };
   const play = (): void => {
-    if (destroyed || !enabled) return;
-    void ambience.play().catch(() => {
-      if (!destroyed) {
-        enabled = false;
-        update();
-      }
-    });
+    const request = ++generation;
+    // Prime inside Enable's gesture, silently if clear; weather resumes later.
+    void rain
+      .play()
+      .then(() => {
+        if (destroyed || request !== generation) return;
+        if (!enabled || !raining) {
+          rain.pause();
+          rain.currentTime = 0;
+        }
+      })
+      .catch(() => unavailable(request));
   };
-  button.addEventListener("click", () => {
+  const toggle = (): void => {
+    if (destroyed) return;
     enabled = !enabled;
-    if (enabled && ambience.src === "") ambience.src = urls[current];
+    status.textContent = '';
     update();
-    if (enabled) play();
-    else {
-      ambience.pause();
-      cue.pause();
-    }
-  });
-  slider.addEventListener("input", () => {
-    volume = Number(slider.value);
+    if (enabled) {
+      if (!rain.hasAttribute('src')) rain.src = rainUrl;
+      play();
+    } else stop();
+  };
+  const changeVolume = (): void => {
+    volume = Math.min(1, Math.max(0, Number(slider.value)));
     update();
-  });
-  controls.append(button, slider);
+  };
+  const error = (): void => unavailable(generation);
+  button.addEventListener('click', toggle);
+  slider.addEventListener('input', changeVolume);
+  rain.addEventListener('error', error);
+  controls.append(button, slider, status, rain);
   parent.append(controls);
   update();
   return {
-    region(biome) {
-      if (biome === current) return;
-      current = biome;
-      if (enabled) {
-        ambience.src = urls[current];
-        play();
-      }
-    },
-    cue(kind) {
-      if (!enabled || destroyed) return;
-      cue.pause();
-      cue.src = urls[kind];
-      cue.currentTime = 0;
-      void cue.play().catch(() => {});
+    weather(weather) {
+      if (destroyed || raining === (weather === 'mist-rain')) return;
+      raining = weather === 'mist-rain';
+      update();
+      if (enabled && raining) play();
+      else stop();
     },
     destroy() {
+      if (destroyed) return;
       destroyed = true;
-      ambience.pause();
-      cue.pause();
-      ambience.removeAttribute("src");
-      cue.removeAttribute("src");
-      ambience.load();
-      cue.load();
+      enabled = false;
+      stop();
+      rain.removeEventListener('error', error);
+      button.removeEventListener('click', toggle);
+      slider.removeEventListener('input', changeVolume);
+      rain.removeAttribute('src');
+      rain.load();
       controls.remove();
     },
   };

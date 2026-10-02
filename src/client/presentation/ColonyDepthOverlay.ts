@@ -85,8 +85,6 @@ export function createColonyDepthOverlay(
         : result.reason.replaceAll("_", " ");
     signature = "";
     render();
-    if (result.status === "committed")
-      audio.cue(action === "inspect-site" ? "inspect" : "research");
   };
   const addButton = (
     parent: HTMLElement,
@@ -111,7 +109,7 @@ export function createColonyDepthOverlay(
       position,
       bundle.authorityTick,
     );
-    audio.region(weather.biomeId);
+    audio.weather(weather.weather);
     const key =
       String(Math.floor(position.x / 64)) +
       ":" +

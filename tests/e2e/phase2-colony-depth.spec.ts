@@ -82,9 +82,7 @@ test("colony exploration: real gathering funds research; walking reveals and ins
     "ready",
   );
   await expect(page).toHaveTitle("ProZ0 — Colony depth");
-  const sound = page.waitForResponse((response) =>
-    /landing.*\.wav/.test(response.url()),
-  );
+  const sound = page.waitForResponse((response) => /owner-rain-loop.*\.ogg/.test(response.url()));
   await page.getByRole('button',{name:'Settings',exact:true}).click();
   await page.getByRole("button", { name: "Enable sound", exact: true }).click();
   expect((await sound).ok()).toBe(true);
