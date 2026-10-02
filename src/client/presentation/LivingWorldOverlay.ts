@@ -7,6 +7,9 @@ import {
   forageDefinition,
   soilAt,
 } from '../../content/livingworld/LivingWorldContent';
+import { livingArt } from './LivingWorldArt';
+import { LivingMotion } from './LivingMotion';
+import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
 import type { LivingCommand } from '../../simulation/livingworld/LivingWorldAuthority';
 import {
   projectPhase1Isometric,
@@ -47,15 +50,20 @@ export function createLivingWorldOverlay(
   hint.className = 'lw-hint';
   hint.hidden = true;
   style.textContent =
-    '.p1-product-terrain[data-soil]::after{content:"";position:absolute;left:42%;top:48%;width:9px;height:3px;opacity:.3;pointer-events:none;background:var(--soil-color)}.p1-product-terrain[data-soil=loam]{--soil-color:#9d9a71}.p1-product-terrain[data-soil=sand]{--soil-color:#d1b679}.p1-product-terrain[data-soil=clay]{--soil-color:#b28471}.p1-product-terrain[data-soil=peat]{--soil-color:#537161}.p1-product-terrain[data-soil=rocky]{--soil-color:#acb4aa}[data-living-season=winter] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #aec9ca44}[data-living-season=autumn] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #d0a66d33}.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:58px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;transform:translate(-50%,-85%);border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;filter:drop-shadow(0 2px 1px #112a30)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:50px}.lw-season{top:95px}}';
-  layer.append(style, markers, season, panel, ghost, hint);
+    '.p1-product-terrain[data-soil]::after{content:"";position:absolute;left:42%;top:48%;width:9px;height:3px;opacity:.3;pointer-events:none;background:var(--soil-color)}.p1-product-terrain[data-soil=loam]{--soil-color:#9d9a71}.p1-product-terrain[data-soil=sand]{--soil-color:#d1b679}.p1-product-terrain[data-soil=clay]{--soil-color:#b28471}.p1-product-terrain[data-soil=peat]{--soil-color:#537161}.p1-product-terrain[data-soil=rocky]{--soil-color:#acb4aa}[data-living-season=winter] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #aec9ca44}[data-living-season=autumn] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #d0a66d33}.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:58px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:50px}.lw-season{top:95px}}';
+  const worldStage = root.querySelector<HTMLElement>('.p1-product-world-stage');
+  if (!worldStage) throw new Error('Living presentation requires the canonical world stage.');
+  const rasterOrigin = { x: Number(worldStage.dataset.rasterOriginX), y: Number(worldStage.dataset.rasterOriginY) };
+  markers.style.display = 'contents';
+  worldStage.append(markers);
+  const motion = new LivingMotion();
+  layer.append(style, season, panel, ghost, hint);
   root.append(layer, menu);
   let opened = false,
     placing = false,
     feedback = '',
     focus = '',
     signature = '',
-    lastFrame = 0,
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -160,46 +168,8 @@ export function createLivingWorldOverlay(
     hint.hidden = false;
     hint.textContent = 'Click explored dry ground within 4 m · Escape cancel';
   };
-  const art = (role: string, kind: string, progress = 0): SVGSVGElement => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 32 32');
-    svg.setAttribute('shape-rendering', 'crispEdges');
-    // Authored pixel silhouettes: identifiable species and crop stages, no text-only world props.
-    const bodies: Record<string, string> = {
-      chicken:
-        '<path fill="#e7d7a1" d="M9 14h13v10H9zM19 9h7v11h-7z"/><path fill="#c87557" d="M20 6h5v4h-5z"/><path fill="#e5b768" d="M25 13h5v3h-5zM12 24h2v5h-2zM20 24h2v5h-2z"/>',
-      rabbit:
-        '<path fill="#b5b5aa" d="M7 17h16v9H7zM19 11h9v12h-9zM19 3h3v10h-3zM25 2h3v11h-3z"/><path fill="#eee6ca" d="M4 20h5v5H4z"/>',
-      goat: '<path fill="#bfc1a5" d="M5 13h19v10H5zM21 8h8v13h-8zM7 23h3v6H7zM20 23h3v6h-3z"/><path fill="#cfa778" d="M22 4h2v5h-2zM27 3h2v6h-2z"/>',
-      boar: '<path fill="#967359" d="M4 14h21v11H4zM22 18h8v5h-8zM7 25h3v4H7zM21 25h3v4h-3zM23 10h3v5h-3z"/>',
-      fox: '<path fill="#c68d56" d="M7 16h17v8H7zM22 10h7v12h-7zM21 5h3v7h-3zM27 5h3v7h-3zM2 12h6v10H2zM9 24h3v5H9zM20 24h3v5h-3z"/><path fill="#e6dfb9" d="M1 11h4v5H1z"/>',
-      wolf: '<path fill="#879594" d="M5 14h20v10H5zM22 8h8v13h-8zM23 3h3v7h-3zM28 4h3v7h-3zM2 13h5v7H2zM8 24h3v5H8zM21 24h3v5h-3z"/>',
-    };
-    if (role === 'animal')
-      svg.innerHTML =
-        '<path fill="#162c31" opacity=".6" d="m2 27 14-5 14 5-14 4z"/>' +
-        bodies[kind] +
-        '<path fill="#162a31" d="M25 13h2v2h-2z"/>';
-    else if (role === 'plot')
-      svg.innerHTML =
-        '<path fill="#6e6249" d="m2 24 14-8 14 8-14 7z"/><path stroke="#ae9363" d="m7 23 9 5 9-5m-14-4 9 5"/>' +
-        (kind === 'empty'
-          ? ''
-          : `<path fill="${kind === 'dead' ? '#9f8562' : kind === 'herb' ? '#a6b582' : '#85aa61'}" d="M14 ${Math.max(6, 22 - progress * 14)}h4v15h-4zM8 15h8v4H8zM17 12h8v4h-8z"/>`);
-    else
-      svg.innerHTML =
-        kind === 'clay-bank' || kind === 'salt-stone'
-          ? `<path fill="${kind === 'clay-bank' ? '#b48766' : '#d5d8bd'}" d="m4 23 6-12h12l7 12-12 5z"/><path fill="#819390" d="M10 16h6v3h-6z"/>`
-          : '<path fill="#506b4c" d="M5 19h22v9H5z"/><path fill="#88a565" d="M8 11h5v12H8zM18 7h5v16h-5z"/>' +
-            (kind === 'berry-bush'
-              ? '<path fill="#b78587" d="M9 14h3v3H9zM20 12h3v3h-3z"/>'
-              : '<path fill="#b9c080" d="M6 11h8v3H6zM16 7h8v3h-8z"/>');
-    return svg;
-  };
   const render = () => {
     const now = performance.now();
-    if (now - lastFrame < 50 && signature) return;
-    lastFrame = now;
     if (root.dataset.colonySettingsOpen === 'true') {
       close();
       placing = false;
@@ -221,11 +191,10 @@ export function createLivingWorldOverlay(
       const t = bundle.authorityTick / 60,
         wx = Math.floor(p.x / 16) * 16 + ((i * 7 + t * 0.35) % 24) - 4,
         wy = Math.floor(p.y / 16) * 16 + ((i * 11 + t * 0.55) % 24) - 4,
-        at = projectPhase1Isometric({ x: wx, y: wy }, p);
-      e.style.left =
-        rect.left - base.left + ((at.x + 320) * rect.width) / 640 + 'px';
-      e.style.top =
-        rect.top - base.top + ((at.y + 165) * rect.height) / 360 + 'px';
+        at = projectPhase1Isometric({ x: wx, y: wy }, rasterOrigin);
+      e.style.left = at.x + 320 + 'px';
+      e.style.top = at.y + 165 + 'px';
+      e.style.zIndex = '780000';
       e.style.background = s.id === 'winter' ? '#c2dbdf' : '#caa578';
       e.dataset.motionPhase = String(Math.floor(t * 10));
     }
@@ -246,6 +215,7 @@ export function createLivingWorldOverlay(
         kind: e.dead ? 'dead' : (e.crop ?? 'empty'),
         progress: e.crop ? e.progress / cropDefinition(e.crop)!.cycleTicks : 0,
         dead: e.dead,
+        young: false, anchor: '',
       })),
       ...state.forage
         .filter((f) => !f.cleared)
@@ -255,6 +225,7 @@ export function createLivingWorldOverlay(
           kind: e.kind,
           progress: 0,
           dead: e.readyTick > bundle.authorityTick,
+          young: false, anchor: '',
         })),
       ...state.animals.map((e) => ({
         e,
@@ -262,16 +233,20 @@ export function createLivingWorldOverlay(
         kind: e.species,
         progress: 0,
         dead: !e.health,
+        young: e.age < speciesDefinition(e.species)!.matureSeconds * 60,
+        anchor: e.pen ?? `${e.anchorX}:${e.anchorY}`, 
       })),
     ];
-    for (const { e, role, kind, progress, dead } of objects) {
+    for (const { e, role, kind, progress, dead, young, anchor } of objects) {
       if (Math.hypot(e.x - p.x, e.y - p.y) > 16 || visible.size >= 64) continue;
-      const at = projectPhase1Isometric(e, p);
+      if (!worldPositionKnown(bundle, e)) continue;
+      const displayed = motion.position(e.id, e, state.lastTick, now, anchor, role === 'animal' && !dead);
+      const at = projectPhase1Isometric(displayed, p);
       if (
-        at.x + 320 < 0 ||
-        at.x + 320 > 640 ||
-        at.y + 180 < 0 ||
-        at.y + 180 > 360
+        at.x + 320 < -48 ||
+        at.x + 320 > 688 ||
+        at.y + 180 < -48 ||
+        at.y + 180 > 408
       )
         continue;
       visible.add(e.id);
@@ -288,13 +263,19 @@ export function createLivingWorldOverlay(
         objectNodes.set(e.id, b);
         markers.append(b);
       }
-      const key = role + kind + Math.floor(progress * 3);
+      const key = [role, kind, Math.min(2, Math.floor(progress * 3)), young, dead].join(':');
+      const definition = livingArt(role, kind, progress, young, dead);
       if (b.dataset.art !== key) {
-        b.replaceChildren(art(role, kind, progress));
+        b.innerHTML = definition.markup;
         b.dataset.art = key;
+        const svg = b.querySelector('svg')!;
+        svg.style.cssText = `position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:${definition.width}px;height:${definition.height}px`;
       }
       b.dataset.dead = String(dead);
-      b.style.zIndex = role === 'plot' ? '3' : role === 'animal' ? '2' : '1';
+      b.dataset.livingRole = role;
+      b.dataset.livingKind = kind;
+      b.dataset.livingYoung = String(young);
+      b.style.zIndex = String(Math.round((displayed.x + displayed.y) * 1000));
       b.setAttribute(
         'aria-label',
         role === 'plot'
@@ -303,18 +284,21 @@ export function createLivingWorldOverlay(
             ? speciesDefinition(kind)!.name
             : forageDefinition(kind)!.name,
       );
-      b.style.left =
-        rect.left - base.left + ((at.x + 320) * rect.width) / 640 + 'px';
-      b.style.top =
-        rect.top - base.top + ((at.y + 180) * rect.height) / 360 + 'px';
-      b.style.width = (32 * rect.width) / 640 + 'px';
-      b.style.height = (32 * rect.height) / 360 + 'px';
+      b.title = b.getAttribute('aria-label') ?? '';
+      const raster = projectPhase1Isometric(displayed, rasterOrigin);
+      // Foot pivot at 50/64 of the authored canvas, shared with terrain's raster origin.
+      const hitWidth = Math.max(24, definition.width), hitHeight = Math.max(24, definition.height);
+      b.style.left = raster.x + 320 - hitWidth / 2 + 'px';
+      b.style.top = raster.y + 180 - definition.height * 50 / 64 - (hitHeight - definition.height) + 'px';
+      b.style.width = hitWidth + 'px';
+      b.style.height = hitHeight + 'px';
     }
     for (const [id, b] of objectNodes)
       if (!visible.has(id)) {
         b.remove();
         objectNodes.delete(id);
       }
+    motion.retain(visible);
     if (placing && cursor) {
       const point = unprojectPhase1Isometric(
           {
@@ -687,11 +671,14 @@ export function createLivingWorldOverlay(
   return {
     open,
     close,
+    cancelPlacement: () => { if (placing) close(); },
     render,
     destroy: () => {
       root.removeEventListener('pointermove', pointer);
       root.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key, true);
+      markers.remove();
+      motion.clear();
       layer.remove();
       menu.remove();
     },

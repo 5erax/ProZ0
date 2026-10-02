@@ -1,0 +1,20 @@
+import { expect, it } from 'vitest';
+import { installGameContextMenu } from '../../src/client/input/GameContextMenu';
+it('owns secondary clicks only inside the game, preserves editing menus, and removes handlers on teardown', () => {
+  const root = document.createElement('section'), sprite = document.createElement('img'), input = document.createElement('input'), chat = document.createElement('div');
+  chat.contentEditable = 'true';
+  root.append(sprite, input, chat); document.body.append(root);
+  let cancelled = 0;
+  const remove = installGameContextMenu(root, () => cancelled++);
+  const context = (target: HTMLElement) => { const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); target.dispatchEvent(event); return event.defaultPrevented; };
+  expect(context(sprite)).toBe(true);
+  expect(cancelled).toBe(1);
+  expect(context(input)).toBe(false);
+  expect(context(chat)).toBe(false);
+  expect(context(document.body)).toBe(false);
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true }); sprite.dispatchEvent(drag); expect(drag.defaultPrevented).toBe(true);
+  remove();
+  expect(context(sprite)).toBe(false);
+  expect(cancelled).toBe(1);
+  root.remove();
+});

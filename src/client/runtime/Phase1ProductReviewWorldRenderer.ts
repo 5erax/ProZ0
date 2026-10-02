@@ -369,7 +369,7 @@ function explorationCellKnown(
   );
 }
 
-function worldPositionKnown(
+export function worldPositionKnown(
   bundle: Phase1AuthorityBundle,
   position: WorldPosition,
 ): boolean {
@@ -561,6 +561,8 @@ export function createPhase1ProductReviewWorldRenderer(
   worldStage.style.cssText = 'position:absolute;inset:0;will-change:transform;';
   layer.append(worldStage);
   const rasterOrigin = bundle.getPlayerPosition(playerId);
+  worldStage.dataset.rasterOriginX = String(rasterOrigin.x);
+  worldStage.dataset.rasterOriginY = String(rasterOrigin.y);
   const rainFrames: string[] = [];
   const rainAtlas = document.createElement('img');
   rainAtlas.addEventListener('load', () => {

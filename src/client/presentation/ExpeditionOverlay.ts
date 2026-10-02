@@ -815,6 +815,7 @@ export function createExpeditionOverlay(
   return {
     open,
     close,
+    cancelPlacement: () => { if (placement) close(); },
     render,
     destroy() {
       root.removeEventListener('pointermove', pointer);

@@ -1,4 +1,5 @@
 import { COLONY_ACTIONS } from "../../simulation/sustenance/ColonySustenanceAuthority";
+import { installGameContextMenu } from '../input/GameContextMenu';
 import type { FacingDirection } from "../../simulation";
 import { phase1IsometricFacing } from "./Phase1IsometricProjection";
 import { createColonyAudio } from "../presentation/ColonyAudio";
@@ -1686,11 +1687,13 @@ export async function bootColonyCoop(
       }
   }
   connect();
+  const removeContextMenu = installGameContextMenu(root);
   render();
   document.title = "ProZ0 — Private colony co-op";
   return {
     destroy() {
       destroyed = true;
+      removeContextMenu();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       clearInterval(inputTimer);
       cancelAnimationFrame(frame);

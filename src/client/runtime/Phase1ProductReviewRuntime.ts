@@ -1,4 +1,5 @@
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
+import { installGameContextMenu } from '../input/GameContextMenu';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
@@ -2274,6 +2275,17 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   input.start();
+  const removeContextMenu = installGameContextMenu(root, () => {
+    livingOverlay?.cancelPlacement();
+    expeditionOverlay?.cancelPlacement();
+    if (actionPanel === 'build') {
+      actionPanel = null;
+      buildAnchor = null;
+      source.setPresentationPanel(null);
+      refreshWorldPresentationContext();
+      worldRenderer.render();
+    }
+  });
   root.addEventListener('click', onPanelClick);
   root.addEventListener('pointermove', updateBuildPointer);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
@@ -2308,6 +2320,7 @@ export async function createPhase1ProductReviewRuntime(
       destroyed = true;
       host.stop();
       input.stop();
+      removeContextMenu();
       root.removeEventListener('click', onPanelClick);
       root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
