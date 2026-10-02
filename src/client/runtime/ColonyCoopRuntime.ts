@@ -268,7 +268,10 @@ export async function bootColonyCoop(
     const local = connection
       .getPlayerMotions()
       .find((p) => p.playerId === connection?.getPlayerId());
-    if (!local) return;
+    if (!local) {
+      audio.weather("clear");
+      return;
+    }
     const rect = stage.getBoundingClientRect(),
       screenX = ((event.clientX - rect.left) * 640) / rect.width - 320,
       screenY = ((event.clientY - rect.top) * 360) / rect.height - 180;
@@ -1421,7 +1424,10 @@ export async function bootColonyCoop(
     );
     stage.style.transform = "translate(-50%,-50%) scale(" + scale + ")";
     canvas.dataset.displayScale = String(scale);
-    if (!scene || connection?.getState() !== "READY") return;
+    if (!scene || connection?.getState() !== "READY") {
+      audio.weather("clear");
+      return;
+    }
     const motions = connection.getPlayerMotions(),
       local = motions.find((p) => p.playerId === connection?.getPlayerId());
     if (!local) return;
@@ -1458,7 +1464,7 @@ export async function bootColonyCoop(
       connection.replication.getAuthorityTick(),
     );
     canvas.dataset.teammateCount = String(motions.length - 1);
-    audio.region(colonyBiomeAt(scene.worldSeed, local.position));
+
     connectionStatus.textContent = placing
       ? "Click nearby ground to place facility"
       : "CO-OP · " + motions.length + "/3";
@@ -1482,6 +1488,7 @@ export async function bootColonyCoop(
       local.position,
       scene.tick,
     );
+    audio.weather(weather.weather);
     setText(
       region,
       weather.biomeId.replaceAll("-", " ") +

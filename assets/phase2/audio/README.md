@@ -1,5 +1,7 @@
-# Phase 2 runtime audio reuse
+# Owner-approved runtime audio
 
-These five PCM WAV files are extracted byte-for-byte from the repository's accepted Phase 1 family bundles and declared manifest; no external samples or new canon were introduced. `landing.wav`, `badlands.wav`, `marsh.wav` use amb_landing_module, amb_exploration_day and amb_exploration_night respectively. `research.wav` reuses craft_success; `inspect.wav` reuses ruin_inspect. Original provenance: assets/phase1/audio/manifest.json and source issue #80.
+Only owner-rain-loop.ogg is approved for game playback under Owner requirements19–20 (2026-10-02). Source supplied by Owner: mixkit-light-rain-loop-1253-_1_.ogg. Copied without transcoding or edits; 568430 bytes; SHA256 23075b2b3fbca8af77f5d1a0b5f2920cf2778b25eb8fa5cdbebe3c20c501781b. No license claim is inferred from the filename.
 
-The runtime uses one ambient voice plus one cue voice, starts only after Enable sound is clicked, exposes mute and volume, and pauses/releases both on teardown. Actual human listening/masking acceptance is not inferred from metadata or automated playback checks; final product review includes sound.
+The former three biome ambiences and research/inspect cues have been retired from runtime and removed from this directory. Historical Phase1 packs remain archived for provenance; their old event map does not authorize new playback. Voice chat is opt-in player communication and remains available.
+
+Rain uses one loop, starts only after Enable sound, follows local authoritative mist-rain weather in solo and co-op, stops on clear/dry wind/disconnect, and releases its source on teardown. Sound volume/mute remain in Settings. Other game sound additions require an explicit Owner sound-design request.
