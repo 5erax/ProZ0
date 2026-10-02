@@ -58,7 +58,8 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await page.mouse.move((320+(-3-p.x+p.y)*16)*2,(180+(-3-p.x-p.y)*8)*2);
  await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state','VALID');await page.getByRole('button',{name:'Place [Enter]',exact:true}).click();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-built-count','1');await page.keyboard.press('Escape');
- await walk(page,-4,0);await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
+ // Stop inside the real 1.25 m storage range, allowing the helper's 0.65 m arrival radius.
+ await walk(page,-3.3,0);await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
  await page.getByRole('button',{name:'Move one',exact:true}).click();
  const storage=page.locator('[data-inventory-pane="storage"]');
  await expect(storage.getByRole('button',{name:'Stone Field Tool',exact:true})).toContainText('×1');
