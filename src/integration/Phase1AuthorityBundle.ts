@@ -445,11 +445,18 @@ export class Phase1AuthorityBundle {
     }
     this.buildings = buildings;
     this.items = items;
-    this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition):null;
+    this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition,{
+      tick:()=>this.authorityTick,
+      survival:playerId=>survival.getPlayerState(playerId),
+      completeRest:playerId=>survival.completeExpeditionRest(playerId),
+      meal:playerId=>survival.applyExpeditionMeal(playerId),
+      weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
+      hostileNear:(x,y)=>world.getActiveGeneratedEntities().some(e=>{if(e.type!=='hostile')return false;const predator=world.getPredator(e.entityId);return predator!==null&&predator.health>0&&Math.hypot(predator.position.x-x,predator.position.y-y)<8;}),
+    }):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
-    }, config.reopen?.bundle.world.colonyDepth);
+    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
       multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
@@ -916,6 +923,7 @@ export class Phase1AuthorityBundle {
 
     this.processPendingDeaths(authorityTick);
     this.processPendingRespawns(authorityTick);
+    this.expedition?.tick();
   }
 
   public getLastGatherResult(

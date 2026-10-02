@@ -25,16 +25,29 @@ export function createExpeditionOverlay(root:HTMLElement,canvas:HTMLCanvasElemen
  const open=()=>{onOpen();opened=true;placement=null;hint.hidden=true;root.dataset.expeditionPanelOpen='true';signature='';render();};
  const render=()=>{
   const state=authority.read(),inventory=bundle.items.getContainerView('inventory:'+playerId);
-  const next=JSON.stringify([opened,state.revision,inventory.revision,feedback]);
+  const rest=authority.restStatus(playerId);const next=JSON.stringify([opened,state.plans,state.facilities.map(({progress,...f})=>({...f,progress:Math.floor(progress/60)})),state.supplyClaimed,inventory.revision,rest?Math.ceil(rest.remainingTicks/60):null,feedback]);
   if(next!==signature){signature=next;panel.hidden=!opened;panel.replaceChildren();
    if(opened){panel.append(text('h2','EXPEDITION · BLUEPRINTS & FIELD CRAFT'),button('Close',close),text('p','Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.'));
     const status=text('p',feedback);status.setAttribute('role','status');panel.append(status);
-    for(const def of EXPEDITION_FACILITIES.filter(d=>d.canonical!==null)){const row=document.createElement('article');row.append(text('p',def.name));costs(row,def.costs);row.append(button('Plan',()=>selectPlacement(def.id)),text('small',def.purpose));panel.append(row);}
+    for(const def of EXPEDITION_FACILITIES){const row=document.createElement('article');row.append(text('p',def.name));costs(row,def.costs);row.append(button('Plan',()=>selectPlacement(def.id)),text('small',def.purpose));panel.append(row);}
     for(const plan of state.plans){const def=expeditionFacility(plan.definitionId)!;const row=document.createElement('article');row.dataset.expeditionPlan=plan.id;row.append(text('p',def.name+' · '+String(plan.x)+', '+String(plan.y)));costs(row,def.costs,plan.paid);row.append(button('Contribute',()=>run('deposit',plan.id)),button('Complete',()=>run('complete',plan.id)),button('Move',()=>selectPlacement(def.id,plan.id)),button('Cancel & refund',()=>run('cancel',plan.id)));panel.append(row);}
+    panel.append(text('h2','FACILITIES & LANDING LAB'));
+    const interact=(target:string,action:'rest'|'supplies'|'cook'|'water')=>{const result=authority.interact({id:'sp-facility:'+crypto.randomUUID(),playerId,target,action,expectedRevision:authority.read().revision,expectedInventoryRevision:bundle.items.getContainerView('inventory:'+playerId).revision});feedback=result.message;signature='';render();};
+    const lab=document.createElement('article');lab.append(text('p','Landing Laboratory'),button('Sleep / rest · 8s',()=>interact('landing-lab','rest')),button('Emergency supplies · once',()=>interact('landing-lab','supplies')),text('small','Recover +15 health / +40 stamina for 5 food + 5 water. Moving, damage or danger cancels rest.'));panel.append(lab);
+    if(rest)panel.append(text('p','Resting · '+String(Math.ceil(rest.remainingTicks/60))+'s remaining'),button('Wake up',()=>{authority.cancelRest(playerId);signature='';render();}));
+    for(const facility of state.facilities){const row=document.createElement('article');row.append(text('p',expeditionFacility(facility.definitionId)!.name));
+     if(facility.definitionId==='camp-bed')row.append(button('Sleep / rest',()=>interact(facility.id,'rest')));
+     if(facility.definitionId==='campfire')row.append(button('Cook meal · 1 plant + 1 water',()=>interact(facility.id,'cook')));
+     if(facility.definitionId==='rain-collector')row.append(button('Collect water · '+String(facility.water)+'/4',()=>interact(facility.id,'water')));
+     if(facility.definitionId==='field-lab')row.append(text('small','Open Research [U] within 4 m'));
+     if(facility.canonicalStructureId)row.append(text('small',facility.definitionId==='supply-cache'?'Open inventory [I] nearby to store stacks':'Use Craft [C] nearby for station recipes'));
+     panel.append(row);
+    }
     panel.append(text('h2','FIELD CRAFT'));
     for(const recipe of EXPEDITION_RECIPES){const row=document.createElement('article');row.append(text('p',recipe.name));costs(row,recipe.costs);if(recipe.station)row.append(text('small','Field Workbench within 2 m'));row.append(button('Craft',()=>{const result=authority.craft({id:'sp-craft:'+crypto.randomUUID(),playerId,recipeId:recipe.id,expectedRevision:authority.read().revision,expectedInventoryRevision:bundle.items.getContainerView('inventory:'+playerId).revision});feedback=result.message;signature='';render();}));panel.append(row);}
    }
    markers.replaceChildren();
+   const labMarker=button('Landing Lab · interact',open);labMarker.className='sp-blueprint sp-outpost';labMarker.dataset.x='0';labMarker.dataset.y='0';markers.append(labMarker);
    for(const plan of state.plans){const marker=button(expeditionFacility(plan.definitionId)!.name+' · blueprint',open);marker.className='sp-blueprint';marker.dataset.planId=plan.id;marker.dataset.x=String(plan.x);marker.dataset.y=String(plan.y);markers.append(marker);}
    for(const facility of state.facilities.filter(f=>f.canonicalStructureId===null)){const marker=button(expeditionFacility(facility.definitionId)!.name,open);marker.className='sp-blueprint sp-outpost';const sprite=document.createElement('span');applyProductionSprite(sprite,PHASE1_PRODUCTION_WORLD_SPRITES.workbench,.5);marker.prepend(sprite);marker.dataset.x=String(facility.x);marker.dataset.y=String(facility.y);markers.append(marker);}
   }

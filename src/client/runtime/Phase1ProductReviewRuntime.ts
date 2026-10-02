@@ -988,6 +988,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginGather = (clickedId?: string): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     if (activeGather !== null) {
       bundle.items.cancelGather(config.localPlayerId);
       activeGather = null;
@@ -1275,6 +1276,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginConsume = (): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     beginConsumeStack(
       source.resolveQuickUseStackId(),
       'V',
@@ -1814,6 +1816,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const attackPredator = (): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     const predator = bundle.world.findGeneratedEntityByDefinition(
       'hostile:territorial-predator',
     );

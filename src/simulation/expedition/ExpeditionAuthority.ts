@@ -8,10 +8,54 @@ export interface ExpeditionCommand {
  readonly action:'plan'|'move'|'deposit'|'complete'|'cancel';readonly target:string;readonly x?:number;readonly y?:number;readonly orientation?:0|1|2|3;
 }
 export interface ExpeditionResult {readonly status:'committed'|'rejected';readonly message:string;}
+export interface ExpeditionServices {
+ tick():number;
+ survival(playerId:string):{healthMilli:number;foodMilli:number;waterMilli:number;lifeState:{type:string}};
+ completeRest(playerId:string):boolean;
+ meal(playerId:string):boolean;
+ weather(x:number,y:number):string;
+ hostileNear(x:number,y:number):boolean;
+}
 export class ExpeditionAuthority {
+ private readonly resting=new Map<string,{target:string;x:number;y:number;start:number;health:number}>();
+ public restStatus(playerId:string):{remainingTicks:number}|null{const rest=this.resting.get(playerId);return rest&&this.services?{remainingTicks:Math.max(0,480-(this.services.tick()-rest.start))}:null;}
+ public hasRemoteLab(playerId:string):boolean{const actor=this.actor(playerId);return this.state.facilities.some(f=>f.definitionId==='field-lab'&&Math.hypot(f.x-actor.x,f.y-actor.y)<=4);}
+ public cancelRest(playerId:string):void{this.resting.delete(playerId);}
+ public tick():void{
+  this.reconcile();if(!this.services)return;const tick=this.services.tick();
+  for(const [playerId,rest] of this.resting){const actor=this.actor(playerId),survival=this.services.survival(playerId);
+   if(!actor.alive||Math.hypot(actor.x-rest.x,actor.y-rest.y)>.05||survival.healthMilli<rest.health||this.services.hostileNear(actor.x,actor.y)||survival.foodMilli<15000||survival.waterMilli<15000){this.resting.delete(playerId);continue;}
+   if(tick-rest.start>=480){this.resting.delete(playerId);if(this.services.completeRest(playerId))this.state=validateExpeditionState({...this.state,revision:this.state.revision+1,restCooldown:{...this.state.restCooldown,[playerId]:tick+1800}});}
+  }
+  let changed=false;const facilities=this.state.facilities.map(f=>{if(f.definitionId!=='rain-collector'||f.water>=4||this.services!.weather(f.x,f.y)!=='mist-rain')return f;changed=true;const progress=f.progress+1;return progress>=3600?{...f,progress:0,water:f.water+1}:{...f,progress};});
+  if(changed)this.state=validateExpeditionState({...this.state,facilities,revision:this.state.revision+1});
+ }
+ public interact(command:{id:string;playerId:string;target:string;action:'rest'|'supplies'|'cook'|'water';expectedRevision:number;expectedInventoryRevision:number}):ExpeditionResult{
+  const reject=(message:string):ExpeditionResult=>({status:'rejected',message});if(!this.services)return reject('SERVICES_UNAVAILABLE');
+  const signature=JSON.stringify(command),receipt=this.state.receipts.find(r=>r.id===command.id);if(receipt)return receipt.signature===signature?{status:'committed',message:receipt.result}:reject('OPERATION_ID_CONFLICT');
+  if(!command.id||command.id.length>120||command.expectedRevision!==this.state.revision)return reject('STALE_REVISION');const actor=this.actor(command.playerId);if(!actor.alive)return reject('PLAYER_DEAD');
+  const facility=this.state.facilities.find(f=>f.id===command.target),lab=command.target==='landing-lab';if(!facility&&!lab)return reject('FACILITY_MISSING');
+  const x=lab?0:facility!.x,y=lab?0:facility!.y;if(Math.hypot(actor.x-x,actor.y-y)>4)return reject('OUT_OF_RANGE');
+  const inventory=this.items.getContainerView('inventory:'+command.playerId);if(inventory.revision!==command.expectedInventoryRevision)return reject('STALE_INVENTORY_REVISION');
+  let next=this.state;let message:string;
+  if(command.action==='rest'){
+   if(!lab&&facility?.definitionId!=='camp-bed')return reject('BED_REQUIRED');if(this.resting.has(command.playerId))return reject('ALREADY_RESTING');const survival=this.services.survival(command.playerId);
+   if((this.state.restCooldown[command.playerId]??0)>this.services.tick())return reject('REST_COOLDOWN');if(survival.foodMilli<15000||survival.waterMilli<15000)return reject('FOOD_AND_WATER_REQUIRED');if(this.services.hostileNear(actor.x,actor.y))return reject('HOSTILE_NEARBY');
+   this.resting.set(command.playerId,{target:command.target,x:actor.x,y:actor.y,start:this.services.tick(),health:survival.healthMilli});message='REST_STARTED';
+  }else{
+   this.cancelRest(command.playerId);let inputs:{itemDefinitionId:string;quantity:number}[]=[],outputs:{itemDefinitionId:string;quantity:number}[]=[];
+   if(command.action==='supplies'){if(!lab)return reject('LANDING_LAB_REQUIRED');if(next.supplyClaimed.includes(command.playerId))return reject('SUPPLIES_ALREADY_CLAIMED');outputs=[{itemDefinitionId:'item:clean-water',quantity:3},{itemDefinitionId:'item:edible-plant',quantity:3},{itemDefinitionId:'item:plant-fiber',quantity:6},{itemDefinitionId:'item:field-dressing',quantity:1}];}
+   else if(command.action==='cook'){if(facility?.definitionId!=='campfire')return reject('CAMPFIRE_REQUIRED');if(this.services.survival(command.playerId).foodMilli>=100000)return reject('FOOD_FULL');inputs=[{itemDefinitionId:'item:edible-plant',quantity:1},{itemDefinitionId:'item:clean-water',quantity:1}];}
+   else if(command.action==='water'){if(facility?.definitionId!=='rain-collector'||facility.water<1)return reject('NO_COLLECTED_WATER');outputs=[{itemDefinitionId:'item:clean-water',quantity:facility.water}];}
+   else return reject('INVALID_ACTION');
+   const result=this.items.commitColonyExchange({operationId:command.id,playerId:command.playerId,expectedInventoryRevision:command.expectedInventoryRevision,inputs,outputs});if(result.status==='rejected')return reject(result.reason);
+   if(command.action==='supplies')next={...next,supplyClaimed:[...next.supplyClaimed,command.playerId]};else if(command.action==='cook')this.services.meal(command.playerId);else next={...next,facilities:next.facilities.map(f=>f.id===command.target?{...f,water:0}:f)};message='FACILITY_ACTION_COMPLETED';
+  }
+  this.state=validateExpeditionState({...next,revision:next.revision+1,receipts:[...next.receipts,{id:command.id,signature,result:message}].slice(-96)});return {status:'committed',message};
+ }
  private state:ExpeditionState;
- public constructor(private readonly items:Phase1ItemAuthority,private readonly buildings:Phase1BuildingWorld,private readonly actor:(player:string)=>ExpeditionActor,initial?:ExpeditionState){this.state=initial?validateExpeditionState(initial):emptyExpeditionState();}
- public read():ExpeditionState{return structuredClone(this.state);}
+ public constructor(private readonly items:Phase1ItemAuthority,private readonly buildings:Phase1BuildingWorld,private readonly actor:(player:string)=>ExpeditionActor,initial?:ExpeditionState,private readonly services?:ExpeditionServices){this.state=validateExpeditionState(initial??emptyExpeditionState());}
+ public read():ExpeditionState{return this.state;}
  public reconcile():void{
   const facilities=this.state.facilities.filter(f=>f.canonicalStructureId===null||this.buildings.getStructure(f.canonicalStructureId)!==null);
   if(facilities.length!==this.state.facilities.length)this.state=validateExpeditionState({...this.state,facilities,revision:this.state.revision+1});
@@ -27,7 +71,7 @@ export class ExpeditionAuthority {
   const reject=(message:string):ExpeditionResult=>({status:'rejected',message});
   if(!command.id||command.id.length>120||command.expectedRevision!==this.state.revision)return reject('STALE_REVISION');
   let actor:ExpeditionActor;try{actor=this.actor(command.playerId);}catch{return reject('UNKNOWN_PLAYER');}if(!actor.alive)return reject('PLAYER_DEAD');
-  const recipe=EXPEDITION_RECIPES.find(r=>r.id===command.recipeId);if(!recipe)return reject('UNKNOWN_RECIPE');
+  this.cancelRest(command.playerId);const recipe=EXPEDITION_RECIPES.find(r=>r.id===command.recipeId);if(!recipe)return reject('UNKNOWN_RECIPE');
   if(recipe.station && !this.state.facilities.some(f=>f.definitionId===recipe.station && f.canonicalStructureId!==null && this.buildings.getStructure(f.canonicalStructureId)!==null && Math.hypot(f.x-actor.x,f.y-actor.y)<=2))return reject('NEARBY_FIELD_WORKBENCH_REQUIRED');
   const result=this.items.commitColonyExchange({operationId:command.id,playerId:command.playerId,expectedInventoryRevision:command.expectedInventoryRevision,inputs:recipe.costs.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity})),outputs:[{itemDefinitionId:recipe.output,quantity:recipe.quantity}]});
   if(result.status==='rejected')return reject(result.reason);
@@ -39,7 +83,7 @@ export class ExpeditionAuthority {
   const signature=JSON.stringify(command);const receipt=this.state.receipts.find(r=>r.id===command.id);if(receipt)return receipt.signature===signature?{status:'committed',message:receipt.result}:reject('OPERATION_ID_CONFLICT');
   if(command.expectedRevision!==this.state.revision)return reject('STALE_REVISION');
   let actor:ExpeditionActor;try{actor=this.actor(command.playerId);if(this.items.getContainerView('inventory:'+command.playerId).revision!==command.expectedInventoryRevision)return reject('STALE_INVENTORY_REVISION');}catch{return reject('UNKNOWN_PLAYER');}if(!actor.alive)return reject('PLAYER_DEAD');
-  let next=this.state;let message:string;
+  this.cancelRest(command.playerId);let next=this.state;let message:string;
   if(command.action==='plan'){
    if(this.state.facilities.some(f=>f.id==='facility:plan:'+command.id))return reject('OPERATION_ID_CONFLICT');
    const def=expeditionFacility(command.target);if(!def)return reject('UNKNOWN_FACILITY');if(this.state.plans.length>=32||this.state.facilities.length>=64)return reject('PLAN_LIMIT');

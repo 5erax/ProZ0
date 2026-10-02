@@ -19,5 +19,5 @@ export function validateExpeditionState(value:unknown):ExpeditionState {
  for(const f of s.facilities){const def=expeditionFacility(f.definitionId)!;if(!natural(f.water)||f.water>4||!natural(f.progress)||f.progress>=3600||(def.canonical===null?f.canonicalStructureId!==null:typeof f.canonicalStructureId!=='string'||!f.canonicalStructureId))throw Error('Invalid expedition facility');}
  for(const e of s.events)if(!e||!natural(e.tick)||!natural(e.untilTick)||e.untilTick<=e.tick||typeof e.region!=='string'||! /^-?\d+:-?\d+$/.test(e.region)||!['growth-flush','dry-spell','mineral-bloom','wildlife-drift'].includes(e.kind))throw Error('Invalid expedition event');
  if(new Set(s.receipts.map(r=>r.id)).size!==s.receipts.length||s.receipts.some(r=>!r||typeof r.id!=='string'||!r.id||typeof r.signature!=='string'||!r.signature||typeof r.result!=='string'||!r.result))throw Error('Invalid expedition receipt');
- return structuredClone(s);
+ const freeze=(object:unknown):void=>{if(object&&typeof object==='object'){for(const child of Object.values(object))freeze(child);Object.freeze(object);}};const copy=structuredClone(s);freeze(copy);return copy;
 }
