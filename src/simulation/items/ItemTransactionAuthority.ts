@@ -434,7 +434,7 @@ export class Phase1ItemAuthority {
     let ordinal = 0;
     for (const output of request.outputs) {
       const insertion = draft.insert({ containerId, itemDefinitionId: output.itemDefinitionId,
-        quantity: output.quantity, condition: null, operationId: request.operationId, generatedOrdinal: ordinal });
+        quantity: output.quantity, condition: this.options.catalog.getAs(output.itemDefinitionId, 'item').conditionMax, operationId: request.operationId, generatedOrdinal: ordinal });
       if (typeof insertion === 'string') return { status: 'rejected', reason: insertion };
       ordinal = insertion.nextGeneratedOrdinal;
     }

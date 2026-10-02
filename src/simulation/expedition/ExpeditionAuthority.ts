@@ -1,6 +1,6 @@
 import type {Phase1ItemAuthority} from '../items';
 import type {Phase1BuildingWorld} from '../../world/building/Phase1BuildingWorld';
-import {expeditionFacility} from '../../content/singleplayer/ExpeditionContent';
+import {EXPEDITION_RECIPES,expeditionFacility} from '../../content/singleplayer/ExpeditionContent';
 import {emptyExpeditionState,validateExpeditionState,type ExpeditionState,type ExpeditionPlan} from './ExpeditionState';
 export interface ExpeditionActor {readonly x:number;readonly y:number;readonly alive:boolean;}
 export interface ExpeditionCommand {
@@ -20,6 +20,18 @@ export class ExpeditionAuthority {
   const def=expeditionFacility(definition);if(!def||!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>1e7||Math.abs(y)>1e7||![0,1,2,3].includes(orientation))return 'INVALID_POSITION';
   const assessment=this.buildings.assessPlacement(def.shape,{mode:'free',anchor:{x,y},orientationQuarterTurns:orientation},def.canonical===null);if(typeof assessment==='string')return assessment;
   if([...this.state.plans,...this.state.facilities.filter(f=>f.canonicalStructureId===null)].some(p=>p.id!==ignoreId&&Math.abs(p.x-x)<1.5&&Math.abs(p.y-y)<1.5))return 'PLAN_OVERLAP';return null;
+ }
+ public craft(command:{id:string;playerId:string;recipeId:string;expectedRevision:number;expectedInventoryRevision:number}):ExpeditionResult{
+  const signature=JSON.stringify(command);const receipt=this.state.receipts.find(r=>r.id===command.id);
+  if(receipt)return receipt.signature===signature?{status:'committed',message:receipt.result}:{status:'rejected',message:'OPERATION_ID_CONFLICT'};
+  const reject=(message:string):ExpeditionResult=>({status:'rejected',message});
+  if(!command.id||command.id.length>120||command.expectedRevision!==this.state.revision)return reject('STALE_REVISION');
+  let actor:ExpeditionActor;try{actor=this.actor(command.playerId);}catch{return reject('UNKNOWN_PLAYER');}if(!actor.alive)return reject('PLAYER_DEAD');
+  const recipe=EXPEDITION_RECIPES.find(r=>r.id===command.recipeId);if(!recipe)return reject('UNKNOWN_RECIPE');
+  if(recipe.station && !this.state.facilities.some(f=>f.definitionId===recipe.station && f.canonicalStructureId!==null && this.buildings.getStructure(f.canonicalStructureId)!==null && Math.hypot(f.x-actor.x,f.y-actor.y)<=2))return reject('NEARBY_FIELD_WORKBENCH_REQUIRED');
+  const result=this.items.commitColonyExchange({operationId:command.id,playerId:command.playerId,expectedInventoryRevision:command.expectedInventoryRevision,inputs:recipe.costs.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity})),outputs:[{itemDefinitionId:recipe.output,quantity:recipe.quantity}]});
+  if(result.status==='rejected')return reject(result.reason);
+  this.state=validateExpeditionState({...this.state,revision:this.state.revision+1,receipts:[...this.state.receipts,{id:command.id,signature,result:'CRAFTED'}].slice(-96)});return {status:'committed',message:'CRAFTED'};
  }
  public execute(command:ExpeditionCommand):ExpeditionResult{
   const reject=(message:string):ExpeditionResult=>({status:'rejected',message});

@@ -151,6 +151,7 @@ export interface Phase1BuildCatalogEntryPresentation {
 
 export interface Phase1BuildPanelPresentation {
   readonly kind: 'build';
+  readonly expeditionEnabled?: boolean;
   readonly title: string;
   readonly selectedStructure: string;
   readonly sourceKitLabel: string;

@@ -38,3 +38,9 @@ it('legacy build radius remains constrained; expedition still rejects unexplored
  const f=fixture();const placement={mode:'free' as const,anchor:{x:102,y:100},orientationQuarterTurns:0 as const};expect(new Phase1BuildingWorld(f.spatial).assessPlacement('structure:storage-crate',placement)).toBe('OUTSIDE_BASE_BUILD_ZONE');
  f.spatial.explored=false;expect(f.command('unknown','plan','supply-cache',{x:102,y:100}).status).toBe('rejected');f.spatial.explored=true;expect(f.command('stale','plan','supply-cache',{x:102,y:100,expectedInventoryRevision:42}).message).toBe('STALE_INVENTORY_REVISION');
 });
+
+it('field craft preserves materials on station failure and issues a usable durable spear once',()=>{
+ const f=fixture();expect(f.items.commitColonyExchange({operationId:'fixture-craft',playerId:'solo',expectedInventoryRevision:0,inputs:[],outputs:[{itemDefinitionId:'item:stone',quantity:2},{itemDefinitionId:'item:cordage',quantity:1}]}).status).toBe('committed');
+ const before=f.items.exportLedgerSnapshot();expect(f.authority.craft({id:'tool',playerId:'solo',recipeId:'field-tool',expectedRevision:0,expectedInventoryRevision:1}).message).toBe('NEARBY_FIELD_WORKBENCH_REQUIRED');expect(f.items.exportLedgerSnapshot()).toEqual(before);
+ const command={id:'spear',playerId:'solo',recipeId:'field-spear',expectedRevision:0,expectedInventoryRevision:1};expect(f.authority.craft(command).status).toBe('committed');const after=f.items.exportLedgerSnapshot();expect(f.items.getContainerView('inventory:solo').stacks.find(s=>s.itemDefinitionId==='item:basic-spear')?.condition).toBe(100);expect(f.authority.craft(command).status).toBe('committed');expect(f.items.exportLedgerSnapshot()).toEqual(after);
+});

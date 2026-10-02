@@ -128,5 +128,6 @@ Prioritize split-stack/quick-transfer storage, discovered outpost map naming, li
 |---|---|---|---|
 | SP-01 | COMMITTED | `5e35627`; source audit at baseline above | Plan is authoritative for this branch; implementation adjustments must be recorded |
 | SP-02 | COMMITTED | `466e462`; typecheck/lint; 7 targeted item/capacity tests PASS | Solo runtime opts into 32/40 kg and 48 volume; ledger enforcement and presentation share policy; legacy/co-op default retained. Browser/save integration checked at SP-10 |
-| SP-03 | CORE VERIFIED; commit next | Construction unit tests and Save V2 reopen test; typecheck/lint | Escrow/refund/idempotency, canonical remote crate/workbench, optional solo save state and custom collider adapter implemented. UI and functional custom facilities remain SP-04/SP-05 |
-| SP-04–SP-10 | PLANNED | No implementation claimed | Execute dependency order; update ledger in each meaningful commit |
+| SP-03 | CORE COMMITTED | `7877c0d`; construction unit tests and Save V2 reopen test; typecheck/lint | Escrow/refund/idempotency, canonical remote crate/workbench, optional solo save state and custom collider adapter implemented. UI and functional custom facilities remain SP-04/SP-05 |
+| SP-04 | UI/CRAFT IMPLEMENTED; verification in progress | Solo Build opens blueprints, partial costs/refunds/move markers; durable field craft uses real transactions | Custom facility functions and browser journey pending SP-05/SP-10 |
+| SP-05–SP-10 | PLANNED | No implementation claimed | Execute dependency order; update ledger in each meaningful commit |
