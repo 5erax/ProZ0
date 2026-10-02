@@ -40,7 +40,7 @@ Làm trong chat này, commit từng increment sau kiểm tra phù hợp. Không 
 |---|---|---|
 | LW-01 | COMPLETE / audit and contract | Cơ chế hiện tại: farm -6,4; pen 6,4; 7 facilities / 6 field recipes; không relocate completed buildings |
 | LW-02–LW-06 | IMPLEMENTED / targeted QA PASS | Commits và API trong nhật ký bên dưới |
-| LW-07 | FINAL CI / delivery in progress | Natural planting/save/reopen PASS; chờ CI đầy đủ và deployment |
+| LW-07 | Evidence tracked in #213 / #214 | Natural planting/save/reopen/E PASS; final CI/deploy links trong tracker và release |
 
 ## Nhật ký triển khai
 
@@ -59,3 +59,5 @@ Mùa dựa 60 Hz active tick; 12 phút/mùa, 48 phút/năm. Không catch-up khi 
 - Rà soát sinh học bổ sung: trứng/sữa chỉ do con cái sản xuất; shearing có cooldown riêng, không dùng chung breedTick. Giới tính migration không phụ thuộc parity loài. Vật nuôi di chuyển trong pen với collision của pen được bỏ qua riêng; không bỏ qua công trình khác. Bricks dùng xây cabin; bone compost bổ sung, tổng 15 recipes mới. Spawn khi chưa khám phá phải retry; lịch sử spawn tránh nhân đôi sau săn.
 
 - Hoàn thiện QA: làm đất dọn forage tại chỗ và nhận phần tài nguyên còn có trong một giao dịch; túi đầy không đổi đất hoặc bụi cây. Tombstone được lưu, plot được ưu tiên thao tác qua marker. Domain + save 12 PASS; natural browser farming/save/reopen 1 PASS, không test grants.
+
+- QA bounds: 4d48f69 giữ vật nuôi trong pen khi thiên địch tới. E không chọn forage đã dọn. Natural browser kiểm tra cả click và E vào crop sau reopen PASS. Windows full run 0c34182: 149 unit / 181 integration (3 skip) / 13 determinism / 31 browser PASS; 40 E2E PASS, 2 skip, 2 frame failures (29.26 / 29.77 FPS, marsh P95 50.1ms). Final CI và deployment evidence dùng #213/#214; #204 vẫn giữ performance failure, không hạ gate.

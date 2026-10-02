@@ -627,7 +627,11 @@ export function createLivingWorldOverlay(
     ) {
       const p = bundle.getPlayerPosition(player),
         state = authority.presentationSnapshot(),
-        near = [...state.plots, ...state.animals, ...state.forage]
+        near = [
+          ...state.plots,
+          ...state.animals,
+          ...state.forage.filter((f) => !f.cleared),
+        ]
           .filter((a) => Math.hypot(a.x - p.x, a.y - p.y) <= 2)
           .sort(
             (a, b) =>

@@ -128,6 +128,12 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
       .click();
   }
   expect(planted, 'Natural explored soil near the stone outcrop').toBe(true);
+  const plantedPoint = await page
+    .locator('.lw-ghost')
+    .evaluate((e) => ({
+      x: Number((e as HTMLElement).dataset.x),
+      y: Number((e as HTMLElement).dataset.y),
+    }));
   const row = panel.locator('[data-living-row^="plot:"]').first();
   await row
     .getByRole('button', { name: 'Plant Root Vegetables', exact: true })
@@ -159,6 +165,12 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
     page.locator('.lw-object[data-living-id="' + id + '"]'),
   ).toBeVisible();
   await page.locator('.lw-object[data-living-id="' + id + '"]').click();
+  await expect(panel.locator('[data-living-row="' + id + '"]')).toContainText(
+    'Root Vegetables',
+  );
+  await page.keyboard.press('Escape');
+  await walk(page, plantedPoint.x, plantedPoint.y);
+  await page.keyboard.press('e');
   await expect(panel.locator('[data-living-row="' + id + '"]')).toContainText(
     'Root Vegetables',
   );
