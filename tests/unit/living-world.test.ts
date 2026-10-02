@@ -71,10 +71,15 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
             ownerPlayerId: 'solo',
             revision: 0,
             stacks: full
-              ? Array.from({ length: 3 }, (_, i) => ({
+              ? [
+                  ['item:field-hoe', 1],
+                  ['item:timber', 10],
+                  ['item:timber', 1],
+                  ['item:watering-can', 1],
+                ].map(([id, quantity], i) => ({
                   stackId: 'full' + i,
-                  itemDefinitionId: 'item:timber',
-                  quantity: i === 0 ? 10 : 1,
+                  itemDefinitionId: id as string,
+                  quantity: quantity as number,
                   condition: null,
                 }))
               : [
@@ -504,4 +509,49 @@ it('failed unexplored spawn points retry later without duplicating hunted animal
   });
   rooster.advance(120);
   expect(rooster.authority.read().animals[0]!.product).toBe(0);
+});
+
+it('tilling clears wild plants and pays remaining forage once; a full bag preserves soil and plants across saved commands', () => {
+  const forage = {
+    id: 'forage:berry',
+    kind: 'berry-bush',
+    x: 100,
+    y: 103,
+    readyTick: 0,
+    cleared: false,
+  };
+  const f = fixture({ forage: [forage] });
+  const op = f.command('till', 'ground', { x: 100, y: 103 });
+  expect(f.authority.execute(op).message).toBe('SOIL_TILLED');
+  expect(f.authority.read().plots).toHaveLength(1);
+  expect(f.authority.read().forage[0]!.cleared).toBe(true);
+  const berries = () =>
+    f.items
+      .getContainerView('inventory:solo')
+      .stacks.find((s) => s.itemDefinitionId === 'item:berries')!.quantity;
+  expect(berries()).toBe(2);
+  expect(f.authority.execute(op).message).toBe('SOIL_TILLED');
+  expect(berries()).toBe(2);
+  const restored = new LivingWorldAuthority(
+    f.items,
+    f.expedition,
+    f.services,
+    validateLivingWorld(f.authority.read()),
+  );
+  expect(restored.read().forage[0]!.cleared).toBe(true);
+  expect(
+    restored.execute({
+      ...f.command('forage', forage.id),
+      expectedRevision: restored.read().revision,
+    }).message,
+  ).toBe('FORAGE_MISSING');
+  const full = fixture({ forage: [forage] }, true);
+  const soilBefore = full.authority.read();
+  const itemsBefore = full.items.getContainerView('inventory:solo');
+  expect(
+    full.authority.execute(full.command('till', 'ground', { x: 100, y: 103 }))
+      .status,
+  ).toBe('rejected');
+  expect(full.authority.read()).toEqual(soilBefore);
+  expect(full.items.getContainerView('inventory:solo')).toEqual(itemsBefore);
 });

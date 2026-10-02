@@ -28,7 +28,7 @@ Làm trong chat này, commit từng increment sau kiểm tra phù hợp. Không 
 ## Authority / save / hiệu năng
 
 - Các command id/player/expected world + inventory revisions/action/target/position có cached receipts lưu bounded. Repeated ID không loot/craft/góp đồ hai lần. Sai owner/range/alive/terrain/capacity giữ cả inventory và entity.
-- Building relocation giữ structure ID và linked container ID; tự tính lại network. Các custom facility references và living pen refs đồng bộ, từ chối move nếu sẽ strand captive animals/crops chưa di chuyển.
+- Building relocation giữ structure ID và linked container ID; tự tính lại network. Các custom facility references và living pen refs đồng bộ: di dời pen giữ animal ID và dịch chuyển vật nuôi theo anchor; các plots giữ vị trí đất ban đầu.
 - LivingWorld là extension optional; absent khởi tạo tại clock đã lưu, không giả lập hàng giờ trước đó cho save cũ. Mùa là pure clock-derived. State lưu animals/plots/forage/fuel/receipts/spawn-region cursors; validation finite/range/caps/timestamps/refs. Không reroll terrain hoặc reset inventory.
 - Content thêm item cần fingerprint compatibility/upgrade cũ được kiểm chứng; không bỏ toàn bộ fingerprint guard để mở save.
 - Tick ecology theo giây, movement bounded, index/culling theo vùng, cap plots 256 / animals 96 / forage regions bounded. Caps kỹ thuật không khóa vị trí quanh base. Không render/sort toàn bộ động vật mỗi simulation tick nếu không cần. Frame gates ≥50 FPS/P95≤34ms giữ nguyên; máy Owner đã có baseline timing failure, phải ghi số đo thực thay vì gọi mọi máy 60 FPS.
@@ -38,8 +38,9 @@ Làm trong chat này, commit từng increment sau kiểm tra phù hợp. Không 
 
 | Task | Trạng thái | Commit / evidence |
 |---|---|---|
-| LW-01 | PLANNED / audit complete | Cơ chế hiện tại: farm -6,4; pen 6,4; 7 facilities / 6 field recipes; không relocate completed buildings |
-| LW-02–LW-07 | PENDING | Triển khai và ghi evidence từng increment |
+| LW-01 | COMPLETE / audit and contract | Cơ chế hiện tại: farm -6,4; pen 6,4; 7 facilities / 6 field recipes; không relocate completed buildings |
+| LW-02–LW-06 | IMPLEMENTED / targeted QA PASS | Commits và API trong nhật ký bên dưới |
+| LW-07 | FINAL CI / delivery in progress | Natural planting/save/reopen PASS; chờ CI đầy đủ và deployment |
 
 ## Nhật ký triển khai
 
@@ -56,3 +57,5 @@ Mùa dựa 60 Hz active tick; 12 phút/mùa, 48 phút/năm. Không catch-up khi 
 
 - LW-06: 39d204e — panel Homestead [F], E contextual/world markers, 10 sprite công trình và 29 icon vật phẩm. Craft details và scroll giữ ổn định qua refresh; soil tint cache theo tile, snow/leaves drift theo active clock và camera.
 - Rà soát sinh học bổ sung: trứng/sữa chỉ do con cái sản xuất; shearing có cooldown riêng, không dùng chung breedTick. Giới tính migration không phụ thuộc parity loài. Vật nuôi di chuyển trong pen với collision của pen được bỏ qua riêng; không bỏ qua công trình khác. Bricks dùng xây cabin; bone compost bổ sung, tổng 15 recipes mới. Spawn khi chưa khám phá phải retry; lịch sử spawn tránh nhân đôi sau săn.
+
+- Hoàn thiện QA: làm đất dọn forage tại chỗ và nhận phần tài nguyên còn có trong một giao dịch; túi đầy không đổi đất hoặc bụi cây. Tombstone được lưu, plot được ưu tiên thao tác qua marker. Domain + save 12 PASS; natural browser farming/save/reopen 1 PASS, không test grants.

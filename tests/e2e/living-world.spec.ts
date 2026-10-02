@@ -162,7 +162,7 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   await expect(panel.locator('[data-living-row="' + id + '"]')).toContainText(
     'Root Vegetables',
   );
-  const folder = resolve('..', 'outputs', 'living-world-browser');
+  const folder = resolve('test-results', 'living-world');
   mkdirSync(folder, { recursive: true });
   await page.screenshot({ path: resolve(folder, 'remote-crop-reopened.png') });
   expect(errors).toEqual([]);

@@ -41,6 +41,7 @@ export interface LivingForage {
   x: number;
   y: number;
   readyTick: number;
+  cleared: boolean;
 }
 export interface LivingStation {
   id: string;
@@ -167,7 +168,12 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
       throw Error('Invalid animal');
   }
   for (const f of s.forage)
-    if (!point(f) || !forageDefinition(f.kind) || !n(f.readyTick))
+    if (
+      !point(f) ||
+      !forageDefinition(f.kind) ||
+      !n(f.readyTick) ||
+      typeof f.cleared !== 'boolean'
+    )
       throw Error('Invalid forage');
   for (const f of s.stations)
     if (!n(f.water) || f.water > 24 || !n(f.fireUntil))

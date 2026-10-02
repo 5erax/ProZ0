@@ -201,6 +201,7 @@ export class LivingWorldAuthority {
           x,
           y,
           readyTick: 0,
+          cleared: false,
         });
     }
     for (let i = 0; i < 5 && this.state.animals.length < 96; i++) {
@@ -633,6 +634,16 @@ export class LivingWorldAuthority {
           )
       )
         return reject('OCCUPIED_GROUND');
+      // Tilling clears local wild vegetation/deposits atomically with their available yield.
+      for (const f of next.forage.filter(
+        (f) => !f.cleared && Math.hypot(f.x - x, f.y - y) < 1.25,
+      )) {
+        if (f.readyTick <= this.services.tick()) {
+          const d = forageDefinition(f.kind)!;
+          produce(d.output, d.quantity);
+        }
+        f.cleared = true;
+      }
       next.plots.push({
         id: 'plot:' + ++next.serial,
         owner: c.playerId,
@@ -698,7 +709,7 @@ export class LivingWorldAuthority {
         message = 'CLEARED';
       }
     } else if (c.action === 'forage') {
-      if (!f) return reject('FORAGE_MISSING');
+      if (!f || f.cleared) return reject('FORAGE_MISSING');
       if (distance(f) > near) return reject('OUT_OF_RANGE');
       if (this.services.tick() < f.readyTick) return reject('RENEWING');
       const d = forageDefinition(f.kind)!;
