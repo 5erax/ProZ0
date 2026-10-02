@@ -3,6 +3,7 @@ import type {
   ItemDefinitionV1,
 } from '../../content';
 import type { PlayerId } from '../../foundation';
+import { temperaturePenalty, damagingTemperature } from './SurvivalThermalRules';
 import { type Phase1ItemAuthority } from '../items';
 import {
   SURVIVAL_MAX_MILLI,
@@ -119,19 +120,6 @@ function applyRationalIncrease(
   };
 }
 
-function temperaturePenalty(temperature: number): number {
-  if (temperature <= 4 || temperature >= 96) return 100;
-  if (
-    (temperature >= 5 && temperature <= 19)
-    || (temperature >= 81 && temperature <= 95)
-  ) return 40;
-  if (
-    (temperature >= 20 && temperature <= 34)
-    || (temperature >= 66 && temperature <= 80)
-  ) return 10;
-  return 0;
-}
-
 function waterPenalty(water: number): number {
   if (water <= 0) return 100;
   if (water <= 24) return 30;
@@ -198,21 +186,6 @@ function compareDamageEvents(left: DamageEvent, right: DamageEvent): number {
   const leftEntity = left.sourceEntityId ?? '';
   const rightEntity = right.sourceEntityId ?? '';
   return leftEntity < rightEntity ? -1 : leftEntity > rightEntity ? 1 : 0;
-}
-
-function damagingTemperature(
-  value: number,
-): { readonly source: SurvivalDamageSource; readonly cadence: number } | null {
-  if (value <= 4 || value >= 96) {
-    return { source: 'critical-temperature', cadence: 180 };
-  }
-  if (
-    (value >= 5 && value <= 19)
-    || (value >= 81 && value <= 95)
-  ) {
-    return { source: 'severe-temperature', cadence: 600 };
-  }
-  return null;
 }
 
 function validateState(state: PlayerSurvivalState): void {

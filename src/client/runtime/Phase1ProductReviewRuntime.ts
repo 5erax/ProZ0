@@ -2278,6 +2278,8 @@ export async function createPhase1ProductReviewRuntime(
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
+    if (action === 'inventory-use' && source.isInventoryOpen()) beginSelectedConsume();
+    if (action === 'inventory-drop' && source.isInventoryOpen()) dropSelectedInventoryQuantity();
     if (action?.startsWith('colony:') && actionPanel === 'colony') {
       colonyCommand(action.slice(7) as ColonySustenanceAction);
       return;

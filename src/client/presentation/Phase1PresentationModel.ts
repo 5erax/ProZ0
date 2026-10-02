@@ -1,3 +1,6 @@
+import type { ItemInspection } from './ItemInspection';
+import type { CharacterInspection } from './CharacterInspection';
+
 export type Phase1SemanticSeverity =
   | 'normal'
   | 'warning'
@@ -66,6 +69,9 @@ export interface Phase1ToastPresentation {
 }
 
 export interface Phase1InventoryItemPresentation {
+  readonly inspection?: ItemInspection;
+  readonly stackWeightKg?: number;
+  readonly stackBulk?: number;
   readonly id: string;
   readonly name: string;
   readonly quantity: number;
@@ -76,6 +82,7 @@ export interface Phase1InventoryItemPresentation {
 }
 
 export interface Phase1InventoryPanelPresentation {
+  readonly character?: CharacterInspection;
   readonly kind: 'inventory';
   readonly title: string;
   readonly items: readonly Phase1InventoryItemPresentation[];
@@ -95,6 +102,7 @@ export interface Phase1ContainerCapacityPresentation {
 }
 
 export interface Phase1ContainerPanelPresentation {
+  readonly character?: CharacterInspection;
   readonly kind: 'container';
   readonly title: string;
   readonly playerItems: readonly Phase1InventoryItemPresentation[];

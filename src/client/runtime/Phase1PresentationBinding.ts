@@ -1,3 +1,5 @@
+import { inspectItem } from '../presentation/ItemInspection';
+import { inspectCharacter } from '../presentation/CharacterInspection';
 import type {
   ContentCatalogV1,
   ContentId,
@@ -184,6 +186,9 @@ function inventoryItems(
       id: stack.stackId,
       name: definition.displayName,
       quantity: stack.quantity,
+      inspection: inspectItem(catalog, definition.id),
+      stackWeightKg: definition.unitWeightKg * stack.quantity,
+      stackBulk: definition.unitVolume * stack.quantity,
       condition: stack.condition,
       conditionMax: definition.conditionMax,
       available: stack.condition !== 0,
@@ -439,6 +444,7 @@ function inventoryPanel(
   const feedback = input.commandFeedback;
   return Object.freeze({
     kind: 'inventory',
+    character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: 'Inventory',
     items: inventoryItems(input.catalog, input.inventory),
     selectedItemId: selected?.stackId ?? null,
@@ -483,6 +489,7 @@ function containerPanel(
   const storageCapacity = storageDefinition?.container ?? null;
   return Object.freeze({
     kind: 'container',
+    character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: container.kind === 'death-cache'
       ? 'Death Cache'
       : 'Inventory / Storage',

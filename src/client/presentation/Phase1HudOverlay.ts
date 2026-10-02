@@ -19,6 +19,7 @@ import {
   teammateIdentitySprite,
   type Phase1ProductionSprite,
 } from './Phase1ProductionAssets';
+import type { CharacterInspection } from './CharacterInspection';
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
   document: Document,
@@ -242,6 +243,43 @@ function itemRow(
   return row;
 }
 
+function itemInspectionCard(document: Document, item: Phase1InventoryItemPresentation | undefined): HTMLElement {
+  const card = createElement(document, 'section', 'p1-item-inspection');
+  if (!item?.inspection) return card;
+  card.setAttribute('aria-label', 'Selected item details');
+  card.dataset.inspectedStack = item.id;
+  card.append(createElement(document, 'h3', '', item.name), createElement(document, 'p', '', item.inspection.purpose), createElement(document, 'p', '', 'Selected stack: ' + item.quantity + ' items · ' + (item.stackWeightKg ?? 0).toFixed(2) + ' kg · ' + (item.stackBulk ?? 0).toFixed(2) + ' bulk units'));
+  const details = createElement(document, 'details', 'p1-inspection-more');
+  details.dataset.inspectionKey = 'item:' + item.id;
+  details.append(createElement(document, 'summary', '', 'Properties, sources and crafting uses'));
+  for (const fact of item.inspection.facts) details.append(createElement(document, 'p', '', fact));
+  if (item.condition !== null) details.append(createElement(document, 'p', '', 'Durability now: ' + item.condition + '/' + (item.conditionMax ?? 100) + (item.condition === 0 ? ' · Broken; repair before using.' : '')));
+  if (item.inspection.sources.length) details.append(createElement(document, 'p', '', 'Sources: ' + item.inspection.sources.join(' · ')));
+  if (item.inspection.recipes.length) details.append(createElement(document, 'p', '', 'Ingredient for: ' + item.inspection.recipes.join(' · ')));
+  card.append(details);
+  if (item.inspection.canConsume) card.append(actionButton(document, 'Use selected item [V]', 'inventory-use'));
+  if (item.inspection.canEquip) { const equip = actionButton(document, 'Equip selected item [X]', 'equip'); equip.disabled = item.condition === 0; if (equip.disabled) equip.title = 'Repair this broken item before equipping it.'; card.append(equip); }
+  card.append(actionButton(document, 'Drop selected quantity [G]', 'inventory-drop'));
+  return card;
+}
+
+function characterInspectionCard(document: Document, character: CharacterInspection | undefined): HTMLElement {
+  const details = createElement(document, 'details', 'p1-character-inspection');
+  if (!character) return details;
+  details.dataset.inspectionKey = 'character';
+  details.append(createElement(document, 'summary', '', 'Character status · ' + (character.effects.length ? character.effects.length + ' conditions' : 'No adverse conditions')));
+  const values = createElement(document, 'div', 'p1-character-values');
+  for (const stat of character.values) values.append(createElement(document, 'span', '', stat.name + ': ' + stat.value + '/100'));
+  details.append(values, createElement(document, 'p', '', 'Current stamina recovery penalty: ' + character.staminaRegenPenaltyPercent + '% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.'));
+  for (const effect of character.effects) {
+    const entry = createElement(document, 'article', 'p1-character-effect');
+    entry.dataset.effect = effect.id; entry.dataset.severity = effect.severity;
+    entry.append(createElement(document, 'strong', '', effect.name + ' · ' + effect.severity), createElement(document, 'p', '', effect.consequence), createElement(document, 'p', '', 'Treatment: ' + effect.remedy));
+    details.append(entry);
+  }
+  return details;
+}
+
 function teammate(
   document: Document,
   entry: Phase1TeammatePresentation,
@@ -302,6 +340,7 @@ function renderPanel(
       return root;
     }
     case 'inventory': {
+      root.append(characterInspectionCard(document, panel.character));
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'),actionButton(document,'Stack matching items','inventory-stack'));
       root.append(actionButton(document,'Build storage crate','build-storage'));
       if(panel.capacity?.weightMax===32)root.append(actionButton(document,'Plan expedition storage','open-expedition'));
@@ -355,10 +394,12 @@ function renderPanel(
           ),
         );
       }
+      root.append(itemInspectionCard(document, panel.items.find(i => i.id === panel.selectedItemId)));
       return root;
     }
 
     case 'container': {
+      root.append(characterInspectionCard(document, panel.character));
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
       root.append(actionButton(document,'Move one','inventory-transfer-one'),actionButton(document,'Move stack','inventory-transfer-stack'));
       root.dataset.inventoryActivePane = panel.activePane;
@@ -446,6 +487,7 @@ function renderPanel(
             + ' u',
         ));
       }
+      root.append(itemInspectionCard(document, (panel.activePane === 'player' ? panel.playerItems : panel.containerItems).find(i => i.id === (panel.activePane === 'player' ? panel.selectedPlayerItemId : panel.selectedContainerItemId))));
       root.append(
         panes,
         capacityContext,
@@ -1154,6 +1196,8 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-survival .p1-meter{grid-template-columns:12px 42px 18px 8px;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
+    '.p1-item-inspection,.p1-character-inspection{border:1px solid #51636d;padding:6px;margin:6px 0;line-height:1.5}.p1-item-inspection h3{font-size:11px;margin:0 0 4px}.p1-item-inspection p,.p1-character-inspection p{margin:4px 0}.p1-inspection-more summary,.p1-character-inspection summary{cursor:pointer;font-weight:bold}.p1-character-values{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0}.p1-character-effect{border-left:2px solid #d6c78d;padding:4px 8px;margin:6px 0}.p1-character-effect[data-severity="critical"]{border-color:#e8a088}.p1-item-inspection button{margin:4px 4px 0 0;}',
+    '[data-product-review-panel-open=true] .sp-blueprint,[data-product-review-panel-open=true] .lw-menu,[data-product-review-panel-open=true] .lw-season,[data-product-review-panel-open=true] .p2-colony-controls,[data-product-review-help-open=true] .sp-blueprint{visibility:hidden;pointer-events:none;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
     '.p1-item-row,.p1-craft-row{display:grid;gap:4px;padding:3px;border:1px solid #3b465a;}',
@@ -1320,6 +1364,13 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.layer.dataset.panelOpen = String(panelOpen);
     this.root.dataset.productReviewPanelOpen = String(panelOpen);
     const style = this.layer.querySelector('style');
+    const previousPanel = this.layer.querySelector<HTMLElement>('.p1-panel');
+    const expanded = new Set(Array.from(previousPanel?.querySelectorAll<HTMLElement>('details[data-inspection-key][open]') ?? [], e => e.dataset.inspectionKey));
+    const previousScroll = previousPanel?.scrollTop ?? 0;
+    const active = this.document.activeElement instanceof HTMLElement && previousPanel?.contains(this.document.activeElement) ? this.document.activeElement : null;
+    const activeInspection = active?.closest<HTMLElement>('details[data-inspection-key]')?.dataset.inspectionKey;
+    const activeAction = active?.dataset.reviewAction, activeItem = active?.dataset.reviewItem;
+    const activeLabel = active?.textContent;
     const signature = state.panel?.kind === 'colony' ? 'colony' : JSON.stringify(state.panel);
     if (state.panel?.kind === 'colony') {
       const lines = state.panel.lines;
@@ -1637,7 +1688,16 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     if (state.panel !== null && signature !== this.panelSignature) {
-      this.layer.append(renderPanel(this.document, state.panel));
+      const panel = renderPanel(this.document, state.panel);
+      this.layer.append(panel);
+      if (previousPanel?.dataset.panelKind === state.panel.kind) {
+        panel.querySelectorAll<HTMLDetailsElement>('details[data-inspection-key]').forEach(e => { e.open = expanded.has(e.dataset.inspectionKey); });
+        panel.scrollTop = previousScroll;
+        const focus = active?.tagName === 'SUMMARY'
+          ? Array.from(panel.querySelectorAll<HTMLElement>('details[data-inspection-key]')).find(e => e.dataset.inspectionKey === activeInspection)?.querySelector<HTMLElement>('summary')
+          : Array.from(panel.querySelectorAll<HTMLElement>('button')).find(e => e.textContent === activeLabel && (activeAction ? e.dataset.reviewAction === activeAction : activeItem ? e.dataset.reviewItem === activeItem : false));
+        focus?.focus({ preventScroll: true });
+      }
     }
     this.panelSignature = signature;
   }

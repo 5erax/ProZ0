@@ -1,0 +1,40 @@
+import { expect, test } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+
+test('item inspection: actual emergency water use updates stack and character without collapsing details', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:inspection-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=inspection-ui');
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
+  await page.keyboard.press('i');
+  const inventory = page.locator('[data-panel-kind="inventory"]'), card = inventory.getByRole('region', { name: 'Selected item details', exact: true });
+  await inventory.getByRole('button', { name: 'Stone Field Tool', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Landing Lab · interact', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Homestead farming and wildlife', exact: true })).toBeHidden();
+  await expect(card).toContainText('not a weapon');
+  await expect(card.getByRole('button', { name: 'Equip selected item [X]', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
+  await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+  const expedition = page.locator('.sp-expedition-panel');
+  await expedition.getByRole('button', { name: 'Emergency supplies · once', exact: true }).click();
+  await expedition.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.keyboard.press('i'); await inventory.getByRole('button', { name: 'Clean Water', exact: true }).click();
+  await card.getByText('Properties, sources and crafting uses', { exact: true }).click();
+  await expect(card).toContainText('Restores'); await expect(card).toContainText('water');
+  await inventory.locator('.p1-character-inspection summary').click();
+  const water = page.locator('[data-region="survival"] [data-meter="water"]');
+  // Meter names differ from display copy; locate by its canonical ordering instead of fabricating state.
+  const waterMeter = (await water.count()) ? water : page.locator('[data-region="survival"] .p1-meter').nth(1);
+  const before = Number(await waterMeter.getAttribute('data-value'));
+  await card.getByRole('button', { name: 'Use selected item [V]', exact: true }).click();
+  await expect.poll(async () => Number(await waterMeter.getAttribute('data-value'))).toBeGreaterThan(before);
+  await expect(card).toContainText('Selected stack: 2 items');
+  await expect(inventory.locator('.p1-character-inspection')).toHaveAttribute('open', '');
+  await expect(card.locator('details')).toHaveAttribute('open', '');
+  mkdirSync('test-results/item-character-inspection', { recursive: true });
+  await page.screenshot({ path: 'test-results/item-character-inspection/desktop.png' });
+  await page.setViewportSize({ width: 960, height: 640 });
+  await expect(card).toBeVisible(); await page.screenshot({ path: 'test-results/item-character-inspection/compact.png' });
+  expect(errors).toEqual([]);
+});
