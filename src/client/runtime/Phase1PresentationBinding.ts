@@ -209,6 +209,7 @@ function equipment(
   if (stack === undefined) return null;
   const definition = catalog.getAs(stack.itemDefinitionId, 'item');
   return Object.freeze({
+    stackId: stack.stackId,
     name: definition.displayName,
     condition: stack.condition,
     conditionMax: definition.conditionMax,
@@ -444,6 +445,7 @@ function inventoryPanel(
   const feedback = input.commandFeedback;
   return Object.freeze({
     kind: 'inventory',
+    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
     character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: 'Inventory',
     items: inventoryItems(input.catalog, input.inventory),
@@ -489,6 +491,7 @@ function containerPanel(
   const storageCapacity = storageDefinition?.container ?? null;
   return Object.freeze({
     kind: 'container',
+    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
     character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: container.kind === 'death-cache'
       ? 'Death Cache'

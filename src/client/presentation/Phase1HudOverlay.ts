@@ -1,6 +1,7 @@
 import {
   validatePhase1PresentationState,
   type Phase1InventoryItemPresentation,
+  type Phase1EquipmentSlotsPresentation,
   type Phase1MeterPresentation,
   type Phase1PanelPresentation,
   type Phase1PresentationState,
@@ -12,6 +13,8 @@ import {
   hudStatusSprite,
   interactionSprite,
   itemIconSprite,
+  playerActorSprite,
+  thermalWrapActorSprite,
   mapMarkerSprite,
   panelSkinCornerSprite,
   PHASE1_PRODUCTION_WORLD_SPRITES,
@@ -20,6 +23,8 @@ import {
   type Phase1ProductionSprite,
 } from './Phase1ProductionAssets';
 import type { CharacterInspection } from './CharacterInspection';
+import { heldSpearSprite } from './EquipmentArt';
+import { selectedPlayerSkin, playerSkinFilter } from '../runtime/PlayerProfile';
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
   document: Document,
@@ -182,6 +187,7 @@ function itemRow(
   row.dataset.itemId = item.id;
   row.dataset.selected = String(selected);
   row.dataset.available = String(item.available ?? item.condition !== 0);
+  row.draggable = item.inspection?.canEquip === true;
 
   const icon = assetSprite(
     document,
@@ -241,6 +247,35 @@ function itemRow(
     ));
   }
   return row;
+}
+
+function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'> | undefined): HTMLElement {
+  const wardrobe = createElement(document, 'section', 'p1-wardrobe');
+  if (!equipment) return wardrobe;
+  wardrobe.setAttribute('aria-label', 'Equipment and character preview');
+  const avatar = createElement(document, 'div', 'p1-avatar');
+  avatar.setAttribute('role', 'img'); avatar.setAttribute('aria-label', 'Current character appearance');
+  avatar.dataset.skin = selectedPlayerSkin();
+  const body = createElement(document, 'span', 'p1-avatar-layer');
+  applyProductionSprite(body, playerActorSprite('S', 'IDLE', 0).sprite, 2);
+  body.style.filter = playerSkinFilter(avatar.dataset.skin);
+  avatar.append(body);
+  if (equipment.protection) { const protection = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(protection, thermalWrapActorSprite('S', 'IDLE', 0).sprite, 2); protection.dataset.avatarEquipment = 'protection'; avatar.append(protection); }
+  if (equipment.weapon) { const weapon = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(weapon, heldSpearSprite('S').sprite, 2); weapon.dataset.avatarEquipment = 'weapon'; avatar.append(weapon); }
+  const slot = (kind: 'weapon' | 'protection') => {
+    const equipped = equipment[kind], label = kind === 'weapon' ? 'Weapon' : 'Protection';
+    const cell = createElement(document, 'div', 'p1-wardrobe-slot'); cell.dataset.equipmentDropSlot = kind;
+    cell.append(createElement(document, 'strong', '', label));
+    if (equipped) {
+      const icon = assetSprite(document, 'p1-asset-icon', itemIconSprite(equipped.name)); if (icon) cell.append(icon);
+      cell.append(createElement(document, 'span', '', equipped.name), createElement(document, 'small', '', equipped.condition === null ? 'Equipped' : 'Durability ' + equipped.condition + '/' + equipped.conditionMax), actionButton(document, 'Unequip ' + label.toLowerCase(), 'unequip-slot:' + kind));
+      cell.dataset.equippedStack = equipped.stackId ?? '';
+    } else cell.append(createElement(document, 'span', '', 'Empty'), actionButton(document, 'Equip selected ' + label.toLowerCase(), 'equip-slot:' + kind));
+    cell.title = 'Drag a matching item from your bag here, or select it and use Equip.';
+    return cell;
+  };
+  wardrobe.append(slot('weapon'), avatar, slot('protection'), createElement(document, 'small', 'p1-wardrobe-help', 'Select gear and equip it, or drag it into a slot. Equipped gear stays in your bag.'));
+  return wardrobe;
 }
 
 function itemInspectionCard(document: Document, item: Phase1InventoryItemPresentation | undefined): HTMLElement {
@@ -340,6 +375,7 @@ function renderPanel(
       return root;
     }
     case 'inventory': {
+      root.append(equipmentPreview(document, panel.equipment));
       root.append(characterInspectionCard(document, panel.character));
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'),actionButton(document,'Stack matching items','inventory-stack'));
       root.append(actionButton(document,'Build storage crate','build-storage'));
@@ -399,6 +435,7 @@ function renderPanel(
     }
 
     case 'container': {
+      root.append(equipmentPreview(document, panel.equipment));
       root.append(characterInspectionCard(document, panel.character));
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'));
       root.append(actionButton(document,'Move one','inventory-transfer-one'),actionButton(document,'Move stack','inventory-transfer-stack'));
@@ -1197,6 +1234,7 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-item-inspection,.p1-character-inspection{border:1px solid #51636d;padding:6px;margin:6px 0;line-height:1.5}.p1-item-inspection h3{font-size:11px;margin:0 0 4px}.p1-item-inspection p,.p1-character-inspection p{margin:4px 0}.p1-inspection-more summary,.p1-character-inspection summary{cursor:pointer;font-weight:bold}.p1-character-values{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0}.p1-character-effect{border-left:2px solid #d6c78d;padding:4px 8px;margin:6px 0}.p1-character-effect[data-severity="critical"]{border-color:#e8a088}.p1-item-inspection button{margin:4px 4px 0 0;}',
+    '.p1-wardrobe{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:center;padding:8px;border:1px solid #65747b;margin-bottom:6px}.p1-wardrobe-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:70px;border:1px dashed #708a92;padding:8px}.p1-wardrobe-slot[data-equipped-stack]{border-style:solid}.p1-avatar{position:relative;width:80px;height:104px;background:radial-gradient(ellipse at 50% 80%,#6b8b8b44,transparent 70%)}.p1-avatar-layer{position:absolute!important;left:8px;bottom:4px;image-rendering:pixelated}.p1-wardrobe-help{grid-column:1/4;line-height:1.5}.p1-item-row[draggable=true]{cursor:grab;}',
     '[data-product-review-panel-open=true] .sp-blueprint,[data-product-review-panel-open=true] .lw-menu,[data-product-review-panel-open=true] .lw-season,[data-product-review-panel-open=true] .p2-colony-controls,[data-product-review-help-open=true] .sp-blueprint{visibility:hidden;pointer-events:none;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',

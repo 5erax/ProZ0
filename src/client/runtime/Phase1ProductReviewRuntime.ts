@@ -1896,6 +1896,7 @@ export async function createPhase1ProductReviewRuntime(
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
+      if ((event.code === 'Enter' || event.code === 'Space') && event.target instanceof HTMLButtonElement) return;
       switch (event.code) {
         case 'ArrowUp':
           event.preventDefault();
@@ -2277,6 +2278,12 @@ export async function createPhase1ProductReviewRuntime(
     }
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
+    if (action?.startsWith('equip-slot:') && source.isInventoryOpen()) equipInventorySlot(action.slice('equip-slot:'.length));
+    if (action?.startsWith('unequip-slot:') && source.isInventoryOpen()) {
+      const slot = action.slice('unequip-slot:'.length), equipped = bundle.equipment.getView(config.localPlayerId);
+      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : null;
+      if (stackId) { source.selectInventoryItem(stackId); toggleSelectedEquipment('X'); }
+    }
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
     if (action === 'inventory-use' && source.isInventoryOpen()) beginSelectedConsume();
     if (action === 'inventory-drop' && source.isInventoryOpen()) dropSelectedInventoryQuantity();
@@ -2288,6 +2295,34 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   input.start();
+  const equipInventorySlot = (slot: string, stackId?: string) => {
+    if (!source.isInventoryOpen() || !['weapon', 'protection'].includes(slot)) return;
+    if (stackId) {
+      if (!bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === stackId)) { presentInventoryGuard('DRAG', 'EQUIP', 'SOURCE_MISSING'); return; }
+      source.selectInventoryItem(stackId);
+    }
+    const selection = source.getInventoryActionSelection();
+    const id = selection.stack?.itemDefinitionId;
+    if (selection.pane !== 'player' || (slot === 'weapon' ? id !== 'item:basic-spear' : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    if ((slot === 'weapon' ? current.equippedWeaponStackId : current.equippedThermalWrapStackId) === selection.stack?.stackId) return;
+    toggleSelectedEquipment('X');
+  };
+  const onGearDragStart = (event: DragEvent) => {
+    if (!(event.target instanceof Element) || !source.isInventoryOpen()) return;
+    const item = event.target.closest<HTMLElement>('[data-review-item][draggable=true]');
+    if (!item || !bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === item.dataset.reviewItem)) { event.preventDefault(); return; }
+    event.dataTransfer?.setData('application/x-proz0-inventory-stack', item.dataset.reviewItem!);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  };
+  const onGearDragOver = (event: DragEvent) => { if (event.target instanceof Element && event.target.closest('[data-equipment-drop-slot]') && source.isInventoryOpen()) event.preventDefault(); };
+  const onGearDrop = (event: DragEvent) => {
+    const slot = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-equipment-drop-slot]')?.dataset.equipmentDropSlot : null;
+    if (!slot || !source.isInventoryOpen()) return;
+    event.preventDefault(); event.stopPropagation();
+    const id = event.dataTransfer?.getData('application/x-proz0-inventory-stack');
+    if (id && id.length < 512) equipInventorySlot(slot, id);
+  };
   const removeContextMenu = installGameContextMenu(root, () => {
     livingOverlay?.cancelPlacement();
     expeditionOverlay?.cancelPlacement();
@@ -2300,6 +2335,9 @@ export async function createPhase1ProductReviewRuntime(
     }
   });
   root.addEventListener('click', onPanelClick);
+  root.addEventListener('dragstart', onGearDragStart);
+  root.addEventListener('dragover', onGearDragOver);
+  root.addEventListener('drop', onGearDrop);
   root.addEventListener('pointermove', updateBuildPointer);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
   host.start();
@@ -2335,6 +2373,9 @@ export async function createPhase1ProductReviewRuntime(
       input.stop();
       removeContextMenu();
       root.removeEventListener('click', onPanelClick);
+      root.removeEventListener('dragstart', onGearDragStart);
+      root.removeEventListener('dragover', onGearDragOver);
+      root.removeEventListener('drop', onGearDrop);
       root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
       playtestTools?.destroy();

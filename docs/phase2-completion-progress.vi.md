@@ -58,3 +58,11 @@ Typecheck/lint/build đạt; 26 construction unit tests gồm matrix 20 loại v
 UI: mục dài đóng mặc định, giữ expanded/scroll/focus khi stat cập nhật. Khi core panel mở, nhãn lab/manage/blueprint và Homestead/Colony controls không nổi đè lên panel. Desktop 1280×720 và compact 960×640 đã xem trực tiếp. Evidence ở work/outputs/checkpoint-E1; không coi screenshots là Owner art acceptance.
 
 Kiểm chứng: 21 test inspection/binding/carry/survival-combat integration/unit đạt, browser expansion/focus đạt; E2E nhận emergency water thật từ lab → dùng một water → stat authority tăng → stack còn 2, details giữ mở đạt (4.4 s), không grant fixture trong journey này. Typecheck/lint/build đạt tại mốc kiểm tra; required CI head E1 còn cần chạy. #227/#228 giữ OPEN đến tích hợp. Equipment avatar/rarity/EN–VI còn là E2, chưa tuyên bố hoàn thành nhóm E. CI đầy đủ của F1 db22bb8 và C1 5d658df đều PASS.
+
+## E2 — trang bị và preview nhân vật
+
+#220: Inventory/Storage có nhân vật giữa hai ô Weapon/Protection đang được authority hỗ trợ. Body dùng đúng skin đã chọn, lớp áo và giáo dùng cùng art với nhân vật ngoài thế giới; idle giáo hiện rõ, attack không bị vẽ giáo hai lần. Nút Equip/Unequip và kéo thả từ túi kiểm tra đúng slot, quyền sở hữu, stack hiện hữu và trạng thái authority. Drop lại vật phẩm đang trang bị giữ nguyên; X vẫn là toggle. Không nhân đôi hoặc tiêu thụ gear. Enter/Space trên button dùng kích hoạt native, không bị gameplay chặn. Sửa fallback null weapon đọc nhầm legacy equippedStack (áo) vào weapon slot.
+
+E2E fixture Save V2 hợp lệ cấp một giáo và một áo để kiểm tra UI: kéo áo vào ô giáo bị từ chối; kéo giáo đúng ô, lặp lại không tháo; Enter trang bị áo; ID không sở hữu không thay ref; quantity mỗi stack vẫn 1; avatar và world layer đúng; Save/reopen giữ cả hai ref; Space tháo giáo xóa cả preview/world layer. Đạt 1.4 s. Typecheck/lint/build đạt; ảnh đã xem ở `work/outputs/checkpoint-E2/wardrobe.png`. Đây là hai slot thực tế, chưa thêm head/legs/boots chỉ để trang trí, và chưa hoàn tất rarity/EN–VI. #220 giữ OPEN đến tích hợp cuối.
+
+CI E1 `37074400913` FAILED ở natural storage walk: test nhắm vào `-3.3,0`, trong footprint kho vừa đặt `-3,0`, nhân vật dừng `-3.63,-0.57`. Chưa tính lần CI này là PASS; cần sửa điểm tiếp cận hợp lệ và xác minh lại, không bỏ collision hoặc force teleport. Security/dependency review E1 PASS.

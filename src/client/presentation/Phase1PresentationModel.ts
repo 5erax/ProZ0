@@ -24,6 +24,7 @@ export interface Phase1CarryPresentation {
 }
 
 export interface Phase1EquipmentPresentation {
+  readonly stackId?: string;
   readonly name: string;
   readonly condition: number | null;
   readonly conditionMax: number | null;
@@ -82,6 +83,7 @@ export interface Phase1InventoryItemPresentation {
 }
 
 export interface Phase1InventoryPanelPresentation {
+  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
   readonly character?: CharacterInspection;
   readonly kind: 'inventory';
   readonly title: string;
@@ -102,6 +104,7 @@ export interface Phase1ContainerCapacityPresentation {
 }
 
 export interface Phase1ContainerPanelPresentation {
+  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
   readonly character?: CharacterInspection;
   readonly kind: 'container';
   readonly title: string;

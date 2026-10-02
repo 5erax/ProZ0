@@ -3,6 +3,7 @@ import { moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { colonyGroundSprite } from '../presentation/ColonySoilArt';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
+import { heldSpearSprite } from '../presentation/EquipmentArt';
 import {
   WORLD_PIXELS_PER_UNIT,
   type WorldPosition,
@@ -946,6 +947,10 @@ export function createPhase1ProductReviewWorldRenderer(
     if(local){const skin=selectedPlayerSkin();if(player.dataset.skin!==skin){player.style.filter=skin==='pioneer'?'':playerSkinFilter(skin)+' drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef)';player.dataset.skin=skin;}}
 
     const equipment = bundle.equipment.getView(id);
+    if (equipment.equippedWeaponStackId !== null && state !== 'SPEAR_ATTACK' && state !== 'DEATH') {
+      const held = heldSpearSprite(phase1IsometricFacing(movement.facing));
+      renderSprite(held.sprite, movement.position, camera, 'held-weapon-overlay', id, { flipX: held.flipX, zIndex: 900002, className: local ? 'p1-product-player' : 'p1-product-teammate', data: { actorState: state } });
+    }
     if (equipment.equippedThermalWrapStackId !== null) {
       const overlayFrame = thermalWrapActorSprite(
         phase1IsometricFacing(movement.facing),
