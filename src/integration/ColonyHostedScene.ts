@@ -166,8 +166,10 @@ export function colonyHostedScene(
         depleted: false,
         containerId: drop.containerId,
       });
+  const environment = bundle.worldStore.getEnvironmentView();
   return {
     version: 1,
+    ...(environment.brightness !== undefined ? { clock: { minute: environment.localMinuteOfDay, day: environment.dayIndex!, period: environment.dayPeriod, segment: environment.timeSegment!, brightness: environment.brightness } } : {}),
     worldSeed: bundle.config.worldSeed,
     tick: bundle.authorityTick,
     playerSkins: skins,

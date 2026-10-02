@@ -63,6 +63,7 @@ export const PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS = 6.25;
 export const PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS = 3.75;
 
 export interface Phase1WorldStoreConfig {
+  readonly calendarVersion?: 1;
   readonly generationVersion?: number;
   readonly worldSeed: string;
   readonly catalog: ContentCatalogV1;
@@ -465,6 +466,7 @@ export class Phase1WorldStore {
       this.environment = createPhase1EnvironmentState(
         this.config.worldSeed,
         this.config.catalog,
+        this.config.calendarVersion,
       );
       this.environmentDirty = true;
       return;

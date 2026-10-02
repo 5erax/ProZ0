@@ -1432,6 +1432,16 @@ export async function bootColonyCoop(
     const motions = connection.getPlayerMotions(),
       local = motions.find((p) => p.playerId === connection?.getPlayerId());
     if (!local) return;
+    if (scene.clock) {
+      const brightness = Math.round(scene.clock.brightness * 200) / 200;
+      if (worldLayer.dataset.brightness !== String(brightness)) {
+        worldLayer.style.filter = `brightness(${brightness})`;
+        worldLayer.dataset.brightness = String(brightness);
+      }
+      canvas.dataset.timeSegment = scene.clock.segment;
+      canvas.dataset.calendarDay = String(scene.clock.day);
+      region.title = `${String(Math.floor(scene.clock.minute / 60)).padStart(2, '0')}:${String(scene.clock.minute % 60).padStart(2, '0')} · ${scene.clock.segment} · Day ${scene.clock.day}`;
+    }
     const now = performance.now(),
       blend = 1 - Math.exp(-Math.min(now - lastFrame, 100) / 65);
     lastFrame = now;

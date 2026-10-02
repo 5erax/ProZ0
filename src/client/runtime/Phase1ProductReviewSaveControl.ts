@@ -4,6 +4,7 @@ import type {
 import type {
   WorldManifestV2,
 } from '../../persistence/schema/v2/WorldManifestV2';
+import { COLONY_AUTOSAVE_EVENT, type ColonyAutosaveIntent } from './ColonyAutosave';
 
 export interface Phase1ProductReviewSaveControl {
   destroy(): void;
@@ -47,6 +48,13 @@ export function createPhase1ProductReviewSaveControl(
   box.textContent = 'L · SAVE WORLD';
   layer.append(box);
   root.append(layer);
+  const toast = document.createElement('div');
+  toast.className = 'p1-product-save-toast';
+  toast.style.cssText = 'position:absolute;left:50%;top:4px;transform:translateX(-50%);padding:4px 8px;background:#10252ef0;border:1px solid #8da99b;width:max-content;max-width:90%;box-sizing:border-box';
+  toast.setAttribute('role', 'status');
+  toast.hidden = true;
+  toast.dataset.autosaveFeedback = '';
+  layer.append(toast);
 
   const helpPanel = root.querySelector<HTMLElement>(
     '.p1-product-controls-panel',
@@ -59,6 +67,8 @@ export function createPhase1ProductReviewSaveControl(
 
   let destroyed = false;
   let pending = false;
+  let queuedAutosave: ColonyAutosaveIntent | null = null;
+  const seenAutosaves = new Set<string>();
   let clearTimer: ReturnType<typeof setTimeout> | null = null;
 
   const applyScale = (): void => {
@@ -84,6 +94,8 @@ export function createPhase1ProductReviewSaveControl(
   ): void => {
     layer.dataset.saveState = state;
     box.textContent = text;
+    toast.hidden = state === 'idle';
+    toast.textContent = text;
   };
 
   const scheduleIdle = (delayMs: number): void => {
@@ -95,11 +107,12 @@ export function createPhase1ProductReviewSaveControl(
     }, delayMs);
   };
 
-  const triggerSave = async (): Promise<void> => {
+  const triggerSave = async (auto?: ColonyAutosaveIntent): Promise<void> => {
     if (destroyed || pending) return;
     pending = true;
     clearScheduledState();
-    setState('pending', 'Saving…');
+    setState('pending', auto ? 'Autosaving…' : 'Saving…');
+    if (auto) { layer.dataset.autosaveReason = auto.reason; layer.dataset.autosaveId = auto.id; }
 
     try {
       const result = await saveWorld();
@@ -108,7 +121,7 @@ export function createPhase1ProductReviewSaveControl(
       if (result.ok) {
         setState('success', root.dataset.savedReviewBookmark === 'unavailable'
           ? 'World saved — bookmark this page to return; Continue is unavailable.'
-          : 'World saved');
+          : auto ? 'World autosaved' : 'World saved');
         scheduleIdle(SAVE_SUCCESS_VISIBLE_MS);
         return;
       }
@@ -126,11 +139,27 @@ export function createPhase1ProductReviewSaveControl(
         'Save failed — progress since your last successful save is not durable. Retry Save.',
       );
       scheduleIdle(SAVE_FAILURE_VISIBLE_MS);
+    } finally {
+      pending = false;
+      const next = queuedAutosave;
+      queuedAutosave = null;
+      if (next && !destroyed) void triggerSave(next);
     }
   };
+  const onAutosave = (event: Event) => {
+    if (!(event instanceof CustomEvent)) return;
+    const intent = event.detail as ColonyAutosaveIntent;
+    if (!intent || typeof intent.id !== 'string' || !['rest', 'dawn'].includes(intent.reason) || !Number.isSafeInteger(intent.tick) || intent.tick < 0 || seenAutosaves.has(intent.id)) return;
+    seenAutosaves.add(intent.id);
+    if (seenAutosaves.size > 64) seenAutosaves.delete(seenAutosaves.values().next().value!);
+    if (pending) queuedAutosave = intent;
+    else void triggerSave(intent);
+  };
+  root.addEventListener(COLONY_AUTOSAVE_EVENT, onAutosave);
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat || event.code !== 'KeyL') return;
+    if (event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]')) return;
     event.preventDefault();
     void triggerSave();
   };
@@ -156,6 +185,8 @@ export function createPhase1ProductReviewSaveControl(
     destroy(): void {
       destroyed = true;
       pending = false;
+      queuedAutosave = null;
+      root.removeEventListener(COLONY_AUTOSAVE_EVENT, onAutosave);
       clearScheduledState();
       document.removeEventListener('keydown', onKeyDown);
       targetWindow.removeEventListener('resize', applyScale);

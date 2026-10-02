@@ -396,11 +396,18 @@ export class Phase1SurvivalAuthority {
     const food = applyRationalDecrease(
       state.foodMilli,
       state.foodDrainRemainder,
-      600,
+      context.sprinting ? 750 : 600,
       TICKS_PER_MINUTE,
     );
     state.foodMilli = food.value;
     state.foodDrainRemainder = food.remainder;
+    if (context.sprinting) {
+      // Exactly 8 points/second at 60 Hz; no additional persisted remainder.
+      const cost = tick % 3 === 0 ? 134 : 133;
+      state.staminaMilli = Math.max(0, state.staminaMilli - cost);
+      state.lastStaminaSpendTick = tick;
+      state.staminaRegenRemainder = 0;
+    }
 
     const targetMilli = clampMilli(context.thermalTarget * SURVIVAL_STAT_SCALE);
     if (state.temperatureMilli !== targetMilli) {

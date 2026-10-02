@@ -1,4 +1,5 @@
 import {generationCatalog} from '../../content/phase1/Phase1Catalog';
+import { colonyCalendarAt } from '../phase2/ColonyCalendar';
 import type { ContentCatalogV1 } from '../../content';
 import {
   DeterministicRng,
@@ -41,6 +42,7 @@ function stableEventId(worldSeed: string): string {
 export function createPhase1EnvironmentState(
   worldSeed: string,
   catalog: ContentCatalogV1,
+  calendarVersion?: 1,
 ): Phase1EnvironmentState {
   if (worldSeed.length === 0) {
     throw new RangeError('World seed must not be empty.');
@@ -85,6 +87,7 @@ export function createPhase1EnvironmentState(
 
   return Object.freeze({
     activeTick: 0,
+    ...(calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: PHASE1_NEW_WORLD_START_LOCAL_MINUTE,
     weatherEvents: Object.freeze([event]),
   });
@@ -95,6 +98,7 @@ export function validatePhase1EnvironmentState(
   catalog: ContentCatalogV1,
 ): Phase1EnvironmentState {
   requireTick(state.activeTick, 'Environment activeTick');
+  if (state.calendarVersion !== undefined && state.calendarVersion !== 1) throw new Error('Unsupported world calendar version.');
 
   if (
     !Number.isInteger(state.cycleStartLocalMinute)
@@ -151,6 +155,7 @@ export function validatePhase1EnvironmentState(
 
   return Object.freeze({
     activeTick: state.activeTick,
+    ...(state.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze([
       Object.freeze({
@@ -190,6 +195,7 @@ export function advancePhase1Environment(
 export function localMinuteOfDay(
   state: Phase1EnvironmentState,
 ): number {
+  if (state.calendarVersion === 1) return colonyCalendarAt(state.activeTick, state.cycleStartLocalMinute).localMinuteOfDay;
   const dayTicks =
     PHASE1_WORLD_DAY_ACTIVE_SECONDS * SIMULATION_HZ;
   const normalizedTick = state.activeTick % dayTicks;
@@ -222,6 +228,7 @@ export function getPhase1EnvironmentView(
 ): Phase1EnvironmentView {
   const validated = validatePhase1EnvironmentState(state, catalog);
   const localMinute = localMinuteOfDay(validated);
+  const calendar = validated.calendarVersion === 1 ? colonyCalendarAt(validated.activeTick, validated.cycleStartLocalMinute) : null;
   const dayPeriod =
     localMinute >= PHASE1_DAYLIGHT_START_LOCAL_MINUTE
     && localMinute < PHASE1_DAYLIGHT_END_LOCAL_MINUTE
@@ -231,7 +238,8 @@ export function getPhase1EnvironmentView(
   return Object.freeze({
     state: validated,
     localMinuteOfDay: localMinute,
-    dayPeriod,
+    dayPeriod: calendar?.dayPeriod ?? dayPeriod,
+    ...(calendar ? { timeSegment: calendar.timeSegment, brightness: calendar.brightness, dayIndex: calendar.dayIndex, nightOrdinal: calendar.nightOrdinal } : {}),
     coldRainStatus: coldRainStatus(validated),
   });
 }

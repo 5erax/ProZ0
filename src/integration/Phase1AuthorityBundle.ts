@@ -406,6 +406,8 @@ export class Phase1AuthorityBundle {
 
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly registeredSurvival = new Set<PlayerId>();
+  private readonly sprintingPlayers = new Set<PlayerId>();
+  private readonly exhaustedSprinters = new Set<PlayerId>();
   private readonly lastGatherResults = new Map<PlayerId, GatherTickResult>();
   private readonly lastConsumeResults = new Map<PlayerId, ConsumeTickResult>();
   private readonly lastDeathResults =
@@ -536,6 +538,7 @@ export class Phase1AuthorityBundle {
       chunks: reopen?.chunks.map((entry) => entry.worldSlice) ?? [],
     });
     const worldStore = new Phase1WorldStore({
+      ...(config.colonyDepthEnabled === true ? { calendarVersion: 1 as const } : {}),
       generationVersion: reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       worldSeed: config.worldSeed,
       catalog,
@@ -713,6 +716,21 @@ export class Phase1AuthorityBundle {
       worldQuery: this.world,
       initialPlayerPosition: this.positions.get(playerId),
       initialPlayerFacing: reopened?.record.facing ?? 'E',
+      movementMultiplier: (input) => {
+        const moving = input.moveLeft !== input.moveRight || input.moveUp !== input.moveDown;
+        if (!input.sprint || !moving || this.config.colonyDepthEnabled !== true) {
+          this.sprintingPlayers.delete(playerId);
+          if (!input.sprint) this.exhaustedSprinters.delete(playerId);
+          return 1;
+        }
+        const survival = this.survival.getPlayerState(playerId);
+        if (this.exhaustedSprinters.has(playerId) && survival.staminaMilli >= 15000) this.exhaustedSprinters.delete(playerId);
+        const canSprint = !this.exhaustedSprinters.has(playerId) && this.survival.canSpendStamina(playerId, 1) && survival.foodMilli > 0 && survival.waterMilli > 0 && !this.expedition?.restStatus(playerId);
+        if (canSprint) { this.sprintingPlayers.add(playerId); return 1.6; }
+        this.exhaustedSprinters.add(playerId);
+        this.sprintingPlayers.delete(playerId);
+        return 1;
+      },
     });
     this.positions.bind(playerId, runtime);
     this.runtimes.set(playerId, runtime);
@@ -875,6 +893,7 @@ export class Phase1AuthorityBundle {
       const thermalWrapActive =
         this.equipment.isThermalWrapActive(playerId);
       this.survival.stepPlayer(playerId, authorityTick, {
+        sprinting: this.sprintingPlayers.has(playerId) && Math.hypot(this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.x, this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.y) > 0,
         thermalTarget: this.livingWorld?.thermalTarget(this.positions.get(playerId),this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,exposure.sheltered) ?? (this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget),
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',

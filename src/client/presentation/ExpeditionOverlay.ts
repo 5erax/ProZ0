@@ -140,7 +140,7 @@ export function createExpeditionOverlay(
       OUT_OF_RANGE: 'Move closer to this blueprint or facility.',
       PLAN_OVERLAP:
         'Choose a position clear of other blueprints and facilities.',
-      REST_STARTED: 'Rest started. Stay still and safe to recover.',
+      REST_STARTED: 'Rest started. Stay still and safe; closing this panel wakes you up.',
       REST_COOLDOWN: 'You have rested recently. Wait before resting again.',
       FOOD_AND_WATER_REQUIRED:
         'You need at least 15 food and 15 water to rest safely.',

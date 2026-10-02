@@ -51,6 +51,7 @@ export interface PlayerSurvivalState {
 }
 
 export interface SurvivalTickContext {
+  readonly sprinting?: boolean;
   readonly thermalTarget: number;
   readonly thermalWrapActive: boolean;
   readonly carryState: PlayerWeightState;

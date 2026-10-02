@@ -13,6 +13,19 @@ Kiểm chứng đầu: typecheck/lint/build đạt, 151 unit đạt, 37 browser 
 
 Giới hạn còn lại: #242 vẫn OPEN vì địa hình/thời tiết, UI và art review của Owner chưa hoàn tất. Y-sort nhân vật cũ có ưu tiên cao cố định, cần giải quyết cùng occlusion tổng thể; không tuyên bố đã sửa toàn bộ. Chưa thêm living-world gameplay mới vào replica co-op; guard chuột phải dùng chung nhưng hình ảnh wildlife co-op vẫn cần kiểm chứng theo scene contract. Required CI/full regression chưa chạy cho mốc cuối. Chưa đóng #231 trước khi tích hợp và kiểm tra đầy đủ.
 
+Required CI ở head `0b279e6` phát hiện hồi quy có thật: vùng trong suốt phía trên sprite đá chặn nhấp ô trồng sau mở save. Sửa hit mask đá/quặng/nước theo phần hình có thể nhấp; không ép click xuyên vật thể trong test. E2E `living-world.spec.ts` tự thu thập, trồng và mở lại đã đạt sau sửa (72 s). Cần CI tại head mới trước khi đóng issue.
+
+## B1 — lịch, ánh sáng, sprint và autosave
+
+- #217/#229/#235: calendar v1 dùng tick authority, một ngày 12 phút active, một ngày/mùa theo mùa 12 phút hiện có; bốn mùa là 48 phút active. Xuân/thu sáng 12 h, hạ 16 h, đông 8 h; lịch dawn/dusk chuyển mềm một phút active đầu mùa. Sáu buổi MORNING/NOON/AFTERNOON/DUSK/MIDNIGHT/PREDAWN, sáu tâm sáng 0.82/1/0.84/0.62/0.43/0.60 nội suy liên tục. HUD lấy buổi từ authority; scene co-op truyền cùng clock/brightness. Không đổi tốc độ simulation hoặc weather ordinal.
+- Save V2 thêm `environment.calendarVersion?: 1`. Chỉ thế giới Colony mới có field. Save cũ thiếu field giữ lịch cũ 48 phút/ngày; không nâng ngầm, nhảy đồng hồ hay đổi seed. Unknown calendar bị từ chối. Không tính bù offline. Season v1 vẫn đổi tại 09:00 theo tick khởi đầu, không tuyên bố đổi tại nửa đêm.
+- #219: giữ Shift lúc đi để chạy ×1.6, tiêu 8 stamina/s, food drain thêm 25% **chỉ khi có dịch chuyển được authority giải quyết**. Tuning chốt khác đề xuất ×1.5/+15% để dễ phân biệt đi/chạy; cần Owner playtest cân bằng. Cạn sức giữ Shift chờ hồi 15 điểm sẽ chạy lại; thả Shift xóa latch. Không chạy nếu chết, thiếu food/water, đang nghỉ hoặc stamina đã được giao dịch khác giữ. Diagonal/collision/địa hình dùng movement system cũ. Đứng, va tường, panel mở không tính sprint. Input/chat và blur xóa intent. Wire co-op chưa nhận sprint: tính năng mới này ưu tiên solo, không hứa prediction sprint qua Internet.
+- #218: sự kiện hoàn tất nghỉ và crossing dawn gọi checkpoint Save V2 hiện có. Dedup theo world/player/rest cooldown hoặc night ordinal; mở save lấy mốc đã lưu, không autosave lại ngay. Serialize với manual Save, coalesce event pending để không ghi song song. Toast báo lỗi ở ngoài Settings. Nghỉ an toàn 8 giây đã có sẵn; không fast-forward thời gian. Đóng panel/Wake up/di chuyển/nguy hiểm hủy nghỉ, không ghi thành nghỉ thành công.
+
+Source map: `ColonyCalendar.ts` → environment/store/Save V2 mapper/reopen → presentation binding/scene; `PlayerInput.ts` → mapper/FixedStepRuntime → bundle permission → movement/survival; `ColonyAutosave.ts` → product runtime crossing → SaveControl checkpoint. Không thêm âm thanh.
+
+Kiểm chứng local: 154 unit, 184 integration + 3 skip (trước bổ sung thêm một test authority sprint), 13 determinism, 39 browser đạt; bốn test sprint/calendar integration mới đạt, typecheck/lint/build đạt. Hai E2E nghỉ/autosave đạt (19.7 s): nghỉ đủ lưu/mở lại giữ lịch và đóng panel hủy không tự lưu. Test authority sprint kiểm tra reservation, va tường, đứng giữ Shift và hồi ngưỡng 15; fixture collision được ghi rõ, không thay playtest tự nhiên. Required CI/full-suite tại head mới và kiểm tra ngày/đêm dài còn cần hoàn tất. Các issue nhóm B giữ OPEN đến tích hợp.
+
 ## Tiếp theo
 
-Nhóm B: nguồn thời gian ngày/mùa thống nhất, sáu bậc ánh sáng, autosave sau nghỉ thành công/qua đêm, sprint với chi phí stamina/food. Giữ day-cycle của save/Phase 1 cũ và công bố quy tắc mới theo generation version, không sửa weather tick đã lưu.
+Nhóm C: kích thước/sản lượng, stat sinh trưởng và gốc trồng lại, cỏ thu hoạch, độ ẩm/màu đất, weather motion. Schema/content mới phải có migration từ catalog hiện có và giữ generation V3/V4; không đổi fingerprint rồi làm mất save cũ.

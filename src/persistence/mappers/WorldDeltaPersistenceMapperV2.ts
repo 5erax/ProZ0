@@ -88,6 +88,7 @@ export function environmentStateToManifestFieldsV2(
 ): WorldManifestV2['environment'] {
   return Object.freeze({
     activeTick: state.activeTick,
+    ...(state.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze(state.weatherEvents.map((event) => Object.freeze({ ...event }))),
   });

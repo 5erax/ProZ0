@@ -41,6 +41,7 @@ export interface Phase1EquipmentSlotsPresentation {
 }
 
 export interface Phase1WorldPresentation {
+  readonly timeSegment?: string;
   readonly timeLabel: string;
   readonly dayPeriod: 'DAY' | 'NIGHT';
   readonly weatherLabel: string;

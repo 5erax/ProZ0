@@ -36,6 +36,7 @@ function copyEnvironment(
 ): Phase1EnvironmentState {
   return Object.freeze({
     activeTick: state.activeTick,
+    ...(state.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze(
       state.weatherEvents.map((entry) => Object.freeze({ ...entry })),

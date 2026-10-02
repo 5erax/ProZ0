@@ -877,6 +877,7 @@ export function projectPhase1RuntimePresentation(
     world: Object.freeze({
       timeLabel: worldTimeLabel(environment),
       dayPeriod: environment.dayPeriod.toUpperCase() as 'DAY' | 'NIGHT',
+      ...(environment.timeSegment ? { timeSegment: environment.timeSegment } : {}),
       weatherLabel: input.weatherOverride?.label ?? (coldRain === 'active'
         ? 'COLD RAIN'
         : coldRain === 'warning'

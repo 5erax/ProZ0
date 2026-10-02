@@ -3,6 +3,13 @@ export interface ColonySceneV1 {
   readonly version: 1;
   readonly worldSeed: string;
   readonly tick: number;
+  readonly clock?: {
+    readonly minute: number;
+    readonly day: number;
+    readonly period: 'day' | 'night';
+    readonly segment: string;
+    readonly brightness: number;
+  };
   readonly playerSkins?: Readonly<Record<string, string>>;
   readonly playerNames?: Readonly<Record<string, string>>;
   readonly map?: readonly {

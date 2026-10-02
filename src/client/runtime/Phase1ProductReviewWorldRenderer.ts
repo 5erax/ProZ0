@@ -1165,6 +1165,15 @@ export function createPhase1ProductReviewWorldRenderer(
     // the full viewport backdrop on each simulation tick.
     layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
     const environment = bundle.worldStore.getEnvironmentView();
+    if (environment.brightness !== undefined) {
+      const brightness = Math.round(environment.brightness * 200) / 200;
+      if (worldStage.dataset.brightness !== String(brightness)) {
+        worldStage.style.filter = `brightness(${brightness})`;
+        worldStage.dataset.brightness = String(brightness);
+      }
+      canvas.dataset.timeSegment = environment.timeSegment;
+      canvas.dataset.calendarDay = String(environment.dayIndex);
+    }
     const context = getPresentationContext();
     const regionalWeather=bundle.config.colonyDepthEnabled===true?colonyWeatherAt(bundle.config.worldSeed,camera,bundle.authorityTick):null;
     if(bundle.livingWorld)layer.dataset.livingSeason=bundle.livingWorld.season().id;
@@ -1180,11 +1189,11 @@ export function createPhase1ProductReviewWorldRenderer(
     renderTerrain(
       camera,
       bundle.authorityTick,
-      environment.dayPeriod === 'night',
+      environment.brightness === undefined && environment.dayPeriod === 'night',
       raining,
     );
 
-    if (environment.dayPeriod === 'night') {
+    if (environment.brightness === undefined && environment.dayPeriod === 'night') {
       const night = sceneElement('night');
       night.className = 'p1-product-night';
       night.dataset.dayPeriod = 'NIGHT';
@@ -1216,6 +1225,10 @@ export function createPhase1ProductReviewWorldRenderer(
         entity.entityId,
       );
       if(rendered!==null && entity.type==='resource' && bundle.config.colonyDepthEnabled===true){
+        // The authored 32×48 resource cell has transparent sky above a rock.
+        // Do not let that empty rectangle steal clicks from a crop behind it.
+        if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
+        else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
         const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
         if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':name+' · approach to interact';

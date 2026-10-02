@@ -1,5 +1,6 @@
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import { installGameContextMenu } from '../input/GameContextMenu';
+import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
@@ -2148,13 +2149,23 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const dawnOrdinal = () => {
+    const view = bundle.worldStore.getEnvironmentView();
+    // Legacy saves retain their 48-minute clock and 06:00 dawn.
+    return view.nightOrdinal ?? Math.floor((view.state.cycleStartLocalMinute + bundle.authorityTick / 120 - 360) / 1440);
+  };
+  const autosaveCrossings = new ColonyAutosaveCrossings(dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0);
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
         await bundle.stepSolo();
+        if (config.colonyDepthEnabled === true) {
+          const intent = autosaveCrossings.advance(config.worldId, config.localPlayerId, bundle.authorityTick, dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0, bundle.survival.getPlayerState(config.localPlayerId).lifeState.type === 'alive');
+          if (intent) root.dispatchEvent(new CustomEvent(COLONY_AUTOSAVE_EVENT, { detail: intent }));
+        }
         colonyDepthOverlay?.render();
         updateGather(
           bundle.getLastGatherResult(config.localPlayerId),
