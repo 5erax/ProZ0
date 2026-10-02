@@ -5,12 +5,10 @@ async function walk(page: Page, x: number, y: number) {
   let held: string[] = [];
   try {
     for (let n = 0; n < 1500; n++) {
-      const p = await page
-        .locator('canvas')
-        .evaluate((e) => ({
-          x: Number(e.getAttribute('data-player-x')),
-          y: Number(e.getAttribute('data-player-y')),
-        }));
+      const p = await page.locator('canvas').evaluate((e) => ({
+        x: Number(e.getAttribute('data-player-x')),
+        y: Number(e.getAttribute('data-player-y')),
+      }));
       const dx = x - p.x,
         dy = y - p.y;
       if (Math.hypot(dx, dy) < 0.15) return;
@@ -181,15 +179,19 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   await panel
     .getByRole('button', { name: 'Emergency supplies · once', exact: true })
     .click();
-  await expect(panel.getByRole('status')).toHaveText(
+  await expect(panel.getByRole('status')).toHaveAttribute(
+    'data-result',
     'FACILITY_ACTION_COMPLETED',
   );
+  await expect(panel.getByRole('status')).toContainText('Supplies collected');
   await panel
     .getByRole('button', { name: 'Emergency supplies · once', exact: true })
     .click();
-  await expect(panel.getByRole('status')).toHaveText(
+  await expect(panel.getByRole('status')).toHaveAttribute(
+    'data-result',
     'SUPPLIES_ALREADY_CLAIMED',
   );
+  await expect(panel.getByRole('status')).toContainText('already collected');
   await panel
     .getByRole('button', { name: 'Sleep / rest · 8s', exact: true })
     .click();

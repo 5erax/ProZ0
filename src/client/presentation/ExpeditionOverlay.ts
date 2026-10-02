@@ -27,7 +27,7 @@ export function createExpeditionOverlay(
     authority = bundle.expedition!;
   const style = document.createElement('style');
   style.textContent =
-    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
+    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
   const layer = document.createElement('section');
   layer.className = 'sp-expedition';
   layer.setAttribute('aria-label', 'Expedition construction');
@@ -68,6 +68,54 @@ export function createExpeditionOverlay(
     const e = document.createElement(tag);
     e.textContent = value;
     return e;
+  };
+  const describeFeedback = (message: string): string => {
+    if (message.startsWith('plan:'))
+      return 'Blueprint placed. Bring materials and contribute what you carry.';
+    const messages: Readonly<Record<string, string>> = {
+      MATERIALS_DEPOSITED: 'Materials contributed. You can add more later.',
+      PLAN_MOVED: 'Blueprint moved. Contributed materials are kept.',
+      PLAN_REFUNDED:
+        'Blueprint cancelled. Contributed materials returned to your bag.',
+      FACILITY_COMPLETED: 'Outpost facility completed.',
+      MATERIALS_MISSING:
+        'Contribute the remaining materials before completing this facility.',
+      NO_OUTSTANDING_MATERIALS_AVAILABLE:
+        'Your bag has no remaining materials needed by this blueprint.',
+      OUT_OF_RANGE: 'Move closer to this blueprint or facility.',
+      PLAN_OVERLAP:
+        'Choose a position clear of other blueprints and facilities.',
+      REST_STARTED: 'Rest started. Stay still and safe to recover.',
+      REST_COOLDOWN: 'You have rested recently. Wait before resting again.',
+      FOOD_AND_WATER_REQUIRED:
+        'You need at least 15 food and 15 water to rest safely.',
+      HOSTILE_NEARBY: 'A hostile is nearby. Reach a safe place before resting.',
+      SUPPLIES_ALREADY_CLAIMED:
+        'You have already collected this world’s emergency supplies.',
+      FACILITY_ACTION_COMPLETED:
+        'Supplies collected or facility action completed.',
+      NO_COLLECTED_WATER:
+        'No water collected yet. This collector fills during local rain.',
+      FOOD_FULL: 'You are already well fed.',
+      CRAFTED: 'Item crafted and added to your bag.',
+      NEARBY_FIELD_WORKBENCH_REQUIRED:
+        'Use a nearby Field Workbench for this recipe.',
+      SEED_COPIED: 'World seed copied.',
+      STALE_REVISION: 'The world changed. Try this action again.',
+      STALE_INVENTORY_REVISION:
+        'Your inventory changed. Try this action again.',
+      PLAN_LIMIT:
+        'Too many unfinished blueprints. Complete or cancel one first.',
+      FACILITY_LIMIT: 'This world has reached the expedition facility limit.',
+      INSUFFICIENT_ITEMS: 'Gather the missing materials first.',
+      TARGET_CAPACITY_WEIGHT:
+        'Your bag is too heavy. Store or drop some items first.',
+      TARGET_CAPACITY_VOLUME:
+        'Your bag has no room. Store or drop some items first.',
+      QUANTITY_UNAVAILABLE: 'Gather the missing materials first.',
+      CAPACITY_EXCEEDED: 'Your bag is full. Store or drop some items first.',
+    };
+    return messages[message] ?? message.replaceAll('_', ' ').toLowerCase();
   };
   const run = (
     action: ExpeditionCommand['action'],
@@ -154,11 +202,22 @@ export function createExpeditionOverlay(
       panel.hidden = !opened;
       panel.replaceChildren();
       if (opened) {
-        panel.append(
+        const header = document.createElement('header');
+        header.className = 'sp-expedition-header';
+        header.append(
           text('h2', 'EXPEDITION · BLUEPRINTS & FIELD CRAFT'),
           button('Close', close),
+        );
+        panel.append(
+          header,
           text('small', 'World seed: ' + bundle.config.worldSeed),
           button('Copy seed', () => {
+            if (!navigator.clipboard) {
+              feedback = 'Select the displayed seed to copy it.';
+              signature = '';
+              render();
+              return;
+            }
             void navigator.clipboard
               .writeText(bundle.config.worldSeed)
               .then(() => {
@@ -202,7 +261,8 @@ export function createExpeditionOverlay(
             );
           panel.append(history);
         }
-        const status = text('p', feedback);
+        const status = text('p', describeFeedback(feedback));
+        status.dataset.result = feedback;
         status.setAttribute('role', 'status');
         panel.append(status);
         for (const def of EXPEDITION_FACILITIES) {
@@ -447,7 +507,9 @@ export function createExpeditionOverlay(
       placement = null;
       hint.hidden = true;
       open();
-    } else hint.textContent = feedback + ' · choose a different position';
+    } else
+      hint.textContent =
+        describeFeedback(feedback) + ' · choose a different position';
   };
   const key = (event: KeyboardEvent) => {
     if (!opened && !placement) return;
