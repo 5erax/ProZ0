@@ -1,4 +1,5 @@
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
+import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { installGameContextMenu } from '../input/GameContextMenu';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
@@ -215,7 +216,7 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.visualQaMode = 'none';
   root.dataset.runtimeStatus = 'booting';
 
-  const bundle = await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
+  const bundle = await Phase1AuthorityBundle.create({...config,...(config.colonyDepthEnabled===true && config.playerIds.length===1 ? {resourceProfileVersion:1 as const} : {}),singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
   const checkpointCoordinator =
     new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(
@@ -1500,12 +1501,14 @@ export async function createPhase1ProductReviewRuntime(
       const resourceState = bundle.worldStore.getResourceState(resource.entityId);
       const renewing = resourceState?.depleted === true;
       const readyTick = resourceState?.regenerationReadyTick;
+      const size = bundle.worldStore.getResourceSize(resource.entityId, resource.definitionId);
+      const harvest = resourceHarvestDefinition(definition, size);
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
         verb: renewing ? 'RENEWING' : 'GATHER',
         target: definition.displayName,
         state: renewing ? 'BLOCKED' : 'AVAILABLE',
-        reason: !renewing ? null : readyTick == null ? 'Resource depleted' :
+        reason: !renewing ? size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's' : null : readyTick == null ? 'Resource depleted' :
           'Regrows in ' + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + 's of world time',
         progress: null,
       }));

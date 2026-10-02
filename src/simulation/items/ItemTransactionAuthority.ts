@@ -1,4 +1,5 @@
 import { SIMULATION_HZ, type PlayerId } from '../../foundation';
+import { resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import {
   ContentLookupError,
   type ContentCatalogV1,
@@ -2169,13 +2170,14 @@ export class Phase1ItemAuthority {
       return 'OUT_OF_RANGE';
     }
 
-    const definition = getResourceDefinition(
+    const baseDefinition = getResourceDefinition(
       this.options.catalog,
       resource.resourceDefinitionId,
     );
-    if (definition === null) {
+    if (baseDefinition === null) {
       return 'SOURCE_MISSING';
     }
+    const definition = resourceHarvestDefinition(baseDefinition, resource.size);
 
     const toolFailure = this.validateGatherTool(
       inventory.stacks,

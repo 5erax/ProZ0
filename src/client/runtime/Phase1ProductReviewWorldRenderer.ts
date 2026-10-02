@@ -1,4 +1,6 @@
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
+import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
+import { sizedResourceSprite, sizedResourceHitShape } from '../presentation/ResourceSizeArt';
 import { moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { colonyGroundSprite } from '../presentation/ColonySoilArt';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
@@ -263,6 +265,8 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
+      const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
+      if (size) return sizedResourceSprite(entity.definitionId, size, state?.depleted === true);
       if(bundle.config.colonyDepthEnabled===true)return colonyResourceSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),entity.definitionId,state?.depleted===true);
       return phase1ResourcePresentationSprite(
         entity.definitionId,
@@ -509,6 +513,7 @@ function styleElement(document: Document): HTMLStyleElement {
     '.p1-product-player,.p1-product-teammate{z-index:900000!important;}',
     '.p1-product-player[data-local-player="true"]{filter:drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef);}',
     '.p1-product-focused-target{outline:1px solid #f4f6ef;outline-offset:1px;box-shadow:0 0 0 1px #111722;}',
+    '.p1-product-focused-target[data-resource-size]{outline:none;box-shadow:none;filter:drop-shadow(1px 0 0 #e6ebcf) drop-shadow(-1px 0 0 #e6ebcf) drop-shadow(0 -1px 0 #e6ebcf);}',
     '.p1-product-critical{z-index:890000!important;}',
     '.p1-product-identity{z-index:930000!important;}',
     '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);z-index:910000!important;}',
@@ -1233,11 +1238,16 @@ export function createPhase1ProductReviewWorldRenderer(
       if(rendered!==null && entity.type==='resource' && bundle.config.colonyDepthEnabled===true){
         // The authored 32×48 resource cell has transparent sky above a rock.
         // Do not let that empty rectangle steal clicks from a crop behind it.
-        if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
+        const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
+        if (size) rendered.style.clipPath = sizedResourceHitShape(entity.definitionId, size, bundle.worldStore.getResourceState(entity.entityId)?.depleted === true);
+        else if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
         else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
         const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':name+' · approach to interact';
+        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);
+        if (size) rendered.dataset.resourceSize = size;
+        const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId, 'resource'), size);
+        rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':(size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' : '') + name + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's · approach to interact';
       }
 
       if (entity.type === 'ruin') {

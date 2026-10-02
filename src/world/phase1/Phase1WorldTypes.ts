@@ -112,6 +112,8 @@ export interface Phase1WeatherEventState {
 }
 
 export interface Phase1EnvironmentState {
+  /** Absent preserves legacy resource yield/work/art on existing saves. */
+  readonly resourceProfileVersion?: 1;
   /** Absent keeps the historical 48-minute day when reopening old saves. */
   readonly calendarVersion?: 1;
   readonly activeTick: number;

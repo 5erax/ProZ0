@@ -6,6 +6,7 @@ export type WorldDropId = string;
 export type StructureInstanceId = string;
 
 export interface ResourceNodeView {
+  readonly size?: import('../../content/livingworld/ResourceSizeProfiles').ResourceSize | undefined;
   readonly resourceEntityId: ResourceEntityId;
   readonly resourceDefinitionId: ContentId;
   readonly revision: number;

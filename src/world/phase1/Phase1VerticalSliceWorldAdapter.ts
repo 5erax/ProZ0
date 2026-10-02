@@ -407,6 +407,7 @@ export class Phase1VerticalSliceWorldAdapter
     return Object.freeze({
       resourceEntityId,
       resourceDefinitionId: entity.definitionId,
+      size: this.options.store.getResourceSize(entity.entityId, entity.definitionId),
       revision: state.revision,
       remainingActions: state.remainingGatherActions,
       depleted: state.depleted,

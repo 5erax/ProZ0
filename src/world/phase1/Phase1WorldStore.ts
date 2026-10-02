@@ -4,6 +4,7 @@ import type {
   ContentId,
   ResourceNodeDefinitionV1,
 } from '../../content';
+import { resourceSizeAt, type ResourceSize } from '../../content/livingworld/ResourceSizeProfiles';
 import {
   SIMULATION_HZ,
   createWorldPosition,
@@ -63,6 +64,7 @@ export const PHASE1_FOG_REVEAL_RADIUS_WORLD_UNITS = 6.25;
 export const PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS = 3.75;
 
 export interface Phase1WorldStoreConfig {
+  readonly resourceProfileVersion?: 1;
   readonly calendarVersion?: 1;
   readonly generationVersion?: number;
   readonly worldSeed: string;
@@ -438,6 +440,16 @@ function circleChunkCoords(
 }
 
 export class Phase1WorldStore {
+  private readonly resourceSizes = new Map<string, ResourceSize | undefined>();
+  public getResourceSize(entityId: string, definitionId: string): ResourceSize | undefined {
+    if (this.requireEnvironment().resourceProfileVersion !== 1) return undefined;
+    const key = entityId + ':' + definitionId;
+    if (this.resourceSizes.has(key)) return this.resourceSizes.get(key);
+    const size = resourceSizeAt(this.config.worldSeed, entityId, definitionId, 1);
+    if (this.resourceSizes.size >= 1024) this.resourceSizes.delete(this.resourceSizes.keys().next().value!);
+    this.resourceSizes.set(key, size);
+    return size;
+  }
   private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
   public setRenewalPolicy(policy: NonNullable<Phase1WorldStore['renewalPolicy']>): void { this.renewalPolicy = policy; }
   private readonly entries = new Map<string, Phase1WorldChunkEntry>();
@@ -467,6 +479,7 @@ export class Phase1WorldStore {
         this.config.worldSeed,
         this.config.catalog,
         this.config.calendarVersion,
+        this.config.resourceProfileVersion,
       );
       this.environmentDirty = true;
       return;
