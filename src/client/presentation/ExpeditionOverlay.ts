@@ -12,8 +12,9 @@ import {
 import {
   applyProductionSprite,
   itemIconSprite,
-  PHASE1_PRODUCTION_WORLD_SPRITES,
 } from './Phase1ProductionAssets';
+
+import { expeditionSprite } from './ExpeditionAssets';
 
 /** Presentation only: every material change runs through the solo authority. */
 export function createExpeditionOverlay(
@@ -27,7 +28,7 @@ export function createExpeditionOverlay(
     authority = bundle.expedition!;
   const style = document.createElement('style');
   style.textContent =
-    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
+    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-ghost{position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;z-index:1}.sp-ghost svg{position:absolute;inset:0}.sp-ghost .sp-facility-art{position:absolute;left:16px;bottom:20px;opacity:.65}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
   const layer = document.createElement('section');
   layer.className = 'sp-expedition';
   layer.setAttribute('aria-label', 'Expedition construction');
@@ -38,7 +39,23 @@ export function createExpeditionOverlay(
   hint.className = 'sp-placement-hint';
   panel.hidden = true;
   hint.hidden = true;
-  layer.append(style, markers, panel, hint);
+  const ghost = document.createElement('div');
+  ghost.className = 'sp-ghost';
+  ghost.hidden = true;
+  const footprint = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'svg',
+  );
+  footprint.setAttribute('viewBox', '0 0 64 64');
+  const outline = document.createElementNS(
+    'http://www.w3.org/2000/svg',
+    'path',
+  );
+  outline.setAttribute('stroke-width', '2');
+  outline.setAttribute('stroke-dasharray', '4 2');
+  footprint.append(outline);
+  ghost.append(footprint);
+  layer.append(style, markers, ghost, panel, hint);
   root.append(layer);
   let opened = false,
     feedback = '',
@@ -48,10 +65,19 @@ export function createExpeditionOverlay(
       planId?: string;
       orientation: 0 | 1 | 2 | 3;
     } | null = null;
+  let cursor: { x: number; y: number } | null = null,
+    previewSignature = '';
+  const art = (id: string) => {
+    const sprite = document.createElement('span');
+    sprite.className = 'sp-facility-art';
+    applyProductionSprite(sprite, expeditionSprite(id), 0.5);
+    return sprite;
+  };
   const close = () => {
     authority.cancelRest(playerId);
     opened = false;
     panel.hidden = true;
+    ghost.hidden = true;
     root.dataset.expeditionPanelOpen = 'false';
   };
   const button = (label: string, run: () => void) => {
@@ -78,6 +104,12 @@ export function createExpeditionOverlay(
       PLAN_REFUNDED:
         'Blueprint cancelled. Contributed materials returned to your bag.',
       FACILITY_COMPLETED: 'Outpost facility completed.',
+      FACILITY_DISMANTLED:
+        'Facility removed. Building materials returned to your bag.',
+      COLLECT_WATER_FIRST:
+        'Collect the stored water before dismantling this collector.',
+      USE_CANONICAL_DISMANTLE:
+        'Use the existing building dismantle action; empty storage first.',
       MATERIALS_MISSING:
         'Contribute the remaining materials before completing this facility.',
       NO_OUTSTANDING_MATERIALS_AVAILABLE:
@@ -141,7 +173,7 @@ export function createExpeditionOverlay(
   const costs = (
     row: HTMLElement,
     entries: readonly (readonly [string, number])[],
-    paid: Readonly<Record<string, number>> = {},
+    paid?: Readonly<Record<string, number>>,
   ) => {
     for (const [id, count] of entries) {
       const cost = document.createElement('span');
@@ -154,7 +186,14 @@ export function createExpeditionOverlay(
         document.createTextNode(
           bundle.catalog.get(id).displayName +
             ' ' +
-            String(paid[id] ?? 0) +
+            String(
+              paid
+                ? (paid[id] ?? 0)
+                : bundle.items
+                    .getContainerView('inventory:' + playerId)
+                    .stacks.filter((s) => s.itemDefinitionId === id)
+                    .reduce((n, s) => n + s.quantity, 0),
+            ) +
             '/' +
             String(count),
         ),
@@ -165,11 +204,14 @@ export function createExpeditionOverlay(
   const selectPlacement = (definition: string, planId?: string) => {
     placement = { definition, ...(planId ? { planId } : {}), orientation: 0 };
     close();
+    ghost.querySelector('.sp-facility-art')?.remove();
+    ghost.append(art(definition));
+    previewSignature = '';
     hint.hidden = false;
     hint.textContent =
       'Click nearby explored ground · R rotate · Escape cancel';
   };
-  const open = () => {
+  const open = (focus?: string) => {
     onOpen();
     opened = true;
     placement = null;
@@ -177,6 +219,18 @@ export function createExpeditionOverlay(
     root.dataset.expeditionPanelOpen = 'true';
     signature = '';
     render();
+    if (focus) {
+      const row = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          '[data-expedition-facility],[data-expedition-plan]',
+        ),
+      ).find(
+        (e) =>
+          e.dataset.expeditionFacility === focus ||
+          e.dataset.expeditionPlan === focus,
+      );
+      row?.scrollIntoView({ block: 'center' });
+    }
   };
   const render = () => {
     if (root.dataset.colonySettingsOpen === 'true' && (opened || placement)) {
@@ -267,7 +321,7 @@ export function createExpeditionOverlay(
         panel.append(status);
         for (const def of EXPEDITION_FACILITIES) {
           const row = document.createElement('article');
-          row.append(text('p', def.name));
+          row.append(art(def.id), text('p', def.name));
           costs(row, def.costs);
           row.append(
             button('Plan', () => selectPlacement(def.id)),
@@ -279,6 +333,7 @@ export function createExpeditionOverlay(
           const def = expeditionFacility(plan.definitionId)!;
           const row = document.createElement('article');
           row.dataset.expeditionPlan = plan.id;
+          row.append(art(def.id));
           row.append(
             text(
               'p',
@@ -314,6 +369,7 @@ export function createExpeditionOverlay(
           render();
         };
         const lab = document.createElement('article');
+        lab.dataset.expeditionLab = 'true';
         lab.append(
           text('p', 'Landing Laboratory'),
           button('Sleep / rest · 8s', () => interact('landing-lab', 'rest')),
@@ -348,6 +404,8 @@ export function createExpeditionOverlay(
           );
         for (const facility of state.facilities) {
           const row = document.createElement('article');
+          row.dataset.expeditionFacility = facility.id;
+          row.append(art(facility.definitionId));
           row.append(
             text('p', expeditionFacility(facility.definitionId)!.name),
           );
@@ -376,6 +434,10 @@ export function createExpeditionOverlay(
                 );
               }),
               text('small', 'Research within 4 m'),
+            );
+          if (facility.canonicalStructureId === null)
+            row.append(
+              button('Dismantle & refund', () => run('dismantle', facility.id)),
             );
           if (facility.canonicalStructureId)
             row.append(
@@ -415,7 +477,12 @@ export function createExpeditionOverlay(
         }
       }
       markers.replaceChildren();
-      const labMarker = button('Landing Lab · interact', open);
+      const labMarker = button('Landing Lab · interact', () => {
+        open();
+        panel
+          .querySelector('[data-expedition-lab]')
+          ?.scrollIntoView({ block: 'center' });
+      });
       labMarker.className = 'sp-blueprint sp-outpost';
       labMarker.dataset.x = '0';
       labMarker.dataset.y = '0';
@@ -423,7 +490,7 @@ export function createExpeditionOverlay(
       for (const plan of state.plans) {
         const marker = button(
           expeditionFacility(plan.definitionId)!.name + ' · blueprint',
-          open,
+          () => open(plan.id),
         );
         marker.className = 'sp-blueprint';
         marker.dataset.planId = plan.id;
@@ -436,15 +503,10 @@ export function createExpeditionOverlay(
       )) {
         const marker = button(
           expeditionFacility(facility.definitionId)!.name,
-          open,
+          () => open(facility.id),
         );
         marker.className = 'sp-blueprint sp-outpost';
-        const sprite = document.createElement('span');
-        applyProductionSprite(
-          sprite,
-          PHASE1_PRODUCTION_WORLD_SPRITES.workbench,
-          0.5,
-        );
+        const sprite = art(facility.definitionId);
         marker.prepend(sprite);
         marker.dataset.x = String(facility.x);
         marker.dataset.y = String(facility.y);
@@ -454,6 +516,7 @@ export function createExpeditionOverlay(
     const canvasRect = canvas.getBoundingClientRect(),
       rootRect = root.getBoundingClientRect(),
       camera = bundle.getPlayerPosition(playerId);
+    renderPreview();
     for (const marker of Array.from(markers.children) as HTMLElement[]) {
       const point = projectPhase1Isometric(
         { x: Number(marker.dataset.x), y: Number(marker.dataset.y) },
@@ -473,6 +536,84 @@ export function createExpeditionOverlay(
             ((point.y + 180) * canvasRect.height) / 360,
         ) + 'px';
     }
+  };
+  const renderPreview = () => {
+    if (!placement || !cursor) {
+      ghost.hidden = true;
+      return;
+    }
+    const rect = canvas.getBoundingClientRect(),
+      base = root.getBoundingClientRect();
+    const sx = ((cursor.x - rect.left) * 640) / rect.width,
+      sy = ((cursor.y - rect.top) * 360) / rect.height;
+    if (sx < 0 || sx > 640 || sy < 0 || sy > 360) {
+      ghost.hidden = true;
+      return;
+    }
+    const camera = bundle.getPlayerPosition(playerId),
+      point = unprojectPhase1Isometric({ x: sx - 320, y: sy - 180 }, camera),
+      x = Math.round(point.x * 4) / 4,
+      y = Math.round(point.y * 4) / 4;
+    const key = JSON.stringify([
+      placement,
+      x,
+      y,
+      camera,
+      rect.width,
+      rect.height,
+      Math.floor(bundle.authorityTick / 15),
+    ]);
+    if (key === previewSignature) {
+      ghost.hidden = false;
+      return;
+    }
+    previewSignature = key;
+    const reason = authority.assessPreview(
+        playerId,
+        placement.definition,
+        x,
+        y,
+        placement.orientation,
+        placement.planId,
+      ),
+      size = authority.previewFootprint(
+        placement.definition,
+        placement.orientation,
+      )!;
+    ghost.hidden = false;
+    ghost.dataset.valid = String(reason === null);
+    ghost.dataset.orientation = String(placement.orientation);
+    ghost.dataset.x = String(x);
+    ghost.dataset.y = String(y);
+    ghost.dataset.reason = reason ?? '';
+    const center = projectPhase1Isometric({ x, y }, camera);
+    ghost.style.left =
+      String(rect.left - base.left + ((center.x + 320) * rect.width) / 640) +
+      'px';
+    ghost.style.top =
+      String(rect.top - base.top + ((center.y + 180) * rect.height) / 360) +
+      'px';
+    ghost.style.width = String((64 * rect.width) / 640) + 'px';
+    ghost.style.height = String((64 * rect.height) / 360) + 'px';
+    const points = [
+      [-size.width / 2, -size.depth / 2],
+      [size.width / 2, -size.depth / 2],
+      [size.width / 2, size.depth / 2],
+      [-size.width / 2, size.depth / 2],
+    ].map(
+      ([dx, dy]) =>
+        String(32 + (dx! - dy!) * 16) + ',' + String(32 + (dx! + dy!) * 8),
+    );
+    outline.setAttribute('d', 'M' + points.join('L') + 'Z');
+    outline.setAttribute('stroke', reason ? '#eb9277' : '#ace5ce');
+    outline.setAttribute('fill', reason ? '#eb927744' : '#ace5ce44');
+    hint.textContent =
+      (reason ? describeFeedback(reason) : 'Valid ground') +
+      ' · R rotate · Escape cancel';
+  };
+  const pointer = (event: PointerEvent) => {
+    cursor = { x: event.clientX, y: event.clientY };
+    renderPreview();
   };
   const click = (event: MouseEvent) => {
     if (
@@ -506,6 +647,7 @@ export function createExpeditionOverlay(
     ) {
       placement = null;
       hint.hidden = true;
+      ghost.hidden = true;
       open();
     } else
       hint.textContent =
@@ -524,6 +666,7 @@ export function createExpeditionOverlay(
       close();
       placement = null;
       hint.hidden = true;
+      ghost.hidden = true;
     } else if (event.code === 'KeyR' && placement) {
       placement.orientation = ((placement.orientation + 1) % 4) as
         | 0
@@ -534,8 +677,10 @@ export function createExpeditionOverlay(
         'Orientation ' +
         String(placement.orientation * 90) +
         '° · click ground';
+      renderPreview();
     }
   };
+  root.addEventListener('pointermove', pointer);
   root.addEventListener('click', click, true);
   document.addEventListener('keydown', key, true);
   return {
@@ -543,6 +688,7 @@ export function createExpeditionOverlay(
     close,
     render,
     destroy() {
+      root.removeEventListener('pointermove', pointer);
       root.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key, true);
       layer.remove();
