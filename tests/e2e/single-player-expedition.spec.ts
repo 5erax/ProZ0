@@ -83,7 +83,12 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   );
   await expect(page.locator('[data-region="carry"]')).toContainText('/32');
   const interaction = page.locator('[data-region="interaction"]');
-  const gather = async (n: number) => {
+  const gather = async (n: number, itemName: string) => {
+    const target = page.locator('[data-world-role="resource"][data-focused-target="true"]');
+    await expect(target).toHaveCount(1);
+    const title = await target.getAttribute('title');
+    const output = Number(title?.match(new RegExp('· (\\d+) ' + itemName))?.[1]);
+    expect(output, title ?? 'Missing gather tooltip').toBeGreaterThan(0);
     for (let i = 0; i < n; i++) {
       await page.keyboard.press('e');
       await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
@@ -91,11 +96,12 @@ test('solo expedition: real gathering builds remote storage and reload preserves
         timeout: 4000,
       });
     }
+    return n * output;
   };
   await walk(page, 18, 10);
-  await gather(2);
+  const fiberGathered = await gather(2, 'Plant Fiber');
   await walk(page, -36, -12);
-  await gather(4);
+  const timberGathered = await gather(4, 'Timber');
   await walk(page, -39, -12);
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
@@ -112,12 +118,12 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     panel
       .locator('article')
       .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
-  ).toContainText('Timber 4/2');
+  ).toContainText('Timber ' + String(timberGathered) + '/2');
   await expect(
     panel
       .locator('article')
       .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
-  ).toContainText('Plant Fiber 4/2');
+  ).toContainText('Plant Fiber ' + String(fiberGathered) + '/2');
   await panel
     .locator('article')
     .filter({ has: page.getByText('Supply Cache', { exact: true }) })

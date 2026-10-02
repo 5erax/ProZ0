@@ -86,3 +86,9 @@ Browser thật kiểm tra flora trước actor che đúng, flora sau actor nằm
 Typecheck/lint/build đã đạt mốc A2 trước đổi cache camera-only; exact-head CI và toàn bộ scene performance vẫn cần kiểm tra cuối. #242 giữ OPEN: đây là cải thiện layering, không phải ký thay Owner về chất lượng toàn bộ art/UI.
 
 Evidence retention: CI upload bổ sung resource-size, equipment-preview, item-character-inspection, living-camera-world và blueprint-replacement để reviewer không chỉ thấy local screenshots. CI cũ C2 bị supersede bởi head A2; lấy exact head CI cuối làm gate.
+
+## Kiểm tra sau C2/A2
+
+CI `37077973791` và full-suite local ở `c9db78b` đều FAILED cùng assertion của journey expedition: test ghi cứng Timber 4/Fiber 4, trong khi tooltip và inventory thật nay cho Timber 8/Fiber 12 theo kích cỡ. Test đã đọc yield từ tooltip trước thu thập, nhân đúng số hành động và đối chiếu inventory/cost trong bảng blueprint; không bỏ kiểm tra nguyên liệu. 42 E2E đạt trước max-failures dừng suite; colony exploration bị interrupted, không được ghi là thất bại gameplay hay PASS.
+
+Fixture FPS trước đó dùng generation 3, không bật resource profile v1. Bài đo nay tạo Save V2 generation 4/resourceProfileVersion 1 với expedition/living bật, giữ cùng gate ≥50 FPS/P95 ≤34 ms và ghi version vào frames.json. Typecheck/lint của thay đổi test đạt; hành trình dài/FPS đang được chạy lại. Đây là sửa coverage, không thay bằng chứng Internet hoặc nghiệm thu Owner.

@@ -50,6 +50,8 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     const bundle = await Phase1AuthorityBundle.create({
       worldId: dbName,
       worldSeed: "p1-world-golden",
+      worldGenerationVersion: 4,
+      resourceProfileVersion: 1,
       playerIds: ["observer"],
       colonyDepthEnabled: true,
       singlePlayerExpeditionEnabled: true,
@@ -230,7 +232,9 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
         JSON.stringify(
           {
             sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? "local-working-tree",
-            fixture: "canonical Save V2 scene setup",
+            fixture: "canonical Save V2 scene setup; generation 4; resource profiles v1; expedition/living enabled",
+            generationVersion: request.world.generationVersion,
+            resourceProfileVersion: request.world.environment.resourceProfileVersion,
             threshold: { fpsMinimum: 50, p95MaximumMs: 34 },
             samples: reports,
           },
