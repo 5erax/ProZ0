@@ -449,7 +449,7 @@ export class Phase1ItemAuthority {
   }
 
   /** Solo construction escrow is validated by ExpeditionAuthority before this synchronous commit. */
-  public commitPrepaidConstruction(request:{readonly playerId:string;readonly expectedInventoryRevision:number;readonly container:{readonly containerId:string;readonly kind:'storage-crate'}|null}):string|null {
+  public commitPrepaidConstruction(request:{readonly playerId:string;readonly expectedInventoryRevision:number;readonly container:{readonly containerId:string;readonly kind:'storage-crate'|'machine-output'}|null}):string|null {
     const draft=this.ledger.createDraft();const inventory=draft.getContainer('inventory:'+request.playerId);
     if(!inventory||inventory.ownerPlayerId!==request.playerId)return 'SOURCE_MISSING';if(inventory.revision!==request.expectedInventoryRevision)return 'STALE_REVISION';
     if(request.container){const error=draft.createContainer({...request.container,ownerPlayerId:null,revision:0,stacks:[]});if(error)return error;}

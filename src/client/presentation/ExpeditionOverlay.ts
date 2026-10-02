@@ -116,6 +116,8 @@ export function createExpeditionOverlay(
     const messages: Readonly<Record<string, string>> = {
       MATERIALS_DEPOSITED: 'Materials contributed. You can add more later.',
       PLAN_MOVED: 'Blueprint moved. Contributed materials are kept.',
+      PLAN_REPLACED: 'Blueprint type changed. Shared materials are kept; surplus materials returned to your bag.',
+      SAME_BLUEPRINT_TYPE: 'Choose a different facility to change this blueprint.',
       PLAN_REFUNDED:
         'Blueprint cancelled. Contributed materials returned to your bag.',
       FACILITY_COMPLETED: 'Outpost facility completed.',
@@ -390,6 +392,16 @@ export function createExpeditionOverlay(
             button('Move', () => selectPlacement(def.id, plan.id)),
             button('Cancel & refund', () => run('cancel', plan.id)),
           );
+          const change = document.createElement('details'), summary = document.createElement('summary'), choice = document.createElement('select');
+          summary.textContent = 'Change blueprint type';
+          choice.setAttribute('aria-label', 'Replacement for ' + def.name);
+          for (const replacement of EXPEDITION_FACILITIES.filter(d => d.id !== def.id)) {
+            const option = document.createElement('option');
+            option.value = replacement.id; option.textContent = replacement.name;
+            choice.append(option);
+          }
+          change.append(summary, choice, button('Change & refund surplus', () => run('replace', plan.id, { replacementDefinition: choice.value })), text('small', 'Keeps shared materials. Returns the surplus; if your bag is full, the original blueprint stays intact. Missing materials can be added later.'));
+          row.append(change);
           panel.append(row);
         }
         panel.append(text('h2', 'FACILITIES & LANDING LAB'));
@@ -671,7 +683,7 @@ export function createExpeditionOverlay(
             Math.round(point.y * 4) / 4,
             placement.orientation,
           )
-        : { x: Math.round(point.x * 4) / 4, y: Math.round(point.y * 4) / 4 },
+        : authority.planPosition(placement.definition, Math.round(point.x * 4) / 4, Math.round(point.y * 4) / 4, placement.orientation),
       x = position.x,
       y = position.y;
     const key = JSON.stringify([
@@ -737,7 +749,7 @@ export function createExpeditionOverlay(
     outline.setAttribute('fill', reason ? '#eb927744' : '#ace5ce44');
     hint.textContent =
       (reason ? describeFeedback(reason) : 'Valid ground') +
-      ' · R rotate · Escape cancel';
+      (placement.definition === 'attached-habitat' ? ' · R choose lab side · Escape cancel' : ' · R rotate · Escape cancel');
   };
   const pointer = (event: PointerEvent) => {
     cursor = { x: event.clientX, y: event.clientY };
@@ -789,6 +801,7 @@ export function createExpeditionOverlay(
     if (!opened && !placement) return;
     if (
       event.target instanceof HTMLInputElement ||
+      event.target instanceof HTMLSelectElement ||
       event.target instanceof HTMLTextAreaElement
     )
       return;

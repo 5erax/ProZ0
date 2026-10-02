@@ -42,3 +42,9 @@ Kiểm chứng local: 156 unit, 186 integration + 3 skip, 13 determinism, 41 bro
 
 Tiếp phần còn lại C (canonical resource size/yield/growth/root), D (sông/POI/núi/hang/cá), E (equipment/detail/rarity/EN–VI), F (mọi facility blueprint và đổi loại), G (co-op và profiling) rồi H. Không đóng issue bằng tiến độ một phần.
 C1 bổ sung: E2E root UI dùng fixture Save V2 hợp lệ kiểm tra Gather → Uproot → ghost Replant → thanh toán đúng một gốc → Save/reopen giữ ID mới và tombstone cũ, không force-click. Fixture benchmark hiện dùng generation V3 với expedition/living bật; chưa thay benchmark thế giới V4 tự khám phá dài. Tilling lấy sản lượng theo growth thật thay vì readyTick legacy; regression kiểm tra thu non đúng một lần. Typecheck/lint cuối đạt, 16 test living unit/save đạt sau sửa.
+
+## F1 — 20 công trình đặt trước, vật liệu sau và đổi loại
+
+Thêm blueprint máy phát, máy ngưng tụ và habitat gắn lab; catalogue hiện 20 loại, không tiêu vật liệu khi đặt. Habitat preview/plan/hoàn công đọc cùng connector intent, R chọn cạnh lab; remote housing dùng Field Cabin. Đổi loại giữ ID/owner/escrow dùng chung, hoàn trả phần thừa nguyên tử; túi đầy/va chạm/stale giữ bản dựng cũ. Condenser tạo ledger machine-output đúng contract. Không đổi catalog fingerprint hoặc version save. Handoff/matrix đầy đủ: [phase2-blueprint-handoff.md](phase2-blueprint-handoff.md).
+
+Typecheck/lint/build đạt; 26 construction unit tests gồm matrix 20 loại và failure/replay/capacity; 3 canonical Save V2 integration đạt. Natural expedition E2E (thu thập → storage xa → transfer → relocation → save/reopen), launcher seed và depleted-fiber renewal đạt cả 3 (1.9 phút). E2E đổi loại fixture UI đạt (2.7 s), ảnh ở work/outputs/blueprint-replacement-F1.png. Giữ #240 OPEN: cần exact-head required CI, tích hợp cuối và hoàn thiện UX/art chung. Full-bag refund không có overflow crate mới: thông báo yêu cầu cất/bỏ bớt đồ, escrow vẫn được giữ an toàn.

@@ -79,6 +79,24 @@ export const EXPEDITION_FACILITIES = [
     purpose: 'Visible marker for a discovered outpost.',
   },
   ...LIVING_FACILITIES,
+  {
+    id: 'colony-power', name: 'Compact Power Unit',
+    canonical: 'structure:compact-power-unit', shape: 'structure:compact-power-unit',
+    costs: [['item:cordage', 2], ['item:metal-ore', 5], ['item:timber', 2]],
+    purpose: 'Supply the existing colony power network. One unit per world.',
+  },
+  {
+    id: 'colony-condenser', name: 'Atmospheric Water Condenser',
+    canonical: 'structure:atmospheric-water-condenser', shape: 'structure:atmospheric-water-condenser',
+    costs: [['item:cordage', 3], ['item:metal-ore', 6], ['item:timber', 4]],
+    purpose: 'Produce clean water using nearby colony power. One per world.',
+  },
+  {
+    id: 'attached-habitat', name: 'Attached Habitat Room',
+    canonical: 'structure:habitat-room', shape: 'structure:habitat-room',
+    costs: [['item:cordage', 3], ['item:stone', 6], ['item:timber', 6]],
+    purpose: 'Attach shelter to the landing lab. R chooses its side; use Field Cabin for a remote home.',
+  },
 ] as const;
 export type ExpeditionFacilityId = (typeof EXPEDITION_FACILITIES)[number]['id'];
 export const expeditionFacility = (id: string) =>

@@ -107,7 +107,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     })
     .click();
   const panel = page.locator('.sp-expedition-panel');
-  await expect(panel.locator('.sp-facility-art')).toHaveCount(17);
+  await expect(panel.locator('.sp-facility-art')).toHaveCount(20);
   await expect(
     panel
       .locator('article')
