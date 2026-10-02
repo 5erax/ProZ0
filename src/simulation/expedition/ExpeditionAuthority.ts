@@ -4,6 +4,10 @@ import {
   expeditionRenewalMultiplier,
 } from '../../content/singleplayer/ExpeditionEcology';
 import type { Phase1ItemAuthority } from '../items';
+import type {
+  PlacementIntent,
+  Phase1StructureDefinitionId,
+} from '../../world/building/BuildingTypes';
 import {
   PHASE1_STRUCTURE_PLACEMENT_PROFILES,
   type Phase1BuildingWorld,
@@ -34,8 +38,10 @@ export interface ExpeditionCommand {
     | 'deposit'
     | 'complete'
     | 'cancel'
-    | 'dismantle';
+    | 'dismantle'
+    | 'relocate';
   readonly target: string;
+  readonly expectedBuildRevision?: number;
   readonly x?: number;
   readonly y?: number;
   readonly orientation?: 0 | 1 | 2 | 3;
@@ -374,13 +380,147 @@ export class ExpeditionAuthority {
       return 'PLAN_OVERLAP';
     return null;
   }
+  public relocationInfo(target: string) {
+    const facility = this.state.facilities.find((f) => f.id === target);
+    if (facility) {
+      const def = expeditionFacility(facility.definitionId)!;
+      return {
+        x: facility.x,
+        y: facility.y,
+        orientation: facility.orientation,
+        owner: facility.owner,
+        shape: def.shape,
+        canonicalId: facility.canonicalStructureId,
+        facilityId: facility.id,
+      };
+    }
+    const structure = this.buildings.getStructure(target);
+    if (!structure || structure.definitionId === 'structure:landing-module')
+      return null;
+    return {
+      x: structure.position.x,
+      y: structure.position.y,
+      orientation: structure.orientationQuarterTurns,
+      owner: structure.placedByPlayerId,
+      shape: structure.definitionId,
+      canonicalId: structure.structureId,
+      facilityId: null,
+    };
+  }
+  public relocationPosition(
+    target: string,
+    x: number,
+    y: number,
+    orientation: 0 | 1 | 2 | 3,
+  ) {
+    const info = this.relocationInfo(target);
+    if (info?.shape === 'structure:habitat-room') {
+      const offset =
+        (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:landing-module']
+          .connectorOffsetWorldUnits ?? 0) +
+        (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:habitat-room']
+          .connectorOffsetWorldUnits ?? 0);
+      const [dx, dy] = [
+        [1, 0],
+        [0, 1],
+        [-1, 0],
+        [0, -1],
+      ][orientation]!;
+      return { x: dx! * offset, y: dy! * offset };
+    }
+    return { x, y };
+  }
+  private relocationIntent(
+    info: NonNullable<ReturnType<ExpeditionAuthority['relocationInfo']>>,
+    x: number,
+    y: number,
+    orientation: 0 | 1 | 2 | 3,
+  ): PlacementIntent {
+    if (info.shape === 'structure:habitat-room') {
+      const side = ['east', 'south', 'west', 'north'][orientation]!;
+      return {
+        mode: 'connector',
+        targetConnectorId: 'connector:landing:' + side,
+        requestedOrientationQuarterTurns: orientation,
+      };
+    }
+    return {
+      mode: 'free',
+      anchor: { x, y },
+      orientationQuarterTurns: orientation,
+    };
+  }
+  public assessRelocationPreview(
+    playerId: string,
+    target: string,
+    x: number,
+    y: number,
+    orientation: 0 | 1 | 2 | 3,
+  ): string | null {
+    const info = this.relocationInfo(target);
+    if (!info) return 'FACILITY_MISSING';
+    if (
+      !Number.isFinite(x) ||
+      !Number.isFinite(y) ||
+      Math.abs(x) > 1e7 ||
+      Math.abs(y) > 1e7 ||
+      ![0, 1, 2, 3].includes(orientation)
+    )
+      return 'INVALID_POSITION';
+    let actor: ExpeditionActor;
+    try {
+      actor = this.actor(playerId);
+    } catch {
+      return 'UNKNOWN_PLAYER';
+    }
+    if (!actor.alive) return 'PLAYER_DEAD';
+    if (info.owner !== playerId) return 'NOT_STRUCTURE_OWNER';
+    const position = this.relocationPosition(target, x, y, orientation);
+    if (
+      Math.hypot(actor.x - info.x, actor.y - info.y) > 4 ||
+      Math.hypot(actor.x - position.x, actor.y - position.y) > 4
+    )
+      return 'OUT_OF_RANGE';
+    if (
+      [
+        ...this.state.plans,
+        ...this.state.facilities.filter((f) => f.canonicalStructureId === null),
+      ].some(
+        (f) =>
+          f.id !== info.facilityId &&
+          Math.abs(f.x - position.x) < 1.5 &&
+          Math.abs(f.y - position.y) < 1.5,
+      )
+    )
+      return 'PLAN_OVERLAP';
+    if (info.canonicalId) {
+      const assessment = this.buildings.assessRelocation(
+        info.canonicalId,
+        this.relocationIntent(info, position.x, position.y, orientation),
+      );
+      return typeof assessment === 'string' ? assessment : null;
+    }
+    return this.spatial(
+      this.state.facilities.find((f) => f.id === target)!.definitionId,
+      position.x,
+      position.y,
+      orientation,
+      target,
+    );
+  }
+
   public previewFootprint(
     definition: string,
     orientation: 0 | 1 | 2 | 3,
   ): { width: number; depth: number } | null {
     const def = expeditionFacility(definition);
-    if (!def) return null;
-    const size = PHASE1_STRUCTURE_PLACEMENT_PROFILES[def.shape].footprint;
+    const shape =
+      def?.shape ??
+      (definition in PHASE1_STRUCTURE_PLACEMENT_PROFILES
+        ? (definition as Phase1StructureDefinitionId)
+        : null);
+    if (!shape) return null;
+    const size = PHASE1_STRUCTURE_PLACEMENT_PROFILES[shape].footprint;
     return orientation % 2
       ? { width: size.depth, depth: size.width }
       : { width: size.width, depth: size.depth };
@@ -518,7 +658,53 @@ export class ExpeditionAuthority {
     this.cancelRest(command.playerId);
     let next = this.state;
     let message: string;
-    if (command.action === 'dismantle') {
+    if (command.action === 'relocate') {
+      if (command.expectedBuildRevision !== this.buildings.getBuildRevision())
+        return reject('STALE_BUILD_REVISION');
+      const info = this.relocationInfo(command.target);
+      if (!info) return reject('FACILITY_MISSING');
+      const orientation = command.orientation ?? info.orientation,
+        x = command.x ?? info.x,
+        y = command.y ?? info.y;
+      const reason = this.assessRelocationPreview(
+        command.playerId,
+        command.target,
+        x,
+        y,
+        orientation,
+      );
+      if (reason) return reject(reason);
+      const position = this.relocationPosition(
+        command.target,
+        x,
+        y,
+        orientation,
+      );
+      if (info.canonicalId) {
+        const error = this.buildings.relocate({
+          structureId: info.canonicalId,
+          playerId: command.playerId,
+          expectedBuildRevision: command.expectedBuildRevision!,
+          expectedStructureRevision: this.buildings.getStructure(
+            info.canonicalId,
+          )!.revision,
+          placement: this.relocationIntent(
+            info,
+            position.x,
+            position.y,
+            orientation,
+          ),
+        });
+        if (error) return reject(error);
+      }
+      next = {
+        ...next,
+        facilities: next.facilities.map((f) =>
+          f.id === info.facilityId ? { ...f, ...position, orientation } : f,
+        ),
+      };
+      message = 'FACILITY_RELOCATED';
+    } else if (command.action === 'dismantle') {
       const facility = this.state.facilities.find(
         (f) => f.id === command.target && f.owner === command.playerId,
       );

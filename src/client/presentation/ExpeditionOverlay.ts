@@ -11,6 +11,7 @@ import {
 } from '../runtime/Phase1IsometricProjection';
 import {
   applyProductionSprite,
+  PHASE1_PRODUCTION_WORLD_SPRITES,
   itemIconSprite,
 } from './Phase1ProductionAssets';
 
@@ -63,6 +64,7 @@ export function createExpeditionOverlay(
     placement: {
       definition: string;
       planId?: string;
+      relocationId?: string;
       orientation: 0 | 1 | 2 | 3;
     } | null = null;
   let cursor: { x: number; y: number } | null = null,
@@ -70,7 +72,18 @@ export function createExpeditionOverlay(
   const art = (id: string) => {
     const sprite = document.createElement('span');
     sprite.className = 'sp-facility-art';
-    applyProductionSprite(sprite, expeditionSprite(id), 0.5);
+    const canonical = {
+      'structure:storage-crate': PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate,
+      'structure:workbench': PHASE1_PRODUCTION_WORLD_SPRITES.workbench,
+      'structure:habitat-room': PHASE1_PRODUCTION_WORLD_SPRITES.habitat,
+      'structure:compact-power-unit': PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit,
+      'structure:atmospheric-water-condenser':
+        PHASE1_PRODUCTION_WORLD_SPRITES.condenser,
+    };
+    const definition = expeditionFacility(id)
+      ? expeditionSprite(id)
+      : canonical[id as keyof typeof canonical];
+    if (definition) applyProductionSprite(sprite, definition, 0.5);
     return sprite;
   };
   const close = () => {
@@ -104,6 +117,14 @@ export function createExpeditionOverlay(
       PLAN_REFUNDED:
         'Blueprint cancelled. Contributed materials returned to your bag.',
       FACILITY_COMPLETED: 'Outpost facility completed.',
+      FACILITY_RELOCATED:
+        'Building moved. Stored items and production are preserved.',
+      STALE_BUILD_REVISION: 'Buildings changed. Choose the position again.',
+      NOT_STRUCTURE_OWNER: 'Only the builder can move this building.',
+      LANDMARK_IMMOVABLE: 'The landing lab is a fixed world landmark.',
+      PLAYER_INSIDE: 'Leave this building before moving it.',
+      CONNECTOR_REQUIRED:
+        'Attached habitat: use R to choose a landing connector.',
       FACILITY_DISMANTLED:
         'Facility removed. Building materials returned to your bag.',
       COLLECT_WATER_FIRST:
@@ -158,6 +179,7 @@ export function createExpeditionOverlay(
       id: 'sp:' + crypto.randomUUID(),
       playerId,
       expectedRevision: authority.read().revision,
+      expectedBuildRevision: bundle.buildings.getBuildRevision(),
       expectedInventoryRevision: bundle.items.getContainerView(
         'inventory:' + playerId,
       ).revision,
@@ -211,6 +233,24 @@ export function createExpeditionOverlay(
     hint.textContent =
       'Click nearby explored ground · R rotate · Escape cancel';
   };
+  const selectRelocation = (target: string, definition: string) => {
+    const info = authority.relocationInfo(target);
+    if (!info) return;
+    placement = {
+      definition,
+      relocationId: target,
+      orientation: info.orientation,
+    };
+    close();
+    ghost.querySelector('.sp-facility-art')?.remove();
+    ghost.append(art(definition));
+    previewSignature = '';
+    hint.hidden = false;
+    hint.textContent =
+      info.shape === 'structure:habitat-room'
+        ? 'Attached habitat · R selects connector · click to confirm'
+        : 'Move building · choose nearby ground · R rotate · Escape cancel';
+  };
   const open = (focus?: string) => {
     onOpen();
     opened = true;
@@ -248,6 +288,7 @@ export function createExpeditionOverlay(
       state.supplyClaimed,
       state.events,
       inventory.revision,
+      bundle.buildings.getBuildRevision(),
       rest ? Math.ceil(rest.remainingTicks / 60) : null,
       feedback,
     ]);
@@ -405,7 +446,12 @@ export function createExpeditionOverlay(
         for (const facility of state.facilities) {
           const row = document.createElement('article');
           row.dataset.expeditionFacility = facility.id;
-          row.append(art(facility.definitionId));
+          row.append(
+            art(facility.definitionId),
+            button('Move / rotate', () =>
+              selectRelocation(facility.id, facility.definitionId),
+            ),
+          );
           row.append(
             text('p', expeditionFacility(facility.definitionId)!.name),
           );
@@ -450,6 +496,33 @@ export function createExpeditionOverlay(
             );
           panel.append(row);
         }
+        for (const structure of bundle.buildings.exportSnapshot().foothold
+          .structures) {
+          if (
+            structure.placedByPlayerId !== playerId ||
+            state.facilities.some(
+              (f) => f.canonicalStructureId === structure.structureId,
+            )
+          )
+            continue;
+          const row = document.createElement('article');
+          row.dataset.expeditionFacility = structure.structureId;
+          row.append(
+            art(structure.definitionId),
+            text('p', bundle.catalog.get(structure.definitionId).displayName),
+            button('Move / rotate', () =>
+              selectRelocation(structure.structureId, structure.definitionId),
+            ),
+          );
+          if (structure.definitionId === 'structure:habitat-room')
+            row.append(
+              text(
+                'small',
+                'Attached module: R selects another lab connector. Field cabins can be built independently.',
+              ),
+            );
+          panel.append(row);
+        }
         panel.append(text('h2', 'FIELD CRAFT'));
         for (const recipe of EXPEDITION_RECIPES) {
           const row = document.createElement('article');
@@ -477,6 +550,7 @@ export function createExpeditionOverlay(
         }
       }
       markers.replaceChildren();
+      delete markers.dataset.buildRevision;
       const labMarker = button('Landing Lab · interact', () => {
         open();
         panel
@@ -513,6 +587,32 @@ export function createExpeditionOverlay(
         markers.append(marker);
       }
     }
+    // Management markers stay contextual rather than covering distant structures.
+    if (
+      markers.dataset.buildRevision !==
+      String(bundle.buildings.getBuildRevision())
+    ) {
+      markers.querySelectorAll('[data-managed]').forEach((e) => e.remove());
+      for (const structure of bundle.buildings.exportSnapshot().foothold
+        .structures) {
+        if (structure.placedByPlayerId !== playerId) continue;
+        const facility = state.facilities.find(
+          (f) => f.canonicalStructureId === structure.structureId,
+        );
+        const manage = button(
+          bundle.catalog.get(structure.definitionId).displayName + ' · manage',
+          () => open(facility?.id ?? structure.structureId),
+        );
+        manage.className = 'sp-blueprint';
+        manage.dataset.managed = 'true';
+        manage.dataset.x = String(structure.position.x);
+        manage.dataset.y = String(structure.position.y);
+        markers.append(manage);
+      }
+      markers.dataset.buildRevision = String(
+        bundle.buildings.getBuildRevision(),
+      );
+    }
     const canvasRect = canvas.getBoundingClientRect(),
       rootRect = root.getBoundingClientRect(),
       camera = bundle.getPlayerPosition(playerId);
@@ -522,7 +622,14 @@ export function createExpeditionOverlay(
         { x: Number(marker.dataset.x), y: Number(marker.dataset.y) },
         camera,
       );
-      marker.hidden = Math.abs(point.x) > 340 || Math.abs(point.y) > 210;
+      marker.hidden =
+        Math.abs(point.x) > 340 ||
+        Math.abs(point.y) > 210 ||
+        (marker.dataset.managed === 'true' &&
+          Math.hypot(
+            Number(marker.dataset.x) - camera.x,
+            Number(marker.dataset.y) - camera.y,
+          ) > 4);
       marker.style.left =
         String(
           canvasRect.left -
@@ -552,8 +659,16 @@ export function createExpeditionOverlay(
     }
     const camera = bundle.getPlayerPosition(playerId),
       point = unprojectPhase1Isometric({ x: sx - 320, y: sy - 180 }, camera),
-      x = Math.round(point.x * 4) / 4,
-      y = Math.round(point.y * 4) / 4;
+      position = placement.relocationId
+        ? authority.relocationPosition(
+            placement.relocationId,
+            Math.round(point.x * 4) / 4,
+            Math.round(point.y * 4) / 4,
+            placement.orientation,
+          )
+        : { x: Math.round(point.x * 4) / 4, y: Math.round(point.y * 4) / 4 },
+      x = position.x,
+      y = position.y;
     const key = JSON.stringify([
       placement,
       x,
@@ -568,14 +683,22 @@ export function createExpeditionOverlay(
       return;
     }
     previewSignature = key;
-    const reason = authority.assessPreview(
-        playerId,
-        placement.definition,
-        x,
-        y,
-        placement.orientation,
-        placement.planId,
-      ),
+    const reason = placement.relocationId
+        ? authority.assessRelocationPreview(
+            playerId,
+            placement.relocationId,
+            x,
+            y,
+            placement.orientation,
+          )
+        : authority.assessPreview(
+            playerId,
+            placement.definition,
+            x,
+            y,
+            placement.orientation,
+            placement.planId,
+          ),
       size = authority.previewFootprint(
         placement.definition,
         placement.orientation,
@@ -620,7 +743,7 @@ export function createExpeditionOverlay(
       !placement ||
       !(event.target instanceof Element) ||
       event.target.closest(
-        '.p1-ui,.p2-colony-controls,.sp-expedition-panel,.sp-blueprint,[data-colony-settings]',
+        '.p1-ui,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
       )
     )
       return;
@@ -636,8 +759,12 @@ export function createExpeditionOverlay(
     );
     if (
       run(
-        placement.planId ? 'move' : 'plan',
-        placement.planId ?? placement.definition,
+        placement.relocationId
+          ? 'relocate'
+          : placement.planId
+            ? 'move'
+            : 'plan',
+        placement.relocationId ?? placement.planId ?? placement.definition,
         {
           x: Math.round(position.x * 4) / 4,
           y: Math.round(position.y * 4) / 4,
@@ -669,10 +796,7 @@ export function createExpeditionOverlay(
       ghost.hidden = true;
     } else if (event.code === 'KeyR' && placement) {
       placement.orientation = ((placement.orientation + 1) % 4) as
-        | 0
-        | 1
-        | 2
-        | 3;
+        0 | 1 | 2 | 3;
       hint.textContent =
         'Orientation ' +
         String(placement.orientation * 90) +
