@@ -1,3 +1,6 @@
+import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
+import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
+import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
 import { validateColonySustenanceState } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import { validateColonyDepthState } from '../../simulation/colony/ColonyDepthAuthority';
@@ -191,6 +194,7 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.colonyDepth !== undefined) {
     try { validateColonyDepthState(record.colonyDepth); }
     catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported colony-depth state.'); }
@@ -767,7 +771,9 @@ export function validateChunkRecordV2(
         && !nonEmpty(predator.targetPlayerId))
       || !nullableTick(predator.stateUntilTick)
       || !finite(predator.encounterAnchor?.x)
-      || !finite(predator.encounterAnchor?.y)) {
+      || !finite(predator.encounterAnchor?.y)
+      || (predator.position!==undefined&&(!finite(predator.position.x)||!finite(predator.position.y)||Math.hypot(predator.position.x-predator.encounterAnchor.x,predator.position.y-predator.encounterAnchor.y)>32))
+      || (predator.outsideLeashTicks!==undefined&&!nonNegativeInt(predator.outsideLeashTicks))) {
       return saveFailure('CORRUPT_RECORD', 'Chunk predator state is invalid.');
     }
     predatorIds.add(predator.entityId);
@@ -959,6 +965,21 @@ function globalCrossReferences(
     );
   }
 
+  const expedition = bundle.world.singlePlayerExpedition;
+  if (expedition) {
+    const tick=bundle.world.authorityTick;
+    if(expedition.nextEventTick<=tick||expedition.nextEventTick>tick+7200||expedition.events.some(e=>e.tick>tick||e.untilTick!==e.tick+10800)||Object.values(expedition.restCooldown).some(until=>until>tick+1800))return saveFailure('CORRUPT_RECORD','Expedition clocks do not match the saved authority time.');
+    if(players.size !== 1 || [...expedition.plans,...expedition.facilities].some(p=>!players.has(p.owner)) || expedition.supplyClaimed.some(p=>!players.has(p)) || Object.keys(expedition.restCooldown).some(p=>!players.has(p))) {
+      return saveFailure('CORRUPT_RECORD','Expedition state references an absent player or multiplayer session.');
+    }
+    for(const facility of expedition.facilities) {
+      if(facility.canonicalStructureId===null)continue;
+      const structure=structures.get(facility.canonicalStructureId);
+      if(!structure || structure.structureDefinitionId!==expeditionFacility(facility.definitionId)?.canonical || structure.placedByPlayerId!==facility.owner || structure.position.x!==facility.x || structure.position.y!==facility.y || structure.orientationQuarterTurns!==facility.orientation) {
+        return saveFailure('CORRUPT_RECORD','Expedition facility does not match its canonical structure.');
+      }
+    }
+  }
   const allStacks = new Map<
     string,
     { container: ContainerRecordV2; itemDefinitionId: string }
@@ -1168,7 +1189,7 @@ function globalCrossReferences(
     }
     for (const [definitionId, count] of definitionCounts) {
       const definition = policy.catalog.getAs(definitionId, 'structure');
-      if (count > definition.phase1WorldCap) {
+      if (count > (bundle.world.singlePlayerExpedition?expeditionStructureCap(definitionId as Phase1StructureDefinitionId):definition.phase1WorldCap)) {
         return saveFailure(
           'CROSS_REFERENCE_FAILURE',
           `Structure cap exceeded for ${definitionId}.`,

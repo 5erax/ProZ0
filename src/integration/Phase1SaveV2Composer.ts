@@ -107,6 +107,8 @@ function predatorRecords(
     bundle.world.exportSnapshot().predators.map((predator) =>
       Object.freeze({
         entityId: predator.entityId,
+        position:Object.freeze({...predator.position}),
+        outsideLeashTicks:predator.outsideLeashTicks,
         revision: predator.revision,
         health: predator.health,
         state: predator.state,
@@ -219,6 +221,7 @@ function composePhase1SaveV2AtRevision(
     throw new Error('Save checkpoint UTC timestamp is required.');
   }
 
+  bundle.expedition?.reconcile();
   const previousWorldRevision = revisionState.previousWorldRevision;
   const worldRevision = nextRecordRevision(previousWorldRevision);
   const environment = bundle.worldStore.getEnvironmentView().state;
@@ -323,6 +326,7 @@ function composePhase1SaveV2AtRevision(
     worldRevision,
     authorityTick: bundle.authorityTick,
     sustenance: bundle.sustenance.read(),
+    ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
       ? { colonyDepth: bundle.colonyDepth.read() } : {}),
     worldSeed: bundle.config.worldSeed,

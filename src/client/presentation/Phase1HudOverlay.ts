@@ -579,6 +579,7 @@ function renderPanel(
     }
 
     case 'build': {
+      if(panel.expeditionEnabled)root.append(actionButton(document,'Expedition blueprints · materials later','open-expedition'));
       const catalog = createElement(
         document,
         'div',

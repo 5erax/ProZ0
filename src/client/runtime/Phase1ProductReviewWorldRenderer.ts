@@ -1213,7 +1213,7 @@ export function createPhase1ProductReviewWorldRenderer(
       if(rendered!==null && entity.type==='resource' && bundle.config.colonyDepthEnabled===true){
         const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name){rendered.setAttribute('aria-label',name);rendered.title=name+' · approach to interact';}
+        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':name+' · approach to interact';
       }
 
       if (entity.type === 'ruin') {
@@ -1458,12 +1458,17 @@ export function createPhase1ProductReviewWorldRenderer(
       const weather = sceneElement('weather:rain');
       weather.className = 'p1-product-weather';
       weather.dataset.weatherEffect = 'cold-rain';
+      const reducedMotion=targetWindow.matchMedia('(prefers-reduced-motion: reduce)').matches;weather.style.opacity=reducedMotion?'.12':targetWindow.innerWidth<850?'.16':'.24';
+      const rainTime=targetWindow.performance.now()*(reducedMotion?.25:1);const worldOffset=projectPhase1Isometric(camera,{x:0,y:0});
+      const driftX=Math.floor((rainTime*.012-worldOffset.x*.25)%32),driftY=Math.floor((rainTime*.07-worldOffset.y*.25)%48);
+      weather.style.inset='-48px';weather.style.transform='translate3d('+String(driftX)+'px,'+String(driftY)+'px,0)';weather.style.willChange='transform';
+      weather.dataset.rainMotionPhase=String(driftX)+':'+String(driftY);
       if (rainFrames.length === 4) {
-        const frame = Math.floor(bundle.authorityTick / 6) % 4;
+        const frame = Math.floor(rainTime / 80) % 4;
         if (spriteKeys.get(weather) !== 'rain-frame:' + String(frame)) {
           weather.style.backgroundImage = 'url("' + rainFrames[frame]! + '")';
           weather.style.backgroundSize = '640px 360px';
-          weather.style.backgroundRepeat = 'no-repeat';
+          weather.style.backgroundRepeat = 'repeat';
           spriteKeys.set(weather, 'rain-frame:' + String(frame));
         }
       } else for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {

@@ -14,6 +14,8 @@ export interface ResourceNodeSaveV2 {
 }
 
 export interface PredatorSaveV2 {
+  readonly position?: {readonly x:number;readonly y:number};
+  readonly outsideLeashTicks?: number;
   readonly entityId: string;
   readonly revision: number;
   readonly health: number;

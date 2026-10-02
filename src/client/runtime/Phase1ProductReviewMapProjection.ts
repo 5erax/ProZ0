@@ -213,7 +213,7 @@ function chunkKnowledge(
 
     const generated = generator.generate({
       worldSeed: bundle.config.worldSeed,
-      generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      generationVersion: bundle.config.reopen?.bundle.world.generationVersion ?? bundle.config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       coord,
     });
     if (
@@ -518,6 +518,10 @@ export function projectPhase1ProductReviewMapPanel(
     }
   }
 
+  for(const facility of bundle.expedition?.read().facilities ?? []) {
+    if(facility.definitionId!=='trail-beacon'&&facility.definitionId!=='camp-bed'&&facility.definitionId!=='field-lab')continue;
+    detailTargets.push(Object.freeze({id:'map:outpost:'+facility.id,label:facility.definitionId.toUpperCase()+' · OUTPOST',worldX:facility.x,worldY:facility.y,markerIndex:4,kind:'base' as const}));
+  }
   const selectedIndex = normalizedSelection(
     selectionOrdinal,
     detailTargets.length,
@@ -540,7 +544,7 @@ export function projectPhase1ProductReviewMapPanel(
     ...detailTargets.map((target, index) => Object.freeze({
       id: target.id,
       kind: target.kind,
-      label: target.kind === 'base'
+      label: target.id === 'map:base'
         ? 'BASE'
         : target.label,
       atlasIndex: target.markerIndex,

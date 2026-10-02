@@ -120,6 +120,8 @@ export type Phase1RuinRewardClaimReservationResult =
 
 export interface Phase1VerticalSliceWorldAdapterOptions {
   readonly colonyTerrainRulesEnabled?: boolean;
+  readonly expeditionCollisionEnabled?: boolean;
+  readonly expeditionShelterAt?: (position:WorldPosition)=>boolean;
   readonly colonyWorldSeed?: string;
   readonly catalog: ContentCatalogV1;
   readonly store: Phase1WorldStore;
@@ -353,7 +355,7 @@ export class Phase1VerticalSliceWorldAdapter
         + (request.axis === 'y' ? request.desiredDelta : 0),
     );
 
-    if (this.isMovementPassable(target, request.footprint)) {
+    if (this.isMovementPassable(target, request.footprint) && !this.blocksExpeditionMotion(request.center,target,request.footprint)) {
       return Object.freeze({
         allowedDelta: request.desiredDelta,
         blocked: false,
@@ -709,6 +711,7 @@ export class Phase1VerticalSliceWorldAdapter
   public getEnvironmentExposure(
     playerId: PlayerId,
   ): Readonly<EnvironmentExposureView> {
+    if(this.options.expeditionShelterAt?.(this.getPlayerPosition(playerId)))return Object.freeze({thermalTarget:50,sheltered:true});
     const environment = this.options.store.getEnvironmentView();
     const weather = this.options.catalog.getAs('weather:cold-rain', 'weather');
 
@@ -776,6 +779,26 @@ export class Phase1VerticalSliceWorldAdapter
     return this.deathCaches.removeEmpty(entityId, expectedRevision);
   }
 
+  /** Small axis sweeps keep an active hostile on loaded land and outside solid facilities. */
+  public movePredatorToward(entityId:string,target:WorldPosition,speedWorldUnitsPerSecond:number):void{
+    const predator=this.predators.get(entityId);if(!predator||predator.health<=0||!Number.isFinite(speedWorldUnitsPerSecond)||speedWorldUnitsPerSecond<=0)return;
+    const dx=target.x-predator.position.x,dy=target.y-predator.position.y,distance=Math.hypot(dx,dy);if(distance<.00001)return;const ratio=Math.min(distance,speedWorldUnitsPerSecond/60)/distance;
+    let position=predator.position;const footprint={halfWidth:.3,halfDepth:.3};
+    for(const axis of ['x','y'] as const){const desiredDelta=(axis==='x'?dx:dy)*ratio;const next=createWorldPosition(position.x+(axis==='x'?desiredDelta:0),position.y+(axis==='y'?desiredDelta:0));
+      if(this.isPositionBuildable(next)&&this.isMovementPassable(next,footprint)&&!this.blocksExpeditionMotion(position,next,footprint))position=next;
+    }
+    if(position.x!==predator.position.x||position.y!==predator.position.y){predator.position=position;predator.revision+=1;}
+  }
+  private blocksExpeditionMotion(previous:WorldPosition,next:WorldPosition,footprint:AxisSweepRequest['footprint']):boolean{
+    if(!this.options.expeditionCollisionEnabled)return false;
+    return this.options.structures().some(structure=>{
+      if(structure.definitionId==='structure:landing-module'||structure.definitionId==='structure:habitat-room')return false;
+      const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],rotated=structure.orientationQuarterTurns%2!==0;
+      const halfWidth=(rotated?profile.footprint.depth:profile.footprint.width)/2+footprint.halfWidth,halfDepth=(rotated?profile.footprint.width:profile.footprint.depth)/2+footprint.halfDepth;
+      const overlaps=(p:WorldPosition)=>Math.abs(p.x-structure.position.x)<halfWidth&&Math.abs(p.y-structure.position.y)<halfDepth;
+      return overlaps(next)&&(!overlaps(previous)||distanceSquared(next,structure.position)<=distanceSquared(previous,structure.position));
+    });
+  }
   public getPredator(
     entityId: string,
   ): Readonly<PredatorWorldView> | null {

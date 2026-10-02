@@ -33,6 +33,7 @@ export type PlayerWeightState =
   | 'OVERLOADED';
 
 export interface ContainerView extends ContainerState {
+  readonly playerCarryPolicy?: import('./ItemCapacity').PlayerCarryPolicy;
   readonly storageCapacityMultiplier?: number;
   readonly totalWeightKg: number;
   readonly totalVolume: number;

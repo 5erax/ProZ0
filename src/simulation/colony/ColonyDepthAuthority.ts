@@ -172,6 +172,7 @@ export class ColonyDepthAuthority {
       readonly alive: boolean;
     },
     initial?: ColonyDepthState,
+    private readonly remoteLabAccess?: (playerId:PlayerId)=>boolean,
   ) {
     validateColonyDepthContent();
     this.state =
@@ -310,7 +311,7 @@ export class ColonyDepthAuthority {
       const def = COLONY_RESEARCH.find((d) => d.id === command.targetId);
       if (def === undefined) return reject("UNKNOWN_RESEARCH");
       if (this.hasResearch(def.id)) return reject("ALREADY_RESEARCHED");
-      if (Math.hypot(actor.position.x, actor.position.y) > 7.5)
+      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId))
         return reject("RETURN_TO_BASE");
       if (def.prerequisites.some((id) => !this.hasResearch(id)))
         return reject("RESEARCH_PREREQUISITE");
@@ -333,7 +334,7 @@ export class ColonyDepthAuthority {
         this.state.discoveredBiomes.length < def.requiredRegions
       )
         return reject("PROFESSION_PREREQUISITE");
-      if (Math.hypot(actor.position.x, actor.position.y) > 7.5)
+      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId))
         return reject("RETURN_TO_BASE");
       if (next.professions[command.playerId] === id)
         return reject("ALREADY_SPECIALIZED");

@@ -163,6 +163,9 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       await expect(page.locator('[data-weather-effect="dry-wind"]')).toBeVisible();
       await expect(page.locator('[data-region="world"]')).toContainText('DRY WIND');
     }
+    if(scene.weather==='mist-rain'){
+      const rain=page.locator('[data-weather-effect="cold-rain"]');await expect(rain).toBeVisible();const before=await rain.getAttribute('data-rain-motion-phase');const transform=await rain.evaluate(e=>e.style.transform);await page.screenshot({path:resolve(directory,scene.name+'-rain-A.png')});await page.waitForTimeout(200);expect(await rain.getAttribute('data-rain-motion-phase')).not.toBe(before);expect(await rain.evaluate(e=>e.style.transform)).not.toBe(transform);await page.screenshot({path:resolve(directory,scene.name+'-rain-B.png')});
+    }
     await page.waitForTimeout(500);
     await page.screenshot({ path: resolve(directory, scene.name + ".png") });
     for (const moving of [false, true]) {

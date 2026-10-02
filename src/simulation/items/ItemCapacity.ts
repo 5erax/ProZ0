@@ -15,6 +15,14 @@ export const PLAYER_MAX_VOLUME = 24;
 export const STORAGE_CRATE_MAX_WEIGHT_KG = 100;
 export const STORAGE_CRATE_MAX_VOLUME = 120;
 
+export interface PlayerCarryPolicy {
+  readonly maxWeightKg: number;
+  readonly hardWeightKg: number;
+  readonly maxVolume: number;
+}
+export const LEGACY_PLAYER_CARRY: PlayerCarryPolicy = Object.freeze({maxWeightKg:20,hardWeightKg:25,maxVolume:24});
+export const EXPEDITION_PLAYER_CARRY: PlayerCarryPolicy = Object.freeze({maxWeightKg:32,hardWeightKg:40,maxVolume:48});
+
 export interface ContainerUsage {
   readonly totalWeightKg: number;
   readonly totalVolume: number;
@@ -48,11 +56,12 @@ export function computeContainerUsage(
 
 export function getPlayerWeightState(
   totalWeightKg: number,
+  policy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
 ): PlayerWeightState {
-  if (totalWeightKg > PLAYER_MAX_WEIGHT_KG) {
+  if (totalWeightKg > policy.maxWeightKg) {
     return 'OVERLOADED';
   }
-  if (totalWeightKg > PLAYER_MAX_WEIGHT_KG * 0.8) {
+  if (totalWeightKg > policy.maxWeightKg * 0.8) {
     return 'HEAVY';
   }
   return 'NORMAL';
@@ -62,14 +71,15 @@ export function validateContainerAbsoluteCapacity(
   kind: ContainerKind,
   usage: ContainerUsage,
   storageMultiplier = 1,
+  playerPolicy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
 ): TransactionRejectionReason | null {
   if(!Number.isFinite(storageMultiplier)||storageMultiplier<1||storageMultiplier>2)throw new Error('Invalid storage capacity multiplier.');
   switch (kind) {
     case 'player-inventory':
-      if (usage.totalVolume > PLAYER_MAX_VOLUME) {
+      if (usage.totalVolume > playerPolicy.maxVolume) {
         return 'TARGET_CAPACITY_VOLUME';
       }
-      if (usage.totalWeightKg > PLAYER_HARD_WEIGHT_KG) {
+      if (usage.totalWeightKg > playerPolicy.hardWeightKg) {
         return 'TARGET_CAPACITY_WEIGHT';
       }
       return null;
@@ -95,8 +105,9 @@ export function validateInboundCapacityTransition(
   current: ContainerUsage,
   projected: ContainerUsage,
   storageMultiplier = 1,
+  playerPolicy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
 ): TransactionRejectionReason | null {
-  const absolute = validateContainerAbsoluteCapacity(kind, projected,storageMultiplier);
+  const absolute = validateContainerAbsoluteCapacity(kind, projected,storageMultiplier,playerPolicy);
   if (absolute !== null) {
     return absolute;
   }
@@ -105,17 +116,17 @@ export function validateInboundCapacityTransition(
     return null;
   }
 
-  if (projected.totalVolume > PLAYER_MAX_VOLUME) {
+  if (projected.totalVolume > playerPolicy.maxVolume) {
     return 'TARGET_CAPACITY_VOLUME';
   }
 
-  if (current.totalWeightKg > PLAYER_MAX_WEIGHT_KG) {
+  if (current.totalWeightKg > playerPolicy.maxWeightKg) {
     return projected.totalWeightKg <= current.totalWeightKg
       ? null
       : 'TARGET_CAPACITY_WEIGHT';
   }
 
-  return projected.totalWeightKg <= PLAYER_MAX_WEIGHT_KG
+  return projected.totalWeightKg <= playerPolicy.maxWeightKg
     ? null
     : 'TARGET_CAPACITY_WEIGHT';
 }

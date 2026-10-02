@@ -443,9 +443,9 @@ function inventoryPanel(
     items: inventoryItems(input.catalog, input.inventory),
     selectedItemId: selected?.stackId ?? null,
     detail: selected === undefined || selectedDefinition === null
-      ? `Weight ${input.inventory.totalWeightKg.toFixed(1)} / ${PLAYER_MAX_WEIGHT_KG} kg · Volume ${input.inventory.totalVolume.toFixed(1)} / ${PLAYER_MAX_VOLUME}`
+      ? `Weight ${input.inventory.totalWeightKg.toFixed(1)} / ${input.inventory.playerCarryPolicy?.maxWeightKg ?? PLAYER_MAX_WEIGHT_KG} kg · Volume ${input.inventory.totalVolume.toFixed(1)} / ${input.inventory.playerCarryPolicy?.maxVolume ?? PLAYER_MAX_VOLUME}`
       : `${selectedDefinition.displayName} · qty ${selected.quantity}${selected.condition === null ? '' : ` · condition ${selected.condition}/${selectedDefinition.conditionMax ?? 100}`}`
-        + (selected.itemDefinitionId === 'item:stone-field-tool' ? ' · AUTO-USED WHEN GATHERING · NOT A WEAPON' : ''),
+        + (selected.itemDefinitionId === 'item:stone-field-tool' ? ' · AUTO-USED WHEN GATHERING · NOT A WEAPON' : '') + ' · '+input.inventory.stacks.length+' stacks · volume is item bulk, not empty slots',
     quantity,
     controls:
       'CLICK / ↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY '
@@ -459,9 +459,9 @@ function inventoryPanel(
         : feedback.verb + ' · ' + feedback.target,
     capacity: Object.freeze({
       weightCurrent: input.inventory.totalWeightKg,
-      weightMax: PLAYER_MAX_WEIGHT_KG,
+      weightMax: input.inventory.playerCarryPolicy?.maxWeightKg ?? PLAYER_MAX_WEIGHT_KG,
       volumeCurrent: input.inventory.totalVolume,
-      volumeMax: PLAYER_MAX_VOLUME,
+      volumeMax: input.inventory.playerCarryPolicy?.maxVolume ?? PLAYER_MAX_VOLUME,
       stateLabel: input.inventory.playerWeightState ?? 'NORMAL',
     }),
   });
@@ -508,9 +508,9 @@ function containerPanel(
         : feedback.verb + ' · ' + feedback.target,
     playerCapacity: Object.freeze({
       weightCurrent: input.inventory.totalWeightKg,
-      weightMax: PLAYER_MAX_WEIGHT_KG,
+      weightMax: input.inventory.playerCarryPolicy?.maxWeightKg ?? PLAYER_MAX_WEIGHT_KG,
       volumeCurrent: input.inventory.totalVolume,
-      volumeMax: PLAYER_MAX_VOLUME,
+      volumeMax: input.inventory.playerCarryPolicy?.maxVolume ?? PLAYER_MAX_VOLUME,
       stateLabel: input.inventory.playerWeightState ?? 'NORMAL',
     }),
     containerCapacity: storageCapacity === null
@@ -835,9 +835,9 @@ export function projectPhase1RuntimePresentation(
     temperature: temperatureMeter(input.survival.temperature),
     carry: Object.freeze({
       weightCurrent: input.inventory.totalWeightKg,
-      weightMax: PLAYER_MAX_WEIGHT_KG,
+      weightMax: input.inventory.playerCarryPolicy?.maxWeightKg ?? PLAYER_MAX_WEIGHT_KG,
       volumeCurrent: input.inventory.totalVolume,
-      volumeMax: PLAYER_MAX_VOLUME,
+      volumeMax: input.inventory.playerCarryPolicy?.maxVolume ?? PLAYER_MAX_VOLUME,
       stateLabel: carryState,
     }),
     equipment: equipment(

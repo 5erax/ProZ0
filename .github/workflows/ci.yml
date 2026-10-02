@@ -70,6 +70,7 @@ jobs:
           path: |
             test-results/phase2-frame-pacing/
             test-results/phase2-colony-depth/
+            test-results/single-player-expedition/
           if-no-files-found: ignore
           retention-days: 30
 

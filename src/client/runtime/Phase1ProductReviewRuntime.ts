@@ -1,3 +1,4 @@
+import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
 import { phase1IsometricInput, unprojectPhase1Isometric } from './Phase1IsometricProjection';
@@ -211,7 +212,7 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.visualQaMode = 'none';
   root.dataset.runtimeStatus = 'booting';
 
-  const bundle = await Phase1AuthorityBundle.create(config);
+  const bundle = await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
   const checkpointCoordinator =
     new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(
@@ -315,9 +316,10 @@ export async function createPhase1ProductReviewRuntime(
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
   const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
-    actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
+    expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
   }):null;
 
+  const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
@@ -787,6 +789,7 @@ export async function createPhase1ProductReviewRuntime(
       bundle.buildings.exportSnapshot().foothold.structures;
     return Object.freeze({
       kind: 'build',
+      expeditionEnabled:bundle.expedition!==null,
       title:
         'BUILD BASE',
       selectedStructure: definition.displayName,
@@ -825,8 +828,8 @@ export async function createPhase1ProductReviewRuntime(
           sourceKitName: bundle.catalog.get(entryKitId).displayName,
           availableKitCount,
           builtCount,
-          buildCap: entry.phase1WorldCap,
-          buildCapState: builtCount >= entry.phase1WorldCap
+          buildCap: bundle.buildings.structureCap(placeableStructureDefinitionId(entry.id)),
+          buildCapState: builtCount >= bundle.buildings.structureCap(placeableStructureDefinitionId(entry.id))
             ? 'CAP REACHED' as const
             : 'AVAILABLE' as const,
           selected: entry.id === definition.id,
@@ -985,6 +988,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginGather = (clickedId?: string): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     if (activeGather !== null) {
       bundle.items.cancelGather(config.localPlayerId);
       activeGather = null;
@@ -1272,6 +1276,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginConsume = (): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     beginConsumeStack(
       source.resolveQuickUseStackId(),
       'V',
@@ -1811,6 +1816,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const attackPredator = (): void => {
+    bundle.expedition?.cancelRest(config.localPlayerId);
     const predator = bundle.world.findGeneratedEntityByDefinition(
       'hostile:territorial-predator',
     );
@@ -1878,7 +1884,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    if(root.dataset.colonySettingsOpen==='true')return;
+    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true')return;
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
@@ -2137,7 +2143,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = root.dataset.colonySettingsOpen==='true' ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
@@ -2165,7 +2171,7 @@ export async function createPhase1ProductReviewRuntime(
     },
     onRender: () => {
       // Present only the most recent completed authority state once per frame.
-      if (!destroyed) worldRenderer.render();
+      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();}
     },
   });
 
@@ -2199,7 +2205,8 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
-    if(action?.startsWith('open-'))colonyDepthOverlay?.close();
+    if(action==='open-expedition'){expeditionOverlay?.open();return;}
+    if(action?.startsWith('open-')){colonyDepthOverlay?.close();expeditionOverlay?.close();}
     if(action==='inventory-stack'){
       const selection=source.getInventoryActionSelection(),containerId=selection.source.containerId;
       const view=bundle.items.getContainerView(containerId);let pair:null|[typeof view.stacks[number],typeof view.stacks[number]]=null;
@@ -2301,6 +2308,7 @@ export async function createPhase1ProductReviewRuntime(
       playtestTools?.destroy();
       controls.destroy();
       colonyDepthOverlay?.destroy();
+      expeditionOverlay?.destroy();
       presentation.destroy();
       worldRenderer.destroy();
       void bundle.destroy();

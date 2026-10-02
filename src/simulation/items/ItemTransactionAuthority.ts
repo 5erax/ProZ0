@@ -78,6 +78,7 @@ interface ActiveGatherChannel {
 }
 
 export interface Phase1ItemAuthorityOptions {
+  readonly playerCarryPolicy?: import('./ItemCapacity').PlayerCarryPolicy;
   readonly storageCapacityMultiplier?: () => number;
   readonly catalog: ContentCatalogV1;
   readonly world: ItemInteractionWorldPort;
@@ -392,7 +393,7 @@ export class Phase1ItemAuthority {
   private readonly activeGatherOperationSignatures = new Map<OperationId, string>();
 
   public constructor(private readonly options: Phase1ItemAuthorityOptions) {
-    this.ledger = new ItemLedger(options.catalog, options.initialLedger,options.storageCapacityMultiplier);
+    this.ledger = new ItemLedger(options.catalog, options.initialLedger,options.storageCapacityMultiplier,options.playerCarryPolicy);
     this.gatherCost = options.gatherCost ?? NOOP_GATHER_COST_PORT;
     this.events = options.events ?? NOOP_ITEM_AUTHORITY_EVENT_SINK;
   }
@@ -433,7 +434,7 @@ export class Phase1ItemAuthority {
     let ordinal = 0;
     for (const output of request.outputs) {
       const insertion = draft.insert({ containerId, itemDefinitionId: output.itemDefinitionId,
-        quantity: output.quantity, condition: null, operationId: request.operationId, generatedOrdinal: ordinal });
+        quantity: output.quantity, condition: this.options.catalog.getAs(output.itemDefinitionId, 'item').conditionMax, operationId: request.operationId, generatedOrdinal: ordinal });
       if (typeof insertion === 'string') return { status: 'rejected', reason: insertion };
       ordinal = insertion.nextGeneratedOrdinal;
     }
@@ -446,6 +447,15 @@ export class Phase1ItemAuthority {
   public getPendingAuthorityEvents(): readonly Readonly<ItemAuthorityEvent>[] {
     return Object.freeze([...this.pendingAuthorityEvents]);
   }
+
+  /** Solo construction escrow is validated by ExpeditionAuthority before this synchronous commit. */
+  public commitPrepaidConstruction(request:{readonly playerId:string;readonly expectedInventoryRevision:number;readonly container:{readonly containerId:string;readonly kind:'storage-crate'}|null}):string|null {
+    const draft=this.ledger.createDraft();const inventory=draft.getContainer('inventory:'+request.playerId);
+    if(!inventory||inventory.ownerPlayerId!==request.playerId)return 'SOURCE_MISSING';if(inventory.revision!==request.expectedInventoryRevision)return 'STALE_REVISION';
+    if(request.container){const error=draft.createContainer({...request.container,ownerPlayerId:null,revision:0,stacks:[]});if(error)return error;}
+    this.ledger.publish(draft);return null;
+  }
+
 
   public flushPendingAuthorityEvents(): number {
     let delivered = 0;

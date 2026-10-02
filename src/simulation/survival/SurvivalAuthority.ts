@@ -313,6 +313,15 @@ export class Phase1SurvivalAuthority {
     });
   }
 
+  /** Recovery is invoked only after the expedition authority validates a safe rest channel. */
+  public completeExpeditionRest(playerId:PlayerId):boolean {
+    const state=this.requirePlayer(playerId);if(state.lifeState.type!=='alive'||state.healthMilli<=0||state.foodMilli<15000||state.waterMilli<15000)return false;
+    state.healthMilli=clampMilli(state.healthMilli+15000);state.staminaMilli=clampMilli(state.staminaMilli+40000);state.foodMilli-=5000;state.waterMilli-=5000;state.revision+=1;return true;
+  }
+  public applyExpeditionMeal(playerId:PlayerId):boolean {
+    const state=this.requirePlayer(playerId);if(state.lifeState.type!=='alive'||state.healthMilli<=0||state.foodMilli>=SURVIVAL_MAX_MILLI)return false;
+    state.foodMilli=clampMilli(state.foodMilli+25000);state.revision+=1;return true;
+  }
   public getPlayerState(playerId: PlayerId): PlayerSurvivalState {
     return canonicalState(this.requirePlayer(playerId));
   }

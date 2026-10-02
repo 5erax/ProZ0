@@ -1,3 +1,6 @@
+import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
+import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
+import { EXPEDITION_PLAYER_CARRY } from '../simulation/items/ItemCapacity';
 import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
@@ -284,10 +287,10 @@ function initialWorldSnapshot(
         state: predator.state,
         targetPlayerId: predator.targetPlayerId,
         stateUntilTick: predator.stateUntilTick,
-        outsideLeashTicks: 0,
+        outsideLeashTicks: predator.outsideLeashTicks ?? 0,
         position: createWorldPosition(
-          predator.encounterAnchor.x,
-          predator.encounterAnchor.y,
+          predator.position?.x ?? predator.encounterAnchor.x,
+          predator.position?.y ?? predator.encounterAnchor.y,
         ),
         encounterAnchor: createWorldPosition(
           predator.encounterAnchor.x,
@@ -361,6 +364,7 @@ export type Phase1RuinRewardClaimResult =
     };
 
 export interface Phase1AuthorityBundleConfig {
+  readonly singlePlayerExpeditionEnabled?: boolean;
   readonly worldGenerationVersion?: number;
   readonly colonyDepthEnabled?: boolean;
   readonly worldId: string;
@@ -394,6 +398,7 @@ export class Phase1AuthorityBundle {
   public readonly machines: Phase1CondenserAuthority;
   public readonly sustenance: ColonySustenanceAuthority;
   public readonly colonyDepth: ColonyDepthAuthority;
+  public readonly expedition: ExpeditionAuthority|null;
   public readonly combat: Phase1CombatAuthority;
   public readonly death: Phase1DeathAuthority;
 
@@ -440,12 +445,24 @@ export class Phase1AuthorityBundle {
     }
     this.buildings = buildings;
     this.items = items;
+    this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition,{
+      seed:config.worldSeed,
+      built:(playerId,structureId,operationId)=>progression.applyEvent({type:'structure-placed',eventId:'expedition-build:'+operationId,playerId,structureId}),
+      crafted:(playerId,recipeId,operationId)=>progression.applyEvent({type:'craft-completed',eventId:'expedition-craft:'+operationId,playerId,recipeId}),
+      pressure:region=>this.colonyDepth.read().pressure.find(p=>p.regionKey===region)?.harvests??0,
+      tick:()=>this.authorityTick,
+      survival:playerId=>survival.getPlayerState(playerId),
+      completeRest:playerId=>survival.completeExpeditionRest(playerId),
+      meal:playerId=>survival.applyExpeditionMeal(playerId),
+      weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
+      hostileNear:(x,y)=>world.getActiveGeneratedEntities().some(e=>{if(e.type!=='hostile')return false;const predator=world.getPredator(e.entityId);return predator!==null&&predator.health>0&&Math.hypot(predator.position.x-x,predator.position.y-y)<8;}),
+    }):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
-    }, config.reopen?.bundle.world.colonyDepth);
+    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
-      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId),
+      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
     });
     this.sustenance = new ColonySustenanceAuthority(items,
@@ -488,6 +505,9 @@ export class Phase1AuthorityBundle {
       throw new Error('Phase 1 vertical-slice player identities are invalid.');
     }
 
+    if ((config.singlePlayerExpeditionEnabled === true && playerIds.length !== 1) || (config.reopen?.bundle.world.singlePlayerExpedition && config.singlePlayerExpeditionEnabled !== true)) {
+      throw new Error('Expedition saves require an explicitly enabled single-player session.');
+    }
     const catalog = config.catalog ?? createPhase1ContentCatalog();
     const reopen = config.reopen;
     if (
@@ -532,9 +552,12 @@ export class Phase1AuthorityBundle {
       value: reopen?.bundle.world.authorityTick ?? 0,
     };
     let buildings: Phase1BuildingWorld | null = null;
+    let expedition: ExpeditionAuthority|null = null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
+      expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
+      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>f.definitionId==='camp-bed'&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
       colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
@@ -544,7 +567,7 @@ export class Phase1AuthorityBundle {
       spawnClearanceRadiusWorldUnits: config.spawnClearanceRadiusWorldUnits,
       requiredAccessRadiusWorldUnits: config.requiredAccessRadiusWorldUnits,
       structures: () =>
-        buildings?.exportSnapshot().foothold.structures ?? Object.freeze([]),
+        [...(buildings?.exportSnapshot().foothold.structures ?? []),...(expedition?.read().facilities.filter(f=>f.canonicalStructureId===null).map(f=>({structureId:f.id,definitionId:expeditionFacility(f.definitionId)!.shape,revision:0,position:createWorldPosition(f.x,f.y),orientationQuarterTurns:f.orientation,placedByPlayerId:f.owner,containerId:null,placementOperationFingerprint:null})) ?? [])],
       playerIds: () => Object.freeze([...playerIds]),
       playerInsideStructure: (playerId, structureId) => {
         const structure = buildings?.getStructure(structureId) ?? null;
@@ -564,6 +587,7 @@ export class Phase1AuthorityBundle {
     buildings = new Phase1BuildingWorld(
       world,
       buildingSnapshot(reopen),
+      config.singlePlayerExpeditionEnabled===true,
     );
     const itemWorld = new BuildingItemWorldAdapter(world, buildings);
     const reopenedProgression = progressionSnapshot(reopen);
@@ -576,6 +600,7 @@ export class Phase1AuthorityBundle {
     const gatherCost = new DeferredGatherCostPort();
     let capacityAuthority:ColonyDepthAuthority|null=null;
     const items = new Phase1ItemAuthority({
+      ...(config.singlePlayerExpeditionEnabled===true?{playerCarryPolicy:EXPEDITION_PLAYER_CARRY}:{}),
       catalog,
       world: itemWorld,
       initialLedger: initialLedger(playerIds, reopen),
@@ -640,6 +665,7 @@ export class Phase1AuthorityBundle {
       death,
     );
     capacityAuthority=bundle.colonyDepth;
+    expedition=bundle.expedition;
 
     if (config.activatePlayersOnCreate !== false) {
       for (const playerId of playerIds) {
@@ -903,6 +929,15 @@ export class Phase1AuthorityBundle {
 
     this.processPendingDeaths(authorityTick);
     this.processPendingRespawns(authorityTick);
+    this.expedition?.tick();
+    if(this.expedition && predator){const state=this.world.getPredator(predator.entityId);
+      if(state?.state==='chase'&&state.targetPlayerId)this.world.movePredatorToward(state.entityId,this.getPlayerPosition(state.targetPlayerId),2.1);
+      else if(state?.state==='return')this.world.movePredatorToward(state.entityId,state.encounterAnchor,2.4);
+      else if(state?.state==='idle'||state?.state==='patrol'){
+        const phase=Math.floor(authorityTick/240)%8,angle=phase*Math.PI/4,radius=this.expedition.currentEvent(state.position)==='wildlife-drift'?2.6:1.5;
+        this.world.movePredatorToward(state.entityId,createWorldPosition(state.encounterAnchor.x+Math.cos(angle)*radius,state.encounterAnchor.y+Math.sin(angle)*radius),1.1);
+      }
+    }
   }
 
   public getLastGatherResult(

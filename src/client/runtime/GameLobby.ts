@@ -540,6 +540,8 @@ export function createGameLobby(root: HTMLElement) {
       const actions = doc.createElement("div");
       actions.className = "lobby-actions";
       view.append(actions);
+      const seedInput=field('worldSeed','Seed thế giới · để trống để tạo ngẫu nhiên');seedInput.maxLength=128;seedInput.placeholder='Ví dụ: mist-expedition-01';seedInput.dataset.singlePlayerSeed='true';
+      const seedHelp=doc.createElement('p');seedHelp.textContent='Cùng seed tạo cùng địa hình và tài nguyên ban đầu. Mỗi thế giới mới có bản lưu riêng; Tiếp tục giữ nguyên seed và tiến độ.';view.append(seedHelp);
       const saved = lastSavedReviewUrl(target);
       if (saved) {
         const link = doc.createElement("a");
@@ -569,7 +571,7 @@ export function createGameLobby(root: HTMLElement) {
           url.search = new URLSearchParams({
             proz0Mode: "phase2-colony-review",
             proz0WorldId: "world-" + id,
-            proz0WorldSeed: id,
+            proz0WorldSeed: seedInput.value.trim() || id,
             proz0Players: "review-player",
             proz0Player: "review-player",
             proz0SaveDb: "proz0-world-" + id,
