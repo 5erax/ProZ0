@@ -84,3 +84,5 @@ Bỏ z-index 900000!important ép player/teammate luôn nổi trước thế gi�
 Browser thật kiểm tra flora trước actor che đúng, flora sau actor nằm dưới, gear đúng offset và camera shift đồng thời tại world 3000,3000. Hai browser tests đạt. Equipment và resource-size E2E vẫn đạt sau đổi depth; camera/secondary-click E2E đạt 2/2, giữ neo tĩnh khi đi/resize và tương tác thật. Ảnh xem ở work/outputs/checkpoint-A2. Một assertion mới từng yêu cầu hai forage trong fog mới khám phá là fixture sai; sửa sang một forage + lab chắc chắn có, không cấp hoặc reveal gian lận. Natural storage tại C2 đạt hai lần liên tiếp (2.4 phút); footprint collision không đổi.
 
 Typecheck/lint/build đã đạt mốc A2 trước đổi cache camera-only; exact-head CI và toàn bộ scene performance vẫn cần kiểm tra cuối. #242 giữ OPEN: đây là cải thiện layering, không phải ký thay Owner về chất lượng toàn bộ art/UI.
+
+Evidence retention: CI upload bổ sung resource-size, equipment-preview, item-character-inspection, living-camera-world và blueprint-replacement để reviewer không chỉ thấy local screenshots. CI cũ C2 bị supersede bởi head A2; lấy exact head CI cuối làm gate.

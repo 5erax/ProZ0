@@ -72,6 +72,11 @@ jobs:
             test-results/phase2-colony-depth/
             test-results/single-player-expedition/
             test-results/living-world/
+            test-results/resource-size/
+            test-results/equipment-preview/
+            test-results/item-character-inspection/
+            test-results/living-camera-world.png
+            test-results/blueprint-replacement.png
           if-no-files-found: ignore
           retention-days: 30
 
