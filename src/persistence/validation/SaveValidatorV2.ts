@@ -967,6 +967,8 @@ function globalCrossReferences(
 
   const expedition = bundle.world.singlePlayerExpedition;
   if (expedition) {
+    const tick=bundle.world.authorityTick;
+    if(expedition.nextEventTick<=tick||expedition.nextEventTick>tick+7200||expedition.events.some(e=>e.tick>tick||e.untilTick!==e.tick+10800)||Object.values(expedition.restCooldown).some(until=>until>tick+1800))return saveFailure('CORRUPT_RECORD','Expedition clocks do not match the saved authority time.');
     if(players.size !== 1 || [...expedition.plans,...expedition.facilities].some(p=>!players.has(p.owner)) || expedition.supplyClaimed.some(p=>!players.has(p)) || Object.keys(expedition.restCooldown).some(p=>!players.has(p))) {
       return saveFailure('CORRUPT_RECORD','Expedition state references an absent player or multiplayer session.');
     }

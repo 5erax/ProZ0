@@ -316,7 +316,7 @@ export async function createPhase1ProductReviewRuntime(
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
   const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
-    actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
+    expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
   }):null;
 
   const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;

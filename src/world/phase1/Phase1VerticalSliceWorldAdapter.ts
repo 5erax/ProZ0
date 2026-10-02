@@ -711,6 +711,7 @@ export class Phase1VerticalSliceWorldAdapter
   public getEnvironmentExposure(
     playerId: PlayerId,
   ): Readonly<EnvironmentExposureView> {
+    if(this.options.expeditionShelterAt?.(this.getPlayerPosition(playerId)))return Object.freeze({thermalTarget:50,sheltered:true});
     const environment = this.options.store.getEnvironmentView();
     const weather = this.options.catalog.getAs('weather:cold-rain', 'weather');
 

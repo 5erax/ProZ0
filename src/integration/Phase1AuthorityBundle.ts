@@ -447,6 +447,8 @@ export class Phase1AuthorityBundle {
     this.items = items;
     this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition,{
       seed:config.worldSeed,
+      built:(playerId,structureId,operationId)=>progression.applyEvent({type:'structure-placed',eventId:'expedition-build:'+operationId,playerId,structureId}),
+      crafted:(playerId,recipeId,operationId)=>progression.applyEvent({type:'craft-completed',eventId:'expedition-craft:'+operationId,playerId,recipeId}),
       pressure:region=>this.colonyDepth.read().pressure.find(p=>p.regionKey===region)?.harvests??0,
       tick:()=>this.authorityTick,
       survival:playerId=>survival.getPlayerState(playerId),

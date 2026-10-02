@@ -334,7 +334,7 @@ export class ColonyDepthAuthority {
         this.state.discoveredBiomes.length < def.requiredRegions
       )
         return reject("PROFESSION_PREREQUISITE");
-      if (Math.hypot(actor.position.x, actor.position.y) > 7.5)
+      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId))
         return reject("RETURN_TO_BASE");
       if (next.professions[command.playerId] === id)
         return reject("ALREADY_SPECIALIZED");
