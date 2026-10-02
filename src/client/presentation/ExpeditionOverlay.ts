@@ -88,6 +88,8 @@ export function createExpeditionOverlay(
   };
   const close = () => {
     authority.cancelRest(playerId);
+    placement = null;
+    hint.hidden = true;
     opened = false;
     panel.hidden = true;
     ghost.hidden = true;
@@ -224,8 +226,8 @@ export function createExpeditionOverlay(
     }
   };
   const selectPlacement = (definition: string, planId?: string) => {
-    placement = { definition, ...(planId ? { planId } : {}), orientation: 0 };
     close();
+    placement = { definition, ...(planId ? { planId } : {}), orientation: 0 };
     ghost.querySelector('.sp-facility-art')?.remove();
     ghost.append(art(definition));
     previewSignature = '';
@@ -236,12 +238,12 @@ export function createExpeditionOverlay(
   const selectRelocation = (target: string, definition: string) => {
     const info = authority.relocationInfo(target);
     if (!info) return;
+    close();
     placement = {
       definition,
       relocationId: target,
       orientation: info.orientation,
     };
-    close();
     ghost.querySelector('.sp-facility-art')?.remove();
     ghost.append(art(definition));
     previewSignature = '';
@@ -455,7 +457,10 @@ export function createExpeditionOverlay(
           row.append(
             text('p', expeditionFacility(facility.definitionId)!.name),
           );
-          if (facility.definitionId === 'camp-bed')
+          if (
+            facility.definitionId === 'camp-bed' ||
+            facility.definitionId === 'field-cabin'
+          )
             row.append(
               button('Sleep / rest', () => interact(facility.id, 'rest')),
             );

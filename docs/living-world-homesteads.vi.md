@@ -5,9 +5,9 @@ Owner mở rộng sáu yêu cầu sau release #212. Baseline main 4220521. Nhán
 ## Kết quả cần đạt
 
 1. Công trình do người chơi dựng có thao tác Move/rotate, kiểm tra nơi cũ và nơi mới, giữ nguyên ID/container/đồ/tiến độ. Lab khởi đầu là landmark cố định; habitat nối lab phải đổi sang connector hợp lệ, không cắt liên kết trên giấy. Di dời không tiêu hao kit hoặc nhân đôi nội dung kho. Hoàn tất lệnh phải kiểm tra revisions, alive, quyền sở hữu và khoảng cách hai đầu. Preview không mutate state. Blueprint cũ vẫn di chuyển như trước.
-2. Chicken, rabbit, goat, boar có tuổi non/trưởng thành khác, thức ăn/nước, sinh sản cần cặp trưởng thành và đủ điều kiện; fox săn chicken/rabbit, wolf săn goat/boar. Động vật có tọa độ/movement/health/corpse/loot thật. Wild graze và predator hunt theo thời gian, giới hạn sức tải vùng và toàn thế giới. Domestication bằng cordage vào pen gần đó; nuôi cần feed/water, sản phẩm egg/milk/wool, sinh con có cooldown. Săn/slaughter dùng công cụ và giao dịch loot chỉ một lần; túi đầy giữ xác/sản phẩm. Không gọi đàn vô hạn là cân bằng tự nhiên.
+2. Chicken, rabbit, goat, boar có tuổi non/trưởng thành khác, thức ăn/nước, sinh sản cần cặp trưởng thành và đủ điều kiện; fox săn chicken/rabbit, wolf săn goat/boar. Động vật có tọa độ/movement/health/corpse/loot thật. Wild graze và predator hunt theo thời gian, giới hạn sức tải vùng và toàn thế giới. Domestication bằng animal feed vào pen gần đó; nuôi cần feed/water, sản phẩm egg/milk/wool, sinh con có cooldown. Săn/slaughter dùng công cụ và giao dịch loot chỉ một lần; túi đầy giữ xác/sản phẩm. Không gọi đàn vô hạn là cân bằng tự nhiên.
 3. Bốn mùa dựa authority clock: một mùa 12 phút active-time, năm 48 phút, bắt đầu xuân; không chạy khi đóng game. Xuân growth +35%; hạ khô nhanh, cây chết sau thời gian thiếu nước; thu yield cao hơn, seed/forage thuận lợi nhưng có gió/khô; đông growth giảm, lạnh ngoài shelter, campfire cần nạp nhiên liệu để sưởi. Biome/soil làm thay đổi hiệu ứng. Rain tưới thật, frost/drought biểu hiện bằng hình và HUD; thermal integration dùng survival authority, không trừ máu từ UI.
-4. Soil theo seed/tile/biome: loam, sand, clay, peat, rocky có fertility/moisture và hệ số khác. Canh tác có moisture, fertilizer, progress, wilt/dead/ready, greenhouse/irrigation tác dụng thật. Thực vật tự nhiên cũng dùng seasonal/soil modifier khi đặt lịch hồi mới; giữ deadline đã lưu.
+4. Soil theo seed/tile và vùng đất riêng (không thay generator/biome cũ): loam, sand, clay, peat, rocky có fertility/moisture và hệ số khác. Canh tác có moisture, fertilizer, progress, wilt/dead/ready, greenhouse/irrigation tác dụng thật. Thực vật tự nhiên cũng dùng seasonal/soil modifier khi đặt lịch hồi mới; giữ deadline đã lưu.
 5. Chọn bất kỳ đất khô đã khám phá hợp lệ trong tầm thao tác, không khóa theo lab/biome/toạ độ farm. Chỉ hạn chế vật lý (nước, collider, plot/công trình chồng nhau) và ngân sách bounded. Farm/pen đặt ngoài base, trạng thái và sản phẩm lưu ở toạ độ thật. Không yêu cầu về lab để gieo/tưới/gặt/feed/thu sản phẩm. Cơ chế farm/pen cố định trước đây giữ nguyên cho compatibility nhưng luồng solo mới dùng plots/animals tại chỗ.
 6. Mở rộng chuỗi nguyên liệu/seed/cây trồng/thịt/trứng/sữa/lông/da/đất sét/salt/than/compost/feed; công cụ hoe/watering can và food/processing recipes. Facilities mới phải có công dụng thật: livestock pen, coop, greenhouse, irrigation, compost, kiln, smoker, mill, tannery. Chi phí địa phương hợp lý; không thêm nút rỗng. World forage/deposits seed-based có depletion/renewal để nguyên liệu không chỉ xuất hiện qua test grants.
 
@@ -40,3 +40,16 @@ Làm trong chat này, commit từng increment sau kiểm tra phù hợp. Không 
 |---|---|---|
 | LW-01 | PLANNED / audit complete | Cơ chế hiện tại: farm -6,4; pen 6,4; 7 facilities / 6 field recipes; không relocate completed buildings |
 | LW-02–LW-07 | PENDING | Triển khai và ghi evidence từng increment |
+
+## Nhật ký triển khai
+
+- LW-01: 1cf1efe — hợp đồng nghiệp vụ/kỹ thuật/QA.
+- LW-02: 903be11 — di dời công trình và connector, unit/domain 8 PASS; browser kho có Plant Fiber + di dời + reopen PASS.
+- LW-03: 9475676 — 29 items bổ sung; season/soil/crop/species/station/recipe metadata; V3/V4 dùng chính identity catalog cũ cho generation. Catalog mới có fingerprint mới, không giả mạo fingerprint cũ.
+- LW-04/05 và save: ed84786 — authority crops/water/wilt/soil, wildlife movement/maturation/reproduction/predation/taming/production, station buffers, cold/fire, known-catalog upgrade. Domain + integration mới 10 PASS.
+- LW-06: giao diện và sprite đang kiểm tra. Đã sửa marker chặn click di dời, thứ tự panel bị HUD che, details/scroll bị reset do refresh dữ liệu.
+- Regression trước kiểm tra hành trình mới: typecheck/lint PASS, 147 unit PASS, 181 integration PASS (3 skip), 13 determinism PASS, 31 browser PASS. Hành trình expedition 3 PASS. Hành trình canh tác đang kiểm tra; chưa coi số này là kết quả CI cuối.
+
+### Giới hạn rõ ràng
+
+Mùa dựa 60 Hz active tick; 12 phút/mùa, 48 phút/năm. Không catch-up khi đóng game. Đây là hệ sinh thái hữu hạn với quy tắc, seed và feedback môi trường; không tự sáng tạo species/terrain/genetics ngoài catalog. Giới hạn 256 plots, 96 animals, 128 vùng spawn, 768 forage, 64 stations và tối đa 64 marker DOM nhìn thấy. Di dời habitat vẫn giữ kết nối lab; field cabin độc lập có thể đặt ngoài base. Co-op không được gán các authority mới trong lần này. #204 đo hiệu năng máy Owner và co-op vẫn mở; không tuyên bố 60 FPS mọi thiết bị.

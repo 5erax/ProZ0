@@ -1,3 +1,4 @@
+import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
@@ -316,10 +317,11 @@ export async function createPhase1ProductReviewRuntime(
   const nextOperationId = (kind: string): string =>
     'product-review:' + kind + ':' + String(++operationOrdinal);
   const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
-    expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
+    livingOverlay?.close();expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
   }):null;
 
-  const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
@@ -1614,9 +1616,7 @@ export async function createPhase1ProductReviewRuntime(
     const current = bundle.equipment.reconcile(config.localPlayerId);
     const wrap = inventory.stacks.find(
       (stack) =>
-        stack.itemDefinitionId === 'item:thermal-wrap'
-        && stack.condition !== null
-        && stack.condition > 0,
+        ((stack.itemDefinitionId === 'item:thermal-wrap'&&stack.condition !== null&&stack.condition>0)||stack.itemDefinitionId==='item:warm-cloak'),
     );
     const next = current.equippedThermalWrapStackId === null
       ? wrap?.stackId ?? null
@@ -1700,7 +1700,7 @@ export async function createPhase1ProductReviewRuntime(
       | ReturnType<typeof bundle.equipWeapon>
       | ReturnType<typeof bundle.equipThermalWrap>;
 
-    if (stack.itemDefinitionId === 'item:thermal-wrap') {
+    if ((stack.itemDefinitionId === 'item:thermal-wrap'||stack.itemDefinitionId === 'item:warm-cloak')) {
       const next = current.equippedThermalWrapStackId === stack.stackId
         ? null
         : stack.stackId;
@@ -1890,7 +1890,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true')return;
+    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true')return;
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
@@ -2177,7 +2177,7 @@ export async function createPhase1ProductReviewRuntime(
     },
     onRender: () => {
       // Present only the most recent completed authority state once per frame.
-      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();}
+      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();}
     },
   });
 
@@ -2202,7 +2202,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const onPanelClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element)) return;
-    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true'){
+    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true'){
       const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){beginGather(resource.dataset.worldId);return;}
     }
     const item = event.target.closest<HTMLElement>('[data-review-item]');
@@ -2212,7 +2212,7 @@ export async function createPhase1ProductReviewRuntime(
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
     if(action==='open-expedition'){expeditionOverlay?.open();return;}
-    if(action?.startsWith('open-')){colonyDepthOverlay?.close();expeditionOverlay?.close();}
+    if(action?.startsWith('open-')){livingOverlay?.close();colonyDepthOverlay?.close();expeditionOverlay?.close();}
     if(action==='inventory-stack'){
       const selection=source.getInventoryActionSelection(),containerId=selection.source.containerId;
       const view=bundle.items.getContainerView(containerId);let pair:null|[typeof view.stacks[number],typeof view.stacks[number]]=null;
@@ -2315,6 +2315,7 @@ export async function createPhase1ProductReviewRuntime(
       controls.destroy();
       colonyDepthOverlay?.destroy();
       expeditionOverlay?.destroy();
+      livingOverlay?.destroy();
       presentation.destroy();
       worldRenderer.destroy();
       void bundle.destroy();

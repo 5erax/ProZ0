@@ -1163,6 +1163,7 @@ export function createPhase1ProductReviewWorldRenderer(
     const environment = bundle.worldStore.getEnvironmentView();
     const context = getPresentationContext();
     const regionalWeather=bundle.config.colonyDepthEnabled===true?colonyWeatherAt(bundle.config.worldSeed,camera,bundle.authorityTick):null;
+    if(bundle.livingWorld)layer.dataset.livingSeason=bundle.livingWorld.season().id;
     const raining = regionalWeather === null ? environment.coldRainStatus === 'active' : regionalWeather.weather === 'mist-rain';
     if(regionalWeather!==null){
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
@@ -1188,7 +1189,7 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     for (const entity of bundle.world.getActiveGeneratedEntities()) {
-      if (entity.type === 'passive-wildlife' && entity.entityId === bundle.sustenance.read().animalEntityId) continue;
+      if (entity.type === 'passive-wildlife' && (bundle.livingWorld || entity.entityId === bundle.sustenance.read().animalEntityId)) continue;
       if (
         entity.type !== 'hostile'
         && !worldPositionKnown(bundle, entity.position)

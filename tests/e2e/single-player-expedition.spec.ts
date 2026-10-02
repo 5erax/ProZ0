@@ -107,7 +107,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     })
     .click();
   const panel = page.locator('.sp-expedition-panel');
-  await expect(panel.locator('.sp-facility-art')).toHaveCount(7);
+  await expect(panel.locator('.sp-facility-art')).toHaveCount(17);
   await expect(
     panel
       .locator('article')
@@ -193,6 +193,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     'true',
   );
   await expect(page.locator('.sp-blueprint[data-plan-id]')).toHaveCount(1);
+  await walk(page, -40, -13);
   await page.keyboard.press('i');
   await expect(page.locator('[data-inventory-pane="storage"]')).toContainText(
     'Plant Fiber',

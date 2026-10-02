@@ -1,3 +1,6 @@
+import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
+import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
+const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
 export interface Phase1ProductionSprite {
   readonly assetPath: string;
   readonly url: string;
@@ -256,7 +259,10 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
-  const index = ITEM_NAMES.indexOf(name as (typeof ITEM_NAMES)[number]);
+  const living=LIVING_ITEMS.findIndex(i=>i.id===name||i.displayName===name);
+  if(living>=0)return {assetPath:'assets/livingworld/items.svg',url:LIVING_ITEM_URL,cellWidth:24,cellHeight:24,sourceWidth:696,sourceHeight:24,columns:29,index:living};
+  const byId=PHASE1_ITEM_IDS.indexOf(name as (typeof PHASE1_ITEM_IDS)[number]);
+  const index = byId>=0?byId:ITEM_NAMES.indexOf(name as (typeof ITEM_NAMES)[number]);
   return index === -1
     ? null
     : atlasSprite(
