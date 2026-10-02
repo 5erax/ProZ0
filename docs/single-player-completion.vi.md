@@ -69,8 +69,10 @@ Sau vòng này ưu tiên đo chuyến solo 20–30 phút: thời gian travel/gat
 | Carry/item transactions | src/simulation/items/ItemLedger.ts, ItemTransactionAuthority.ts; src/content/singleplayer/ExpeditionContent.ts | tests/unit/single-player-carry.test.ts; inventory/storage integration |
 | Plans/facilities/rest | src/simulation/expedition/ExpeditionAuthority.ts, ExpeditionState.ts; src/integration/Phase1AuthorityBundle.ts | tests/unit/single-player-construction.test.ts, single-player-completion.test.ts, single-player-facilities.test.ts |
 | UI/art/placement | src/client/presentation/ExpeditionOverlay.ts, ExpeditionAssets.ts; assets/singleplayer/expedition_facilities.svg; Phase1HudOverlay.ts | tests/e2e/single-player-expedition.spec.ts (keyboard/gather thật, không teleport/cấp đồ) |
-| Generation/renewal/events | src/content/world, src/content/singleplayer/ExpeditionEcology.ts; world store integration | tests/determinism; single-player ecology/renewal integration |
+| Generation/renewal/events | src/world/phase1/Phase1ChunkGenerator.ts, src/world/phase2/ColonyRegions.ts, src/content/singleplayer/ExpeditionEcology.ts; world store integration | tests/determinism; single-player ecology/renewal integration |
 | AI/rain/HUD runtime | src/client/runtime/Phase1ProductReviewRuntime.ts; Phase1ProductReviewWorldRenderer.ts và compositor liên quan | predator/combat/save integration; phase2 frame pacing A/B rain |
 | Save compatibility | src/persistence và src/integration/Phase1SaveV2Composer.ts; optional ExpeditionState trong Save V2 | single-player save/reopen; save upgrades và future-clock validation |
 
 Đọc thêm [nghiệp vụ, bảng giá và hành vi cụ thể](single-player-expedition-handoff.vi.md) cùng [kế hoạch SP-01–SP-10](single-player-expedition-plan.md). Các tài liệu đó ghi lịch sử trước khi merge #210; vòng hiện tại bổ sung UX/thu hồi công trình và xác nhận lại toàn bộ phạm vi. Chạy rg --files trước khi giao task để đối chiếu đường file chính xác, không sửa tên giả định.
+
+Theo dõi triển khai: [issue #211](https://github.com/5erax/ProZ0/issues/211), [PR #212](https://github.com/5erax/ProZ0/pull/212). Nhánh tách riêng từ main, commit theo từng phần, không đổi engine hoặc dữ liệu thế giới cũ.
