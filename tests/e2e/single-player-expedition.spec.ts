@@ -49,7 +49,14 @@ async function clickGround(page: Page, x: number, y: number) {
     },
     { x, y },
   );
+  await page.mouse.move(point.x, point.y);
+  const ghost = page.locator('.sp-ghost');
+  await expect(ghost).toBeVisible();
+  await expect(ghost).toHaveAttribute('data-valid', 'true');
+  await page.keyboard.press('r');
+  await expect(ghost).toHaveAttribute('data-orientation', '1');
   await page.mouse.click(point.x, point.y);
+  await expect(ghost).toBeHidden();
 }
 test('solo expedition: real gathering builds remote storage and reload preserves inventory, plans and lab receipts', async ({
   page,
@@ -87,7 +94,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   await walk(page, 18, 10);
   await gather(2);
   await walk(page, -36, -12);
-  await gather(2);
+  await gather(4);
   await walk(page, -39, -12);
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
@@ -99,6 +106,17 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     })
     .click();
   const panel = page.locator('.sp-expedition-panel');
+  await expect(panel.locator('.sp-facility-art')).toHaveCount(7);
+  await expect(
+    panel
+      .locator('article')
+      .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
+  ).toContainText('Timber 4/2');
+  await expect(
+    panel
+      .locator('article')
+      .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
+  ).toContainText('Plant Fiber 4/2');
   await panel
     .locator('article')
     .filter({ has: page.getByText('Supply Cache', { exact: true }) })
@@ -218,6 +236,32 @@ test('solo expedition: real gathering builds remote storage and reload preserves
       path: resolve(directory, 'lab-' + String(width) + '.png'),
     });
   }
+  await panel.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await walk(page, -38, -10);
+  await walk(page, -40, -12);
+  await page
+    .getByRole('button', { name: 'Camp Bed · blueprint', exact: true })
+    .click();
+  const pending = panel.locator('[data-expedition-plan]');
+  await pending
+    .getByRole('button', { name: 'Contribute', exact: true })
+    .click();
+  await pending.getByRole('button', { name: 'Complete', exact: true }).click();
+  const bed = panel
+    .locator('[data-expedition-facility]')
+    .filter({ has: page.getByText('Camp Bed', { exact: true }) });
+  await expect(bed.locator('.sp-facility-art')).toHaveAttribute(
+    'data-asset-index',
+    '2',
+  );
+  await bed
+    .getByRole('button', { name: 'Dismantle & refund', exact: true })
+    .click();
+  await expect(bed).toHaveCount(0);
+  await expect(panel.getByRole('status')).toContainText(
+    'Building materials returned',
+  );
   expect(errors).toEqual([]);
 });
 
@@ -253,4 +297,36 @@ test('solo launcher rolls distinct default seeds and accepts a reproducible cust
   expect(c.searchParams.get('proz0SaveDb')).not.toBe(
     b.searchParams.get('proz0SaveDb'),
   );
+});
+
+test('depleted fiber shows active-time renewal instead of inviting another gather', async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await page.goto(
+    '/?' +
+      new URLSearchParams({
+        proz0Mode: 'phase2-colony-review',
+        proz0WorldId: 'world:renewal-ui',
+        proz0WorldSeed: 'p1-world-golden',
+        proz0Players: 'solo',
+        proz0Player: 'solo',
+        proz0SaveDb: 'renewal-ui',
+      }),
+  );
+  await expect(page.locator('canvas')).toBeVisible();
+  await walk(page, 18, 10);
+  const hint = page.locator('[data-region="interaction"]');
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('e');
+    await expect(hint).toHaveAttribute('data-state', 'CHANNELING');
+    await expect(hint).toHaveAttribute(
+      'data-state',
+      i === 3 ? 'BLOCKED' : 'AVAILABLE',
+    );
+  }
+  await expect(hint).toContainText('RENEWING');
+  await expect(hint).toContainText('world time');
+  await page.keyboard.press('e');
+  await expect(hint).toHaveAttribute('data-state', 'BLOCKED');
 });

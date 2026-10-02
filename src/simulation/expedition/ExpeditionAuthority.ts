@@ -4,7 +4,10 @@ import {
   expeditionRenewalMultiplier,
 } from '../../content/singleplayer/ExpeditionEcology';
 import type { Phase1ItemAuthority } from '../items';
-import type { Phase1BuildingWorld } from '../../world/building/Phase1BuildingWorld';
+import {
+  PHASE1_STRUCTURE_PLACEMENT_PROFILES,
+  type Phase1BuildingWorld,
+} from '../../world/building/Phase1BuildingWorld';
 import {
   EXPEDITION_RECIPES,
   expeditionFacility,
@@ -25,7 +28,13 @@ export interface ExpeditionCommand {
   readonly playerId: string;
   readonly expectedRevision: number;
   readonly expectedInventoryRevision: number;
-  readonly action: 'plan' | 'move' | 'deposit' | 'complete' | 'cancel';
+  readonly action:
+    | 'plan'
+    | 'move'
+    | 'deposit'
+    | 'complete'
+    | 'cancel'
+    | 'dismantle';
   readonly target: string;
   readonly x?: number;
   readonly y?: number;
@@ -365,6 +374,40 @@ export class ExpeditionAuthority {
       return 'PLAN_OVERLAP';
     return null;
   }
+  public previewFootprint(
+    definition: string,
+    orientation: 0 | 1 | 2 | 3,
+  ): { width: number; depth: number } | null {
+    const def = expeditionFacility(definition);
+    if (!def) return null;
+    const size = PHASE1_STRUCTURE_PLACEMENT_PROFILES[def.shape].footprint;
+    return orientation % 2
+      ? { width: size.depth, depth: size.width }
+      : { width: size.width, depth: size.depth };
+  }
+  public assessPreview(
+    playerId: string,
+    definition: string,
+    x: number,
+    y: number,
+    orientation: 0 | 1 | 2 | 3,
+    planId?: string,
+  ): string | null {
+    let actor: ExpeditionActor;
+    try {
+      actor = this.actor(playerId);
+    } catch {
+      return 'UNKNOWN_PLAYER';
+    }
+    if (!actor.alive) return 'PLAYER_DEAD';
+    if (Math.hypot(actor.x - x, actor.y - y) > 4) return 'OUT_OF_RANGE';
+    if (
+      planId &&
+      !this.state.plans.some((p) => p.id === planId && p.owner === playerId)
+    )
+      return 'PLAN_MISSING';
+    return this.spatial(definition, x, y, orientation, planId);
+  }
   public craft(command: {
     id: string;
     playerId: string;
@@ -475,7 +518,34 @@ export class ExpeditionAuthority {
     this.cancelRest(command.playerId);
     let next = this.state;
     let message: string;
-    if (command.action === 'plan') {
+    if (command.action === 'dismantle') {
+      const facility = this.state.facilities.find(
+        (f) => f.id === command.target && f.owner === command.playerId,
+      );
+      if (!facility) return reject('FACILITY_MISSING');
+      if (facility.canonicalStructureId !== null)
+        return reject('USE_CANONICAL_DISMANTLE');
+      if (Math.hypot(actor.x - facility.x, actor.y - facility.y) > 4)
+        return reject('OUT_OF_RANGE');
+      if (facility.water > 0) return reject('COLLECT_WATER_FIRST');
+      const def = expeditionFacility(facility.definitionId)!;
+      const result = this.items.commitColonyExchange({
+        operationId: command.id,
+        playerId: command.playerId,
+        expectedInventoryRevision: command.expectedInventoryRevision,
+        inputs: [],
+        outputs: def.costs.map(([itemDefinitionId, quantity]) => ({
+          itemDefinitionId,
+          quantity,
+        })),
+      });
+      if (result.status === 'rejected') return reject(result.reason);
+      next = {
+        ...next,
+        facilities: next.facilities.filter((f) => f.id !== facility.id),
+      };
+      message = 'FACILITY_DISMANTLED';
+    } else if (command.action === 'plan') {
       if (
         this.state.facilities.some(
           (f) => f.id === 'facility:plan:' + command.id,
