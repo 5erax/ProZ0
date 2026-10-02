@@ -1024,6 +1024,8 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    if(resource.depleted){refreshWorldPresentationContext();return;}
+
     const inventory = bundle.items.getContainerView(
       'inventory:' + config.localPlayerId,
     );
@@ -1491,12 +1493,16 @@ export async function createPhase1ProductReviewRuntime(
         resource.definitionId,
         'resource',
       );
+      const resourceState = bundle.worldStore.getResourceState(resource.entityId);
+      const renewing = resourceState?.depleted === true;
+      const readyTick = resourceState?.regenerationReadyTick;
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: 'GATHER',
+        verb: renewing ? 'RENEWING' : 'GATHER',
         target: definition.displayName,
-        state: 'AVAILABLE',
-        reason: null,
+        state: renewing ? 'BLOCKED' : 'AVAILABLE',
+        reason: !renewing ? null : readyTick == null ? 'Resource depleted' :
+          'Regrows in ' + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + 's of world time',
         progress: null,
       }));
       return;

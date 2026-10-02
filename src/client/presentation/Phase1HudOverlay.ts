@@ -304,7 +304,8 @@ function renderPanel(
     case 'inventory': {
       root.append(actionButton(document, 'Equip / Unequip [X]', 'equip'),actionButton(document,'Stack matching items','inventory-stack'));
       root.append(actionButton(document,'Build storage crate','build-storage'));
-      root.append(createElement(document,'div','p1-storage-tip','Store supplies near a crate: open Inventory [I] beside it. Build a crate with 4 Timber + 2 Cordage.'));
+      if(panel.capacity?.weightMax===32)root.append(actionButton(document,'Plan expedition storage','open-expedition'));
+      root.append(createElement(document,'div','p1-storage-tip',panel.capacity?.weightMax===32?'Supply Cache blueprint: 2 Timber + 2 Plant Fiber. Open Inventory [I] nearby to store supplies. Volume measures item bulk, not empty slots.':'Store supplies near a crate: open Inventory [I] beside it. Build a crate with 4 Timber + 2 Cordage.'));
       root.dataset.inventoryActivePane = 'player';
       root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
@@ -1498,6 +1499,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const carry = createElement(this.document, 'section', 'p1-carry p1-box p1-context-hud');
     carry.dataset.region = 'carry';
     carry.dataset.carryState = state.carry.stateLabel;
+    carry.title='Weight: '+state.carry.weightCurrent.toFixed(1)+'/'+state.carry.weightMax+' kg. Volume: '+state.carry.volumeCurrent.toFixed(1)+'/'+state.carry.volumeMax+' bulk units, not slots.';
+    carry.setAttribute('aria-label',carry.title);
     const weightIcon = assetSprite(
       this.document,
       'p1-asset-icon',
