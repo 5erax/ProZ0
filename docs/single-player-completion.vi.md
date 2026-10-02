@@ -57,7 +57,7 @@ Sau vòng này ưu tiên đo chuyến solo 20–30 phút: thời gian travel/gat
 | Task | Trạng thái | Commit / bằng chứng |
 |---|---|---|
 | SC-01 | COMMITTED cùng kế hoạch | Audit baseline fbad288; các gaps nêu trên có source đối chiếu |
-| SC-02 | PLANNED | Chờ implementation và domain tests |
+| SC-02 | VERIFIED / COMMITTED cùng increment | assessPreview/previewFootprint read-only; custom dismantle/refund; 8 construction/completion tests PASS, typecheck/lint PASS |
 | SC-03 | PLANNED | Chờ asset/UI/preview |
 | SC-04 | PLANNED | Chờ contextual state |
 | SC-05 | PLANNED | Chờ CI/public delivery |
