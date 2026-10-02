@@ -60,7 +60,7 @@ Sau vòng này ưu tiên đo chuyến solo 20–30 phút: thời gian travel/gat
 | SC-02 | VERIFIED / COMMITTED | `402f977`; assessPreview/previewFootprint read-only; custom dismantle/refund; 8 construction/completion tests PASS, typecheck/lint PASS |
 | SC-03 | VERIFIED / COMMITTED | `d8e069a`; atlas 7 hình riêng, preview footprint/rotation, have/required, marker focus; natural journey PASS |
 | SC-04 | VERIFIED / COMMITTED | `5349a40`; HUD renewing, storage guidance, 3 E2E PASS (natural journey, seeds, depletion) |
-| SC-05 | IN PROGRESS | Full CI đang chạy; sau đó exact-head CI/CodeQL, PR, main và public verification |
+| SC-05 | VERIFIED CI / DELIVERY TRACKED | Head `53cf7fc`: GitHub CI/CodeQL/dependency review PASS; 41 E2E PASS, 2 conditional skips. Trạng thái merge/main/public cuối cùng tại #211/#212 và release evidence |
 
 ## Đường code cho nhân sự tiếp nhận
 
@@ -76,3 +76,11 @@ Sau vòng này ưu tiên đo chuyến solo 20–30 phút: thời gian travel/gat
 Đọc thêm [nghiệp vụ, bảng giá và hành vi cụ thể](single-player-expedition-handoff.vi.md) cùng [kế hoạch SP-01–SP-10](single-player-expedition-plan.md). Các tài liệu đó ghi lịch sử trước khi merge #210; vòng hiện tại bổ sung UX/thu hồi công trình và xác nhận lại toàn bộ phạm vi. Chạy rg --files trước khi giao task để đối chiếu đường file chính xác, không sửa tên giả định.
 
 Theo dõi triển khai: [issue #211](https://github.com/5erax/ProZ0/issues/211), [PR #212](https://github.com/5erax/ProZ0/pull/212). Nhánh tách riêng từ main, commit theo từng phần, không đổi engine hoặc dữ liệu thế giới cũ.
+
+## Kết quả QA và giới hạn đo trên máy Owner
+
+CI chính thức [36979981004](https://github.com/5erax/ProZ0/actions/runs/36979981004) tại head 53cf7fc: typecheck/lint/build PASS; 134 unit, 180 integration (3 conditional skips), 13 determinism, 31 browser, 41 E2E PASS (2 public/environment skips). Ba lần lặp test co-op UI PASS riêng. [CodeQL](https://github.com/5erax/ProZ0/actions/runs/36979981021) và dependency review PASS. Tám mẫu Phase 2 có minimum 59.868 FPS, maximum P95 16.8 ms; không đổi gate 50 FPS/34 ms.
+
+Local full CI: các kiểm tra trước E2E đều PASS; 39 E2E PASS, 2 conditional skips, 2 frame-pacing failures. Rerun riêng frame-pacing: hosted tick budget PASS, Phase 1 32.64 FPS và Phase 2 marsh-rain 33.96 FPS, không đạt gate. Đối chứng cùng fixture trên production baseline fbad288 cũng không đạt (34.77 FPS); asset baseline xác nhận index-CgMxvnP7.js. Không khẳng định nguyên nhân chỉ do nhánh mới hay mọi máy đều chạy 60 FPS. Giữ số đo lỗi cùng bằng chứng CI/live release; hiệu năng thiết bị thực tế cần tiếp tục đo, không hạ gate để đổi failure thành PASS. Các failure này không ảnh hưởng kiểm tra giao dịch, save, UI và 12 hành vi chức năng đã đối chiếu.
+
+Bản release cuối phải ghi source SHA, asset hash, public journey và CI/main links ở tracker/release. Đây là hồ sơ stage của branch; trạng thái triển khai cuối lấy từ thông báo release thay vì suy diễn từ một bảng task.
