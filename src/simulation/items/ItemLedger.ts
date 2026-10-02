@@ -7,6 +7,8 @@ import {
   getPlayerWeightState,
   validateContainerAbsoluteCapacity,
   validateInboundCapacityTransition,
+  LEGACY_PLAYER_CARRY,
+  type PlayerCarryPolicy,
 } from './ItemCapacity';
 import type {
   ContainerId,
@@ -114,6 +116,7 @@ export class ItemLedgerDraft {
     private readonly catalog: ContentCatalogV1,
     snapshot: ItemLedgerSnapshot,
     private readonly storageMultiplier = 1,
+    private readonly playerPolicy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
   ) {
     this.containers = new Map(
       snapshot.containers.map((container) => [
@@ -289,6 +292,7 @@ export class ItemLedgerDraft {
       currentUsage,
       projectedUsage,
       this.storageMultiplier,
+      this.playerPolicy,
     );
 
     if (capacityFailure !== null) {
@@ -347,6 +351,7 @@ export class ItemLedgerDraft {
       candidate.kind,
       usage,
       this.storageMultiplier,
+      this.playerPolicy,
     );
     if (capacityFailure !== null) {
       return capacityFailure;
@@ -414,6 +419,7 @@ function validateInitialSnapshot(
   catalog: ContentCatalogV1,
   snapshot: ItemLedgerSnapshot,
   storageMultiplier = 1,
+  playerPolicy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
 ): void {
   const containerIds = new Set<ContainerId>();
   const stackIds = new Set<ItemStackId>();
@@ -463,6 +469,7 @@ function validateInitialSnapshot(
       container.kind,
       usage,
       storageMultiplier,
+      playerPolicy,
     );
     if (capacityFailure !== null) {
       throw new Error(
@@ -479,13 +486,14 @@ export class ItemLedger {
     private readonly catalog: ContentCatalogV1,
     snapshot: ItemLedgerSnapshot,
     private readonly storageMultiplier: () => number = () => 1,
+    private readonly playerPolicy: PlayerCarryPolicy = LEGACY_PLAYER_CARRY,
   ) {
-    validateInitialSnapshot(catalog, snapshot,storageMultiplier());
-    this.snapshotState = new ItemLedgerDraft(catalog, snapshot,storageMultiplier()).snapshot();
+    validateInitialSnapshot(catalog, snapshot,storageMultiplier(),playerPolicy);
+    this.snapshotState = new ItemLedgerDraft(catalog, snapshot,storageMultiplier(),playerPolicy).snapshot();
   }
 
   public createDraft(): ItemLedgerDraft {
-    return new ItemLedgerDraft(this.catalog, this.snapshotState,this.storageMultiplier());
+    return new ItemLedgerDraft(this.catalog, this.snapshotState,this.storageMultiplier(),this.playerPolicy);
   }
 
   public publish(draft: ItemLedgerDraft): void {
@@ -509,10 +517,11 @@ export class ItemLedger {
       ...container,
       totalWeightKg: usage.totalWeightKg,
       totalVolume: usage.totalVolume,
+      ...(container.kind==='player-inventory'?{playerCarryPolicy:this.playerPolicy}:{}),
       ...(container.kind==='storage-crate'?{storageCapacityMultiplier:this.storageMultiplier()}:{}),
       playerWeightState:
         container.kind === 'player-inventory'
-          ? getPlayerWeightState(usage.totalWeightKg)
+          ? getPlayerWeightState(usage.totalWeightKg,this.playerPolicy)
           : null,
     });
   }

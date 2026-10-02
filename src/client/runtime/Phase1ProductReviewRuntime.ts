@@ -211,7 +211,7 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.visualQaMode = 'none';
   root.dataset.runtimeStatus = 'booting';
 
-  const bundle = await Phase1AuthorityBundle.create(config);
+  const bundle = await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
   const checkpointCoordinator =
     new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(

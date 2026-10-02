@@ -1,3 +1,4 @@
+import { EXPEDITION_PLAYER_CARRY } from '../simulation/items/ItemCapacity';
 import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
@@ -361,6 +362,7 @@ export type Phase1RuinRewardClaimResult =
     };
 
 export interface Phase1AuthorityBundleConfig {
+  readonly singlePlayerExpeditionEnabled?: boolean;
   readonly worldGenerationVersion?: number;
   readonly colonyDepthEnabled?: boolean;
   readonly worldId: string;
@@ -576,6 +578,7 @@ export class Phase1AuthorityBundle {
     const gatherCost = new DeferredGatherCostPort();
     let capacityAuthority:ColonyDepthAuthority|null=null;
     const items = new Phase1ItemAuthority({
+      ...(config.singlePlayerExpeditionEnabled===true?{playerCarryPolicy:EXPEDITION_PLAYER_CARRY}:{}),
       catalog,
       world: itemWorld,
       initialLedger: initialLedger(playerIds, reopen),

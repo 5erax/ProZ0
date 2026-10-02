@@ -78,6 +78,7 @@ interface ActiveGatherChannel {
 }
 
 export interface Phase1ItemAuthorityOptions {
+  readonly playerCarryPolicy?: import('./ItemCapacity').PlayerCarryPolicy;
   readonly storageCapacityMultiplier?: () => number;
   readonly catalog: ContentCatalogV1;
   readonly world: ItemInteractionWorldPort;
@@ -392,7 +393,7 @@ export class Phase1ItemAuthority {
   private readonly activeGatherOperationSignatures = new Map<OperationId, string>();
 
   public constructor(private readonly options: Phase1ItemAuthorityOptions) {
-    this.ledger = new ItemLedger(options.catalog, options.initialLedger,options.storageCapacityMultiplier);
+    this.ledger = new ItemLedger(options.catalog, options.initialLedger,options.storageCapacityMultiplier,options.playerCarryPolicy);
     this.gatherCost = options.gatherCost ?? NOOP_GATHER_COST_PORT;
     this.events = options.events ?? NOOP_ITEM_AUTHORITY_EVENT_SINK;
   }
