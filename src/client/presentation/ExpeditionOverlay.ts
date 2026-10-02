@@ -25,9 +25,10 @@ export function createExpeditionOverlay(root:HTMLElement,canvas:HTMLCanvasElemen
  const open=()=>{onOpen();opened=true;placement=null;hint.hidden=true;root.dataset.expeditionPanelOpen='true';signature='';render();};
  const render=()=>{
   const state=authority.read(),inventory=bundle.items.getContainerView('inventory:'+playerId);
-  const rest=authority.restStatus(playerId);const next=JSON.stringify([opened,state.plans,state.facilities.map(({progress,...f})=>({...f,progress:Math.floor(progress/60)})),state.supplyClaimed,inventory.revision,rest?Math.ceil(rest.remainingTicks/60):null,feedback]);
+  const rest=authority.restStatus(playerId);const next=JSON.stringify([opened,state.plans,state.facilities.map(({progress,...f})=>({...f,progress:Math.floor(progress/60)})),state.supplyClaimed,state.events,inventory.revision,rest?Math.ceil(rest.remainingTicks/60):null,feedback]);
   if(next!==signature){signature=next;panel.hidden=!opened;panel.replaceChildren();
    if(opened){panel.append(text('h2','EXPEDITION · BLUEPRINTS & FIELD CRAFT'),button('Close',close),text('small','World seed: '+bundle.config.worldSeed),text('p','Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.'));
+    const event=authority.currentEvent(bundle.getPlayerPosition(playerId));if(event)panel.append(text('small','Local ecology: '+event.replaceAll('-',' ')));
     const status=text('p',feedback);status.setAttribute('role','status');panel.append(status);
     for(const def of EXPEDITION_FACILITIES){const row=document.createElement('article');row.append(text('p',def.name));costs(row,def.costs);row.append(button('Plan',()=>selectPlacement(def.id)),text('small',def.purpose));panel.append(row);}
     for(const plan of state.plans){const def=expeditionFacility(plan.definitionId)!;const row=document.createElement('article');row.dataset.expeditionPlan=plan.id;row.append(text('p',def.name+' · '+String(plan.x)+', '+String(plan.y)));costs(row,def.costs,plan.paid);row.append(button('Contribute',()=>run('deposit',plan.id)),button('Complete',()=>run('complete',plan.id)),button('Move',()=>selectPlacement(def.id,plan.id)),button('Cancel & refund',()=>run('cancel',plan.id)));panel.append(row);}

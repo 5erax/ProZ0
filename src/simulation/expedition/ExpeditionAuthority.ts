@@ -1,3 +1,4 @@
+import {expeditionEventKind,expeditionRegion,expeditionRenewalMultiplier} from '../../content/singleplayer/ExpeditionEcology';
 import type {Phase1ItemAuthority} from '../items';
 import type {Phase1BuildingWorld} from '../../world/building/Phase1BuildingWorld';
 import {EXPEDITION_RECIPES,expeditionFacility} from '../../content/singleplayer/ExpeditionContent';
@@ -9,6 +10,8 @@ export interface ExpeditionCommand {
 }
 export interface ExpeditionResult {readonly status:'committed'|'rejected';readonly message:string;}
 export interface ExpeditionServices {
+ readonly seed?:string;
+ pressure?(region:string):number;
  tick():number;
  survival(playerId:string):{healthMilli:number;foodMilli:number;waterMilli:number;lifeState:{type:string}};
  completeRest(playerId:string):boolean;
@@ -21,8 +24,13 @@ export class ExpeditionAuthority {
  public restStatus(playerId:string):{remainingTicks:number}|null{const rest=this.resting.get(playerId);return rest&&this.services?{remainingTicks:Math.max(0,480-(this.services.tick()-rest.start))}:null;}
  public hasRemoteLab(playerId:string):boolean{const actor=this.actor(playerId);return this.state.facilities.some(f=>f.definitionId==='field-lab'&&Math.hypot(f.x-actor.x,f.y-actor.y)<=4);}
  public cancelRest(playerId:string):void{this.resting.delete(playerId);}
+ public currentEvent(point:{x:number;y:number}){const tick=this.services?.tick()??0,region=expeditionRegion(point);return [...this.state.events].reverse().find(e=>e.region===region&&e.untilTick>tick)?.kind;}
+ public recoveryMultiplier(point:{x:number;y:number},resource:string):number{return expeditionRenewalMultiplier(resource,this.currentEvent(point));}
  public tick():void{
   this.reconcile();if(!this.services)return;const tick=this.services.tick();
+  if(tick>=this.state.nextEventTick){const owner=this.state.facilities[0]?.owner??this.items.exportLedgerSnapshot().containers.find(c=>c.kind==='player-inventory')?.ownerPlayerId;
+   if(owner){const actor=this.actor(owner),region=expeditionRegion(actor);const event={tick,region,kind:expeditionEventKind(this.services.seed??'expedition',tick,region,this.services.pressure?.(region)??0,this.services.weather(actor.x,actor.y)),untilTick:tick+10800};this.state=validateExpeditionState({...this.state,revision:this.state.revision+1,nextEventTick:(Math.floor(tick/7200)+1)*7200,events:[...this.state.events,event].slice(-32)});}
+  }
   for(const [playerId,rest] of this.resting){const actor=this.actor(playerId),survival=this.services.survival(playerId);
    if(!actor.alive||Math.hypot(actor.x-rest.x,actor.y-rest.y)>.05||survival.healthMilli<rest.health||this.services.hostileNear(actor.x,actor.y)||survival.foodMilli<15000||survival.waterMilli<15000){this.resting.delete(playerId);continue;}
    if(tick-rest.start>=480){this.resting.delete(playerId);if(this.services.completeRest(playerId))this.state=validateExpeditionState({...this.state,revision:this.state.revision+1,restCooldown:{...this.state.restCooldown,[playerId]:tick+1800}});}
@@ -54,7 +62,7 @@ export class ExpeditionAuthority {
   this.state=validateExpeditionState({...next,revision:next.revision+1,receipts:[...next.receipts,{id:command.id,signature,result:message}].slice(-96)});return {status:'committed',message};
  }
  private state:ExpeditionState;
- public constructor(private readonly items:Phase1ItemAuthority,private readonly buildings:Phase1BuildingWorld,private readonly actor:(player:string)=>ExpeditionActor,initial?:ExpeditionState,private readonly services?:ExpeditionServices){this.state=validateExpeditionState(initial??emptyExpeditionState());}
+ public constructor(private readonly items:Phase1ItemAuthority,private readonly buildings:Phase1BuildingWorld,private readonly actor:(player:string)=>ExpeditionActor,initial?:ExpeditionState,private readonly services?:ExpeditionServices){this.state=validateExpeditionState(initial??{...emptyExpeditionState(),nextEventTick:(Math.floor((services?.tick()??0)/7200)+1)*7200});}
  public read():ExpeditionState{return this.state;}
  public reconcile():void{
   const facilities=this.state.facilities.filter(f=>f.canonicalStructureId===null||this.buildings.getStructure(f.canonicalStructureId)!==null);

@@ -131,5 +131,6 @@ Prioritize split-stack/quick-transfer storage, discovered outpost map naming, li
 | SP-03 | CORE COMMITTED | `7877c0d`; construction unit tests and Save V2 reopen test; typecheck/lint | Escrow/refund/idempotency, canonical remote crate/workbench, optional solo save state and custom collider adapter implemented. UI and functional custom facilities remain SP-04/SP-05 |
 | SP-04 | COMMITTED | `a6f8c9c`; 15 targeted construction/items/colony tests PASS; typecheck/lint | Custom facility functions and browser journey pending SP-05/SP-10 |
 | SP-05 | COMMITTED | `dc089c7`; 9 targeted facilities/rest/save/colony tests PASS; typecheck/lint | Rest does not skip night; transient rest cancels on reload; buffer/cooldown/claimed supplies persist |
-| SP-06 | IMPLEMENTED; verification in progress | New World already uses UUID seeds; added optional reproducible seed input and in-world seed; corrected inactive-map generation version | Starter landmarks remain intentional; no generator-version change or old-world terrain reroll |
-| SP-07–SP-10 | PLANNED | No implementation claimed | Execute dependency order; update ledger in each meaningful commit |
+| SP-06 | COMMITTED | `a5f6eb5`; 7 generation determinism tests PASS; typecheck/lint | Starter landmarks remain intentional; no generator-version change or old-world terrain reroll |
+| SP-07/SP-08 | IMPLEMENTED; verification in progress | Solo renewal factors and saved bounded regional events | Event combinations affect resource renewal; old depleted-node deadlines remain valid, offline time stays paused; wildlife movement effect integrated in SP-09 |
+| SP-09–SP-10 | PLANNED | No implementation claimed | Execute dependency order; update ledger in each meaningful commit |

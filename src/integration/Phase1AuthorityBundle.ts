@@ -446,6 +446,8 @@ export class Phase1AuthorityBundle {
     this.buildings = buildings;
     this.items = items;
     this.expedition=config.singlePlayerExpeditionEnabled===true?new ExpeditionAuthority(items,buildings,playerId=>{const p=positions.get(playerId);return {x:p.x,y:p.y,alive:survival.getPlayerState(playerId).lifeState.type==='alive'};},config.reopen?.bundle.world.singlePlayerExpedition,{
+      seed:config.worldSeed,
+      pressure:region=>this.colonyDepth.read().pressure.find(p=>p.regionKey===region)?.harvests??0,
       tick:()=>this.authorityTick,
       survival:playerId=>survival.getPlayerState(playerId),
       completeRest:playerId=>survival.completeExpeditionRest(playerId),
@@ -458,7 +460,7 @@ export class Phase1AuthorityBundle {
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
     }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
-      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId),
+      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
     });
     this.sustenance = new ColonySustenanceAuthority(items,
