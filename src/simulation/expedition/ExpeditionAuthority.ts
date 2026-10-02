@@ -229,7 +229,7 @@ export class ExpeditionAuthority {
     let next = this.state;
     let message: string;
     if (command.action === 'rest') {
-      if (!lab && facility?.definitionId !== 'camp-bed')
+      if (!lab && facility?.definitionId !== 'camp-bed' && facility?.definitionId !== 'field-cabin')
         return reject('BED_REQUIRED');
       if (this.resting.has(command.playerId)) return reject('ALREADY_RESTING');
       const survival = this.services.survival(command.playerId);

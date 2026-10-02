@@ -326,6 +326,7 @@ function composePhase1SaveV2AtRevision(
     worldRevision,
     authorityTick: bundle.authorityTick,
     sustenance: bundle.sustenance.read(),
+    ...(bundle.livingWorld?{livingWorld:bundle.livingWorld.read()}:{}),
     ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
       ? { colonyDepth: bundle.colonyDepth.read() } : {}),

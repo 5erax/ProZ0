@@ -189,9 +189,7 @@ export class Phase1EquipmentAuthority {
       (entry) => entry.stackId === view.equippedThermalWrapStackId,
     );
     return stack !== undefined
-      && stack.itemDefinitionId === 'item:thermal-wrap'
-      && stack.condition !== null
-      && stack.condition > 0;
+      && ((stack.itemDefinitionId === 'item:thermal-wrap' && stack.condition !== null && stack.condition > 0) || stack.itemDefinitionId === 'item:warm-cloak');
   }
 
   public clear(playerId: PlayerId): Readonly<Phase1EquipmentView> {
@@ -238,7 +236,7 @@ export class Phase1EquipmentAuthority {
       (entry) => entry.stackId === stackId,
     );
     if (stack === undefined) return 'SOURCE_MISSING';
-    if (stack.itemDefinitionId !== expectedDefinitionId) {
+    if (stack.itemDefinitionId !== expectedDefinitionId && !(expectedDefinitionId==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak')) {
       return 'INVALID_EQUIPMENT';
     }
     return null;

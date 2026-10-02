@@ -1,3 +1,4 @@
+import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
 import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
 import { EXPEDITION_PLAYER_CARRY } from '../simulation/items/ItemCapacity';
@@ -399,6 +400,7 @@ export class Phase1AuthorityBundle {
   public readonly sustenance: ColonySustenanceAuthority;
   public readonly colonyDepth: ColonyDepthAuthority;
   public readonly expedition: ExpeditionAuthority|null;
+  public readonly livingWorld: LivingWorldAuthority|null;
   public readonly combat: Phase1CombatAuthority;
   public readonly death: Phase1DeathAuthority;
 
@@ -457,12 +459,21 @@ export class Phase1AuthorityBundle {
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
       hostileNear:(x,y)=>world.getActiveGeneratedEntities().some(e=>{if(e.type!=='hostile')return false;const predator=world.getPredator(e.entityId);return predator!==null&&predator.health>0&&Math.hypot(predator.position.x-x,predator.position.y-y)<8;}),
     }):null;
+    this.livingWorld=this.expedition?new LivingWorldAuthority(items,this.expedition,{
+      seed:config.worldSeed,tick:()=>this.authorityTick,players:()=>this.getActivePlayerIds(),
+      actor:id=>{const p=positions.get(id);return {...p,alive:survival.getPlayerState(id).lifeState.type==='alive'};},
+      ground:(x,y)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
+      plotGround:(x,y)=>{const r=buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true);return typeof r==='string'?r:null;},
+      weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
+      weapon:id=>equipment.reconcile(id).equippedWeaponStackId!==null,
+      cancelRest:id=>this.expedition!.cancelRest(id),
+    },config.reopen?.bundle.world.livingWorld):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
     }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
-      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1),
+      multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)*(this.livingWorld?.renewal(position,definitionId)??1),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
     });
     this.sustenance = new ColonySustenanceAuthority(items,
@@ -557,7 +568,7 @@ export class Phase1AuthorityBundle {
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
       expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
-      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>f.definitionId==='camp-bed'&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
+      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
       colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
@@ -864,8 +875,7 @@ export class Phase1AuthorityBundle {
       const thermalWrapActive =
         this.equipment.isThermalWrapActive(playerId);
       this.survival.stepPlayer(playerId, authorityTick, {
-        thermalTarget: this.config.colonyDepthEnabled === true && !exposure.sheltered
-          ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,
+        thermalTarget: this.livingWorld?.thermalTarget(this.positions.get(playerId),this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,exposure.sheltered) ?? (this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget),
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',
       });
@@ -930,6 +940,7 @@ export class Phase1AuthorityBundle {
     this.processPendingDeaths(authorityTick);
     this.processPendingRespawns(authorityTick);
     this.expedition?.tick();
+    this.livingWorld?.tick();
     if(this.expedition && predator){const state=this.world.getPredator(predator.entityId);
       if(state?.state==='chase'&&state.targetPlayerId)this.world.movePredatorToward(state.entityId,this.getPlayerPosition(state.targetPlayerId),2.1);
       else if(state?.state==='return')this.world.movePredatorToward(state.entityId,state.encounterAnchor,2.4);
