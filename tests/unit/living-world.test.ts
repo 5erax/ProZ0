@@ -367,10 +367,16 @@ it('fed mature pairs breed, youth cannot breed, predators eat species prey and d
       animal('hen', 'chicken', 0, 'livestock-pen'),
     ],
   });
-  protectedPair.advance(10);
-  expect(
-    protectedPair.authority.read().animals.find((a) => a.id === 'hen')!.health,
-  ).toBe(4);
+  for (let i = 0; i < 60; i++) {
+    protectedPair.advance();
+    const hen = protectedPair.authority
+      .read()
+      .animals.find((a) => a.id === 'hen')!;
+    expect(hen.health).toBe(4);
+    expect(
+      Math.hypot(hen.x - hen.anchorX, hen.y - hen.anchorY),
+    ).toBeLessThanOrEqual(1.01);
+  }
 });
 it('animals mature and produce eggs; taming, feeding, hunting, loot and fuel perform real item exchanges', () => {
   const f = fixture({ animals: [animal('hen')] });

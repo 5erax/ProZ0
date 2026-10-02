@@ -23,7 +23,7 @@ Baseline: main 4220521 / PR #212. Tracking: #213; PR #214. Nhánh: product/livin
 | Đất | Loam 100%, sand 70%, clay 90%, peat 125%, rocky 45%; retention khác nhau, nhận dạng theo seed/vùng đất độc lập |
 | Cây | Grain 5 phút, root 4 phút, flax 4 phút, herb 3 phút trước soil/season/fertilizer; thu cơ bản 4 sản phẩm + 2 hạt |
 | Vật nuôi | Chicken trưởng thành 120s, rabbit 90s, goat 240s, boar 180s; có food/water, tuổi non, giới tính, cooldown sinh sản riêng |
-| Thiên địch | Fox săn chicken/rabbit; wolf săn goat/boar; nuôi trong pen bảo vệ khỏi săn hoang |
+| Thiên địch | Fox săn chicken/rabbit; wolf săn goat/boar; nuôi trong pen bảo vệ khỏi săn hoang và giữ vật nuôi trong phạm vi pen |
 | Sản phẩm | Con cái chicken đẻ trứng, goat cho sữa; goat xén wool có cooldown riêng 5 phút; không dùng chung breed timer |
 | Content | 29 items thêm, 10 facilities thêm (17 expedition facilities tổng), 15 homestead recipes thêm |
 

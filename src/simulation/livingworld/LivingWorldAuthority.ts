@@ -397,16 +397,17 @@ export class LivingWorldAuthority {
                 Math.hypot(q.x - a.x, q.y - a.y),
             )[0]
         : null;
-      const predator = !d.diet.length
-        ? this.state.animals.find(
-            (p) =>
-              p.health > 0 &&
-              (
-                speciesDefinition(p.species)!.diet as readonly string[]
-              ).includes(a.species) &&
-              Math.hypot(p.x - a.x, p.y - a.y) < 4,
-          )
-        : null;
+      const predator =
+        !a.pen && !d.diet.length
+          ? this.state.animals.find(
+              (p) =>
+                p.health > 0 &&
+                (
+                  speciesDefinition(p.species)!.diet as readonly string[]
+                ).includes(a.species) &&
+                Math.hypot(p.x - a.x, p.y - a.y) < 4,
+            )
+          : null;
       const phase =
         ((livingHash(a.id + ':' + Math.floor(tick / 600)) % 8) * Math.PI) / 4;
       const tx =
