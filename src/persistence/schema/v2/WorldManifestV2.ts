@@ -15,6 +15,7 @@ export interface WeatherEventSaveV2 {
 }
 
 export interface WorldManifestV2 {
+  readonly livingWorld?: import('../../../simulation/livingworld/LivingWorldState').LivingWorldState;
   readonly singlePlayerExpedition?: import('../../../simulation/expedition/ExpeditionState').ExpeditionState;
   readonly formatId: typeof SAVE_FORMAT_ID;
   readonly schemaVersion: typeof SAVE_SCHEMA_VERSION_V2;

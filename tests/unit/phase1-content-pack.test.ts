@@ -1,7 +1,7 @@
+import {createLegacyPhase1ContentCatalog as createPhase1ContentCatalog} from '../../src/content/phase1/Phase1Catalog';
 import { describe, expect, it } from 'vitest';
 import {
   PHASE1_REQUIRED_CONTENT_IDS,
-  createPhase1ContentCatalog,
 } from '../../src/content';
 
 describe('Phase 1 vertical-slice content pack', () => {

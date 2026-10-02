@@ -1,3 +1,4 @@
+import {generationCatalog} from '../../content/phase1/Phase1Catalog';
 import type {
   ContentCatalogV1,
   ContentCompatibilityIdentityV1,
@@ -661,8 +662,9 @@ function colonyResourceClusters(worldSeed:string,coord:ChunkCoord,catalog:Conten
 
 export class Phase1ChunkGenerator implements ChunkGenerator {
   public constructor(
-    private readonly catalog: ContentCatalogV1,
-  ) {}
+    catalog: ContentCatalogV1,
+  ) { this.catalog = generationCatalog(catalog); }
+  private readonly catalog: ContentCatalogV1;
 
   public generate(
     request: ChunkGenerationRequest,

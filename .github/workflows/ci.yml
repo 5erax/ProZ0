@@ -71,6 +71,7 @@ jobs:
             test-results/phase2-frame-pacing/
             test-results/phase2-colony-depth/
             test-results/single-player-expedition/
+            test-results/living-world/
           if-no-files-found: ignore
           retention-days: 30
 

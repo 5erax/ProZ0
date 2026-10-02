@@ -53,8 +53,9 @@ async function clickGround(page: Page, x: number, y: number) {
   const ghost = page.locator('.sp-ghost');
   await expect(ghost).toBeVisible();
   await expect(ghost).toHaveAttribute('data-valid', 'true');
+  const orientation = Number(await ghost.getAttribute('data-orientation'));
   await page.keyboard.press('r');
-  await expect(ghost).toHaveAttribute('data-orientation', '1');
+  await expect(ghost).toHaveAttribute('data-orientation', String((orientation + 1) % 4));
   await page.mouse.click(point.x, point.y);
   await expect(ghost).toBeHidden();
 }
@@ -106,7 +107,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     })
     .click();
   const panel = page.locator('.sp-expedition-panel');
-  await expect(panel.locator('.sp-facility-art')).toHaveCount(7);
+  await expect(panel.locator('.sp-facility-art')).toHaveCount(17);
   await expect(
     panel
       .locator('article')
@@ -157,6 +158,14 @@ test('solo expedition: real gathering builds remote storage and reload preserves
       exact: true,
     })
     .click();
+  const cache = panel
+    .locator('[data-expedition-facility]')
+    .filter({ has: page.getByText('Supply Cache', { exact: true }) });
+  await cache
+    .getByRole('button', { name: 'Move / rotate', exact: true })
+    .click();
+  await clickGround(page, -41, -13);
+  await expect(panel.getByRole('status')).toContainText('Building moved');
   await panel
     .locator('article')
     .filter({ has: page.getByText('Camp Bed', { exact: true }) })
@@ -184,6 +193,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     'true',
   );
   await expect(page.locator('.sp-blueprint[data-plan-id]')).toHaveCount(1);
+  await walk(page, -40, -13);
   await page.keyboard.press('i');
   await expect(page.locator('[data-inventory-pane="storage"]')).toContainText(
     'Plant Fiber',

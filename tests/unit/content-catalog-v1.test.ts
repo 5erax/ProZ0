@@ -1,9 +1,9 @@
+import {createLegacyPhase1ContentCatalog as createPhase1ContentCatalog} from '../../src/content/phase1/Phase1Catalog';
 import { describe, expect, it } from 'vitest';
 import {
   ContentLookupError,
   ContentValidationException,
   createContentCatalogV1,
-  createPhase1ContentCatalog,
   type ContentDefinitionV1,
   type ContentPackV1,
   type ProfessionQuestDefinitionV1,

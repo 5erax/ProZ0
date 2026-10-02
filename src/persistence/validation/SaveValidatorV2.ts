@@ -1,3 +1,6 @@
+import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
+import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
+import {acceptsLegacyCatalog} from '../../content/phase1/Phase1Catalog';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
@@ -155,7 +158,7 @@ function sameContentIdentity(
   if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
-  if (actual.canonicalFingerprint !== expected.canonicalFingerprint) {
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint)) {
     return saveFailure('CONTENT_FINGERPRINT_MISMATCH', 'Saved content fingerprint does not match the active catalog.');
   }
   return null;
@@ -194,6 +197,7 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
   if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.colonyDepth !== undefined) {
     try { validateColonyDepthState(record.colonyDepth); }
@@ -946,6 +950,9 @@ function globalCrossReferences(
   if (Object.keys(bundle.world.colonyDepth?.professions ?? {}).some(playerId => !players.has(playerId))) {
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
+  const living=bundle.world.livingWorld;
+  if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>LIVING_ITEMS.some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
+  if(living&&(living.plots.some(p=>!players.has(p.owner))||living.animals.some(a=>a.owner&&!players.has(a.owner))||living.stations.some(s=>!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===s.id))||living.animals.some(a=>a.pen&&!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===a.pen))))return saveFailure('CORRUPT_RECORD','Invalid living-world references.');
   const containers = new Map(
     bundle.containers.map((entry) => [entry.containerId, entry]),
   );
@@ -1094,7 +1101,7 @@ function globalCrossReferences(
       const stack = allStacks.get(stackId);
       if (stack === undefined
         || stack.container.containerId !== inventory.containerId
-        || stack.itemDefinitionId !== expectedItem) {
+        || (stack.itemDefinitionId !== expectedItem && !(expectedItem==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak'))) {
         return saveFailure(
           'CROSS_REFERENCE_FAILURE',
           `Player ${player.playerId} equipment reference ${stackId} is invalid.`,

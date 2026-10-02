@@ -1,3 +1,4 @@
+import {LIVING_FACILITIES} from '../livingworld/LivingWorldContent';
 export const EXPEDITION_FACILITIES = [
   {
     id: 'supply-cache',
@@ -77,6 +78,7 @@ export const EXPEDITION_FACILITIES = [
     ],
     purpose: 'Visible marker for a discovered outpost.',
   },
+  ...LIVING_FACILITIES,
 ] as const;
 export type ExpeditionFacilityId = (typeof EXPEDITION_FACILITIES)[number]['id'];
 export const expeditionFacility = (id: string) =>

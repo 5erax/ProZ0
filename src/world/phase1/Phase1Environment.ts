@@ -1,3 +1,4 @@
+import {generationCatalog} from '../../content/phase1/Phase1Catalog';
 import type { ContentCatalogV1 } from '../../content';
 import {
   DeterministicRng,
@@ -63,7 +64,7 @@ export function createPhase1EnvironmentState(
     worldSeed,
     namespace: PHASE1_COLD_RAIN_NAMESPACE,
     stableIdentifiers: Object.freeze([
-      catalog.compatibility.canonicalFingerprint,
+      generationCatalog(catalog).compatibility.canonicalFingerprint,
       `min:${minimumTick}`,
       `max:${maximumTick}`,
     ]),

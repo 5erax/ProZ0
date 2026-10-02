@@ -1,17 +1,8 @@
-import {expect,test,type Page} from '@playwright/test';
+import {expect,test} from '@playwright/test';
+import {walk} from './support/solo-actions';
 import {mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 const evidence=resolve('test-results/phase2-colony-depth/feedback');
-async function walk(page:Page,x:number,y:number):Promise<void>{
- let held:string[]=[];
- try{for(let i=0;i<900;i++){
-  const p=await page.locator('canvas').evaluate(element=>({x:Number(element.getAttribute('data-player-x')),y:Number(element.getAttribute('data-player-y'))}));
-  const dx=x-p.x,dy=y-p.y;if(Math.hypot(dx,dy)<.2)return;
-  const next=Math.abs(dx)>=Math.abs(dy)?dx>0?['s','d']:['w','a']:dy>0?['s','a']:['w','d'];
-  if(next.join()!==held.join()){for(const key of held)await page.keyboard.up(key);for(const key of next)await page.keyboard.down(key);held=next;}
-  await page.waitForTimeout(100);
- }throw Error('Normal walking failed');}finally{for(const key of held)await page.keyboard.up(key);}
-}
 test('settings consolidate display, sound and real save; quiet HUD keeps contextual actions',async({page})=>{
  await page.setViewportSize({width:1280,height:720});
  await page.goto('/?'+new URLSearchParams({proz0Mode:'phase2-colony-review',proz0WorldId:'world:settings',proz0WorldSeed:'p1-world-golden',proz0Players:'colonist',proz0Player:'colonist',proz0SaveDb:'settings'}));
@@ -56,14 +47,19 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await page.getByRole('button',{name:'Craft [C]',exact:true}).click();
  for(let n=0;n<2;n++)await page.locator('[data-review-action="craft-recipe:recipe:cordage"]').click();await page.keyboard.press('Escape');
  await walk(page,-36,-12);await gather(4);await walk(page,-4,0);
- await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
+ await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
+ await expect(page.locator('.lw-object').first()).toHaveCSS('pointer-events','none');
+ await page.keyboard.press('e');
+ await expect(page.locator('.lw-panel')).toBeHidden();
+ await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await page.getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
  await page.getByRole('button',{name:'Build base [B]',exact:true}).click();
  const p=await page.locator('canvas').evaluate(element=>({x:Number(element.getAttribute('data-player-x')),y:Number(element.getAttribute('data-player-y'))}));
  await page.mouse.move((320+(-3-p.x+p.y)*16)*2,(180+(-3-p.x-p.y)*8)*2);
  await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state','VALID');await page.getByRole('button',{name:'Place [Enter]',exact:true}).click();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-built-count','1');await page.keyboard.press('Escape');
- await walk(page,-4,0);await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
+ // Stop inside the real 1.25 m storage range, allowing the helper's 0.65 m arrival radius.
+ await walk(page,-3.3,0);await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
  await page.getByRole('button',{name:'Move one',exact:true}).click();
  const storage=page.locator('[data-inventory-pane="storage"]');
  await expect(storage.getByRole('button',{name:'Stone Field Tool',exact:true})).toContainText('×1');
