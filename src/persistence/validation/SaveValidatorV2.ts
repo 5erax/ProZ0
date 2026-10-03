@@ -1,8 +1,9 @@
+import { validWearableReferences, wearableSlotFor, WEARABLE_SLOTS, WEARABLE_ITEMS } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import { resourceGrowthCheckpoint, validateResourceLifecycle } from '../../world/phase1/ResourceLifecycle';
 import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
-import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog, acceptsEquipmentV1Catalog} from '../../content/phase1/Phase1Catalog';
+import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog, acceptsEquipmentV1Catalog, acceptsRootsV2Catalog} from '../../content/phase1/Phase1Catalog';
 import { GEAR_ITEMS } from '../../content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import { LIVING_ROOT_ITEMS, CANONICAL_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
@@ -163,7 +164,7 @@ function sameContentIdentity(
   if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
-  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsEquipmentV1Catalog(policy.catalog, actual.canonicalFingerprint)) {
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsEquipmentV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootsV2Catalog(policy.catalog, actual.canonicalFingerprint)) {
     return saveFailure('CONTENT_FINGERPRINT_MISMATCH', 'Saved content fingerprint does not match the active catalog.');
   }
   return null;
@@ -587,6 +588,7 @@ export function validatePlayerRecordV2(
     && !nonEmpty(record.equipment.equippedThermalWrapStackId)) {
     return saveFailure('CORRUPT_RECORD', 'Thermal Wrap stack reference is invalid.');
   }
+  if (record.equipment.wearables !== undefined && !validWearableReferences(record.equipment.wearables)) return saveFailure('CORRUPT_RECORD', 'Wearable version or references are invalid.');
   const survival = validateSurvival(record);
   if (survival !== null) return survival;
   if (!isObject(record.lifeState)
@@ -966,7 +968,8 @@ function globalCrossReferences(
   }
   const living=bundle.world.livingWorld;
   if(living?.huntCooldowns && Object.entries(living.huntCooldowns.until).some(([id,tick])=>!players.has(id)||tick>bundle.world.authorityTick+600))return saveFailure('CORRUPT_RECORD','Invalid saved hunting cooldown references.');
-  if (bundle.world.contentCompatibility.canonicalFingerprint !== policy.catalog.compatibility.canonicalFingerprint && (bundle.containers.some(c=>c.stacks.some(stack=>CANONICAL_ROOT_ITEMS.some(item=>item.id===stack.itemDefinitionId))) || living?.forage.some(f=>['timber-tree','fiber-plant','food-plant'].includes(f.kind)))) return saveFailure('CORRUPT_RECORD','Previous content identity cannot contain canonical-root transplants');
+  if (bundle.world.contentCompatibility.canonicalFingerprint !== policy.catalog.compatibility.canonicalFingerprint && !acceptsRootsV2Catalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (bundle.containers.some(c=>c.stacks.some(stack=>CANONICAL_ROOT_ITEMS.some(item=>item.id===stack.itemDefinitionId))) || living?.forage.some(f=>['timber-tree','fiber-plant','food-plant'].includes(f.kind)))) return saveFailure('CORRUPT_RECORD','Previous content identity cannot contain canonical-root transplants');
+  if (bundle.world.contentCompatibility.canonicalFingerprint !== policy.catalog.compatibility.canonicalFingerprint && bundle.containers.some(c=>c.stacks.some(s=>WEARABLE_ITEMS.some(i=>i.id===s.itemDefinitionId)))) return saveFailure('CORRUPT_RECORD','Previous content identity cannot contain new wearable gear.');
   if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
   if(acceptsPreviousLivingCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living?.fishing || bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId))))) return saveFailure('CORRUPT_RECORD', 'Prior living catalog cannot contain newly introduced roots or fishing.');
   if(acceptsFishingV1Catalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && bundle.containers.some(c=>c.stacks.some(s=>GEAR_ITEMS.some(i=>i.id===s.itemDefinitionId)))) return saveFailure('CORRUPT_RECORD', 'Prior fishing catalog cannot contain newly introduced rarity gear.');
@@ -1132,6 +1135,16 @@ function globalCrossReferences(
           'CROSS_REFERENCE_FAILURE',
           `Player ${player.playerId} equipment reference ${stackId} is invalid.`,
         );
+      }
+    }
+    if (player.equipment.wearables) {
+      const references = new Set<string>();
+      for (const slot of WEARABLE_SLOTS) {
+        const id = player.equipment.wearables[slot];
+        if (id === null) continue;
+        const stack = allStacks.get(id);
+        if (!stack || stack.container.containerId !== inventory.containerId || wearableSlotFor(stack.itemDefinitionId) !== slot || references.has(id)) return saveFailure('CROSS_REFERENCE_FAILURE', 'Wearable slot, duplicate or ownership is invalid.');
+        references.add(id);
       }
     }
     if (player.lifeState.type === 'dead-pending-respawn'

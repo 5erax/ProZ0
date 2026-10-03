@@ -1,3 +1,4 @@
+import { wearableThermalTarget } from '../content/livingworld/WearableContent';
 import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
@@ -661,8 +662,10 @@ export class Phase1AuthorityBundle {
             entry.record.equipment.equippedWeaponStackId,
           equippedThermalWrapStackId:
             entry.record.equipment.equippedThermalWrapStackId,
+          ...(entry.record.equipment.wearables ? {wearables: entry.record.equipment.wearables} : {}),
         })),
       ),
+      playerId => survival.getPlayerState(playerId).lifeState.type === 'alive',
     );
     const reopenedSurvival = survivalSnapshot(reopen);
     const survival = new Phase1SurvivalAuthority({
@@ -923,9 +926,13 @@ export class Phase1AuthorityBundle {
       );
       const thermalWrapActive =
         this.equipment.isThermalWrapActive(playerId);
+      const wearableModifiers = this.equipment.survivalModifiers(playerId);
+      const regionalThermalTarget = this.livingWorld?.thermalTarget(this.positions.get(playerId),this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,exposure.sheltered) ?? (this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget);
       this.survival.stepPlayer(playerId, authorityTick, {
+        sprintStaminaPercent: wearableModifiers.sprintStaminaPercent,
+        waterDrainPercent: wearableModifiers.waterDrainPercent,
         sprinting: this.sprintingPlayers.has(playerId) && Math.hypot(this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.x, this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.y) > 0,
-        thermalTarget: this.livingWorld?.thermalTarget(this.positions.get(playerId),this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,exposure.sheltered) ?? (this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget),
+        thermalTarget: wearableThermalTarget(regionalThermalTarget, wearableModifiers),
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',
       });

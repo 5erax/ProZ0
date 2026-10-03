@@ -1,3 +1,4 @@
+import { WEARABLE_SLOTS, type WearableReferencesV1 } from '../../content/livingworld/WearableContent';
 import { inspectItem } from '../presentation/ItemInspection';
 import { inspectCharacter } from '../presentation/CharacterInspection';
 import type {
@@ -96,6 +97,7 @@ export interface Phase1RuntimePresentationInput {
   readonly catalog: ContentCatalogV1;
   readonly survival: Readonly<PlayerSurvivalView>;
   readonly inventory: Readonly<ContainerView>;
+  readonly wearables?: WearableReferencesV1;
   readonly equippedStackId?: string | null;
   readonly equippedWeaponStackId?: string | null;
   readonly equippedThermalWrapStackId?: string | null;
@@ -447,7 +449,7 @@ function inventoryPanel(
   const feedback = input.commandFeedback;
   return Object.freeze({
     kind: 'inventory',
-    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
+    equipment: { ...wearablePresentation(input), weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
     character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: 'Inventory',
     items: inventoryItems(input.catalog, input.inventory),
@@ -493,7 +495,7 @@ function containerPanel(
   const storageCapacity = storageDefinition?.container ?? null;
   return Object.freeze({
     kind: 'container',
-    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
+    equipment: { ...wearablePresentation(input), weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
     character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: container.kind === 'death-cache'
       ? 'Death Cache'
@@ -870,6 +872,7 @@ export function projectPhase1RuntimePresentation(
               input.inventory,
               input.equippedThermalWrapStackId,
             ),
+            ...wearablePresentation(input),
             quickUse: Object.freeze({
               inputLabel: 'V' as const,
               verb: 'CONSUME' as const,
@@ -907,4 +910,10 @@ export function projectPhase1RuntimePresentation(
     panel: panel(input),
     teammates: teammateViews,
   });
+}
+
+function wearablePresentation(input: Phase1RuntimePresentationInput) {
+  const slots = Object.fromEntries(WEARABLE_SLOTS.map(slot => [slot, equipment(input.catalog, input.inventory, input.wearables?.[slot])])) as Pick<import('../presentation/Phase1PresentationModel').Phase1EquipmentSlotsPresentation, 'head' | 'legs' | 'feet' | 'accessory'>;
+  const active = (slot: typeof WEARABLE_SLOTS[number]) => (slots[slot]?.condition ?? 0) > 0;
+  return {...slots, effects: Object.freeze(['Sprint: ' + (active('feet') ? '6.4' : '8') + ' stamina/s', 'Water: ' + (active('accessory') ? '0.8' : '1') + '/min', 'Hot target: −' + (active('head') ? '8' : '0'), 'Cold target: +' + (active('legs') ? '8' : '0')])};
 }

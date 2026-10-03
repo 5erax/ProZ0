@@ -1,3 +1,4 @@
+import type { WearableReferencesV1 } from '../../../content/livingworld/WearableContent';
 import type { ContentId } from '../../../content';
 import type { PlayerId } from '../../../foundation';
 import type { ContainerId, ItemStackId } from '../../../simulation/items';
@@ -60,6 +61,7 @@ export interface PlayerRecordV2 {
   readonly facing: PlayerFacingV1;
   readonly inventoryContainerId: ContainerId;
   readonly equipment: {
+    readonly wearables?: WearableReferencesV1;
     readonly equippedWeaponStackId: ItemStackId | null;
     readonly equippedThermalWrapStackId: ItemStackId | null;
   };

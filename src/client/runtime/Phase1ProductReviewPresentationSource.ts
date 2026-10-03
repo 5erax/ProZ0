@@ -513,6 +513,7 @@ export class Phase1ProductReviewPresentationSource
       survival: this.bundle.survival.getPlayerView(this.playerId, inventory.playerWeightState ?? 'NORMAL'),
       inventory,
       equippedStackId,
+      wearables: equipment.wearables,
       equippedWeaponStackId: equipment.equippedWeaponStackId,
       equippedThermalWrapStackId:
         equipment.equippedThermalWrapStackId,

@@ -1,3 +1,4 @@
+import { WEARABLE_RECIPES } from '../../content/livingworld/WearableContent';
 import type { Phase1AuthorityBundle } from '../../integration';
 import {
   CROPS,
@@ -648,11 +649,11 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length) + ' recipes',
+        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length + WEARABLE_RECIPES.length) + ' recipes',
       ),
     );
     if (!targeted) panel.append(craft);
-    for (const r of targeted ? [] : [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
+    for (const r of targeted ? [] : [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES, ...WEARABLE_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
       const definition = bundle.catalog.getAs(r.output, 'item');
       if (definition.rarity) { a.dataset.rarity = definition.rarity; a.style.borderColor = RARITY_STYLE[definition.rarity].colour; const badge = text('small', RARITY_STYLE[definition.rarity].label); badge.style.color = RARITY_STYLE[definition.rarity].colour; a.append(badge); a.querySelector('h3')?.setAttribute('style', 'color:' + RARITY_STYLE[definition.rarity].colour); }

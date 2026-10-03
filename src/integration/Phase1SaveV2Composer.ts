@@ -263,6 +263,7 @@ function composePhase1SaveV2AtRevision(
       equippedWeaponStackId: equipment.equippedWeaponStackId,
       equippedThermalWrapStackId:
         equipment.equippedThermalWrapStackId,
+      wearables: equipment.wearables,
       survival: bundle.survival.getPlayerState(playerId),
       progression: progressionState,
     }, bundle.catalog);

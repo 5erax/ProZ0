@@ -32,4 +32,11 @@ S1 làm trước để thực thể nhiều state không lấn màn hình. S2 t�
 
 ## Checkpoint hiện tại
 
-S1 có checkpoint code: right-click/Shift-F10 mở stat card bounded 4Hz, left-click/E harvest living forage trực tiếp, plot/animal chỉ mở targeted actions. Hover không tooltip stat dài. Desktop và 640×360 đã xem ảnh; typecheck/lint/build, 3 browser input tests, resource/root/camera/placement/fishing E2E và hành trình canh tác natural/save-reopen đạt. Natural farming phát hiện tên crop bị mất trong targeted panel và đã sửa; một lần chạy song song browser khác mất held key do blur, chạy cô lập đạt, không đổi movement authority. #244 vẫn mở tới khi hoàn tất routing canonical building/POI, CI và deploy. Các mốc S2–S8 là công việc cần thực hiện, không phải completed claims. Các yêu cầu human và Internet giữ ngoài phạm vi ưu tiên solo hiện tại.
+- S1: routing đúng object/card chủ động/dock focus/input queue đã commit. Natural expedition thu thập→kho xa→move→save→lab rest→Camp Bed complete/dismantle PASS 5.5 phút; targeted POI/stump/plan-facility có input thật.
+- S2: canonical early/growing/mature, finite ore, cut/uproot/transplant và save compatibility đã commit. Canonical ETA hiện khóa duration tại lúc cut; tưới local chưa làm thay đổi tốc độ canonical plant trong thời gian hồi (#222 còn seam cần nối).
+- S3: đất ẩm local version1/persist, 6 grass silhouettes, coherent tile variants và dry-wind warning/rise/peak/fall đã commit. Bản art toàn thể #242/FPS vẫn cần review S8.
+- S4: Hunt dùng weapon profile/cost/wear/cooldown theo player và persist đã commit e68c313. Sáu ô gear, bốn wearable/craft/passive effects, world/avatar/save/old-catalog đang chốt commit. Domain 458 và browser 49 PASS; E2E gear/rarity/wearable PASS. Co-op wearable chưa triển khai theo phạm vi solo ưu tiên.
+- S5: 20 blueprints có code; còn rà matrix footprint/core-kit/conservation và natural UI coverage trước nghiệm thu.
+- S6: cave layout contract có mã nhưng chưa nối runtime; không tính là hang có thể chơi. S7 EN/VI mới phủ lobby, còn gameplay. S8 contract/final CI/FPS/deploy chưa thực hiện.
+
+#244 và các feature issue vẫn OPEN đến tích hợp/deploy. #187/#199/human và Internet co-op giữ ngoài ưu tiên solo hiện tại. Không đóng toàn Phase2 bằng các checkpoint này.

@@ -1,3 +1,4 @@
+import { wearableSlotFor, WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
@@ -1740,7 +1741,12 @@ export async function createPhase1ProductReviewRuntime(
       | ReturnType<typeof bundle.equipWeapon>
       | ReturnType<typeof bundle.equipThermalWrap>;
 
-    if ((stack.itemDefinitionId === 'item:thermal-wrap'||stack.itemDefinitionId === 'item:warm-cloak')) {
+    const wearableSlot = wearableSlotFor(stack.itemDefinitionId);
+    if (wearableSlot !== null) {
+      const next = current.wearables[wearableSlot] === stack.stackId ? null : stack.stackId;
+      verb = next === null ? 'UNEQUIP' : 'EQUIP';
+      result = bundle.equipment.equipWearable(config.localPlayerId, wearableSlot, next);
+    } else if ((stack.itemDefinitionId === 'item:thermal-wrap'||stack.itemDefinitionId === 'item:warm-cloak')) {
       const next = current.equippedThermalWrapStackId === stack.stackId
         ? null
         : stack.stackId;
@@ -2342,7 +2348,7 @@ export async function createPhase1ProductReviewRuntime(
     if (action?.startsWith('equip-slot:') && source.isInventoryOpen()) equipInventorySlot(action.slice('equip-slot:'.length));
     if (action?.startsWith('unequip-slot:') && source.isInventoryOpen()) {
       const slot = action.slice('unequip-slot:'.length), equipped = bundle.equipment.getView(config.localPlayerId);
-      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : null;
+      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : equipped.wearables[slot as WearableSlot] ?? null;
       if (stackId) { source.selectInventoryItem(stackId); toggleSelectedEquipment('X'); }
     }
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
@@ -2357,16 +2363,16 @@ export async function createPhase1ProductReviewRuntime(
 
   input.start();
   const equipInventorySlot = (slot: string, stackId?: string) => {
-    if (!source.isInventoryOpen() || !['weapon', 'protection'].includes(slot)) return;
+    if (!source.isInventoryOpen() || !['weapon', 'protection', ...WEARABLE_SLOTS].includes(slot)) return;
     if (stackId) {
       if (!bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === stackId)) { presentInventoryGuard('DRAG', 'EQUIP', 'SOURCE_MISSING'); return; }
       source.selectInventoryItem(stackId);
     }
     const selection = source.getInventoryActionSelection();
     const id = selection.stack?.itemDefinitionId;
-    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
+    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : slot === 'protection' ? id !== 'item:thermal-wrap' && id !== 'item:warm-cloak' : wearableSlotFor(id ?? '') !== slot)) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
     const current = bundle.equipment.reconcile(config.localPlayerId);
-    if ((slot === 'weapon' ? current.equippedWeaponStackId : current.equippedThermalWrapStackId) === selection.stack?.stackId) return;
+    if ((slot === 'weapon' ? current.equippedWeaponStackId : slot === 'protection' ? current.equippedThermalWrapStackId : current.wearables[slot as WearableSlot]) === selection.stack?.stackId) return;
     toggleSelectedEquipment('X');
   };
   const onGearDragStart = (event: DragEvent) => {

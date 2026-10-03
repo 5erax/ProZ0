@@ -1,3 +1,4 @@
+import { WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
 import {
   validatePhase1PresentationState,
   type Phase1InventoryItemPresentation,
@@ -24,7 +25,7 @@ import {
 } from './Phase1ProductionAssets';
 import type { CharacterInspection } from './CharacterInspection';
 import { RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
-import { heldSpearSprite } from './EquipmentArt';
+import { heldSpearSprite, wearableSprite } from './EquipmentArt';
 import { selectedPlayerSkin, playerSkinFilter } from '../runtime/PlayerProfile';
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
@@ -252,7 +253,7 @@ function itemRow(
   return row;
 }
 
-function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'> | undefined): HTMLElement {
+function equipmentPreview(document: Document, equipment: Omit<Phase1EquipmentSlotsPresentation, 'quickUse'> | undefined): HTMLElement {
   const wardrobe = createElement(document, 'section', 'p1-wardrobe');
   if (!equipment) return wardrobe;
   wardrobe.setAttribute('aria-label', 'Equipment and character preview');
@@ -265,8 +266,13 @@ function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlo
   avatar.append(body);
   if (equipment.protection) { const protection = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(protection, thermalWrapActorSprite('S', 'IDLE', 0).sprite, 2); protection.dataset.avatarEquipment = 'protection'; avatar.append(protection); }
   if (equipment.weapon) { const weapon = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(weapon, heldSpearSprite('S', equipment.weapon.rarity).sprite, 2); weapon.dataset.avatarEquipment = 'weapon'; weapon.dataset.rarity = equipment.weapon.rarity ?? 'common'; avatar.append(weapon); }
-  const slot = (kind: 'weapon' | 'protection') => {
-    const equipped = equipment[kind], label = kind === 'weapon' ? 'Weapon' : 'Protection';
+  for (const kind of WEARABLE_SLOTS) if (equipment[kind]) {
+    const layer = createElement(document, 'span', 'p1-avatar-layer');
+    applyProductionSprite(layer, wearableSprite(kind, 'S').sprite, 2);
+    layer.dataset.avatarEquipment = kind; avatar.append(layer);
+  }
+  const slot = (kind: 'weapon' | 'protection' | WearableSlot) => {
+    const equipped = equipment[kind], label = {weapon:'Weapon',protection:'Torso',head:'Head',legs:'Legs',feet:'Feet',accessory:'Accessory'}[kind];
     const cell = createElement(document, 'div', 'p1-wardrobe-slot'); cell.dataset.equipmentDropSlot = kind;
     cell.append(createElement(document, 'strong', '', label));
     if (equipped) {
@@ -280,8 +286,21 @@ function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlo
     cell.title = 'Drag a matching item from your bag here, or select it and use Equip.';
     return cell;
   };
-  wardrobe.append(slot('weapon'), avatar, slot('protection'), createElement(document, 'small', 'p1-wardrobe-help', 'Select gear and equip it, or drag it into a slot. Equipped gear stays in your bag.'));
+  const left = createElement(document, 'div', 'p1-wardrobe-column'); left.append(slot('head'), slot('protection'), slot('legs'));
+  const right = createElement(document, 'div', 'p1-wardrobe-column'); right.append(slot('weapon'), slot('feet'), slot('accessory'));
+  wardrobe.append(left, avatar, right);
+  if (equipment.effects) wardrobe.append(createElement(document, 'small', 'p1-wardrobe-help', 'Active effects · ' + equipment.effects.join(' · ')));
+  const help = createElement(document, 'details', 'p1-wardrobe-help'); help.append(createElement(document, 'summary', '', 'Equipment help'), createElement(document, 'small', '', 'Select gear and equip it, or drag it into a slot. Equipped gear stays in your bag.')); wardrobe.append(help);
   return wardrobe;
+}
+
+function arrangeWardrobe(document: Document, root: HTMLElement): void {
+  const wardrobe = root.querySelector<HTMLElement>('.p1-wardrobe');
+  if (!wardrobe) return;
+  const layout = createElement(document, 'div', 'p1-inventory-layout');
+  const bag = createElement(document, 'div', 'p1-inventory-bag');
+  for (const child of Array.from(root.children)) if (child !== wardrobe && !child.matches('.p1-panel-title,.p1-panel-skin-corner')) bag.append(child);
+  layout.append(wardrobe, bag); root.append(layout);
 }
 
 function itemInspectionCard(document: Document, item: Phase1InventoryItemPresentation | undefined): HTMLElement {
@@ -438,6 +457,7 @@ function renderPanel(
         );
       }
       root.append(itemInspectionCard(document, panel.items.find(i => i.id === panel.selectedItemId)));
+      arrangeWardrobe(document, root);
       return root;
     }
 
@@ -1241,8 +1261,10 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-item-inspection,.p1-character-inspection{border:1px solid #51636d;padding:6px;margin:6px 0;line-height:1.5}.p1-item-inspection h3{font-size:11px;margin:0 0 4px}.p1-item-inspection p,.p1-character-inspection p{margin:4px 0}.p1-inspection-more summary,.p1-character-inspection summary{cursor:pointer;font-weight:bold}.p1-character-values{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0}.p1-character-effect{border-left:2px solid #d6c78d;padding:4px 8px;margin:6px 0}.p1-character-effect[data-severity="critical"]{border-color:#e8a088}.p1-item-inspection button{margin:4px 4px 0 0;}',
-    '.p1-wardrobe{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:center;padding:8px;border:1px solid #65747b;margin-bottom:6px}.p1-wardrobe-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:70px;border:1px dashed #708a92;padding:8px}.p1-wardrobe-slot[data-equipped-stack]{border-style:solid}.p1-avatar{position:relative;width:80px;height:104px;background:radial-gradient(ellipse at 50% 80%,#6b8b8b44,transparent 70%)}.p1-avatar-layer{position:absolute!important;left:8px;bottom:4px;image-rendering:pixelated}.p1-wardrobe-help{grid-column:1/4;line-height:1.5}.p1-item-row[draggable=true]{cursor:grab;}',
+    '.p1-wardrobe{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:center;padding:8px;border:1px solid #65747b;margin-bottom:6px}.p1-wardrobe-column{display:flex;flex-direction:column;gap:6px;min-width:0}.p1-wardrobe-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:70px;border:1px dashed #708a92;padding:8px}.p1-wardrobe-slot[data-equipped-stack]{border-style:solid}.p1-avatar{position:relative;width:80px;height:104px;background:radial-gradient(ellipse at 50% 80%,#6b8b8b44,transparent 70%)}.p1-avatar-layer{position:absolute!important;left:8px;bottom:4px;image-rendering:pixelated}.p1-wardrobe-help{grid-column:1/4;line-height:1.5}.p1-item-row[draggable=true]{cursor:grab;}',
     '[data-product-review-panel-open=true] .sp-blueprint,[data-product-review-panel-open=true] .lw-menu,[data-product-review-panel-open=true] .lw-season,[data-product-review-panel-open=true] .p2-colony-controls,[data-product-review-help-open=true] .sp-blueprint{visibility:hidden;pointer-events:none;}',
+    '.p1-panel[data-panel-kind="inventory"]{width:600px;max-height:310px}.p1-inventory-layout{display:grid;grid-template-columns:264px 1fr;gap:8px}.p1-inventory-bag{max-height:268px;overflow:auto;min-width:0}.p1-inventory-layout .p1-wardrobe{align-self:start;margin:0;grid-template-columns:1fr 64px 1fr;gap:4px;padding:4px}.p1-inventory-layout .p1-wardrobe-slot{padding:4px;gap:2px;font-size:8px;min-height:65px}.p1-inventory-layout .p1-wardrobe-slot .p1-action{font-size:8px;padding:2px;line-height:1.2}.p1-inventory-layout .p1-avatar{width:64px}.p1-inventory-layout .p1-avatar-layer{left:0}.p1-inventory-layout .p1-wardrobe-help{font-size:8px}.p1-panel[data-panel-kind="inventory"] .p1-inventory-bag .p1-item-list{grid-template-columns:repeat(2,1fr);}',
+    '.p1-inventory-layout .p1-wardrobe-slot{display:grid;grid-template-columns:24px minmax(0,1fr);align-content:center;text-align:center}.p1-inventory-layout .p1-wardrobe-slot>strong,.p1-inventory-layout .p1-wardrobe-slot>.p1-action,.p1-inventory-layout .p1-wardrobe-slot>small:not(.p1-rarity-label){grid-column:1/-1}.p1-inventory-layout .p1-wardrobe-slot>.p1-rarity-label{grid-column:2;font-size:8px}.p1-inventory-layout .p1-wardrobe-slot>.p1-asset-icon{grid-column:1;grid-row:2/4}.p1-inventory-layout .p1-wardrobe-slot>span:not(.p1-asset-icon){grid-column:2;min-width:0;overflow-wrap:anywhere}.p1-inventory-layout .p1-wardrobe-slot:not([data-equipped-stack])>span{grid-column:1/-1}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
     '.p1-rarity-label{display:block;font-size:9px;line-height:1.4}.p1-item-inspection[data-rarity] h3{color:var(--rarity-colour)}',
@@ -1347,6 +1369,9 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private panelSignature = '';
   private displaySignature = '';
   private actionDock: HTMLElement | null = null;
+  private equipmentDragActive = false;
+  private readonly startEquipmentDrag = (event: Event) => { if (event.target instanceof Element && event.target.closest('[data-review-item][draggable=true]')) this.equipmentDragActive = true; };
+  private readonly endEquipmentDrag = () => { this.equipmentDragActive = false; queueMicrotask(() => { if (this.layer.isConnected) this.render(); }); };
 
   public constructor(
     private readonly root: HTMLElement,
@@ -1363,6 +1388,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.layer.dataset.productionAssetFoundation = 'p1-75-78';
     this.layer.append(styles(this.document));
     this.root.append(this.layer);
+    this.root.addEventListener('dragstart', this.startEquipmentDrag, true);
+    this.root.addEventListener('dragend', this.endEquipmentDrag);
+    this.root.addEventListener('drop', this.endEquipmentDrag);
+    this.document.defaultView?.addEventListener('blur', this.endEquipmentDrag);
     this.root.ownerDocument.defaultView?.addEventListener('resize', this.applyScale);
     this.applyScale();
     this.render();
@@ -1376,6 +1405,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   public destroy(): void {
     this.root.ownerDocument.defaultView?.removeEventListener('resize', this.applyScale);
+    this.root.removeEventListener('dragstart', this.startEquipmentDrag, true);
+    this.root.removeEventListener('dragend', this.endEquipmentDrag);
+    this.root.removeEventListener('drop', this.endEquipmentDrag);
+    this.document.defaultView?.removeEventListener('blur', this.endEquipmentDrag);
     delete this.root.dataset.productReviewPanelOpen;
     this.layer.remove();
   }
@@ -1389,6 +1422,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   private render(): void {
     const state = this.currentState;
+    if (this.equipmentDragActive && state.panel?.kind === 'inventory') return;
+    this.equipmentDragActive = false;
     // Meter text and bars are whole-unit pixels. Keep the exact diagnostic
     // values current without rebuilding the HUD for subpixel survival changes.
     const meters = [state.health, state.water, state.food, state.stamina, state.temperature];

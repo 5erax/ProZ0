@@ -1,3 +1,4 @@
+import { WEARABLE_SLOTS } from '../../content/livingworld/WearableContent';
 import {naturalSoilMoisture, soilCellKey} from '../../simulation/livingworld/SoilMoisture';
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
 import { resourceLifecycleFacts } from '../../world/phase1/ResourceLifecycle';
@@ -10,7 +11,7 @@ import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import { explorationSiteSprite } from '../presentation/ExplorationArt';
-import { heldSpearSprite } from '../presentation/EquipmentArt';
+import { heldSpearSprite, wearableSprite } from '../presentation/EquipmentArt';
 import { worldDepthOrder } from '../presentation/WorldDepth';
 import { bindEntityInspection } from '../presentation/EntityInspection';
 import {
@@ -1049,6 +1050,11 @@ export function createPhase1ProductReviewWorldRenderer(
       );
     }
 
+    if (state !== 'DEATH') for (const slot of WEARABLE_SLOTS) {
+      if (equipment.wearables[slot] === null) continue;
+      const overlay = wearableSprite(slot, phase1IsometricFacing(movement.facing), state === 'MOVE', playerFrameOrdinal(state, bundle.authorityTick, startedTick));
+      renderSprite(overlay.sprite, movement.position, camera, 'wearable-' + slot, id, {flipX: overlay.flipX, zIndex: worldDepthOrder(movement.position, 3 + WEARABLE_SLOTS.indexOf(slot)), className: local ? 'p1-product-player' : 'p1-product-teammate', data: {actorState: state, equipmentSlot: slot}});
+    }
     if (!local) {
       const shape = presentationIdentitySlot === 'TEAM_A'||presentationIdentitySlot==='TEAM_D'||presentationIdentitySlot==='TEAM_G'
         ? 'circle'

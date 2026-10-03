@@ -1,3 +1,4 @@
+import { WEARABLE_ITEMS } from './livingworld/WearableContent';
 import {LIVING_ITEMS} from './livingworld/LivingWorldContent';
 import {LIVING_ROOT_ITEMS} from './livingworld/LivingRootContent';
 import { GEAR_ITEMS, ITEM_RARITIES } from './livingworld/EquipmentContent';
@@ -1878,7 +1879,7 @@ function collectPhase1SemanticErrors(
   }
 
   for (const definition of pack.definitions) {
-    if (!required.has(definition.id) && !(definition.kind === 'item' && [...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===definition.id))) {
+    if (!required.has(definition.id) && !(definition.kind === 'item' && [...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS,...WEARABLE_ITEMS].some(i=>i.id===definition.id))) {
       errors.push({
         code: 'INVALID_CROSS_REFERENCE',
         definitionId: definition.id,

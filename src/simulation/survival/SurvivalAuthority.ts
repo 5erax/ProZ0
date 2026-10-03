@@ -360,7 +360,7 @@ export class Phase1SurvivalAuthority {
     const water = applyRationalDecrease(
       state.waterMilli,
       state.waterDrainRemainder,
-      1000,
+      context.waterDrainPercent === 80 ? 800 : 1000,
       TICKS_PER_MINUTE,
     );
     state.waterMilli = water.value;
@@ -375,8 +375,8 @@ export class Phase1SurvivalAuthority {
     state.foodMilli = food.value;
     state.foodDrainRemainder = food.remainder;
     if (context.sprinting) {
-      // Exactly 8 points/second at 60 Hz; no additional persisted remainder.
-      const cost = tick % 3 === 0 ? 134 : 133;
+      // 8 points/s normally; boots use exactly 6.4 points/s. No extra remainder.
+      const cost = context.sprintStaminaPercent === 80 ? (tick % 3 === 0 ? 106 : 107) : (tick % 3 === 0 ? 134 : 133);
       state.staminaMilli = Math.max(0, state.staminaMilli - cost);
       state.lastStaminaSpendTick = tick;
       state.staminaRegenRemainder = 0;

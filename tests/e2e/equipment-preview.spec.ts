@@ -43,7 +43,7 @@ test('equipment UI: owned drag/drop and keyboard equip match avatar/world, conse
   // Repeated drop is idempotent, unlike the explicit X toggle.
   await spear.dragTo(weapon); await expect(weapon).toHaveAttribute('data-equipped-stack', spearId);
   await inventory.getByRole('button', { name: 'Thermal Wrap', exact: true }).click();
-  const equip = protection.getByRole('button', { name: 'Equip selected protection', exact: true });
+  const equip = protection.getByRole('button', { name: 'Equip selected torso', exact: true });
   await equip.focus(); await page.keyboard.press('Enter');
   await expect(protection).toHaveAttribute('data-equipped-stack', wrapId);
   await expect(inventory.locator('[data-avatar-equipment="protection"]')).toHaveCount(1);

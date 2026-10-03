@@ -1,3 +1,4 @@
+import { WEARABLE_RECIPES } from '../../content/livingworld/WearableContent';
 import {advanceSoilPatches,wetSoilCell,soilCellKey} from './SoilMoisture';
 import {
   FORAGE,
@@ -665,7 +666,7 @@ export class LivingWorldAuthority {
       return s;
     };
     if (c.action === 'craft') {
-      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES].find((r) => r.id === c.target);
+      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES, ...WEARABLE_RECIPES].find((r) => r.id === c.target);
       if (!r) return reject('UNKNOWN_RECIPE');
       if (r.station && !this.near(actor, r.station))
         return reject('NEARBY_STATION_REQUIRED');

@@ -41,6 +41,11 @@ export interface Phase1QuickUsePresentation {
 }
 
 export interface Phase1EquipmentSlotsPresentation {
+  readonly effects?: readonly string[];
+  readonly head?: Phase1EquipmentPresentation | null;
+  readonly legs?: Phase1EquipmentPresentation | null;
+  readonly feet?: Phase1EquipmentPresentation | null;
+  readonly accessory?: Phase1EquipmentPresentation | null;
   readonly weapon: Phase1EquipmentPresentation | null;
   readonly protection: Phase1EquipmentPresentation | null;
   readonly quickUse: Phase1QuickUsePresentation;
@@ -86,7 +91,7 @@ export interface Phase1InventoryItemPresentation {
 }
 
 export interface Phase1InventoryPanelPresentation {
-  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
+  readonly equipment?: Omit<Phase1EquipmentSlotsPresentation, 'quickUse'>;
   readonly character?: CharacterInspection;
   readonly kind: 'inventory';
   readonly title: string;
@@ -107,7 +112,7 @@ export interface Phase1ContainerCapacityPresentation {
 }
 
 export interface Phase1ContainerPanelPresentation {
-  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
+  readonly equipment?: Omit<Phase1EquipmentSlotsPresentation, 'quickUse'>;
   readonly character?: CharacterInspection;
   readonly kind: 'container';
   readonly title: string;
