@@ -887,14 +887,9 @@ function renderPanel(
               progressionSprite(rowState.iconIndex),
             );
             if (icon !== null) row.append(icon);
-            row.append(
-              (rowState.groupLabel === undefined
-                ? ''
-                : rowState.groupLabel + ' · ')
-              + rowState.label
-              + ' · '
-              + rowState.state,
-            );
+            const status=createElement(document,'span','p1-progression-status',rowState.state==='COMPLETE'||rowState.state==='UNLOCKED'?'✓':rowState.state==='LOCKED'?'◇':'○');
+            status.setAttribute('role','img');bindUiText(status,'aria-label',rowState.state);row.append(createElement(document,'span','p1-progression-label',rowState.label),status);
+            bindUiText(row,'title',(rowState.groupLabel?rowState.groupLabel+' · ':'')+rowState.label+' · '+rowState.state);
             rows.append(row);
           }
           root.append(rows);

@@ -28,6 +28,7 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
           expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width!);
           expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(height!);
           expect(getComputedStyle(panel!).scrollbarWidth).toBe('none');
+          if(key==='p')expect(panel!.scrollHeight).toBeLessThanOrEqual(panel!.clientHeight);
           if(key==='i')await page.getByTestId('layout-root').screenshot({path:`../../.vitest/attachments/ui-inventory-${width}-${language}.png`});
         }
       }

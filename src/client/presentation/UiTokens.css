@@ -104,3 +104,13 @@ body { block-size:100dvh; }
 .lw-state-cue{position:absolute;right:-4px;top:-12px;background:#172c34;border:1px solid #dfc878;color:#f3d98e;font:12px monospace;min-width:14px;padding:1px;pointer-events:none}.lw-state-cue[hidden]{display:none}.lw-seed-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.lw-seed-choices button{display:flex;align-items:center;gap:6px;margin:0!important;text-align:left}
 
 .lw-panel article,.sp-expedition-panel article{display:flex;flex-wrap:wrap;gap:8px}.lw-panel article :is(h3,p,.lw-seed-choices),.sp-expedition-panel article :is(h3,p){flex-basis:100%}.lw-panel article .lw-seed-choices{width:100%}.lw-panel article>button{flex:1 1 100px}
+
+#proz0-phase1-ui .p1-panel[data-panel-kind=progression]{font-size:12px;padding:10px}
+#proz0-phase1-ui .p1-panel[data-panel-kind=progression] .p1-panel-title{padding-bottom:6px}
+#proz0-phase1-ui .p1-progression-rows{gap:4px}
+#proz0-phase1-ui .p1-progression-rows[data-progression-section=objective]{grid-template-columns:repeat(3,minmax(0,1fr))}
+#proz0-phase1-ui .p1-progression-row{padding:3px 4px;line-height:1.25;min-width:0;align-items:center}
+#proz0-phase1-ui .p1-progression-label{flex:1;min-width:0}
+#proz0-phase1-ui .p1-progression-status{flex:none}
+@media(max-width:850px){#proz0-phase1-ui .p1-progression-rows[data-progression-section=objective]{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#proz0-phase1-ui .p1-progression-rows{gap:2px} #proz0-phase1-ui .p1-progression-row{padding:1px 4px} #proz0-phase1-ui .p1-panel[data-panel-kind=progression] .p1-panel-title{font-size:16px;margin-bottom:4px}
