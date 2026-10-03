@@ -1,4 +1,5 @@
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
+import { resourceGrowthCheckpoint, validateResourceLifecycle } from '../../world/phase1/ResourceLifecycle';
 import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
 import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog} from '../../content/phase1/Phase1Catalog';
@@ -757,6 +758,14 @@ export function validateChunkRecordV2(
       return saveFailure('CORRUPT_RECORD', 'Chunk resource state is invalid.');
     }
     resourceIds.add(resource.resourceEntityId);
+    if (resource.lifecycle !== undefined) {
+      try {
+        const lifecycle = validateResourceLifecycle(resource.lifecycle);
+        if (resource.depleted !== (resource.remainingGatherActions === 0)) throw Error('Resource availability disagrees with remaining actions');
+        if (lifecycle.kind === 'mineral' && resource.regenerationReadyTick !== null) throw Error('Mineral must not renew');
+        if (lifecycle.kind === 'plant' && (resource.depleted !== (lifecycle.stage === 'early') || (resource.depleted && resource.regenerationReadyTick !== resourceGrowthCheckpoint(lifecycle)))) throw Error('Plant stage/renewal mismatch');
+      } catch (error) { return saveFailure('CORRUPT_RECORD', 'Chunk resource lifecycle is invalid: '+String(error)); }
+    }
   }
   const predatorIds = new Set<string>();
   for (const predator of record.predatorStates) {
@@ -1025,6 +1034,12 @@ function globalCrossReferences(
   >();
   const chunkStructures = new Set<string>();
   for (const chunk of bundle.chunks) {
+    if (bundle.world.environment.resourceLifecycleVersion !== 1 && chunk.resourceStates.some(resource => resource.lifecycle !== undefined)) {
+      return saveFailure('CORRUPT_RECORD', 'Resource lifecycle is not enabled in the world manifest');
+    }
+    if (chunk.resourceStates.some(resource => resource.lifecycle?.kind === 'plant' && resource.lifecycle.cutTick > bundle.world.authorityTick)) {
+      return saveFailure('CORRUPT_RECORD', 'Resource growth starts after the persisted world clock');
+    }
     if (chunk.generationVersion !== bundle.world.generationVersion) {
       return saveFailure(
         'UNSUPPORTED_GENERATION_VERSION',

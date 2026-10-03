@@ -11,6 +11,7 @@ export interface ResourceNodeSaveV2 {
   readonly remainingGatherActions: number | null;
   readonly depleted: boolean;
   readonly regenerationReadyTick: number | null;
+  readonly lifecycle?: import('../../../world/phase1/ResourceLifecycle').ResourceLifecycleV1;
 }
 
 export interface PredatorSaveV2 {

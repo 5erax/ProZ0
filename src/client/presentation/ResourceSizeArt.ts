@@ -3,8 +3,9 @@ import type { Phase1ProductionSprite } from './Phase1ProductionAssets';
 const cache = new Map<string, Phase1ProductionSprite>();
 
 /** Trim empty sky from interaction bounds, particularly around low plants/rocks. */
-export function sizedResourceHitShape(id: string, size: ResourceSize, depleted: boolean): string {
-  const rank = size === 'small' ? 0 : size === 'medium' ? 1 : 2;
+export function sizedResourceHitShape(id: string, size: ResourceSize, depleted: boolean, stage?: 'early' | 'growing' | 'mature'): string {
+  const matureRank = size === 'small' ? 0 : size === 'medium' ? 1 : 2;
+  const rank = stage === 'growing' ? Math.max(0, matureRank - 1) : matureRank;
   const tree = id === 'resource:timber-source';
   const rock = id === 'resource:stone-outcrop' || id === 'resource:metal-ore-node';
   const top = depleted ? tree ? 64 : 69 : tree ? [34, 20, 4][rank]! : rock ? [62, 55, 44][rank]! : 48 - rank * 5;
@@ -13,10 +14,11 @@ export function sizedResourceHitShape(id: string, size: ResourceSize, depleted: 
 }
 
 /** Each size has its own native silhouette and detail; scale never depends on camera. */
-export function sizedResourceSprite(id: string, size: ResourceSize, depleted: boolean): Phase1ProductionSprite {
-  const key = id + ':' + size + ':' + depleted, cached = cache.get(key);
+export function sizedResourceSprite(id: string, size: ResourceSize, depleted: boolean, stage?: 'early' | 'growing' | 'mature'): Phase1ProductionSprite {
+  const key = id + ':' + size + ':' + depleted + ':' + (stage ?? 'legacy'), cached = cache.get(key);
   if (cached) return cached;
-  const rank = size === 'small' ? 0 : size === 'medium' ? 1 : 2;
+  const matureRank = size === 'small' ? 0 : size === 'medium' ? 1 : 2;
+  const rank = stage === 'growing' ? Math.max(0, matureRank - 1) : matureRank;
   let body = '<path fill="#172c3088" d="M8 74 32 65 57 74 33 80Z"/>';
   if (id === 'resource:timber-source') {
     const top = [34, 20, 4][rank]!, left = [17, 11, 5][rank]!, width = 64 - left * 2;
@@ -40,6 +42,6 @@ export function sizedResourceSprite(id: string, size: ResourceSize, depleted: bo
     }
   }
   const sprite = Object.freeze({ assetPath: 'procedural:resource-size:' + key, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80" shape-rendering="crispEdges">' + body + '</svg>'), cellWidth: 64, cellHeight: 80, sourceWidth: 64, sourceHeight: 80, columns: 1, index: 0 });
-  if (cache.size >= 30) cache.delete(cache.keys().next().value!);
+  if (cache.size >= 60) cache.delete(cache.keys().next().value!);
   cache.set(key, sprite); return sprite;
 }

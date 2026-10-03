@@ -68,6 +68,7 @@ function reconstructEnvironment(
   return validatePhase1EnvironmentState(Object.freeze({
     activeTick: bundle.world.environment.activeTick,
     ...(bundle.world.environment.resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+    ...(bundle.world.environment.resourceLifecycleVersion === 1 ? { resourceLifecycleVersion: 1 as const } : {}),
     ...(bundle.world.environment.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: bundle.world.environment.cycleStartLocalMinute,
     weatherEvents: Object.freeze(

@@ -12,6 +12,7 @@ export interface ResourceNodeView {
   readonly revision: number;
   readonly remainingActions: number | null;
   readonly depleted: boolean;
+  readonly growthStage?: 'early' | 'growing' | 'mature' | undefined;
 }
 
 export interface WorldDropView {

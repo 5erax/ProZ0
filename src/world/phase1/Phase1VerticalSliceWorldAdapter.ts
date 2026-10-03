@@ -419,6 +419,7 @@ export class Phase1VerticalSliceWorldAdapter
       revision: state.revision,
       remainingActions: state.remainingGatherActions,
       depleted: state.depleted,
+      growthStage: state.lifecycle?.kind === 'plant' ? state.lifecycle.stage : undefined,
     });
   }
 

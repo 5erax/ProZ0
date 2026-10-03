@@ -37,6 +37,7 @@ function copyEnvironment(
   return Object.freeze({
     activeTick: state.activeTick,
     ...(state.resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+    ...(state.resourceLifecycleVersion === 1 ? { resourceLifecycleVersion: 1 as const } : {}),
     ...(state.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze(

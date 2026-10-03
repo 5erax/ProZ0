@@ -2177,7 +2177,7 @@ export class Phase1ItemAuthority {
     if (baseDefinition === null) {
       return 'SOURCE_MISSING';
     }
-    const definition = resourceHarvestDefinition(baseDefinition, resource.size);
+    const definition = resourceHarvestDefinition(baseDefinition, resource.size, resource.growthStage);
 
     const toolFailure = this.validateGatherTool(
       inventory.stacks,

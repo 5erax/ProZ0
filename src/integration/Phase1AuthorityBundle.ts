@@ -368,6 +368,7 @@ export type Phase1RuinRewardClaimResult =
 
 export interface Phase1AuthorityBundleConfig {
   readonly resourceProfileVersion?: 1;
+  readonly resourceLifecycleVersion?: 1;
   readonly singlePlayerExpeditionEnabled?: boolean;
   readonly worldGenerationVersion?: number;
   readonly colonyDepthEnabled?: boolean;
@@ -557,6 +558,7 @@ export class Phase1AuthorityBundle {
     });
     const worldStore = new Phase1WorldStore({
       ...(config.resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+      ...(config.resourceLifecycleVersion === 1 ? { resourceLifecycleVersion: 1 as const } : {}),
       ...(config.colonyDepthEnabled === true ? { calendarVersion: 1 as const } : {}),
       generationVersion: reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       worldSeed: config.worldSeed,
