@@ -2331,7 +2331,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   ).toHaveCount(1);
   await expect(
     page.locator('[data-world-role="player"][data-local-player="true"]'),
-  ).not.toHaveCSS('filter', 'none');
+  ).toHaveCSS('filter', 'none');
   await expect(page.locator('.p1-product-controls-panel')).toBeHidden();
 
   await captureViewport(page, 'polish-first-entry-2x.png');
