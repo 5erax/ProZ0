@@ -133,6 +133,7 @@ export interface Phase1VerticalSliceWorldAdapterOptions {
   readonly structures: () => readonly Readonly<StructureRuntimeState>[];
   readonly structureFootprint?: (structureId:string)=>StructurePlacementProfile['footprint']|null;
   readonly playerIds: () => readonly PlayerId[];
+  readonly playerOnSurface?: (playerId:PlayerId)=>boolean;
   readonly playerInsideStructure?: (
     playerId: PlayerId,
     structureId: string,
@@ -349,6 +350,12 @@ export class Phase1VerticalSliceWorldAdapter
     return this.options.playerPositions.get(playerId);
   }
 
+  public isPlayerOnSurface(playerId:PlayerId):boolean { return this.options.playerOnSurface?.(playerId) !== false; }
+
+  public canStandAt(position: WorldPosition, footprint:AxisSweepRequest['footprint']): boolean {
+    return this.isPositionBuildable(position) && this.isMovementPassable(position,footprint) && !this.blocksExpeditionMotion(position,position,footprint);
+  }
+
   public sweepAabbAxis(request: AxisSweepRequest): AxisSweepResult {
     if (!Number.isFinite(request.desiredDelta)) {
       throw new RangeError('Movement desiredDelta must be finite.');
@@ -384,6 +391,7 @@ export class Phase1VerticalSliceWorldAdapter
     containerId: string,
   ): boolean {
     if (containerId === 'inventory:' + playerId) return true;
+    if (this.options.playerOnSurface?.(playerId) === false) return false;
 
     const drop = [...this.drops.values()].find(
       (entry) => entry.containerId === containerId && entry.available,
@@ -430,7 +438,7 @@ export class Phase1VerticalSliceWorldAdapter
     entityId: string,
   ): boolean {
     const entity = this.findGeneratedEntity(entityId);
-    return entity !== null
+    return this.options.playerOnSurface?.(playerId) !== false && entity !== null
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
         entity.position,
@@ -442,7 +450,7 @@ export class Phase1VerticalSliceWorldAdapter
     resourceEntityId: string,
   ): boolean {
     const entity = this.findGeneratedEntity(resourceEntityId);
-    return entity !== null
+    return this.options.playerOnSurface?.(playerId) !== false && entity !== null
       && entity.type === 'resource'
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
@@ -1002,7 +1010,7 @@ export class Phase1VerticalSliceWorldAdapter
     structureId: string,
   ): boolean {
     const structure = this.structureById(structureId);
-    return structure !== null
+    return this.options.playerOnSurface?.(playerId) !== false && structure !== null
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
         structure.position,

@@ -16,7 +16,7 @@ Năm test mới PASS: transition gates/replay/return fallback; actual movement r
 
 ## Chưa phát hành hay bật vào game
 
-Đây là foundation được kiểm tra, chưa được nối Phase1AuthorityBundle, Save V2 composer/validator/reopen, renderer hoặc portal UI. Không tuyên bố #232 đã hoàn tất hoặc hang đã chơi trên public.
+Đây là hồ sơ checkpoint D4.2 tại `a59b874`. Checkpoint D4.3 tiếp theo đã nối optional Phase1AuthorityBundle/Save V2 và xử lý death-cap bằng recovery tại Landing; cờ vẫn tắt mặc định và chưa có renderer/portal UI. Xem [bàn giao 03/10](phase2-single-player-transfer-2026-10-03.vi.md) để biết trạng thái mới nhất. Không tuyên bố #232 đã hoàn tất hoặc hang đã chơi trên public.
 
 Mốc kế tiếp cần:
 

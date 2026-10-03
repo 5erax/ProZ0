@@ -509,6 +509,7 @@ export class Phase1BuildingWorld {
     readonly expectedBuildRevision: number;
     readonly placement: PlacementIntent;
   }): PlacementReservation | PlacementRejectionReason {
+    if (this.spatial.isPlayerOnSurface?.(request.actorPlayerId) === false) return 'WRONG_WORLDSPACE';
     if (request.expectedBuildRevision !== this.buildRevision) {
       return 'WORLD_STATE_CHANGED';
     }

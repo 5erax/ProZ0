@@ -66,7 +66,7 @@ export class ColonySustenanceAuthority {
   private state: ColonySustenanceState;
   private readonly operations = new Map<string, { signature: string; result: ColonySustenanceResult }>();
   public constructor(private readonly items: Phase1ItemAuthority,
-    private readonly actor: (playerId: PlayerId) => { position: WorldPosition; alive: boolean },
+    private readonly actor: (playerId: PlayerId) => { position: WorldPosition; alive: boolean; spaceId?: string },
     private readonly wildlife: (entityId: string) => WorldPosition | null,
     initial?: ColonySustenanceState) {
     this.state = initial === undefined ? emptyColonySustenanceState() : validateColonySustenanceState(initial);
@@ -113,6 +113,7 @@ export class ColonySustenanceAuthority {
     if (command.expectedRevision !== state.revision) return reject('STALE_REVISION');
     const actor = this.actor(command.playerId);
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const animal = command.action === 'capture' && command.animalEntityId !== undefined
       ? this.wildlife(command.animalEntityId) : null;
     const target = command.action === 'capture' ? animal

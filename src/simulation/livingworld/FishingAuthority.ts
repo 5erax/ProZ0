@@ -6,7 +6,7 @@ import { validateFishingState, type FishingState } from './FishingState';
 export interface FishingServices {
   seed: string;
   tick(): number;
-  actor(id: string): { x: number; y: number; alive: boolean; healthMilli: number };
+  actor(id: string): { x: number; y: number; alive: boolean; healthMilli: number; spaceId?: string };
   water(x: number, y: number): boolean;
   clearLine(from: { x: number; y: number }, to: { x: number; y: number }): boolean;
   habitat(x: number, y: number): 'pond' | 'river' | 'marsh';
@@ -18,6 +18,11 @@ export class FishingAuthority {
   private readonly lastMessages = new Map<string, string>();
   constructor(private readonly items: Phase1ItemAuthority, private readonly services: FishingServices, saved?: FishingState) {
     this.state = saved === undefined ? undefined : validateFishingState(saved);
+  }
+  public cancelForWorldspace(playerId:string):void {
+    if (!this.state?.sessions.some(s=>s.playerId===playerId)) return;
+    this.state = validateFishingState({...this.state,revision:this.state.revision+1,sessions:this.state.sessions.filter(s=>s.playerId!==playerId)});
+    this.lastMessages.set(playerId,'FISHING_CANCELLED');
   }
   public read(): FishingState | undefined { return this.state && structuredClone(this.state); }
   public revision(): number { return this.state?.revision ?? 0; }
@@ -34,6 +39,7 @@ export class FishingAuthority {
     let actor: ReturnType<FishingServices['actor']>;
     try { actor = this.services.actor(playerId); } catch { return 'UNKNOWN_PLAYER'; }
     if (!actor.alive) return 'PLAYER_DEAD';
+    if (actor.spaceId && actor.spaceId !== 'surface') return 'WRONG_WORLDSPACE';
     if (this.session(playerId)) return 'FISHING_ALREADY_CAST';
     const inventory = this.items.getContainerView('inventory:' + playerId);
     if (!inventory.stacks.some(s => s.itemDefinitionId === 'item:fishing-rod')) return 'FISHING_ROD_REQUIRED';
@@ -85,6 +91,7 @@ export class FishingAuthority {
     let actor: ReturnType<FishingServices['actor']>;
     try { actor = this.services.actor(c.playerId); } catch { return reject('UNKNOWN_PLAYER'); }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const inventory = this.items.getContainerView('inventory:' + c.playerId);
     if (inventory.revision !== c.expectedInventoryRevision) return reject('STALE_INVENTORY_REVISION');
     const tick = this.services.tick();

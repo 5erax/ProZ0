@@ -129,6 +129,7 @@ function ledgerSnapshotForPersistence(
   const world = bundle.world.exportSnapshot();
   const activePlayerIds = new Set(bundle.getActivePlayerIds());
   const liveWorldContainerIds = new Set([
+    ...(bundle.caves?.read().spaces.flatMap(s=>[...s.deathCaches.map(c=>c.containerId),...s.drops.map(d=>d.containerId)]) ?? []),
     ...world.deathCaches.caches.map((entry) => entry.containerId),
     ...world.drops
       .filter((entry) => entry.available)
@@ -207,6 +208,12 @@ function ownerResolver(
         });
       }
 
+      for (const space of bundle.caves?.read().spaces ?? []) {
+        const cache = space.deathCaches.find(c=>c.containerId===containerId);
+        if (cache) return Object.freeze({type:'world-entity' as const,entityId:cache.entityId});
+        const drop = space.drops.find(d=>d.containerId===containerId);
+        if (drop) return Object.freeze({type:'world-entity' as const,entityId:drop.worldDropId});
+      }
       return null;
     },
   });
@@ -221,6 +228,7 @@ function composePhase1SaveV2AtRevision(
     throw new Error('Save checkpoint UTC timestamp is required.');
   }
 
+  bundle.caves?.synchronizePose();
   bundle.expedition?.reconcile();
   const previousWorldRevision = revisionState.previousWorldRevision;
   const worldRevision = nextRecordRevision(previousWorldRevision);
@@ -327,6 +335,7 @@ function composePhase1SaveV2AtRevision(
     worldRevision,
     authorityTick: bundle.authorityTick,
     sustenance: bundle.sustenance.read(),
+    ...(bundle.caves?{soloCaves:bundle.caves.read()}:{}),
     ...(bundle.livingWorld?{livingWorld:bundle.livingWorld.read()}:{}),
     ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined

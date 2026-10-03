@@ -84,6 +84,7 @@ export interface FootholdBuildState {
 }
 
 export type PlacementRejectionReason =
+  | 'WRONG_WORLDSPACE'
   | 'UNEXPLORED_AREA'
   | 'INVALID_TERRAIN'
   | 'NON_BUILDABLE_SURFACE'
@@ -157,6 +158,7 @@ export interface BuildingWorldSnapshot {
 }
 
 export interface BuildingSpatialQuery {
+  isPlayerOnSurface?(playerId:PlayerId):boolean;
   isFootprintExplored(
     position: WorldPosition,
     profile: StructurePlacementProfile,

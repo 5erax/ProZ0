@@ -1,3 +1,5 @@
+import { validateSoloCaveState } from '../../simulation/worldspaces/SoloCaveState';
+import { soloCaveRegistry } from '../../world/phase2/SoloCaveRegistry';
 import { validWearableReferences, wearableSlotFor, WEARABLE_SLOTS, WEARABLE_ITEMS } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import { resourceGrowthCheckpoint, validateResourceLifecycle } from '../../world/phase1/ResourceLifecycle';
@@ -205,6 +207,12 @@ export function validateWorldManifestV2(
   const record = input as unknown as WorldManifestV2;
   if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
   if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
+  if (record.soloCaves !== undefined) {
+    try {
+      if (!record.singlePlayerExpedition) throw Error('Caves require solo expedition');
+      validateSoloCaveState(record.soloCaves, soloCaveRegistry(record.worldSeed, record.generationVersion), record.soloCaves.actor.playerId);
+    } catch { return saveFailure('CORRUPT_RECORD','Invalid solo cave registry or state.'); }
+  }
   if (record.colonyDepth !== undefined) {
     try { validateColonyDepthState(record.colonyDepth); }
     catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported colony-depth state.'); }
@@ -995,6 +1003,11 @@ function globalCrossReferences(
     );
   }
 
+  const caves = bundle.world.soloCaves;
+  if (caves) {
+    const actor = players.get(caves.actor.playerId), location = caves.actor.location;
+    if (players.size !== 1 || !actor || actor.position.x !== location.position.x || actor.position.y !== location.position.y) return saveFailure('CROSS_REFERENCE_FAILURE','Cave actor must match the sole player and canonical movement position.');
+  }
   const expedition = bundle.world.singlePlayerExpedition;
   if (expedition) {
     const tick=bundle.world.authorityTick;
@@ -1061,6 +1074,18 @@ function globalCrossReferences(
         );
       }
       worldEntities.set(entity.entityId, entity);
+    }
+  }
+
+  for (const space of caves?.spaces ?? []) {
+    for (const entity of [
+      ...space.drops.map(d=>({type:'ground-drop' as const,entityId:d.worldDropId,containerId:d.containerId})),
+      ...space.deathCaches.map(c=>({type:'death-cache' as const,...c})),
+    ]) {
+      if (worldEntities.has(entity.entityId)) return saveFailure('CORRUPT_RECORD','Cave entity duplicates a surface entity.');
+      const container = containers.get(entity.containerId);
+      if (!container || container.kind !== entity.type || container.owner.type !== 'world-entity' || container.owner.entityId !== entity.entityId) return saveFailure('CROSS_REFERENCE_FAILURE','Cave entity must own its exact ledger container kind and identity.');
+      worldEntities.set(entity.entityId,entity);
     }
   }
 

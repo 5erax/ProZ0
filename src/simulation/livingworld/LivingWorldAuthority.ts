@@ -633,6 +633,7 @@ export class LivingWorldAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const inventory = this.items.getContainerView('inventory:' + c.playerId);
     if (inventory.revision !== c.expectedInventoryRevision)
       return reject('STALE_INVENTORY_REVISION');

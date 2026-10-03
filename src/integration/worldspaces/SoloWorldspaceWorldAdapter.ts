@@ -21,6 +21,7 @@ type SurfacePorts = WorldCollisionQuery &
 export class SoloWorldspaceWorldAdapter
   implements WorldCollisionQuery, ItemInteractionWorldPort, SurvivalWorldPort
 {
+  private readonly overflowRecovery = new WeakSet<DeathCachePlacementReservation>();
   public constructor(
     private readonly surface: SurfacePorts,
     private readonly cave: () => SoloCaveAuthority | null,
@@ -145,6 +146,17 @@ export class SoloWorldspaceWorldAdapter
     requestedPosition: WorldPosition;
   }) {
     const cave = this.interior();
+    if (cave && cave.read().actor.playerId !== request.ownerPlayerId)
+      throw Error("Unknown cave player");
+    const space = cave?.read().spaces.find(s => s.progress.spaceId === cave.read().actor.location.spaceId);
+    if (space && space.deathCaches.length >= 32) {
+      // Preserve cargo when an interior reaches its bounded recovery capacity.
+      // This trusted reservation creates a surface cache at the respawn landing;
+      // no imported token can bypass the normal worldspace routing.
+      const reservation = this.surface.reserveDeathCachePlacement({ ...request, requestedPosition: { x: 0, y: 0 } });
+      this.overflowRecovery.add(reservation);
+      return reservation;
+    }
     return cave
       ? cave.reserveDeathCachePlacement(request)
       : this.surface.reserveDeathCachePlacement(request);
@@ -156,6 +168,11 @@ export class SoloWorldspaceWorldAdapter
     containerId: string;
     reservation: DeathCachePlacementReservation;
   }) {
+    if (this.overflowRecovery.has(request.reservation)) {
+      const cache = this.surface.commitReservedDeathCache(request);
+      this.overflowRecovery.delete(request.reservation);
+      return cache;
+    }
     const cave = this.interior();
     return cave
       ? cave.commitReservedDeathCache(request)

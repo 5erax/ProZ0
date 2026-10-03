@@ -5,15 +5,12 @@ import {
   validateCaveProgressV1,
   validateWorldLocationV1,
   type CaveLayout,
+  type CavePortal,
   type CaveProgressV1,
   type WorldLocationV1,
 } from "../../world/phase2/ColonyCaveLayout";
 import type { DeathCacheWorldView } from "../../world/api/SurvivalWorld";
-export interface CavePortal {
-  readonly id: string;
-  readonly position: WorldPosition;
-  readonly layout: CaveLayout;
-}
+export type { CavePortal } from "../../world/phase2/ColonyCaveLayout";
 export interface CaveDrop {
   readonly worldDropId: string;
   readonly revision: number;

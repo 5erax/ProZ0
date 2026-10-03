@@ -28,6 +28,7 @@ export interface ExpeditionActor {
   readonly x: number;
   readonly y: number;
   readonly alive: boolean;
+  readonly spaceId?: string;
 }
 export interface ExpeditionCommand {
   readonly id: string;
@@ -220,6 +221,7 @@ export class ExpeditionAuthority {
       return reject('STALE_REVISION');
     const actor = this.actor(command.playerId);
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const facility = this.state.facilities.find((f) => f.id === command.target),
       lab = command.target === 'landing-lab',
       siteShelter = command.action === 'rest' ? this.services.siteShelter?.(command.target) : null;
@@ -622,6 +624,7 @@ export class ExpeditionAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     this.cancelRest(command.playerId);
     const recipe = EXPEDITION_RECIPES.find((r) => r.id === command.recipeId);
     if (!recipe) return reject('UNKNOWN_RECIPE');
@@ -699,6 +702,7 @@ export class ExpeditionAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     this.cancelRest(command.playerId);
     let next = this.state;
     let message: string;
