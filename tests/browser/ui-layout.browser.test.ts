@@ -12,6 +12,12 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
       await page.viewport(width!,height!);window.dispatchEvent(new Event('resize'));
       for(const language of ['en','vi'] as const){
         setLocale(language);
+        const water = root.querySelector<HTMLElement>('[data-region=survival] [data-meter=water]');
+        const stamina = root.querySelector<HTMLElement>('[data-region=survival] [data-meter=stamina]');
+        expect(water).not.toBeNull();expect(stamina).not.toBeNull();
+        expect(water).not.toBe(stamina);
+        expect(water!.getAttribute('aria-label')).toContain(language==='vi'?'Nước':'Water');
+        expect(stamina!.getAttribute('aria-label')).toContain(language==='vi'?'Thể lực':'Stamina');
         for(const key of ['i','c','b','m','u','j','p','h']){
           await userEvent.keyboard('{Escape}');await userEvent.keyboard(key);
           const panel=Array.from(root.querySelectorAll<HTMLElement>('.p1-panel,.p2-colony-panel,.p1-product-controls-panel')).find(e=>!e.hidden&&e.getBoundingClientRect().height>0);
