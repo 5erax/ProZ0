@@ -536,7 +536,7 @@ export function createLivingWorldOverlay(
       if (!plot.crop) {
         const choices=document.createElement('div');choices.className='lw-seed-choices';
         for(const c of CROPS) {const count=inventory.stacks.filter(v=>v.itemDefinitionId===c.seed).reduce((n,v)=>n+v.quantity,0);
-          const choice=button(gameUiText('seed',{name:uiPhrase(c.name),count}),()=>execute('plant',plot.id,{crop:c.id}));choice.disabled=count===0;choice.dataset.crop=c.id;
+          const choice=button(gameUiText('seed',{name:uiPhrase(c.name),count}),()=>execute('plant',plot.id,{crop:c.id}));choice.disabled=count===0;choice.dataset.crop=c.id;bindUiText(choice,'aria-label',uiText('ui.3fc2d456')+uiPhrase(c.name));
           const icon=document.createElement('span'),sprite=itemIconSprite(c.seed);if(sprite){applyProductionSprite(icon,sprite,1);choice.prepend(icon);}choices.append(choice);
         } a.append(choices);
       }

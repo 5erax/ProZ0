@@ -86,10 +86,10 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   const panel = page.locator('.lw-panel');
   if (
     !(await panel
-      .locator('details')
+      .locator('[data-living-craft]')
       .evaluate((e) => (e as HTMLDetailsElement).open))
   )
-    await panel.locator('summary').click();
+    await panel.locator('[data-living-craft] > summary').click();
   await panel
     .getByRole('button', { name: 'Craft Field Hoe', exact: true })
     .click();
@@ -97,10 +97,10 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   // Crafting details stay open across authority updates.
   if (
     !(await panel
-      .locator('details')
+      .locator('[data-living-craft]')
       .evaluate((e) => (e as HTMLDetailsElement).open))
   )
-    await panel.locator('summary').click();
+    await panel.locator('[data-living-craft] > summary').click();
   await panel
     .getByRole('button', { name: 'Craft Prepare Root Seeds', exact: true })
     .click();
