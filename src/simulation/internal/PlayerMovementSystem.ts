@@ -73,12 +73,13 @@ export class PlayerMovementSystem {
     this.facing = initialFacing;
   }
 
-  public step(input: PlayerInput, dtSeconds: number): void {
+  public step(input: PlayerInput, dtSeconds: number, speedMultiplier = 1): void {
     if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) {
       throw new Error('Player movement dtSeconds must be finite and greater than zero.');
     }
 
     const moveX = axisValue(input.moveLeft, input.moveRight);
+    if (!Number.isFinite(speedMultiplier) || speedMultiplier < 1 || speedMultiplier > 1.6) throw new Error('Invalid authority movement multiplier.');
     const moveY = axisValue(input.moveUp, input.moveDown);
 
     this.blockedX = false;
@@ -100,8 +101,8 @@ export class PlayerMovementSystem {
     const directionY = moveY * directionScale;
     const terrainSpeed = this.worldQuery.getMovementSpeedMultiplier?.(this.position) ?? 1;
     if (!Number.isFinite(terrainSpeed) || terrainSpeed <= 0 || terrainSpeed > 1) throw new Error('Invalid terrain movement speed.');
-    const velocityX = directionX * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed;
-    const velocityY = directionY * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed;
+    const velocityX = directionX * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed * speedMultiplier;
+    const velocityY = directionY * PLAYER_MOVEMENT_CONFIG.baseMoveSpeed * terrainSpeed * speedMultiplier;
     const desiredX = velocityX * dtSeconds;
     const desiredY = velocityY * dtSeconds;
 

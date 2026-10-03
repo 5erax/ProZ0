@@ -112,6 +112,10 @@ export interface Phase1WeatherEventState {
 }
 
 export interface Phase1EnvironmentState {
+  /** Absent preserves legacy resource yield/work/art on existing saves. */
+  readonly resourceProfileVersion?: 1;
+  /** Absent keeps the historical 48-minute day when reopening old saves. */
+  readonly calendarVersion?: 1;
   readonly activeTick: number;
   readonly cycleStartLocalMinute: number;
   readonly weatherEvents: readonly Phase1WeatherEventState[];
@@ -125,6 +129,10 @@ export type Phase1ColdRainStatus =
   | 'ended';
 
 export interface Phase1EnvironmentView {
+  readonly timeSegment?: string;
+  readonly brightness?: number;
+  readonly dayIndex?: number;
+  readonly nightOrdinal?: number;
   readonly state: Phase1EnvironmentState;
   readonly localMinuteOfDay: number;
   readonly dayPeriod: Phase1DayPeriod;

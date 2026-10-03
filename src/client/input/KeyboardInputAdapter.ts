@@ -44,6 +44,10 @@ export class KeyboardInputAdapter {
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
+    if (event.target instanceof Element && event.target.closest('input,textarea,select,[contenteditable="true"]')) {
+      this.reset();
+      return;
+    }
     if (this.ownsCode(event.code)) {
       event.preventDefault();
     }

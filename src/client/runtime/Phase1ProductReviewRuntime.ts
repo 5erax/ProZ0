@@ -1,4 +1,8 @@
+import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
+import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
+import { installGameContextMenu } from '../input/GameContextMenu';
+import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
@@ -213,7 +217,7 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.visualQaMode = 'none';
   root.dataset.runtimeStatus = 'booting';
 
-  const bundle = await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
+  const bundle = await Phase1AuthorityBundle.create({...config,...(config.colonyDepthEnabled===true && config.playerIds.length===1 ? {resourceProfileVersion:1 as const} : {}),singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
   const checkpointCoordinator =
     new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(
@@ -1388,7 +1392,9 @@ export async function createPhase1ProductReviewRuntime(
     return true;
   };
 
+  const explorationSiteTarget = () => bundle.colonyDepth.sites().find(site=>site.template && bundle.world.isExploredPosition(site.position) && distanceFromPlayerSquared(site.position.x,site.position.y)<=1.25**2);
   const refreshContextInteraction = (): void => {
+    if(root.dataset.colonyDepthPanelOpen==='true'){source.setInteraction(null);return;}
     if (activeGather !== null || activeConsume !== null) return;
 
     const drop = worldDropTarget();
@@ -1498,18 +1504,22 @@ export async function createPhase1ProductReviewRuntime(
       const resourceState = bundle.worldStore.getResourceState(resource.entityId);
       const renewing = resourceState?.depleted === true;
       const readyTick = resourceState?.regenerationReadyTick;
+      const size = bundle.worldStore.getResourceSize(resource.entityId, resource.definitionId);
+      const harvest = resourceHarvestDefinition(definition, size);
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
         verb: renewing ? 'RENEWING' : 'GATHER',
         target: definition.displayName,
         state: renewing ? 'BLOCKED' : 'AVAILABLE',
-        reason: !renewing ? null : readyTick == null ? 'Resource depleted' :
+        reason: !renewing ? size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's' : null : readyTick == null ? 'Resource depleted' :
           'Regrows in ' + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + 's of world time',
         progress: null,
       }));
       return;
     }
 
+    const exploration=explorationSiteTarget();
+    if(exploration){source.setInteraction(Object.freeze({inputLabel:'E',verb:'EXPLORE',target:exploration.name,state:'AVAILABLE',reason:null,progress:null}));return;}
     const site = colonySiteTarget();
     if (site !== null) {
       source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'COLONY', target: site,
@@ -1537,6 +1547,7 @@ export async function createPhase1ProductReviewRuntime(
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
     if (interactWithWorkbench()) return;
+    if(resourceTarget()===null){const site=explorationSiteTarget();if(site){colonyDepthOverlay?.openSite(site.id);return;}}
     if (colonySiteTarget() !== null) { actionPanel = 'colony'; refreshColonyPanel(); return; }
     beginGather();
   };
@@ -1586,13 +1597,14 @@ export async function createPhase1ProductReviewRuntime(
     const current = bundle.equipment.reconcile(config.localPlayerId);
     const spear = inventory.stacks.find(
       (stack) =>
-        stack.itemDefinitionId === 'item:basic-spear'
+        isKnownMeleeEquipment(stack.itemDefinitionId)
         && stack.condition !== null
         && stack.condition > 0,
     );
     const next = current.equippedWeaponStackId === null
       ? spear?.stackId ?? null
       : null;
+    const targetWeapon = inventory.stacks.find(stack => stack.stackId === current.equippedWeaponStackId) ?? spear;
     const result = bundle.equipWeapon(config.localPlayerId, next);
     source.setLocalCommandFeedback({
       inputLabel: 'Q',
@@ -1602,7 +1614,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
-      target: 'Basic Spear',
+      target: targetWeapon ? bundle.catalog.get(targetWeapon.itemDefinitionId).displayName : 'Weapon',
     });
     queueMicrotask(() => {
       if (!destroyed) refreshContextInteraction();
@@ -1890,10 +1902,12 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true')return;
+    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true')return;
+    if((event.code==='Enter'||event.code==='Space') && event.target instanceof Element && actionPanel===null){const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){event.preventDefault();colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}}
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
+      if ((event.code === 'Enter' || event.code === 'Space') && event.target instanceof HTMLButtonElement) return;
       switch (event.code) {
         case 'ArrowUp':
           event.preventDefault();
@@ -2147,13 +2161,23 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const dawnOrdinal = () => {
+    const view = bundle.worldStore.getEnvironmentView();
+    // Legacy saves retain their 48-minute clock and 06:00 dawn.
+    return view.nightOrdinal ?? Math.floor((view.state.cycleStartLocalMinute + bundle.authorityTick / 120 - 360) / 1440);
+  };
+  const autosaveCrossings = new ColonyAutosaveCrossings(dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0);
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
         await bundle.stepSolo();
+        if (config.colonyDepthEnabled === true) {
+          const intent = autosaveCrossings.advance(config.worldId, config.localPlayerId, bundle.authorityTick, dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0, bundle.survival.getPlayerState(config.localPlayerId).lifeState.type === 'alive');
+          if (intent) root.dispatchEvent(new CustomEvent(COLONY_AUTOSAVE_EVENT, { detail: intent }));
+        }
         colonyDepthOverlay?.render();
         updateGather(
           bundle.getLastGatherResult(config.localPlayerId),
@@ -2202,7 +2226,8 @@ export async function createPhase1ProductReviewRuntime(
 
   const onPanelClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element)) return;
-    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true'){
+    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true' && root.dataset.expeditionPanelOpen!=='true' && root.dataset.colonyDepthPanelOpen!=='true' && root.dataset.productReviewPanelOpen!=='true' && root.dataset.productReviewHelpOpen!=='true'){
+      const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}
       const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){beginGather(resource.dataset.worldId);return;}
     }
     const item = event.target.closest<HTMLElement>('[data-review-item]');
@@ -2265,7 +2290,15 @@ export async function createPhase1ProductReviewRuntime(
     }
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
+    if (action?.startsWith('equip-slot:') && source.isInventoryOpen()) equipInventorySlot(action.slice('equip-slot:'.length));
+    if (action?.startsWith('unequip-slot:') && source.isInventoryOpen()) {
+      const slot = action.slice('unequip-slot:'.length), equipped = bundle.equipment.getView(config.localPlayerId);
+      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : null;
+      if (stackId) { source.selectInventoryItem(stackId); toggleSelectedEquipment('X'); }
+    }
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
+    if (action === 'inventory-use' && source.isInventoryOpen()) beginSelectedConsume();
+    if (action === 'inventory-drop' && source.isInventoryOpen()) dropSelectedInventoryQuantity();
     if (action?.startsWith('colony:') && actionPanel === 'colony') {
       colonyCommand(action.slice(7) as ColonySustenanceAction);
       return;
@@ -2274,7 +2307,49 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   input.start();
+  const equipInventorySlot = (slot: string, stackId?: string) => {
+    if (!source.isInventoryOpen() || !['weapon', 'protection'].includes(slot)) return;
+    if (stackId) {
+      if (!bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === stackId)) { presentInventoryGuard('DRAG', 'EQUIP', 'SOURCE_MISSING'); return; }
+      source.selectInventoryItem(stackId);
+    }
+    const selection = source.getInventoryActionSelection();
+    const id = selection.stack?.itemDefinitionId;
+    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
+    const current = bundle.equipment.reconcile(config.localPlayerId);
+    if ((slot === 'weapon' ? current.equippedWeaponStackId : current.equippedThermalWrapStackId) === selection.stack?.stackId) return;
+    toggleSelectedEquipment('X');
+  };
+  const onGearDragStart = (event: DragEvent) => {
+    if (!(event.target instanceof Element) || !source.isInventoryOpen()) return;
+    const item = event.target.closest<HTMLElement>('[data-review-item][draggable=true]');
+    if (!item || !bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === item.dataset.reviewItem)) { event.preventDefault(); return; }
+    event.dataTransfer?.setData('application/x-proz0-inventory-stack', item.dataset.reviewItem!);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  };
+  const onGearDragOver = (event: DragEvent) => { if (event.target instanceof Element && event.target.closest('[data-equipment-drop-slot]') && source.isInventoryOpen()) event.preventDefault(); };
+  const onGearDrop = (event: DragEvent) => {
+    const slot = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-equipment-drop-slot]')?.dataset.equipmentDropSlot : null;
+    if (!slot || !source.isInventoryOpen()) return;
+    event.preventDefault(); event.stopPropagation();
+    const id = event.dataTransfer?.getData('application/x-proz0-inventory-stack');
+    if (id && id.length < 512) equipInventorySlot(slot, id);
+  };
+  const removeContextMenu = installGameContextMenu(root, () => {
+    livingOverlay?.cancelPlacement();
+    expeditionOverlay?.cancelPlacement();
+    if (actionPanel === 'build') {
+      actionPanel = null;
+      buildAnchor = null;
+      source.setPresentationPanel(null);
+      refreshWorldPresentationContext();
+      worldRenderer.render();
+    }
+  });
   root.addEventListener('click', onPanelClick);
+  root.addEventListener('dragstart', onGearDragStart);
+  root.addEventListener('dragover', onGearDragOver);
+  root.addEventListener('drop', onGearDrop);
   root.addEventListener('pointermove', updateBuildPointer);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
   host.start();
@@ -2308,7 +2383,11 @@ export async function createPhase1ProductReviewRuntime(
       destroyed = true;
       host.stop();
       input.stop();
+      removeContextMenu();
       root.removeEventListener('click', onPanelClick);
+      root.removeEventListener('dragstart', onGearDragStart);
+      root.removeEventListener('dragover', onGearDragOver);
+      root.removeEventListener('drop', onGearDrop);
       root.removeEventListener('pointermove', updateBuildPointer);
       root.ownerDocument.removeEventListener('keydown', onKeyDown);
       playtestTools?.destroy();

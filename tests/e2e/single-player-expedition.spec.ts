@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 async function walk(page: Page, x: number, y: number) {
   let held: string[] = [];
+  let last = { x: NaN, y: NaN };
   try {
     for (let n = 0; n < 1500; n++) {
       const p = await page.locator('canvas').evaluate((e) => ({
@@ -11,7 +12,9 @@ async function walk(page: Page, x: number, y: number) {
       }));
       const dx = x - p.x,
         dy = y - p.y;
-      if (Math.hypot(dx, dy) < 0.15) return;
+      last = p;
+      const remaining = Math.hypot(dx, dy);
+      if (remaining < 0.2) return;
       const keys =
         Math.abs(dx) >= Math.abs(dy)
           ? dx > 0
@@ -25,9 +28,11 @@ async function walk(page: Page, x: number, y: number) {
         for (const k of keys) await page.keyboard.down(k);
         held = keys;
       }
-      await page.waitForTimeout(80);
+      // Shorten the final approach rather than oscillating past a close target
+      // on runners that process several authority ticks per browser command.
+      await page.waitForTimeout(remaining < .75 ? 20 : 80);
     }
-    throw Error('Natural walk could not reach ' + String(x) + ',' + String(y));
+    throw Error('Natural walk could not reach ' + String(x) + ',' + String(y) + '; last ' + last.x + ',' + last.y);
   } finally {
     for (const k of held) await page.keyboard.up(k);
   }
@@ -83,7 +88,12 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   );
   await expect(page.locator('[data-region="carry"]')).toContainText('/32');
   const interaction = page.locator('[data-region="interaction"]');
-  const gather = async (n: number) => {
+  const gather = async (n: number, itemName: string) => {
+    const target = page.locator('[data-world-role="resource"][data-focused-target="true"]');
+    await expect(target).toHaveCount(1);
+    const title = await target.getAttribute('title');
+    const output = Number(title?.match(new RegExp('· (\\d+) ' + itemName))?.[1]);
+    expect(output, title ?? 'Missing gather tooltip').toBeGreaterThan(0);
     for (let i = 0; i < n; i++) {
       await page.keyboard.press('e');
       await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
@@ -91,11 +101,12 @@ test('solo expedition: real gathering builds remote storage and reload preserves
         timeout: 4000,
       });
     }
+    return n * output;
   };
   await walk(page, 18, 10);
-  await gather(2);
+  const fiberGathered = await gather(2, 'Plant Fiber');
   await walk(page, -36, -12);
-  await gather(4);
+  const timberGathered = await gather(4, 'Timber');
   await walk(page, -39, -12);
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
@@ -107,17 +118,17 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     })
     .click();
   const panel = page.locator('.sp-expedition-panel');
-  await expect(panel.locator('.sp-facility-art')).toHaveCount(17);
+  await expect(panel.locator('.sp-facility-art')).toHaveCount(20);
   await expect(
     panel
       .locator('article')
       .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
-  ).toContainText('Timber 4/2');
+  ).toContainText('Timber ' + String(timberGathered) + '/2');
   await expect(
     panel
       .locator('article')
       .filter({ has: page.getByText('Supply Cache', { exact: true }) }),
-  ).toContainText('Plant Fiber 4/2');
+  ).toContainText('Plant Fiber ' + String(fiberGathered) + '/2');
   await panel
     .locator('article')
     .filter({ has: page.getByText('Supply Cache', { exact: true }) })

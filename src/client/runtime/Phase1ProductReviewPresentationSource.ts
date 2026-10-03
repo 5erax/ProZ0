@@ -496,7 +496,7 @@ export class Phase1ProductReviewPresentationSource
     const regionalWeather=this.bundle.config.colonyDepthEnabled===true?colonyWeatherAt(this.bundle.config.worldSeed,this.bundle.getPlayerPosition(this.playerId),this.bundle.authorityTick):null;
     const projected = projectPhase1RuntimePresentation({
       catalog: this.bundle.catalog,
-      survival: this.bundle.survival.getPlayerView(this.playerId),
+      survival: this.bundle.survival.getPlayerView(this.playerId, inventory.playerWeightState ?? 'NORMAL'),
       inventory,
       equippedStackId,
       equippedWeaponStackId: equipment.equippedWeaponStackId,

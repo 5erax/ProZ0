@@ -1,6 +1,10 @@
+import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
-import {acceptsLegacyCatalog} from '../../content/phase1/Phase1Catalog';
+import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog} from '../../content/phase1/Phase1Catalog';
+import { GEAR_ITEMS } from '../../content/livingworld/EquipmentContent';
+import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
+import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
@@ -158,7 +162,7 @@ function sameContentIdentity(
   if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
-  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint)) {
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint)) {
     return saveFailure('CONTENT_FINGERPRINT_MISMATCH', 'Saved content fingerprint does not match the active catalog.');
   }
   return null;
@@ -951,7 +955,11 @@ function globalCrossReferences(
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
   const living=bundle.world.livingWorld;
-  if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>LIVING_ITEMS.some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
+  if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
+  if(acceptsPreviousLivingCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living?.fishing || bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId))))) return saveFailure('CORRUPT_RECORD', 'Prior living catalog cannot contain newly introduced roots or fishing.');
+  if(acceptsFishingV1Catalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && bundle.containers.some(c=>c.stacks.some(s=>GEAR_ITEMS.some(i=>i.id===s.itemDefinitionId)))) return saveFailure('CORRUPT_RECORD', 'Prior fishing catalog cannot contain newly introduced rarity gear.');
+  if(acceptsRootV1Catalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living?.fishing || bundle.containers.some(c=>c.stacks.some(s=>[...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId))))) return saveFailure('CORRUPT_RECORD', 'Prior root catalog cannot contain newly introduced fishing.');
+  if (living?.fishing && (living.fishing.lastTick > bundle.world.authorityTick || living.fishing.sessions.some(s => !players.has(s.playerId) || !bundle.containers.some(c => c.containerId === 'inventory:' + s.playerId && c.stacks.some(i => i.stackId === s.rodStackId && i.itemDefinitionId === 'item:fishing-rod'))))) return saveFailure('CORRUPT_RECORD', 'Invalid fishing clock/player/tool references.');
   if(living&&(living.plots.some(p=>!players.has(p.owner))||living.animals.some(a=>a.owner&&!players.has(a.owner))||living.stations.some(s=>!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===s.id))||living.animals.some(a=>a.pen&&!bundle.world.singlePlayerExpedition?.facilities.some(f=>f.id===a.pen))))return saveFailure('CORRUPT_RECORD','Invalid living-world references.');
   const containers = new Map(
     bundle.containers.map((entry) => [entry.containerId, entry]),
@@ -1101,7 +1109,7 @@ function globalCrossReferences(
       const stack = allStacks.get(stackId);
       if (stack === undefined
         || stack.container.containerId !== inventory.containerId
-        || (stack.itemDefinitionId !== expectedItem && !(expectedItem==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak'))) {
+        || (stack.itemDefinitionId !== expectedItem && !(expectedItem === 'item:basic-spear' && isKnownMeleeEquipment(stack.itemDefinitionId)) && !(expectedItem==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak'))) {
         return saveFailure(
           'CROSS_REFERENCE_FAILURE',
           `Player ${player.playerId} equipment reference ${stackId} is invalid.`,

@@ -1,5 +1,5 @@
 import { EXPEDITION_FACILITIES } from '../../content/singleplayer/ExpeditionContent';
-import type { Phase1ProductionSprite } from './Phase1ProductionAssets';
+import { PHASE1_PRODUCTION_WORLD_SPRITES, type Phase1ProductionSprite } from './Phase1ProductionAssets';
 const livingUrl = new URL(
   '../../../assets/livingworld/facilities.svg',
   import.meta.url,
@@ -9,6 +9,9 @@ const url = new URL(
   import.meta.url,
 ).href;
 export function expeditionSprite(id: string): Phase1ProductionSprite {
+  if (id === 'colony-power') return PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit;
+  if (id === 'colony-condenser') return PHASE1_PRODUCTION_WORLD_SPRITES.condenser;
+  if (id === 'attached-habitat') return PHASE1_PRODUCTION_WORLD_SPRITES.habitat;
   const index = EXPEDITION_FACILITIES.findIndex((f) => f.id === id);
   if (index < 0) throw Error('Unknown expedition facility art');
   if (index >= 7)

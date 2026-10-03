@@ -1,4 +1,7 @@
 import {LIVING_ITEMS} from './livingworld/LivingWorldContent';
+import {LIVING_ROOT_ITEMS} from './livingworld/LivingRootContent';
+import { GEAR_ITEMS, ITEM_RARITIES } from './livingworld/EquipmentContent';
+import { FISHING_ITEMS } from './livingworld/FishingContent';
 import {
   CONTENT_FORMAT_ID,
   CONTENT_SCHEMA_VERSION,
@@ -467,6 +470,7 @@ function validateItem(
     'ordinaryStorageAllowed',
     'capabilities',
     'useProfile',
+    'rarity',
   ]);
 
   requireEnum(context, value.category, `${path}.category`, ITEM_CATEGORIES);
@@ -523,6 +527,7 @@ function validateItem(
     });
   }
 
+  if ('rarity' in value) requireEnum(context, value.rarity, `${path}.rarity`, new Set(ITEM_RARITIES));
   if ('useProfile' in value) {
     validateUseProfile(context, value.useProfile, `${path}.useProfile`);
   }
@@ -1873,7 +1878,7 @@ function collectPhase1SemanticErrors(
   }
 
   for (const definition of pack.definitions) {
-    if (!required.has(definition.id) && !(definition.kind === 'item' && LIVING_ITEMS.some(i=>i.id===definition.id))) {
+    if (!required.has(definition.id) && !(definition.kind === 'item' && [...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===definition.id))) {
       errors.push({
         code: 'INVALID_CROSS_REFERENCE',
         definitionId: definition.id,

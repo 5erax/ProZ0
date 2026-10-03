@@ -1,4 +1,7 @@
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
+import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
+import { GEAR_ITEMS, RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
+import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
 const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
 export interface Phase1ProductionSprite {
@@ -259,6 +262,25 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
+  const gear = GEAR_ITEMS.find(i => i.id === name || i.displayName === name);
+  if (gear?.rarity) {
+    const colour = RARITY_STYLE[gear.rarity].colour;
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges"><path stroke="#aa865f" stroke-width="3" d="m3 21 14-14"/><path fill="' + colour + '" d="m15 6 5-4 2 1-3 6-4 2zM10 12h2v3h-2z"/><path fill="#eee8d2" d="m18 4 2-1-2 4-1 1z"/></svg>';
+    return { assetPath: 'living:gear:' + gear.id, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup), cellWidth: 24, cellHeight: 24, sourceWidth: 24, sourceHeight: 24, columns: 1, index: 0 };
+  }
+  const fishIndex = FISHING_ITEMS.findIndex(i => i.id === name || i.displayName === name);
+  if (fishIndex >= 0) {
+    const pigment = ['#d5b983','#9bae64','#b5bf92','#8eaec2','#7fa393','#d5a16e'][fishIndex]!;
+    const pixels = fishIndex === 0 ? '<path stroke="#d5b983" stroke-width="2" d="m4 21 12-18"/><path fill="none" stroke="#a5b4b8" d="m16 3 4 2v12q0 4-3 2"/><path fill="#75533d" d="m3 18 3 2-2 3-3-2z"/>' : fishIndex === 1 ? '<path fill="#85a36b" d="M5 6h5v3H5zM14 3h4v4h-4z"/><path fill="#b8a676" d="M7 11h10v8H7z"/><path fill="#c5bb8b" d="M9 12h2v2H9zM14 16h2v2h-2z"/>' : '<path fill="' + pigment + '" d="m2 5 6 5 4-3h7v2h3v6h-3v2h-7l-4-3-6 5z"/><path fill="#e0d7b4" d="M11 12h8v2h-8z"/><path fill="#233c40" d="M18 10h2v2h-2z"/>';
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges">' + pixels + '</svg>';
+    return { assetPath: 'living:fishing-item:' + fishIndex, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup), cellWidth: 24, cellHeight: 24, sourceWidth: 24, sourceHeight: 24, columns: 1, index: 0 };
+  }
+  const root = LIVING_ROOT_ITEMS.findIndex(i => i.id === name || i.displayName === name);
+  if (root >= 0) {
+    const leaves = ['#6e9165','#b9b472','#83a5b5','#a994b5','#799467'][root]!;
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges"><path fill="' + leaves + '" d="M5 4h6v4H5zM13 2h5v7h-5zM10 6h4v7h-4z"/><path fill="#a68c65" d="M10 12h4v5h-4zM7 16h3v6H7zM14 16h3v5h-3zM10 19h3v4h-3z"/><path fill="#d2b78b" d="M11 12h2v4h-2z"/></svg>';
+    return { assetPath: 'living:root:' + root, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup), cellWidth: 24, cellHeight: 24, sourceWidth: 24, sourceHeight: 24, columns: 1, index: 0 };
+  }
   const living=LIVING_ITEMS.findIndex(i=>i.id===name||i.displayName===name);
   if(living>=0)return {assetPath:'assets/livingworld/items.svg',url:LIVING_ITEM_URL,cellWidth:24,cellHeight:24,sourceWidth:696,sourceHeight:24,columns:29,index:living};
   const byId=PHASE1_ITEM_IDS.indexOf(name as (typeof PHASE1_ITEM_IDS)[number]);

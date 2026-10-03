@@ -10,6 +10,11 @@ import {
   livingHash,
 } from '../../content/livingworld/LivingWorldContent';
 import type { Phase1ItemAuthority } from '../items';
+import { renewablePlant, forageGrowthView, plantGrowthView } from './PlantGrowth';
+import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { GEAR_RECIPES } from '../../content/livingworld/EquipmentContent';
+import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
+import { FishingAuthority, type FishingServices } from './FishingAuthority';
 import type {
   ExpeditionAuthority,
   ExpeditionActor,
@@ -30,6 +35,7 @@ export interface LivingServices {
   weather(x: number, y: number): string;
   weapon(id: string): boolean;
   cancelRest(id: string): void;
+  fishing?: Pick<FishingServices, 'water' | 'clearLine' | 'habitat'> & { healthMilli(id: string): number };
 }
 export interface LivingCommand {
   id: string;
@@ -44,6 +50,9 @@ export interface LivingCommand {
     | 'harvest'
     | 'clear'
     | 'forage'
+    | 'water-forage'
+    | 'uproot'
+    | 'replant'
     | 'hunt'
     | 'loot'
     | 'tame'
@@ -61,6 +70,7 @@ export interface LivingCommand {
 }
 export class LivingWorldAuthority {
   private state: LivingWorldState;
+  public readonly fishing: FishingAuthority;
   constructor(
     private readonly items: Phase1ItemAuthority,
     private readonly expedition: ExpeditionAuthority,
@@ -70,6 +80,14 @@ export class LivingWorldAuthority {
     this.state = validateLivingWorld(
       saved ?? emptyLivingWorld(services.tick()),
     );
+    this.fishing = new FishingAuthority(items, {
+      seed: services.seed, tick: () => services.tick(),
+      actor: id => ({ ...services.actor(id), healthMilli: services.fishing?.healthMilli(id) ?? 100000 }),
+      water: (x,y) => services.fishing?.water(x,y) ?? false,
+      clearLine: (from,to) => services.fishing?.clearLine(from,to) ?? false,
+      habitat: (x,y) => services.fishing?.habitat(x,y) ?? 'pond',
+      cancelRest: id => services.cancelRest(id),
+    }, this.state.fishing);
   }
   private snapshot: LivingWorldState | null = null;
   private reconcile() {
@@ -116,10 +134,23 @@ export class LivingWorldAuthority {
   }
   public read() {
     this.reconcile();
-    return structuredClone(this.state);
+    const state = structuredClone(this.state), fishing = this.fishing.read();
+    if (fishing) state.fishing = fishing;
+    return state;
   }
   public season() {
     return seasonAt(this.services.tick());
+  }
+  public forageStatus(id: string) {
+    const f = this.state.forage.find(f => f.id === id && !f.cleared);
+    if (!f) return null;
+    return forageGrowthView(f, this.services.tick(), 1 / this.renewal(f, 'resource:fiber-plant'));
+  }
+  public plotStatus(id: string) {
+    const p = this.state.plots.find(p => p.id === id), d = cropDefinition(p?.crop ?? '');
+    if (!p || !d) return null;
+    const rate = this.near(p, 'greenhouse') && this.season().id === 'winter' ? 900 : this.season().growthMilli;
+    return plantGrowthView(p.progress, d.cycleTicks, rate * soilAt(this.services.seed, p).growthMilli * (1 + p.fertility * .15) / 1000000, p.dead ? 0 : p.moisture, Math.floor(d.yield * this.season().yieldMilli / 1000));
   }
   public thermalTarget(
     point: { x: number; y: number },
@@ -186,14 +217,14 @@ export class LivingWorldAuthority {
       if (this.state.regions.length >= 128) return;
       this.state.regions.push(key);
     }
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < FORAGE.length; i++) {
       const h = livingHash(this.services.seed + ':forage:' + key + ':' + i),
         x = rx * 16 + 2 + (h % 12),
         y = ry * 16 + 2 + ((h >>> 8) % 12);
       if (
         !this.state.forage.some((f) => f.id === 'forage:' + key + ':' + i) &&
         this.services.ground(x, y) &&
-        this.state.forage.length < 768
+        this.state.forage.length < 896
       )
         this.state.forage.push({
           id: 'forage:' + key + ':' + i,
@@ -202,6 +233,7 @@ export class LivingWorldAuthority {
           y,
           readyTick: 0,
           cleared: false,
+          ...(renewablePlant(FORAGE[i]!.id) ? { growth: { version: 1 as const, progress: FORAGE[i]!.renewalTicks, moisture: 8000, dryTicks: 0, cut: false } } : {}),
         });
     }
     for (let i = 0; i < 5 && this.state.animals.length < 96; i++) {
@@ -260,6 +292,7 @@ export class LivingWorldAuthority {
     };
   }
   public tick() {
+    this.fishing.tick();
     const tick = this.services.tick();
     if (tick - this.state.lastTick < 60) return;
     // No offline or unbounded catch-up: the bundle invokes this every active second.
@@ -318,6 +351,18 @@ export class LivingWorldAuthority {
                 1000000,
             ),
         );
+      }
+    }
+    for (const f of this.state.forage) {
+      if (f.cleared || !f.growth) continue;
+      const g = f.growth, soil = soilAt(this.services.seed, f);
+      const rain = this.services.weather(f.x, f.y) === 'mist-rain';
+      // Wild root networks retain more moisture than exposed cultivated plots.
+      g.moisture = Math.max(0, Math.min(10000, g.moisture + (rain ? 70 : 0) - Math.round(8 * season.evaporationMilli / soil.retentionMilli)));
+      if (g.moisture === 0) g.dryTicks += delta;
+      else {
+        g.dryTicks = 0;
+        g.progress = Math.min(forageDefinition(f.kind)!.renewalTicks, g.progress + Math.round(delta / this.renewal(f, 'resource:fiber-plant')));
       }
     }
     const births: LivingAnimal[] = [];
@@ -604,13 +649,33 @@ export class LivingWorldAuthority {
       return s;
     };
     if (c.action === 'craft') {
-      const r = LIVING_RECIPES.find((r) => r.id === c.target);
+      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES].find((r) => r.id === c.target);
       if (!r) return reject('UNKNOWN_RECIPE');
       if (r.station && !this.near(actor, r.station))
         return reject('NEARBY_STATION_REQUIRED');
       for (const [id, q] of r.costs) consume(id, q);
       produce(r.output, r.quantity);
       message = 'CRAFTED';
+    } else if (c.action === 'uproot') {
+      if (!f || f.cleared || !f.growth || !f.growth.cut) return reject('HARVEST_MATURE_PLANT_FIRST');
+      if (distance(f) > near) return reject('OUT_OF_RANGE');
+      if (!has('item:field-hoe')) return reject('FIELD_HOE_REQUIRED');
+      produce('item:root-' + f.kind);
+      f.cleared = true;
+      message = 'ROOT_UPROOTED';
+    } else if (c.action === 'replant') {
+      const root = LIVING_ROOT_ITEMS.find(i => i.id === c.target);
+      if (!root) return reject('UNKNOWN_ROOT');
+      const x = c.x!, y = c.y!;
+      if (!Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > 1e7 || Math.abs(y) > 1e7) return reject('INVALID_POSITION');
+      if (distance({ x, y }) > near) return reject('OUT_OF_RANGE');
+      if (!has('item:field-hoe')) return reject('FIELD_HOE_REQUIRED');
+      if (next.forage.length >= 896) return reject('FORAGE_LIMIT');
+      const reason = this.services.plotGround(x, y); if (reason) return reject(reason);
+      if (next.plots.some(p => Math.hypot(p.x - x, p.y - y) < 1) || next.forage.some(f => !f.cleared && Math.hypot(f.x - x, f.y - y) < 1.25) || this.expedition.read().facilities.some(f => Math.abs(f.x - x) < 1.5 && Math.abs(f.y - y) < 1.5)) return reject('OCCUPIED_GROUND');
+      consume(root.id);
+      next.forage.push({ id: 'replant:' + ++next.serial, kind: root.id.slice('item:root-'.length), x, y, readyTick: 0, cleared: false, lineage: c.target, growth: { version: 1, progress: 0, moisture: 8000, dryTicks: 0, cut: false } });
+      message = 'ROOT_REPLANTED';
     } else if (c.action === 'till') {
       const x = c.x!,
         y = c.y!;
@@ -639,10 +704,11 @@ export class LivingWorldAuthority {
       for (const f of next.forage.filter(
         (f) => !f.cleared && Math.hypot(f.x - x, f.y - y) < 1.25,
       )) {
-        if (f.readyTick <= this.services.tick()) {
-          const d = forageDefinition(f.kind)!;
-          produce(d.output, d.quantity);
-        }
+        const d = forageDefinition(f.kind)!;
+        const amount = f.growth
+          ? forageGrowthView(f, this.services.tick(), 1).harvestYield
+          : f.readyTick <= this.services.tick() ? d.quantity : 0;
+        if (amount) produce(d.output, amount);
         f.cleared = true;
       }
       next.plots.push({
@@ -709,12 +775,23 @@ export class LivingWorldAuthority {
         p.dryTicks = 0;
         message = 'CLEARED';
       }
+    } else if (c.action === 'water-forage') {
+      if (!f || f.cleared || !renewablePlant(f.kind)) return reject('FORAGE_MISSING');
+      if (distance(f) > near) return reject('OUT_OF_RANGE');
+      if (!has('item:watering-can')) return reject('WATERING_CAN_REQUIRED');
+      if (!f.growth) return reject('LEGACY_GROWTH_PENDING');
+      consume('item:clean-water');
+      f.growth.moisture = 10000;
+      f.growth.dryTicks = 0;
+      message = 'WATERED';
     } else if (c.action === 'forage') {
       if (!f || f.cleared) return reject('FORAGE_MISSING');
       if (distance(f) > near) return reject('OUT_OF_RANGE');
-      if (this.services.tick() < f.readyTick) return reject('RENEWING');
+      if (!f.growth && this.services.tick() < f.readyTick) return reject('RENEWING');
       const d = forageDefinition(f.kind)!;
-      produce(d.output, d.quantity);
+      const amount = f.growth ? forageGrowthView(f, this.services.tick(), 1).harvestYield : d.quantity;
+      if (!amount) return reject('RENEWING');
+      produce(d.output, amount);
       f.readyTick =
         this.services.tick() +
         Math.round(
@@ -724,6 +801,7 @@ export class LivingWorldAuthority {
               : 1),
         );
       message = 'FORAGED';
+      if (renewablePlant(f.kind)) f.growth = { version: 1, progress: 0, moisture: f.growth?.moisture ?? 8000, dryTicks: 0, cut: amount === d.quantity };
     } else if (c.action === 'fuel' || c.action === 'fill') {
       if (!facility || facility.owner !== c.playerId)
         return reject('FACILITY_MISSING');
@@ -819,6 +897,8 @@ export class LivingWorldAuthority {
         }
       }
     }
+    // Validate candidate state before paying either side of the item exchange.
+    try { validateLivingWorld(next); } catch { return reject('INVALID_LIVING_STATE'); }
     if (inputs.length || outputs.length) {
       const result = this.items.commitColonyExchange({
         operationId: c.id,

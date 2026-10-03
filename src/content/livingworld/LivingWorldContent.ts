@@ -237,6 +237,13 @@ export const FORAGE = [
     quantity: 2,
     renewalTicks: 18000,
   },
+  {
+    id: 'wild-grass',
+    name: 'Meadow Grass',
+    output: 'item:plant-fiber',
+    quantity: 3,
+    renewalTicks: 5400,
+  },
 ] as const;
 export type ForageId = (typeof FORAGE)[number]['id'];
 export const forageDefinition = (id: string) => FORAGE.find((f) => f.id === id);

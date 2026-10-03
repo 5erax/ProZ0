@@ -117,8 +117,10 @@ test('runtime binding route renders authoritative derived state and stale reject
     'STALE / WORLD STATE CHANGED',
   );
   await expect(
-    ui.locator('[data-asset-path="assets/phase1/items/item_icon_atlas.png"]'),
+    ui.locator('[data-asset-path="assets/phase1/items/item_icon_atlas.png"]:not(.p1-wardrobe *)'),
   ).toHaveCount(3);
+  await expect(ui.locator('.p1-wardrobe [data-asset-path="assets/phase1/items/item_icon_atlas.png"]')).toHaveCount(1);
+  await expect(ui.getByRole('img', { name: 'Current character appearance', exact: true })).toHaveCount(1);
   await expect(ui.locator('[data-marker-shape="circle"]')).toHaveCount(1);
 });
 

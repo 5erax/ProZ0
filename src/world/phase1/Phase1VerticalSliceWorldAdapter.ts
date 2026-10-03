@@ -197,6 +197,7 @@ export class Phase1VerticalSliceWorldAdapter
     WorldCollisionQuery {
   private readonly activeChunks = new Map<string, Phase1WorldChunkView>();
   private readonly activeCoords = new Map<string, ChunkCoord>();
+  private generatedEntities: readonly Readonly<Phase1GeneratedWorldEntity>[] | null = null;
   private readonly drops = new Map<string, MutableWorldDrop>();
   private readonly predators = new Map<string, MutablePredator>();
   private readonly dropReservations = new Map<string, WorldPosition>();
@@ -271,6 +272,7 @@ export class Phase1VerticalSliceWorldAdapter
     const view = await this.options.store.requestActive(coord);
     this.activeChunks.set(key, view);
     this.activeCoords.set(key, coord);
+    this.generatedEntities = null;
     this.indexHostiles(view);
     return view;
   }
@@ -279,6 +281,7 @@ export class Phase1VerticalSliceWorldAdapter
     const coords = [...this.activeCoords.values()];
     this.activeChunks.clear();
     this.activeCoords.clear();
+    this.generatedEntities = null;
 
     for (const coord of coords) {
       await this.options.store.releaseInterest(coord);
@@ -291,6 +294,7 @@ export class Phase1VerticalSliceWorldAdapter
     await this.options.store.releaseInterest(coord);
     this.activeChunks.delete(key);
     this.activeCoords.delete(key);
+    this.generatedEntities = null;
   }
 
   public getActiveChunkViews(): readonly Readonly<Phase1WorldChunkView>[] {
@@ -308,13 +312,15 @@ export class Phase1VerticalSliceWorldAdapter
   }
 
   public getActiveGeneratedEntities(): readonly Readonly<Phase1GeneratedWorldEntity>[] {
+    const allActive = [...this.activeCoords.values()].every(coord => this.options.store.getMeta(coord)?.lifecycle === 'ACTIVE');
+    if (this.generatedEntities && allActive) return this.generatedEntities;
     const values: Phase1GeneratedWorldEntity[] = [];
     for (const coord of this.activeCoords.values()) {
       const view = this.options.store.query(coord);
       if (view === undefined) continue;
       values.push(...view.base.entities);
     }
-    return Object.freeze(
+    const result = Object.freeze(
       values
         .sort((left, right) => left.entityId.localeCompare(right.entityId))
         .map((entry) => Object.freeze({
@@ -322,6 +328,8 @@ export class Phase1VerticalSliceWorldAdapter
           position: createWorldPosition(entry.position.x, entry.position.y),
         })),
     );
+    this.generatedEntities = allActive ? result : null;
+    return result;
   }
 
   public findGeneratedEntityByDefinition(
@@ -407,6 +415,7 @@ export class Phase1VerticalSliceWorldAdapter
     return Object.freeze({
       resourceEntityId,
       resourceDefinitionId: entity.definitionId,
+      size: this.options.store.getResourceSize(entity.entityId, entity.definitionId),
       revision: state.revision,
       remainingActions: state.remainingGatherActions,
       depleted: state.depleted,
@@ -1117,6 +1126,23 @@ export class Phase1VerticalSliceWorldAdapter
     return this.isPositionBuildable(position)?1:0.7;
   }
 
+  /** Fishing reads canonical explored terrain, never presentation color or an unloaded chunk. */
+  public isExploredPosition(position: WorldPosition): boolean { return this.activeChunks.has(toChunkKey(fromWorldPosition(position))) && this.isPositionExplored(position); }
+  public isExploredWater(position: WorldPosition): boolean {
+    return this.activeChunks.has(toChunkKey(fromWorldPosition(position))) && this.isPositionExplored(position) && !this.isPositionBuildable(position);
+  }
+  public hasClearFishingLine(from: WorldPosition, to: WorldPosition): boolean {
+    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / .2));
+    if (steps > 21) return false;
+    let prior = from;
+    for (let i = 1; i <= steps; i++) {
+      const point = createWorldPosition(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
+      if (!this.isMovementPassable(point, { halfWidth: .05, halfDepth: .05 }) || this.blocksExpeditionMotion(prior, point, { halfWidth: .05, halfDepth: .05 })) return false;
+      prior = point;
+    }
+    return true;
+  }
+
   private isPositionBuildable(position: WorldPosition): boolean {
     if(this.options.colonyTerrainRulesEnabled)for(const structure of this.options.structures())if(positionInsideFootprint(position,structure.position,PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],structure.orientationQuarterTurns))return true;
     const view = this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
@@ -1134,7 +1160,7 @@ export class Phase1VerticalSliceWorldAdapter
     const base=view.base.terrain.cells[
       cellY * view.base.terrain.cellsPerAxis + cellX
     ]!;
-    return (this.options.colonyTerrainRulesEnabled?colonyLandscapeTerrainAt(this.options.colonyWorldSeed!,position,base):base)==='ground';
+    return (this.options.colonyTerrainRulesEnabled?colonyLandscapeTerrainAt(this.options.colonyWorldSeed!,position,base,view.base.generationVersion):base)==='ground';
   }
 
   private isPositionExplored(position: WorldPosition): boolean {

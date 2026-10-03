@@ -81,6 +81,7 @@ export interface ItemDefinitionV1 extends BaseContentDefinitionV1 {
   readonly ordinaryStorageAllowed: boolean;
   readonly capabilities: readonly ItemCapabilityV1[];
   readonly useProfile?: ItemUseProfileV1;
+  readonly rarity?: import('./livingworld/EquipmentContent').ItemRarity;
 }
 
 export interface ItemQuantitySpecV1 {

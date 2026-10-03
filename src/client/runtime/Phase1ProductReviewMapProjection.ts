@@ -2,7 +2,6 @@ import type {
   PlayerMotionViewV1,
   PresentationIdentitySlotV1,
 } from '../../protocol';
-import { colonySurveySites } from '../../world/phase2/ColonyRegions';
 import type {
   Phase1AuthorityBundle,
 } from '../../integration/Phase1AuthorityBundle';
@@ -508,7 +507,7 @@ export function projectPhase1ProductReviewMapPanel(
   }
 
   if (bundle.config.colonyDepthEnabled === true) {
-    for (const site of colonySurveySites(bundle.config.worldSeed)) {
+    for (const site of bundle.colonyDepth.sites()) {
       if (!bundle.colonyDepth.read().inspectedSites.includes(site.id)) continue;
       detailTargets.push(Object.freeze({
         id: 'map:' + site.id, label: site.name.toUpperCase() + ' · SURVEYED',

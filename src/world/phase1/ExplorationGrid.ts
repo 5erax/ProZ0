@@ -17,6 +17,7 @@ export const PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS =
 export const PHASE1_EXPLORATION_WORD_COUNT =
   (PHASE1_EXPLORATION_CELLS_PER_AXIS
     * PHASE1_EXPLORATION_CELLS_PER_AXIS) / 32;
+const validatedImmutableFragments = new WeakMap<Phase1ExplorationFragment, Phase1ExplorationFragment>();
 
 function requireUint32(value: number): number {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff_ffff) {
@@ -51,6 +52,8 @@ export function validateExplorationFragment(
   if (fragment.regionId !== explorationRegionId(coord)) {
     throw new Error('Exploration region identity does not match chunk coordinate.');
   }
+  const cached = validatedImmutableFragments.get(fragment);
+  if (cached) return cached;
 
   if (!Number.isSafeInteger(fragment.revision) || fragment.revision < 0) {
     throw new Error('Exploration revision must be a non-negative safe integer.');
@@ -60,11 +63,16 @@ export function validateExplorationFragment(
     throw new Error('Exploration bitset has an invalid word count.');
   }
 
-  return Object.freeze({
+  const validated = Object.freeze({
     regionId: fragment.regionId,
     revision: fragment.revision,
     words: Object.freeze(fragment.words.map(requireUint32)),
   });
+  // Mutable/untrusted input is always checked again. Immutable authority
+  // snapshots can safely share one validated mask until their revision changes.
+  validatedImmutableFragments.set(validated, validated);
+  if (Object.isFrozen(fragment) && Object.isFrozen(fragment.words) && (['regionId', 'revision', 'words'] as const).every(key => Object.getOwnPropertyDescriptor(fragment, key)?.value === fragment[key])) validatedImmutableFragments.set(fragment, validated);
+  return validated;
 }
 
 function cellCenter(

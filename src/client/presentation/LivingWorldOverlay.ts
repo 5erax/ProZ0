@@ -7,6 +7,15 @@ import {
   forageDefinition,
   soilAt,
 } from '../../content/livingworld/LivingWorldContent';
+import { livingArt } from './LivingWorldArt';
+import { LivingMotion } from './LivingMotion';
+import { worldDepthOrder } from './WorldDepth';
+import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
+import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { GEAR_RECIPES, RARITY_STYLE }  from '../../content/livingworld/EquipmentContent';
+import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
+import type { FishingCommand } from '../../simulation/livingworld/FishingAuthority';
+import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
 import type { LivingCommand } from '../../simulation/livingworld/LivingWorldAuthority';
 import {
   projectPhase1Isometric,
@@ -47,15 +56,36 @@ export function createLivingWorldOverlay(
   hint.className = 'lw-hint';
   hint.hidden = true;
   style.textContent =
-    '.p1-product-terrain[data-soil]::after{content:"";position:absolute;left:42%;top:48%;width:9px;height:3px;opacity:.3;pointer-events:none;background:var(--soil-color)}.p1-product-terrain[data-soil=loam]{--soil-color:#9d9a71}.p1-product-terrain[data-soil=sand]{--soil-color:#d1b679}.p1-product-terrain[data-soil=clay]{--soil-color:#b28471}.p1-product-terrain[data-soil=peat]{--soil-color:#537161}.p1-product-terrain[data-soil=rocky]{--soil-color:#acb4aa}[data-living-season=winter] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #aec9ca44}[data-living-season=autumn] [data-world-role=terrain]{box-shadow:inset 0 0 0 1px #d0a66d33}.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:58px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;transform:translate(-50%,-85%);border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;filter:drop-shadow(0 2px 1px #112a30)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:50px}.lw-season{top:95px}}';
-  layer.append(style, markers, season, panel, ghost, hint);
+    '.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:110px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:110px}.lw-season{top:95px}}';
+  const worldStage = root.querySelector<HTMLElement>('.p1-product-world-stage');
+  if (!worldStage) throw new Error('Living presentation requires the canonical world stage.');
+  const rasterOrigin = { x: Number(worldStage.dataset.rasterOriginX), y: Number(worldStage.dataset.rasterOriginY) };
+  markers.style.display = 'contents';
+  worldStage.append(markers);
+  const motion = new LivingMotion();
+  const fishingStatus = document.createElement('div'), fishingLabel = document.createElement('span'), reelButton = document.createElement('button'), cancelFishButton = document.createElement('button'), bobber = document.createElement('span');
+  fishingStatus.className = 'lw-fishing-status'; fishingStatus.hidden = true;
+  fishingStatus.style.cssText = 'position:absolute;bottom:150px;left:50%;transform:translateX(-50%);background:#102029ef;border:1px solid #90c1c5;padding:8px;pointer-events:auto;z-index:950000;max-width:85%;display:flex;gap:8px;align-items:center';
+  // Keep the DOM stable during the reaction window, including keyboard focus.
+  reelButton.textContent = 'Reel [Space]'; reelButton.type = 'button'; cancelFishButton.textContent = 'Cancel [Esc]'; cancelFishButton.type = 'button';
+  reelButton.onclick = () => fishingAction('reel'); cancelFishButton.onclick = () => fishingAction('cancel');
+  fishingStatus.append(fishingLabel, reelButton, cancelFishButton); layer.append(fishingStatus);
+  bobber.dataset.fishingBobber = 'true'; bobber.style.cssText = 'position:absolute;width:24px;height:16px;pointer-events:none';
+  bobber.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" shape-rendering="crispEdges"><path fill="none" stroke="#a9d9ce" d="m2 10 10-4 10 4-10 4z"/><path fill="#df875e" d="M10 4h4v4h-4z"/><path fill="#f0e2b8" d="M10 8h4v3h-4z"/></svg>';
+  bobber.hidden = true; markers.append(bobber);
+  style.textContent += '.lw-fishing-status[hidden]{display:none!important}.lw-fishing-status button{font:12px monospace;background:#263e47;border:1px solid #acc8c5;color:#e9eee0;padding:7px}.lw-fishing-status[data-phase=bite]{border-color:#d9d98c}.lw-fishing-status[data-phase=bite] span{font-weight:bold;color:#fff1ad}';
+  layer.append(style, season, panel, ghost, hint);
   root.append(layer, menu);
   let opened = false,
     placing = false,
     feedback = '',
     focus = '',
     signature = '',
-    lastFrame = 0,
+    placementRoot: string | null = null,
+    placingFishing = false,
+    fishFlashUntil = 0,
+    lastFishMessage = '',
+    fishingError = '',
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -70,6 +100,7 @@ export function createLivingWorldOverlay(
     opened = false;
     layer.style.zIndex = '15';
     placing = false;
+    placingFishing = false;
     ghost.hidden = true;
     hint.hidden = true;
     panel.hidden = true;
@@ -112,7 +143,27 @@ export function createLivingWorldOverlay(
       FIRE_LIT: 'Fire burning: stay within 4 m for warmth.',
       TANK_FILLED: 'Irrigation reservoir filled.',
       MISSING_INPUT: 'Bring the required materials.',
+      FISHING_ROD_REQUIRED: 'Craft a Field Fishing Rod first.',
+      FISHING_BAIT_REQUIRED: 'Craft or carry Plant Fishing Bait before casting.',
+      FISHING_WATER_REQUIRED: 'Choose explored water within 4 m.',
+      FISHING_LINE_BLOCKED: 'The line is blocked. Try a clear bank.',
+      FISHING_STAND_ON_BANK: 'Stand on dry bank ground before casting.',
+      FISHING_CAST: 'Bait cast. Stay still and watch for the bite.',
+      FISHING_WAIT_FOR_BITE: 'Wait for the bite before reeling.',
+      FISHING_STOCK_RECOVERING: 'Fish population depleted or reserved; let this area recover.',
+      FISHING_INTERRUPTED_MOVE: 'Fishing cancelled because you moved. The cast bait is spent.',
+      FISHING_INTERRUPTED_DAMAGE: 'Fishing cancelled because you took damage.',
+      FISHING_MISSED_BITE: 'The fish escaped. Reel within four seconds of the bite.',
+      FISHING_CANCELLED: 'Fishing cancelled. The cast bait is spent.',
+      TARGET_CAPACITY_WEIGHT: 'Too heavy to land the fish. Free bag space before the bite window closes.',
+      TARGET_CAPACITY_VOLUME: 'No room to land the fish. Free bag space before the bite window closes.',
     })[v] ?? v.replaceAll('_', ' ').toLowerCase();
+  const fishingAction = (action: FishingCommand['action'], extra: Partial<FishingCommand> = {}) => {
+    const result = authority.fishing.execute({ id: 'fish:' + crypto.randomUUID(), playerId: player, expectedRevision: authority.fishing.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:' + player).revision, action, ...extra });
+    feedback = result.message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(result.message.slice('FISHING_CAUGHT:'.length)).displayName : result.message.startsWith('NEED item:fishing-bait') ? 'Craft or carry Plant Fishing Bait before casting.' : statusText(result.message);
+    fishingError = result.status === 'rejected' ? feedback : '';
+    signature = ''; render(); return result.status === 'committed';
+  };
   const execute = (
     action: LivingCommand['action'],
     target: string,
@@ -156,50 +207,17 @@ export function createLivingWorldOverlay(
   menu.onclick = () => open();
   const startPlot = () => {
     close();
+    placementRoot = null;
     placing = true;
     hint.hidden = false;
     hint.textContent = 'Click explored dry ground within 4 m · Escape cancel';
   };
-  const art = (role: string, kind: string, progress = 0): SVGSVGElement => {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 32 32');
-    svg.setAttribute('shape-rendering', 'crispEdges');
-    // Authored pixel silhouettes: identifiable species and crop stages, no text-only world props.
-    const bodies: Record<string, string> = {
-      chicken:
-        '<path fill="#e7d7a1" d="M9 14h13v10H9zM19 9h7v11h-7z"/><path fill="#c87557" d="M20 6h5v4h-5z"/><path fill="#e5b768" d="M25 13h5v3h-5zM12 24h2v5h-2zM20 24h2v5h-2z"/>',
-      rabbit:
-        '<path fill="#b5b5aa" d="M7 17h16v9H7zM19 11h9v12h-9zM19 3h3v10h-3zM25 2h3v11h-3z"/><path fill="#eee6ca" d="M4 20h5v5H4z"/>',
-      goat: '<path fill="#bfc1a5" d="M5 13h19v10H5zM21 8h8v13h-8zM7 23h3v6H7zM20 23h3v6h-3z"/><path fill="#cfa778" d="M22 4h2v5h-2zM27 3h2v6h-2z"/>',
-      boar: '<path fill="#967359" d="M4 14h21v11H4zM22 18h8v5h-8zM7 25h3v4H7zM21 25h3v4h-3zM23 10h3v5h-3z"/>',
-      fox: '<path fill="#c68d56" d="M7 16h17v8H7zM22 10h7v12h-7zM21 5h3v7h-3zM27 5h3v7h-3zM2 12h6v10H2zM9 24h3v5H9zM20 24h3v5h-3z"/><path fill="#e6dfb9" d="M1 11h4v5H1z"/>',
-      wolf: '<path fill="#879594" d="M5 14h20v10H5zM22 8h8v13h-8zM23 3h3v7h-3zM28 4h3v7h-3zM2 13h5v7H2zM8 24h3v5H8zM21 24h3v5h-3z"/>',
-    };
-    if (role === 'animal')
-      svg.innerHTML =
-        '<path fill="#162c31" opacity=".6" d="m2 27 14-5 14 5-14 4z"/>' +
-        bodies[kind] +
-        '<path fill="#162a31" d="M25 13h2v2h-2z"/>';
-    else if (role === 'plot')
-      svg.innerHTML =
-        '<path fill="#6e6249" d="m2 24 14-8 14 8-14 7z"/><path stroke="#ae9363" d="m7 23 9 5 9-5m-14-4 9 5"/>' +
-        (kind === 'empty'
-          ? ''
-          : `<path fill="${kind === 'dead' ? '#9f8562' : kind === 'herb' ? '#a6b582' : '#85aa61'}" d="M14 ${Math.max(6, 22 - progress * 14)}h4v15h-4zM8 15h8v4H8zM17 12h8v4h-8z"/>`);
-    else
-      svg.innerHTML =
-        kind === 'clay-bank' || kind === 'salt-stone'
-          ? `<path fill="${kind === 'clay-bank' ? '#b48766' : '#d5d8bd'}" d="m4 23 6-12h12l7 12-12 5z"/><path fill="#819390" d="M10 16h6v3h-6z"/>`
-          : '<path fill="#506b4c" d="M5 19h22v9H5z"/><path fill="#88a565" d="M8 11h5v12H8zM18 7h5v16h-5z"/>' +
-            (kind === 'berry-bush'
-              ? '<path fill="#b78587" d="M9 14h3v3H9zM20 12h3v3h-3z"/>'
-              : '<path fill="#b9c080" d="M6 11h8v3H6zM16 7h8v3h-8z"/>');
-    return svg;
-  };
+  const startFishing = () => { close(); placing = true; placingFishing = true; hint.hidden = false; hint.textContent = 'Click explored water within 4 m · 1 bait per cast · Escape / right-click cancel'; };
+  const growthText = (v: ReturnType<typeof forageGrowthView>) => v.stage === 'mature'
+    ? 'Maximum growth reached · best yield ' + v.maximumYield + ' · ' + (v.condition === 'normal' ? 'Normal' : 'Needs water')
+    : (v.stage === 'early' ? 'Early growth' : 'Growing') + ' · ' + (v.nextStageSeconds === null ? 'Growth paused: water needed' : 'Next stage ≈ ' + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? 'Needs water' : 'Normal') + ' · yield ' + v.harvestYield + '/' + v.maximumYield;
   const render = () => {
     const now = performance.now();
-    if (now - lastFrame < 50 && signature) return;
-    lastFrame = now;
     if (root.dataset.colonySettingsOpen === 'true') {
       close();
       placing = false;
@@ -209,9 +227,21 @@ export function createLivingWorldOverlay(
     const state = authority.presentationSnapshot(),
       p = bundle.getPlayerPosition(player),
       s = authority.season(),
-      inventory = bundle.items.getContainerView('inventory:' + player),
-      rect = canvas.getBoundingClientRect(),
-      base = root.getBoundingClientRect();
+      inventory = bundle.items.getContainerView('inventory:' + player);
+    const fish = authority.fishing.session(player);
+    const message = authority.fishing.message(player);
+    if (message !== lastFishMessage) { lastFishMessage = message; fishFlashUntil = now + 4000; fishingError = ''; }
+    fishingStatus.hidden = !fish && now >= fishFlashUntil; bobber.hidden = !fish;
+    reelButton.hidden = !fish; cancelFishButton.hidden = !fish;
+    if (fish) {
+      const biting = bundle.authorityTick >= fish.biteTick;
+      fishingStatus.dataset.phase = biting ? 'bite' : 'waiting';
+      const label = (biting ? 'BITE! Reel within ' + Math.max(0, Math.ceil((fish.endTick - bundle.authorityTick) / 60)) + 's' : 'Waiting for a bite · stay still') + (fishingError ? ' · ' + fishingError : '');
+      if (fishingLabel.textContent !== label) fishingLabel.textContent = label;
+      reelButton.disabled = !biting;
+      const at = projectPhase1Isometric(fish, rasterOrigin);
+      bobber.style.left = 320 + at.x - 12 + 'px'; bobber.style.top = 180 + at.y - 8 + (biting ? Math.floor(bundle.authorityTick / 8) % 2 * 2 : 0) + 'px'; bobber.style.zIndex = worldDepthOrder(fish, 2);
+    } else if (message) fishingLabel.textContent = message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(message.slice('FISHING_CAUGHT:'.length)).displayName : statusText(message);
     season.dataset.season = s.id;
     if (root.dataset.livingSeason !== s.id) root.dataset.livingSeason = s.id;
     for (let i = 0; i < particles.length; i++) {
@@ -221,11 +251,10 @@ export function createLivingWorldOverlay(
       const t = bundle.authorityTick / 60,
         wx = Math.floor(p.x / 16) * 16 + ((i * 7 + t * 0.35) % 24) - 4,
         wy = Math.floor(p.y / 16) * 16 + ((i * 11 + t * 0.55) % 24) - 4,
-        at = projectPhase1Isometric({ x: wx, y: wy }, p);
-      e.style.left =
-        rect.left - base.left + ((at.x + 320) * rect.width) / 640 + 'px';
-      e.style.top =
-        rect.top - base.top + ((at.y + 165) * rect.height) / 360 + 'px';
+        at = projectPhase1Isometric({ x: wx, y: wy }, rasterOrigin);
+      e.style.left = at.x + 320 + 'px';
+      e.style.top = at.y + 165 + 'px';
+      e.style.zIndex = '780000';
       e.style.background = s.id === 'winter' ? '#c2dbdf' : '#caa578';
       e.dataset.motionPhase = String(Math.floor(t * 10));
     }
@@ -246,6 +275,7 @@ export function createLivingWorldOverlay(
         kind: e.dead ? 'dead' : (e.crop ?? 'empty'),
         progress: e.crop ? e.progress / cropDefinition(e.crop)!.cycleTicks : 0,
         dead: e.dead,
+        young: false, anchor: '',
       })),
       ...state.forage
         .filter((f) => !f.cleared)
@@ -253,8 +283,9 @@ export function createLivingWorldOverlay(
           e,
           role: 'forage',
           kind: e.kind,
-          progress: 0,
-          dead: e.readyTick > bundle.authorityTick,
+          progress: renewablePlant(e.kind) ? forageGrowthView(e, bundle.authorityTick, 1).fraction : 1,
+          dead: !renewablePlant(e.kind) && e.readyTick > bundle.authorityTick,
+          young: false, anchor: '',
         })),
       ...state.animals.map((e) => ({
         e,
@@ -262,16 +293,20 @@ export function createLivingWorldOverlay(
         kind: e.species,
         progress: 0,
         dead: !e.health,
+        young: e.age < speciesDefinition(e.species)!.matureSeconds * 60,
+        anchor: e.pen ?? `${e.anchorX}:${e.anchorY}`, 
       })),
     ];
-    for (const { e, role, kind, progress, dead } of objects) {
+    for (const { e, role, kind, progress, dead, young, anchor } of objects) {
       if (Math.hypot(e.x - p.x, e.y - p.y) > 16 || visible.size >= 64) continue;
-      const at = projectPhase1Isometric(e, p);
+      if (!worldPositionKnown(bundle, e)) continue;
+      const displayed = motion.position(e.id, e, state.lastTick, now, anchor, role === 'animal' && !dead);
+      const at = projectPhase1Isometric(displayed, p);
       if (
-        at.x + 320 < 0 ||
-        at.x + 320 > 640 ||
-        at.y + 180 < 0 ||
-        at.y + 180 > 360
+        at.x + 320 < -48 ||
+        at.x + 320 > 688 ||
+        at.y + 180 < -48 ||
+        at.y + 180 > 408
       )
         continue;
       visible.add(e.id);
@@ -288,13 +323,19 @@ export function createLivingWorldOverlay(
         objectNodes.set(e.id, b);
         markers.append(b);
       }
-      const key = role + kind + Math.floor(progress * 3);
+      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead].join(':');
+      const definition = livingArt(role, kind, progress, young, dead);
       if (b.dataset.art !== key) {
-        b.replaceChildren(art(role, kind, progress));
+        b.innerHTML = definition.markup;
         b.dataset.art = key;
+        const svg = b.querySelector('svg')!;
+        svg.style.cssText = `position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:${definition.width}px;height:${definition.height}px`;
       }
       b.dataset.dead = String(dead);
-      b.style.zIndex = role === 'plot' ? '3' : role === 'animal' ? '2' : '1';
+      b.dataset.livingRole = role;
+      b.dataset.livingKind = kind;
+      b.dataset.livingYoung = String(young);
+      b.style.zIndex = worldDepthOrder(displayed);
       b.setAttribute(
         'aria-label',
         role === 'plot'
@@ -303,19 +344,33 @@ export function createLivingWorldOverlay(
             ? speciesDefinition(kind)!.name
             : forageDefinition(kind)!.name,
       );
-      b.style.left =
-        rect.left - base.left + ((at.x + 320) * rect.width) / 640 + 'px';
-      b.style.top =
-        rect.top - base.top + ((at.y + 180) * rect.height) / 360 + 'px';
-      b.style.width = (32 * rect.width) / 640 + 'px';
-      b.style.height = (32 * rect.height) / 360 + 'px';
+      if (Math.hypot(e.x - p.x, e.y - p.y) <= 4 && role === 'forage' && renewablePlant(kind)) {
+        const growth = authority.forageStatus(e.id)!;
+        const label = (b.getAttribute('aria-label') ?? '') + ' · ' + growthText(growth);
+        if (b.title !== label) b.title = label;
+      } else b.title = b.getAttribute('aria-label') ?? '';
+      if (role === 'plot') {
+        const plot = state.plots.find(plot => plot.id === e.id)!;
+        b.dataset.moisture = moistureState(plot.moisture);
+        const soilColor = plot.moisture < 2500 ? '#998466' : plot.moisture >= 7000 ? '#4b4837' : '#736348';
+        b.style.setProperty('--plot-soil-color', soilColor);
+      }
+      const raster = projectPhase1Isometric(displayed, rasterOrigin);
+      // Foot pivot at 50/64 of the authored canvas, shared with terrain's raster origin.
+      const hitWidth = Math.max(24, definition.width), hitHeight = Math.max(24, definition.height);
+      b.style.left = raster.x + 320 - hitWidth / 2 + 'px';
+      b.style.top = raster.y + 180 - definition.height * 50 / 64 - (hitHeight - definition.height) + 'px';
+      b.style.width = hitWidth + 'px';
+      b.style.height = hitHeight + 'px';
     }
     for (const [id, b] of objectNodes)
       if (!visible.has(id)) {
         b.remove();
         objectNodes.delete(id);
       }
+    motion.retain(visible);
     if (placing && cursor) {
+      const rect = canvas.getBoundingClientRect(), base = root.getBoundingClientRect();
       const point = unprojectPhase1Isometric(
           {
             x: ((cursor.x - rect.left) * 640) / rect.width - 320,
@@ -323,22 +378,30 @@ export function createLivingWorldOverlay(
           },
           p,
         ),
-        x = Math.round(point.x * 4) / 4,
-        y = Math.round(point.y * 4) / 4;
+        x = placingFishing ? Math.floor(point.x / 2) * 2 + 1 : Math.round(point.x * 4) / 4,
+        y = placingFishing ? Math.floor(point.y / 2) * 2 + 1 : Math.round(point.y * 4) / 4;
       ghost.hidden = false;
       ghost.style.left = cursor.x - base.left + 'px';
       ghost.style.top = cursor.y - base.top + 'px';
       ghost.dataset.x = String(x);
       ghost.dataset.y = String(y);
+      if (placingFishing) {
+        const reason = authority.fishing.assessCast(player,x,y), valid = reason === null;
+        ghost.dataset.valid = String(valid); ghost.style.borderColor = valid ? '#a8e1b3' : '#e89c83';
+        const population = authority.fishing.water(x,y) ? authority.fishing.population(x,y) : null;
+        hint.textContent = (reason ? statusText(reason) : 'Cast here · 1 bait') + (population ? ' · Fish ' + population.stock + '/' + population.capacity + (population.recoverySeconds === null ? '' : ' · next fish ≈ ' + population.recoverySeconds + 's') : '') + ' · Escape cancel';
+      }
     }
     if (!opened) return;
     const next = JSON.stringify([
-      Math.floor(state.lastTick / 300),
+      Math.floor(state.lastTick / 60),
       inventory.revision,
       Math.floor(p.x),
       Math.floor(p.y),
       feedback,
       focus,
+      state.revision,
+      authority.fishing.message(player),
     ]);
     if (next === signature) return;
     signature = next;
@@ -360,6 +423,14 @@ export function createLivingWorldOverlay(
         'Spring +35% growth · Summer: water regularly · Autumn +25% harvest · Winter: fire and shelter. Each season lasts 12 active minutes.',
       ),
     );
+    const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
+    panel.append(button('Fish nearby water', startFishing));
+    const fishFeedback = authority.fishing.message(player);
+    if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length)).displayName : statusText(fishFeedback)));
+    for (const rootItem of roots) panel.append(button('Replant ' + rootItem.displayName, () => {
+      close(); placing = true; placementRoot = rootItem.id; hint.hidden = false;
+      hint.textContent = 'Replant on explored ground within 4 m · Escape / right-click cancel';
+    }));
     const soil = soilAt(bundle.config.worldSeed, p);
     panel.append(
       text(
@@ -404,6 +475,8 @@ export function createLivingWorldOverlay(
                 '%',
         ),
       );
+      const growth = authority.plotStatus(plot.id);
+      if (growth && !plot.dead) a.append(text('p', growthText(growth)));
       if (!plot.crop)
         for (const c of CROPS)
           a.append(
@@ -481,16 +554,22 @@ export function createLivingWorldOverlay(
       .filter((f) => !f.cleared)
       .filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus)) {
       const a = row(f.id, forageDefinition(f.kind)!.name);
+      const growth = authority.forageStatus(f.id)!;
+      if (renewablePlant(f.kind)) a.append(text('p', growthText(growth)));
       a.append(
         button(
-          f.readyTick > bundle.authorityTick
-            ? 'Regrowing · ' +
+          (f.growth ? growth.harvestYield === 0 : f.readyTick > bundle.authorityTick)
+            ? f.growth ? growth.nextStageSeconds === null ? 'Water needed · growth paused' : 'Early growth · ≈ ' + growth.nextStageSeconds + 's' : 'Regrowing · ' +
                 Math.ceil((f.readyTick - bundle.authorityTick) / 60) +
                 's'
             : 'Gather',
           () => execute('forage', f.id),
         ),
       );
+      if (f.growth) {
+        a.append(button('Water roots · 1 clean water', () => execute('water-forage', f.id)));
+        if (f.growth.cut) a.append(text('p', 'Uprooting removes this patch permanently; replant the root elsewhere.'), button('Uproot · Field Hoe', () => execute('uproot', f.id)));
+      }
     }
     for (const f of bundle
       .expedition!.read()
@@ -530,12 +609,14 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + LIVING_RECIPES.length + ' recipes',
+        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length) + ' recipes',
       ),
     );
     panel.append(craft);
-    for (const r of LIVING_RECIPES) {
+    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
+      const definition = bundle.catalog.getAs(r.output, 'item');
+      if (definition.rarity) { a.dataset.rarity = definition.rarity; a.style.borderColor = RARITY_STYLE[definition.rarity].colour; const badge = text('small', RARITY_STYLE[definition.rarity].label); badge.style.color = RARITY_STYLE[definition.rarity].colour; a.append(badge); a.querySelector('h3')?.setAttribute('style', 'color:' + RARITY_STYLE[definition.rarity].colour); }
       craft.append(a);
       const icon = document.createElement('span'),
         sprite = itemIconSprite(r.output);
@@ -577,7 +658,7 @@ export function createLivingWorldOverlay(
       !placing ||
       !(e.target instanceof Element) ||
       e.target.closest(
-        '.lw-panel,.lw-menu,.p1-ui,.p2-settings,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
+        '.lw-panel,.lw-menu,.lw-fishing-status,.p1-ui,.p2-settings,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
       )
     )
       return;
@@ -594,8 +675,13 @@ export function createLivingWorldOverlay(
     cursor = { x: e.clientX, y: e.clientY };
     signature = '';
     render();
+    if (placingFishing) {
+      if (fishingAction('cast', { x: Number(ghost.dataset.x), y: Number(ghost.dataset.y) })) close();
+      else hint.textContent = feedback + ' · choose another position';
+      return;
+    }
     if (
-      execute('till', 'ground', {
+      execute(placementRoot ? 'replant' : 'till', placementRoot ?? 'ground', {
         x: Number(ghost.dataset.x),
         y: Number(ghost.dataset.y),
       })
@@ -607,9 +693,12 @@ export function createLivingWorldOverlay(
   const key = (e: KeyboardEvent) => {
     if (
       e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement
+      e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)
     )
       return;
+    if (authority.fishing.session(player) && (e.code === 'Escape' || (e.code === 'Space' && !opened && root.dataset.productReviewPanelOpen !== 'true' && root.dataset.colonySettingsOpen !== 'true'))) {
+      e.preventDefault(); e.stopImmediatePropagation(); fishingAction(e.code === 'Escape' ? 'cancel' : 'reel'); return;
+    }
     if (
       e.code === 'KeyF' &&
       !root.dataset.colonySettingsOpen?.includes('true')
@@ -687,11 +776,14 @@ export function createLivingWorldOverlay(
   return {
     open,
     close,
+    cancelPlacement: () => { if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); },
     render,
     destroy: () => {
       root.removeEventListener('pointermove', pointer);
       root.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key, true);
+      markers.remove();
+      motion.clear();
       layer.remove();
       menu.remove();
     },

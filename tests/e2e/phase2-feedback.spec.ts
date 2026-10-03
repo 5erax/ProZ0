@@ -54,12 +54,14 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await page.getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
  await page.getByRole('button',{name:'Build base [B]',exact:true}).click();
- const p=await page.locator('canvas').evaluate(element=>({x:Number(element.getAttribute('data-player-x')),y:Number(element.getAttribute('data-player-y'))}));
- await page.mouse.move((320+(-3-p.x+p.y)*16)*2,(180+(-3-p.x-p.y)*8)*2);
+ // Place at a known reachable distance from the actual standing position.
+ // This exercises free placement, instead of asking an axis-only walker to enter/go around a new obstacle.
+ const point=await page.locator('canvas').evaluate(element=>{const r=element.getBoundingClientRect();return{x:r.left+(320+1.1*16)*r.width/640,y:r.top+(180+1.1*8)*r.height/360};});
+ await page.mouse.move(point.x,point.y);
  await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state','VALID');await page.getByRole('button',{name:'Place [Enter]',exact:true}).click();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-built-count','1');await page.keyboard.press('Escape');
- // Stop inside the real 1.25 m storage range, allowing the helper's 0.65 m arrival radius.
- await walk(page,-3.3,0);await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
+ await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
+ await page.locator('[data-inventory-pane="player"]').getByRole('button',{name:'Stone Field Tool',exact:true}).click();
  await page.getByRole('button',{name:'Move one',exact:true}).click();
  const storage=page.locator('[data-inventory-pane="storage"]');
  await expect(storage.getByRole('button',{name:'Stone Field Tool',exact:true})).toContainText('×1');

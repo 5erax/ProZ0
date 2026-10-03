@@ -8,6 +8,7 @@ export * from './equipment';
 import type { WorldPosition } from '../foundation';
 import type { WorldCollisionQuery } from '../world';
 import type { FacingDirection } from './api/SimulationSnapshot';
+import type { PlayerInput } from './api/PlayerInput';
 import { FixedStepRuntime } from './internal/FixedStepRuntime';
 
 export {
@@ -42,6 +43,7 @@ export interface SimulationRuntimeOptions {
   readonly worldQuery: WorldCollisionQuery;
   readonly initialPlayerPosition: WorldPosition;
   readonly initialPlayerFacing?: FacingDirection | null;
+  readonly movementMultiplier?: (input: PlayerInput) => number;
 }
 
 export function createSimulationRuntime(
@@ -51,5 +53,6 @@ export function createSimulationRuntime(
     options.worldQuery,
     options.initialPlayerPosition,
     options.initialPlayerFacing ?? null,
+    options.movementMultiplier,
   );
 }

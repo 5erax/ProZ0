@@ -25,6 +25,7 @@ function copyInput(input: PlayerInput): PlayerInput {
     moveDown: input.moveDown,
     moveLeft: input.moveLeft,
     moveRight: input.moveRight,
+    ...(input.sprint === true ? { sprint: true } : {}),
   });
 }
 
@@ -37,6 +38,7 @@ export class FixedStepRuntime implements AuthorityRuntime {
     worldQuery: WorldCollisionQuery,
     initialPlayerPosition: WorldPosition,
     initialPlayerFacing: FacingDirection | null = null,
+    private readonly movementMultiplier: (input: PlayerInput) => number = () => 1,
   ) {
     this.movement = new PlayerMovementSystem(
       worldQuery,
@@ -61,7 +63,7 @@ export class FixedStepRuntime implements AuthorityRuntime {
       throw new Error('SimulationRuntime only accepts the approved fixed 60 Hz step.');
     }
 
-    this.movement.step(this.currentInput, step.dtSeconds);
+    this.movement.step(this.currentInput, step.dtSeconds, this.movementMultiplier(this.currentInput));
     this.tick = step.tick;
   }
 

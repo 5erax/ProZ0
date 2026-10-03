@@ -3,6 +3,7 @@ import {
   speciesDefinition,
   forageDefinition,
 } from '../../content/livingworld/LivingWorldContent';
+import { validateFishingState, type FishingState } from './FishingState';
 export interface LivingPlot {
   id: string;
   owner: string;
@@ -42,6 +43,9 @@ export interface LivingForage {
   y: number;
   readyTick: number;
   cleared: boolean;
+  /** Additive v1 plant growth. Absent fields retain a saved legacy readyTick. */
+  growth?: { version: 1; progress: number; moisture: number; dryTicks: number; cut: boolean };
+  lineage?: string;
 }
 export interface LivingStation {
   id: string;
@@ -60,6 +64,7 @@ export interface LivingWorldState {
   forage: LivingForage[];
   stations: LivingStation[];
   receipts: { id: string; signature: string; message: string }[];
+  fishing?: FishingState;
 }
 export const emptyLivingWorld = (tick = 0): LivingWorldState => ({
   version: 1,
@@ -100,7 +105,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
     !Array.isArray(s.animals) ||
     s.animals.length > 96 ||
     !Array.isArray(s.forage) ||
-    s.forage.length > 768 ||
+    s.forage.length > 896 ||
     !Array.isArray(s.stations) ||
     s.stations.length > 64 ||
     !Array.isArray(s.receipts) ||
@@ -108,6 +113,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
   )
     throw Error('Invalid living world');
   const ids = new Set<string>();
+  if (s.fishing !== undefined) validateFishingState(s.fishing);
   for (const e of [...s.plots, ...s.animals, ...s.forage, ...s.stations]) {
     if (
       !e ||
@@ -172,7 +178,15 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
       !point(f) ||
       !forageDefinition(f.kind) ||
       !n(f.readyTick) ||
-      typeof f.cleared !== 'boolean'
+      typeof f.cleared !== 'boolean' ||
+      (f.lineage !== undefined && (typeof f.lineage !== 'string' || !f.lineage || f.lineage.length > 180 || !f.growth)) ||
+      (f.growth !== undefined && (
+        !f.growth || f.growth.version !== 1 ||
+        !(f.kind.startsWith('wild-') || f.kind === 'berry-bush') ||
+        ![f.growth.progress, f.growth.moisture, f.growth.dryTicks].every(n) ||
+        f.growth.progress > forageDefinition(f.kind)!.renewalTicks ||
+        f.growth.moisture > 10000 || typeof f.growth.cut !== 'boolean'
+      ))
     )
       throw Error('Invalid forage');
   for (const f of s.stations)

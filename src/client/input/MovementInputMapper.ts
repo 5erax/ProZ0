@@ -9,6 +9,8 @@ const MOVEMENT_CODES = new Set([
   'ArrowDown',
   'ArrowLeft',
   'ArrowRight',
+  'ShiftLeft',
+  'ShiftRight',
 ]);
 
 function pressed(pressedCodes: ReadonlySet<string>, ...codes: string[]): boolean {
@@ -25,5 +27,6 @@ export function mapMovementInput(pressedCodes: ReadonlySet<string>): PlayerInput
     moveDown: pressed(pressedCodes, 'KeyS', 'ArrowDown'),
     moveLeft: pressed(pressedCodes, 'KeyA', 'ArrowLeft'),
     moveRight: pressed(pressedCodes, 'KeyD', 'ArrowRight'),
+    ...(pressed(pressedCodes, 'ShiftLeft', 'ShiftRight') ? { sprint: true } : {}),
   });
 }

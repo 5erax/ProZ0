@@ -1005,7 +1005,7 @@ describe('Phase 0 browser runtime', () => {
 
     await assertFeedbackLifetime(
       'KeyQ',
-      /\[Q\] (EQUIP|UNEQUIP) · Basic Spear/,
+      /\[Q\] (EQUIP|UNEQUIP) · Weapon/,
     );
     await assertFeedbackLifetime(
       'KeyT',

@@ -1,3 +1,5 @@
+import { inspectItem } from '../presentation/ItemInspection';
+import { inspectCharacter } from '../presentation/CharacterInspection';
 import type {
   ContentCatalogV1,
   ContentId,
@@ -183,7 +185,11 @@ function inventoryItems(
     return Object.freeze({
       id: stack.stackId,
       name: definition.displayName,
+      rarity: definition.rarity ?? 'common',
       quantity: stack.quantity,
+      inspection: inspectItem(catalog, definition.id),
+      stackWeightKg: definition.unitWeightKg * stack.quantity,
+      stackBulk: definition.unitVolume * stack.quantity,
       condition: stack.condition,
       conditionMax: definition.conditionMax,
       available: stack.condition !== 0,
@@ -204,7 +210,9 @@ function equipment(
   if (stack === undefined) return null;
   const definition = catalog.getAs(stack.itemDefinitionId, 'item');
   return Object.freeze({
+    stackId: stack.stackId,
     name: definition.displayName,
+    rarity: definition.rarity ?? 'common',
     condition: stack.condition,
     conditionMax: definition.conditionMax,
     stateLabel: stack.condition === 0
@@ -439,6 +447,8 @@ function inventoryPanel(
   const feedback = input.commandFeedback;
   return Object.freeze({
     kind: 'inventory',
+    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
+    character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: 'Inventory',
     items: inventoryItems(input.catalog, input.inventory),
     selectedItemId: selected?.stackId ?? null,
@@ -483,6 +493,8 @@ function containerPanel(
   const storageCapacity = storageDefinition?.container ?? null;
   return Object.freeze({
     kind: 'container',
+    equipment: { weapon: equipment(input.catalog, input.inventory, input.equippedWeaponStackId === undefined ? input.equippedStackId : input.equippedWeaponStackId), protection: equipment(input.catalog, input.inventory, input.equippedThermalWrapStackId) },
+    character: inspectCharacter(input.survival, input.inventory.playerWeightState ?? 'NORMAL'),
     title: container.kind === 'death-cache'
       ? 'Death Cache'
       : 'Inventory / Storage',
@@ -877,6 +889,7 @@ export function projectPhase1RuntimePresentation(
     world: Object.freeze({
       timeLabel: worldTimeLabel(environment),
       dayPeriod: environment.dayPeriod.toUpperCase() as 'DAY' | 'NIGHT',
+      ...(environment.timeSegment ? { timeSegment: environment.timeSegment } : {}),
       weatherLabel: input.weatherOverride?.label ?? (coldRain === 'active'
         ? 'COLD RAIN'
         : coldRain === 'warning'

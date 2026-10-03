@@ -1,11 +1,21 @@
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
+import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
+import { sizedResourceSprite, sizedResourceHitShape } from '../presentation/ResourceSizeArt';
+import { moistureState } from '../../simulation/livingworld/PlantGrowth';
+import { colonyGroundSprite } from '../presentation/ColonySoilArt';
+import { colonyWaterSprite } from '../presentation/ColonyWaterArt';
+import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
+import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
+import { explorationSiteSprite } from '../presentation/ExplorationArt';
+import { heldSpearSprite } from '../presentation/EquipmentArt';
+import { worldDepthOrder } from '../presentation/WorldDepth';
 import {
   WORLD_PIXELS_PER_UNIT,
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
-import { colonyBiomeAt, colonySurveySites, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
+import { colonyBiomeAt, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
 import { colonyTerrainSprite, colonyLandmarkSprite, colonyResourceSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
@@ -160,7 +170,7 @@ function setWorldAnchor(
   camera: WorldPosition,
   width: number,
   height: number,
-  zIndex?: number,
+  zIndex?: number | string,
   rasterOrigin: WorldPosition = camera,
 ): boolean {
   const visible = distancePx(position, camera);
@@ -178,7 +188,7 @@ function setWorldAnchor(
   element.style.left = String(raster.x - width / 2) + 'px';
   element.style.top = String(raster.y - height) + 'px';
   element.style.zIndex = String(
-    zIndex ?? Math.round((position.x + position.y) * 1000),
+    zIndex ?? worldDepthOrder(position),
   );
   return true;
 }
@@ -189,7 +199,7 @@ function setWorldCenter(
   camera: WorldPosition,
   width: number,
   height: number,
-  zIndex: number,
+  zIndex: number | string,
   rasterOrigin: WorldPosition = camera,
 ): boolean {
   const visible = distancePx(position, camera);
@@ -259,6 +269,8 @@ function entitySprite(
       return PHASE1_PRODUCTION_WORLD_SPRITES.ruin;
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
+      const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
+      if (size) return sizedResourceSprite(entity.definitionId, size, state?.depleted === true);
       if(bundle.config.colonyDepthEnabled===true)return colonyResourceSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),entity.definitionId,state?.depleted===true);
       return phase1ResourcePresentationSprite(
         entity.definitionId,
@@ -369,7 +381,7 @@ function explorationCellKnown(
   );
 }
 
-function worldPositionKnown(
+export function worldPositionKnown(
   bundle: Phase1AuthorityBundle,
   position: WorldPosition,
 ): boolean {
@@ -502,12 +514,12 @@ function styleElement(document: Document): HTMLStyleElement {
   style.textContent = [
     '.p1-product-world{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center;overflow:hidden;pointer-events:none;background:#111821;image-rendering:pixelated;}',
     '.p1-product-sprite,.p1-product-terrain,.p1-product-fog{position:absolute;image-rendering:pixelated;}',
-    '.p1-product-player,.p1-product-teammate{z-index:900000!important;}',
     '.p1-product-player[data-local-player="true"]{filter:drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef);}',
     '.p1-product-focused-target{outline:1px solid #f4f6ef;outline-offset:1px;box-shadow:0 0 0 1px #111722;}',
+    '.p1-product-focused-target[data-resource-size]{outline:none;box-shadow:none;filter:drop-shadow(1px 0 0 #e6ebcf) drop-shadow(-1px 0 0 #e6ebcf) drop-shadow(0 -1px 0 #e6ebcf);}',
     '.p1-product-critical{z-index:890000!important;}',
     '.p1-product-identity{z-index:930000!important;}',
-    '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);z-index:910000!important;}',
+    '.p1-product-predator-telegraph{filter:drop-shadow(0 0 1px #f6e2a7) drop-shadow(0 0 2px #7f341f);}',
     '.p1-product-night{position:absolute;inset:0;z-index:-50000;pointer-events:none;background:rgba(7,12,28,.28);mix-blend-mode:multiply;}',
     '.p1-product-weather{position:absolute;inset:0;z-index:800000;pointer-events:none;opacity:.24;}',
     '.p1-product-build-preview{z-index:920000!important;opacity:.82;}',
@@ -537,6 +549,7 @@ export function createPhase1ProductReviewWorldRenderer(
   getPlayerMotions: () => readonly Readonly<PlayerMotionViewV1>[] =
     () => Object.freeze([]),
 ): Phase1ProductReviewWorldRenderer {
+  const generationVersion = bundle.getWorldCompatibility().worldGenerationVersion;
   const document = root.ownerDocument;
   const targetWindow = document.defaultView ?? window;
   const canvas = document.createElement('canvas');
@@ -561,26 +574,17 @@ export function createPhase1ProductReviewWorldRenderer(
   worldStage.style.cssText = 'position:absolute;inset:0;will-change:transform;';
   layer.append(worldStage);
   const rasterOrigin = bundle.getPlayerPosition(playerId);
-  const rainFrames: string[] = [];
-  const rainAtlas = document.createElement('img');
-  rainAtlas.addEventListener('load', () => {
-    const frameCanvas = document.createElement('canvas');
-    frameCanvas.width = INTERNAL_WIDTH; frameCanvas.height = INTERNAL_HEIGHT;
-    const context = frameCanvas.getContext('2d');
-    if (context === null) return;
-    context.imageSmoothingEnabled = false;
-    for (let frame = 0; frame < 4; frame += 1) {
-      context.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
-      for (let y = -32; y < INTERNAL_HEIGHT; y += 48) for (let x = -32; x < INTERNAL_WIDTH; x += 48) {
-        const hash = stableDecorHash(x, y);
-        if (hash % 3 === 0) continue;
-        const index = (frame + hash) % 4;
-        context.drawImage(rainAtlas, index * 16, 0, 16, 16, x + hash % 16, y, 32, 32);
-      }
-      rainFrames.push(frameCanvas.toDataURL('image/png'));
-    }
-  }, { once: true });
-  rainAtlas.src = PHASE1_PRODUCTION_WORLD_SPRITES.coldRain.url;
+  worldStage.dataset.rasterOriginX = String(rasterOrigin.x);
+  worldStage.dataset.rasterOriginY = String(rasterOrigin.y);
+  let cameraDepth = Number.NaN;
+  const particles = createAtmosphericParticles(document);
+  // Encapsulate the effect's internal raster; #proz0-canvas remains the public game surface.
+  const particleHost = document.createElement('div');
+  particleHost.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+  particleHost.attachShadow({ mode: 'closed' }).append(particles.canvas);
+  const motionPreference = targetWindow.matchMedia('(prefers-reduced-motion: reduce)');
+  const soilMoistures = new Map<string, number>();
+  let soilRevision = -1;
 
   root.replaceChildren(canvas, layer);
 
@@ -608,7 +612,7 @@ export function createPhase1ProductReviewWorldRenderer(
   };
   const applySprite = (element: HTMLElement, definition: Phase1ProductionSprite,
     scale = 1, flipX = false): void => {
-    const key = [definition.url, definition.index, definition.cellWidth,
+    const key = [definition.assetPath, definition.index, definition.cellWidth,
       definition.cellHeight, definition.sourceWidth, definition.sourceHeight, scale, flipX].join(':');
     if (spriteKeys.get(element) === key) return;
     applyProductionSprite(element, definition, scale, flipX);
@@ -646,32 +650,32 @@ export function createPhase1ProductReviewWorldRenderer(
     options: {
       readonly flipX?: boolean;
       readonly className?: string;
-      readonly zIndex?: number;
+      readonly zIndex?: number | string;
       readonly data?: Readonly<Record<string, string>>;
     } = {},
   ): HTMLElement | null => {
     if (!inViewport(position, camera)) return null;
     const element = sceneElement('sprite:' + role + ':' + id);
-    element.className =
+    const className =
       'p1-product-sprite'
       + (options.className === undefined
         ? ''
-        : ' ' + options.className);
+        : ' ' + options.className) + (id === getPresentationContext().focusedWorldTargetId ? ' p1-product-focused-target' : '');
+    if (element.className !== className) element.className = className;
     const focused = id === getPresentationContext().focusedWorldTargetId;
     if (focused) {
-      element.classList.add('p1-product-focused-target');
-      element.dataset.focusedTarget = 'true';
+      if (element.dataset.focusedTarget !== 'true') element.dataset.focusedTarget = 'true';
     }
-    if (!focused) delete element.dataset.focusedTarget;
-    element.dataset.worldRole = role;
-    element.dataset.worldId = id;
+    if (!focused && element.dataset.focusedTarget !== undefined) delete element.dataset.focusedTarget;
+    if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
+    if (element.dataset.worldId !== id) element.dataset.worldId = id;
     const data = options.data ?? {};
     for (const key of spriteDataKeys.get(element) ?? []) {
       if (!(key in data)) delete element.dataset[key];
     }
     spriteDataKeys.set(element, Object.keys(data));
     for (const [key, value] of Object.entries(data)) {
-      element.dataset[key] = value;
+      if (element.dataset[key] !== value) element.dataset[key] = value;
     }
     applySprite(
       element,
@@ -743,33 +747,52 @@ export function createPhase1ProductReviewWorldRenderer(
         const baseTerrain = known
           ? terrainForCell(bundle, gx, gy)
           : 'ground';
-        const terrain=known&&bundle.config.colonyDepthEnabled===true?colonyLandscapeTerrainAt(bundle.config.worldSeed,position,baseTerrain):baseTerrain;
+        const terrain=known&&bundle.config.colonyDepthEnabled===true?colonyLandscapeTerrainAt(bundle.config.worldSeed,position,baseTerrain,generationVersion):baseTerrain;
         const variant = terrain === 'water'
           ? Math.floor(authorityTick / 15)
           : (stableDecorHash(Math.floor(gx / 3), Math.floor(gy / 3))
             + (stableDecorHash(gx, gy) % 7 === 0 ? 1 : 0)) % 4;
         if (known) {
         const tile = sceneElement('terrain:' + String(gx) + ':' + String(gy));
-        tile.className = 'p1-product-terrain';
-        tile.dataset.worldRole = 'terrain';
-        tile.dataset.terrainState = terrain;
+        if (tile.dataset.worldRole !== 'terrain') {
+          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED';
+        }
+        if (tile.dataset.terrainState !== terrain) tile.dataset.terrainState = terrain;
         if(bundle.livingWorld && terrain!=='water' && !tile.dataset.soil)tile.dataset.soil=soilAt(bundle.config.worldSeed,position).id;
-        if(bundle.config.colonyDepthEnabled===true)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
-        tile.dataset.explorationState =
-          known ? 'EXPLORED' : 'UNEXPLORED';
+        if(bundle.config.colonyDepthEnabled===true && !tile.dataset.biome)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
+        let groundShore = 0;
+        if (terrain === 'ground') for (const [bit, dx, dy] of [[1,1,0],[2,0,1]] as const) {
+          if (!explorationCellKnown(bundle, gx + dx, gy + dy)) continue;
+          const neighbor = worldCell(gx + dx, gy + dy), base = terrainForCell(bundle, gx + dx, gy + dy);
+          if ((bundle.config.colonyDepthEnabled === true ? colonyLandscapeTerrainAt(bundle.config.worldSeed, neighbor, base, generationVersion) : base) === 'water') groundShore |= 1 << bit;
+        }
+        let waterArt: Phase1ProductionSprite | null = null;
+        if (terrain === 'water' && generationVersion >= 5) {
+          const sample = colonyWaterAt(bundle.config.worldSeed, position);
+          let shoreMask = 0;
+          for (const [bit, dx, dy] of [[0,0,-1],[1,1,0],[2,0,1],[3,-1,0]] as const) {
+            if (explorationCellKnown(bundle, gx + dx, gy + dy) && terrainForCell(bundle, gx + dx, gy + dy) === 'ground') shoreMask |= 1 << bit;
+          }
+          const flowDirection = sample ? (Math.abs(sample.flow.x) > Math.abs(sample.flow.y) ? sample.flow.x > 0 ? 0 : 2 : sample.flow.y > 0 ? 1 : 3) : 0;
+          waterArt = colonyWaterSprite(colonyBiomeAt(bundle.config.worldSeed, position), shoreMask, Math.floor(authorityTick / 15), flowDirection, sample?.crossing ?? false);
+          if (!tile.dataset.waterKind) { tile.dataset.waterKind = sample?.kind ?? 'spring'; tile.dataset.waterDepth = sample ? sample.depthMeters.toFixed(2) : 'shallow'; }
+        }
         applySprite(
           tile,
-          bundle.config.colonyDepthEnabled===true?colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant):terrainCellSprite(terrain, variant),
+          bundle.config.colonyDepthEnabled===true
+            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', stableDecorHash(gx, gy) % 8, moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
+            : terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
-        tile.style.filter = night ? 'brightness(.78) saturate(.72)' : '';
-        tile.style.boxShadow = '';
-        delete tile.dataset.terrainDepth;
-        if (known && terrain === 'ground' && explorationCellKnown(bundle, gx, gy + 1)
-          && terrainForCell(bundle, gx, gy + 1) === 'water') {
-          tile.style.boxShadow = '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e';
-          tile.style.zIndex = '-90000';
-          tile.dataset.terrainDepth = 'raised-shore';
+        const filter = night ? 'brightness(.78) saturate(.72)' : '';
+        if (tile.style.filter !== filter) tile.style.filter = filter;
+        const moisture = moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000));
+        if (tile.dataset.moisture !== moisture) tile.dataset.moisture = moisture;
+        const raisedShore = groundShore !== 0;
+        if (raisedShore && tile.dataset.terrainDepth !== 'raised-shore') {
+          tile.style.boxShadow = bundle.config.colonyDepthEnabled === true ? '' : '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e'; tile.dataset.terrainDepth = 'raised-shore';
+        } else if (!raisedShore && tile.dataset.terrainDepth !== undefined) {
+          tile.style.boxShadow = ''; delete tile.dataset.terrainDepth;
         }
         if (known &&
           setWorldCenter(
@@ -789,6 +812,7 @@ export function createPhase1ProductReviewWorldRenderer(
         if (
           known
           && terrain === 'ground'
+          && bundle.config.colonyDepthEnabled !== true
           && decorativeFloraCell(gx, gy)
           && !withinDecorClearance(
             position,
@@ -937,7 +961,7 @@ export function createPhase1ProductReviewWorldRenderer(
         className: local
           ? 'p1-product-player'
           : 'p1-product-teammate',
-        zIndex: 900000,
+        zIndex: worldDepthOrder(movement.position),
         data: Object.freeze({
           actorState: state,
           facing: movement.facing ?? 'S',
@@ -949,6 +973,12 @@ export function createPhase1ProductReviewWorldRenderer(
     if(local){const skin=selectedPlayerSkin();if(player.dataset.skin!==skin){player.style.filter=skin==='pioneer'?'':playerSkinFilter(skin)+' drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef)';player.dataset.skin=skin;}}
 
     const equipment = bundle.equipment.getView(id);
+    if (equipment.equippedWeaponStackId !== null && state !== 'SPEAR_ATTACK' && state !== 'DEATH') {
+      const stack = bundle.items.getContainerView('inventory:' + id).stacks.find(s => s.stackId === equipment.equippedWeaponStackId);
+      const rarity = stack ? bundle.catalog.getAs(stack.itemDefinitionId, 'item').rarity : undefined;
+      const held = heldSpearSprite(phase1IsometricFacing(movement.facing), rarity);
+      renderSprite(held.sprite, movement.position, camera, 'held-weapon-overlay', id, { flipX: held.flipX, zIndex: worldDepthOrder(movement.position, 2), className: local ? 'p1-product-player' : 'p1-product-teammate', data: { actorState: state, rarity: rarity ?? 'common' } });
+    }
     if (equipment.equippedThermalWrapStackId !== null) {
       const overlayFrame = thermalWrapActorSprite(
         phase1IsometricFacing(movement.facing),
@@ -970,7 +1000,7 @@ export function createPhase1ProductReviewWorldRenderer(
           className: local
             ? 'p1-product-player'
             : 'p1-product-teammate',
-          zIndex: 900001,
+          zIndex: worldDepthOrder(movement.position, 1),
           data: Object.freeze({
             actorState: state,
           }),
@@ -1093,7 +1123,7 @@ export function createPhase1ProductReviewWorldRenderer(
         ...(telegraph
           ? {
               className: 'p1-product-predator-telegraph',
-              zIndex: 910000,
+              zIndex: worldDepthOrder(predator.position),
             }
           : {}),
         data: Object.freeze({
@@ -1157,32 +1187,65 @@ export function createPhase1ProductReviewWorldRenderer(
     visibleKeys.clear();
 
     const camera = bundle.getPlayerPosition(playerId);
+    const nextCameraDepth = Math.round((camera.x + camera.y) * 1000);
+    // The shared depth origin only prevents large-coordinate underflow; relative
+    // ordering does not depend on following each camera step. Rebase with 32 m
+    // hysteresis so motion does not invalidate every descendant's z-index at 60 Hz.
+    if (!Number.isFinite(cameraDepth) || Math.abs(nextCameraDepth - cameraDepth) > 32000) { cameraDepth = nextCameraDepth; worldStage.style.setProperty('--world-camera-depth', String(cameraDepth)); }
+    const living = bundle.livingWorld?.presentationSnapshot();
+    if (living && living.revision !== soilRevision) {
+      soilRevision = living.revision; soilMoistures.clear();
+      for (const f of living.forage) if (!f.cleared && f.growth) soilMoistures.set(Math.floor(f.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(f.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), f.growth.moisture);
+      for (const p of living.plots) soilMoistures.set(Math.floor(p.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(p.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), p.moisture);
+    }
     const offset = projectPhase1Isometric(camera, rasterOrigin);
     worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y) + 'px)';
     // Atmospheric cloud drift is screen-space; camera motion must not repaint
     // the full viewport backdrop on each simulation tick.
     layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
     const environment = bundle.worldStore.getEnvironmentView();
+    if (environment.brightness !== undefined) {
+      const brightness = Math.round(environment.brightness * 200) / 200;
+      if (worldStage.dataset.brightness !== String(brightness)) {
+        worldStage.dataset.brightness = String(brightness);
+      }
+      // An ancestor brightness filter re-rasterizes the entire moving SVG/DOM
+      // world when an actor changes. A screen-space black alpha layer gives the
+      // same RGB attenuation without putting the world inside a filter surface.
+      if (brightness < 1) {
+        const daylight = sceneElement('daylight');
+        daylight.style.cssText = 'position:absolute;inset:0;z-index:740000;pointer-events:none;background:rgba(0,0,0,' + String(1 - brightness) + ')';
+        daylight.dataset.worldLighting = 'calendar';
+        appendScene(daylight, true);
+      }
+      canvas.dataset.timeSegment = environment.timeSegment;
+      canvas.dataset.calendarDay = String(environment.dayIndex);
+    }
     const context = getPresentationContext();
     const regionalWeather=bundle.config.colonyDepthEnabled===true?colonyWeatherAt(bundle.config.worldSeed,camera,bundle.authorityTick):null;
     if(bundle.livingWorld)layer.dataset.livingSeason=bundle.livingWorld.season().id;
     const raining = regionalWeather === null ? environment.coldRainStatus === 'active' : regionalWeather.weather === 'mist-rain';
     if(regionalWeather!==null){
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
-      for(const site of colonySurveySites(bundle.config.worldSeed)){
+      for(const site of bundle.colonyDepth.sites()){
         if(!worldPositionKnown(bundle,site.position))continue;
-        renderSprite(colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:700000,data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED'})});
+        const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
+        if(rendered && site.template){
+          rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';
+          rendered.setAttribute('aria-label','Explore '+site.name);rendered.title='Explore '+site.name+' · approach to inspect';
+          rendered.style.clipPath='polygon(0 25%,100% 25%,100% 100%,0 100%)';
+        }
       }
     }
 
     renderTerrain(
       camera,
       bundle.authorityTick,
-      environment.dayPeriod === 'night',
+      environment.brightness === undefined && environment.dayPeriod === 'night',
       raining,
     );
 
-    if (environment.dayPeriod === 'night') {
+    if (environment.brightness === undefined && environment.dayPeriod === 'night') {
       const night = sceneElement('night');
       night.className = 'p1-product-night';
       night.dataset.dayPeriod = 'NIGHT';
@@ -1214,9 +1277,18 @@ export function createPhase1ProductReviewWorldRenderer(
         entity.entityId,
       );
       if(rendered!==null && entity.type==='resource' && bundle.config.colonyDepthEnabled===true){
+        // The authored 32×48 resource cell has transparent sky above a rock.
+        // Do not let that empty rectangle steal clicks from a crop behind it.
+        const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
+        if (size) rendered.style.clipPath = sizedResourceHitShape(entity.definitionId, size, bundle.worldStore.getResourceState(entity.entityId)?.depleted === true);
+        else if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
+        else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
         const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':name+' · approach to interact';
+        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);
+        if (size) rendered.dataset.resourceSize = size;
+        const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId, 'resource'), size);
+        rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':(size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' : '') + name + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's · approach to interact';
       }
 
       if (entity.type === 'ruin') {
@@ -1278,7 +1350,7 @@ export function createPhase1ProductReviewWorldRenderer(
       const pad = sceneElement('colony-site:' + site.id);
       pad.dataset.worldRole = site.id;
       pad.dataset.built = String(site.built);
-      if (!setWorldCenter(pad, site.position, camera, 52, 36, Math.round((site.position.x + site.position.y) * 1000), rasterOrigin)) continue;
+      if (!setWorldCenter(pad, site.position, camera, 52, 36, worldDepthOrder(site.position), rasterOrigin)) continue;
       pad.style.width = '52px'; pad.style.height = '36px';
       if (pad.childElementCount === 0) {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -1457,61 +1529,21 @@ export function createPhase1ProductReviewWorldRenderer(
     }
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
-    if (raining) {
-      const weather = sceneElement('weather:rain');
-      weather.className = 'p1-product-weather';
-      weather.dataset.weatherEffect = 'cold-rain';
-      const reducedMotion=targetWindow.matchMedia('(prefers-reduced-motion: reduce)').matches;weather.style.opacity=reducedMotion?'.12':targetWindow.innerWidth<850?'.16':'.24';
-      const rainTime=targetWindow.performance.now()*(reducedMotion?.25:1);const worldOffset=projectPhase1Isometric(camera,{x:0,y:0});
-      const driftX=Math.floor((rainTime*.012-worldOffset.x*.25)%32),driftY=Math.floor((rainTime*.07-worldOffset.y*.25)%48);
-      weather.style.inset='-48px';weather.style.transform='translate3d('+String(driftX)+'px,'+String(driftY)+'px,0)';weather.style.willChange='transform';
-      weather.dataset.rainMotionPhase=String(driftX)+':'+String(driftY);
-      if (rainFrames.length === 4) {
-        const frame = Math.floor(rainTime / 80) % 4;
-        if (spriteKeys.get(weather) !== 'rain-frame:' + String(frame)) {
-          weather.style.backgroundImage = 'url("' + rainFrames[frame]! + '")';
-          weather.style.backgroundSize = '640px 360px';
-          weather.style.backgroundRepeat = 'repeat';
-          spriteKeys.set(weather, 'rain-frame:' + String(frame));
-        }
-      } else for (let y = -32; y < INTERNAL_HEIGHT; y += 48) {
-        for (let x = -32; x < INTERNAL_WIDTH; x += 48) {
-          const hash = stableDecorHash(x, y);
-          if (hash % 3 === 0) continue;
-          const streak = sceneElement('weather:streak:' + String(x) + ':' + String(y));
-          applySprite(streak, coldRainSprite('RAIN_STREAK',
-            ((Math.floor(bundle.authorityTick / 6) + hash) % 4) as 0 | 1 | 2 | 3), 2);
-          streak.style.position = 'absolute';
-          streak.style.left = String(x + hash % 16) + 'px';
-          streak.style.top = String(y) + 'px';
-          if (streak.parentElement !== weather) weather.append(streak);
-        }
-      }
-      const atmosphere = sceneElement('weather:atmosphere');
-      atmosphere.dataset.weatherEffect = 'atmospheric-mass';
-      const drift = Math.floor(bundle.authorityTick / 90) % 64;
-      if (atmosphere.dataset.drift !== String(drift)) {
-      atmosphere.style.cssText = 'position:absolute;inset:-64px;z-index:790000;pointer-events:none;opacity:.12;'
-        + 'background-image:url("' + PHASE1_PRODUCTION_WORLD_SPRITES.weatherDither.url + '");'
-        + 'background-position:' + String(drift) + 'px ' + String(-drift) + 'px;'
-        + 'clip-path:polygon(0 0,42% 0,34% 18%,63% 34%,100% 12%,100% 52%,66% 70%,28% 48%,0 68%);';
-      atmosphere.dataset.drift = String(drift);
-      }
-      appendScene(atmosphere, true);
+    if (raining || regionalWeather?.weather === 'dry-wind') {
+      const kind = raining ? 'rain' : 'dry-wind';
+      const weather = sceneElement('weather:particles');
+      weather.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none';
+      weather.dataset.weatherEffect = raining ? 'cold-rain' : 'dry-wind';
+      if (particleHost.parentElement !== weather) weather.append(particleHost);
+      particles.render(kind, targetWindow.performance.now() / 1000, projectPhase1Isometric(camera, rasterOrigin), motionPreference.matches);
+      weather.dataset.rainMotionPhase = particles.canvas.dataset.particlePhase;
       appendScene(weather, true);
-    }
-
-    if (regionalWeather?.weather === 'dry-wind') {
-      const dust = sceneElement('weather:dust');
-      dust.dataset.weatherEffect = 'dry-wind';
-      const drift = Math.floor(bundle.authorityTick / 8) % 128;
-      if (dust.dataset.drift !== String(drift)) {
-        dust.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none;opacity:.22;'
-          + 'background-image:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27128%27 height=%27128%27 shape-rendering=%27crispEdges%27%3E%3Cg fill=%27%23dfb575%27%3E%3Cpath d=%27M8 16h12v2H8zM60 38h7v1h-7zM92 74h16v2H92zM34 110h8v1h-8z%27/%3E%3C/g%3E%3C/svg%3E");'
-          + 'background-position:' + String(drift) + 'px 0;image-rendering:pixelated;';
-        dust.dataset.drift = String(drift);
+      if (raining) {
+        const haze = sceneElement('weather:atmosphere');
+        haze.dataset.weatherEffect = 'atmospheric-mass';
+        haze.style.cssText = 'position:absolute;inset:0;z-index:780000;pointer-events:none;background:linear-gradient(140deg,#9cbac20c,transparent 55%,#759ba00a)';
+        appendScene(haze, true);
       }
-      appendScene(dust, true);
     }
 
     // Remove only entities that actually leave the visible canonical scene.

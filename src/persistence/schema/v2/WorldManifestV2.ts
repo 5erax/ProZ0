@@ -31,6 +31,8 @@ export interface WorldManifestV2 {
   readonly seedDerivationVersion: string;
   readonly contentCompatibility: SaveContentCompatibilityV2;
   readonly environment: {
+    readonly resourceProfileVersion?: 1;
+    readonly calendarVersion?: 1;
     readonly activeTick: number;
     readonly cycleStartLocalMinute: number;
     readonly weatherEvents: readonly WeatherEventSaveV2[];

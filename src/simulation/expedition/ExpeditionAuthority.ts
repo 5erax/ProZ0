@@ -35,12 +35,14 @@ export interface ExpeditionCommand {
   readonly action:
     | 'plan'
     | 'move'
+    | 'replace'
     | 'deposit'
     | 'complete'
     | 'cancel'
     | 'dismantle'
     | 'relocate';
   readonly target: string;
+  readonly replacementDefinition?: string;
   readonly expectedBuildRevision?: number;
   readonly x?: number;
   readonly y?: number;
@@ -66,6 +68,7 @@ export interface ExpeditionServices {
   meal(playerId: string): boolean;
   weather(x: number, y: number): string;
   hostileNear(x: number, y: number): boolean;
+  siteShelter?(target: string): { readonly x: number; readonly y: number } | null;
 }
 export class ExpeditionAuthority {
   private readonly resting = new Map<
@@ -216,10 +219,11 @@ export class ExpeditionAuthority {
     const actor = this.actor(command.playerId);
     if (!actor.alive) return reject('PLAYER_DEAD');
     const facility = this.state.facilities.find((f) => f.id === command.target),
-      lab = command.target === 'landing-lab';
-    if (!facility && !lab) return reject('FACILITY_MISSING');
-    const x = lab ? 0 : facility!.x,
-      y = lab ? 0 : facility!.y;
+      lab = command.target === 'landing-lab',
+      siteShelter = command.action === 'rest' ? this.services.siteShelter?.(command.target) : null;
+    if (!facility && !lab && !siteShelter) return reject('FACILITY_MISSING');
+    const x = lab ? 0 : (facility ?? siteShelter)!.x,
+      y = lab ? 0 : (facility ?? siteShelter)!.y;
     if (Math.hypot(actor.x - x, actor.y - y) > 4) return reject('OUT_OF_RANGE');
     const inventory = this.items.getContainerView(
       'inventory:' + command.playerId,
@@ -229,7 +233,7 @@ export class ExpeditionAuthority {
     let next = this.state;
     let message: string;
     if (command.action === 'rest') {
-      if (!lab && facility?.definitionId !== 'camp-bed' && facility?.definitionId !== 'field-cabin')
+      if (!lab && !siteShelter && facility?.definitionId !== 'camp-bed' && facility?.definitionId !== 'field-cabin')
         return reject('BED_REQUIRED');
       if (this.resting.has(command.playerId)) return reject('ALREADY_RESTING');
       const survival = this.services.survival(command.playerId);
@@ -362,7 +366,7 @@ export class ExpeditionAuthority {
       return 'INVALID_POSITION';
     const assessment = this.buildings.assessPlacement(
       def.shape,
-      { mode: 'free', anchor: { x, y }, orientationQuarterTurns: orientation },
+      this.planIntent(definition, x, y, orientation),
       def.canonical === null,
     );
     if (typeof assessment === 'string') return assessment;
@@ -379,6 +383,20 @@ export class ExpeditionAuthority {
     )
       return 'PLAN_OVERLAP';
     return null;
+  }
+  public planPosition(definition: string, x: number, y: number, orientation: 0 | 1 | 2 | 3) {
+    if (![0, 1, 2, 3].includes(orientation)) return { x: NaN, y: NaN };
+    if (expeditionFacility(definition)?.canonical !== 'structure:habitat-room') return { x, y };
+    const offset = (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:landing-module'].connectorOffsetWorldUnits ?? 0)
+      + (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:habitat-room'].connectorOffsetWorldUnits ?? 0);
+    const landing = this.buildings.getStructure('structure-instance:landing-module')!;
+    const [dx, dy] = [[1, 0], [0, 1], [-1, 0], [0, -1]][orientation]!;
+    return { x: landing.position.x + dx! * offset, y: landing.position.y + dy! * offset };
+  }
+  private planIntent(definition: string, x: number, y: number, orientation: 0 | 1 | 2 | 3): PlacementIntent {
+    return expeditionFacility(definition)?.canonical === 'structure:habitat-room'
+      ? { mode: 'connector', targetConnectorId: 'connector:landing:' + ['east', 'south', 'west', 'north'][orientation]!, requestedOrientationQuarterTurns: orientation }
+      : { mode: 'free', anchor: { x, y }, orientationQuarterTurns: orientation };
   }
   public relocationInfo(target: string) {
     const facility = this.state.facilities.find((f) => f.id === target);
@@ -540,13 +558,14 @@ export class ExpeditionAuthority {
       return 'UNKNOWN_PLAYER';
     }
     if (!actor.alive) return 'PLAYER_DEAD';
-    if (Math.hypot(actor.x - x, actor.y - y) > 4) return 'OUT_OF_RANGE';
+    const position = this.planPosition(definition, x, y, orientation);
+    if (Math.hypot(actor.x - position.x, actor.y - position.y) > 4) return 'OUT_OF_RANGE';
     if (
       planId &&
       !this.state.plans.some((p) => p.id === planId && p.owner === playerId)
     )
       return 'PLAN_MISSING';
-    return this.spatial(definition, x, y, orientation, planId);
+    return this.spatial(definition, position.x, position.y, orientation, planId);
   }
   public craft(command: {
     id: string;
@@ -742,9 +761,9 @@ export class ExpeditionAuthority {
       if (!def) return reject('UNKNOWN_FACILITY');
       if (this.state.plans.length >= 32 || this.state.facilities.length >= 64)
         return reject('PLAN_LIMIT');
-      const x = command.x ?? NaN,
-        y = command.y ?? NaN,
-        orientation = command.orientation ?? 0;
+      const orientation = command.orientation ?? 0;
+      if (![0, 1, 2, 3].includes(orientation)) return reject('INVALID_POSITION');
+      const { x, y } = this.planPosition(def.id, command.x ?? NaN, command.y ?? NaN, orientation);
       if (Math.hypot(actor.x - x, actor.y - y) > 4)
         return reject('OUT_OF_RANGE');
       const reason = this.spatial(def.id, x, y, orientation);
@@ -768,9 +787,9 @@ export class ExpeditionAuthority {
         return reject('OUT_OF_RANGE');
       const def = expeditionFacility(plan.definitionId)!;
       if (command.action === 'move') {
-        const x = command.x ?? plan.x,
-          y = command.y ?? plan.y,
-          orientation = command.orientation ?? plan.orientation;
+        const orientation = command.orientation ?? plan.orientation;
+        if (![0, 1, 2, 3].includes(orientation)) return reject('INVALID_POSITION');
+        const { x, y } = this.planPosition(def.id, command.x ?? plan.x, command.y ?? plan.y, orientation);
         if (Math.hypot(actor.x - x, actor.y - y) > 4)
           return reject('OUT_OF_RANGE');
         const reason = this.spatial(def.id, x, y, orientation, plan.id);
@@ -782,6 +801,25 @@ export class ExpeditionAuthority {
           ),
         };
         message = 'PLAN_MOVED';
+      } else if (command.action === 'replace') {
+        const replacement = expeditionFacility(command.replacementDefinition ?? '');
+        if (!replacement) return reject('UNKNOWN_FACILITY');
+        if (replacement.id === def.id) return reject('SAME_BLUEPRINT_TYPE');
+        const { x, y } = this.planPosition(replacement.id, plan.x, plan.y, plan.orientation);
+        if (Math.hypot(actor.x - x, actor.y - y) > 4) return reject('OUT_OF_RANGE');
+        const reason = this.spatial(replacement.id, x, y, plan.orientation, plan.id);
+        if (reason) return reject(reason);
+        const paid: Record<string, number> = {}, outputs: { itemDefinitionId: string; quantity: number }[] = [];
+        for (const [itemDefinitionId, quantity] of Object.entries(plan.paid)) {
+          const kept = Math.min(quantity, replacement.costs.find(([id]) => id === itemDefinitionId)?.[1] ?? 0);
+          if (kept) paid[itemDefinitionId] = kept;
+          if (quantity > kept) outputs.push({ itemDefinitionId, quantity: quantity - kept });
+        }
+        const candidate = validateExpeditionState({ ...next, plans: next.plans.map(p => p.id === plan.id ? { ...p, definitionId: replacement.id, x, y, paid } : p) });
+        const result = this.items.commitColonyExchange({ operationId: command.id, playerId: command.playerId, expectedInventoryRevision: command.expectedInventoryRevision, inputs: [], outputs });
+        if (result.status === 'rejected') return reject(result.reason);
+        next = candidate;
+        message = 'PLAN_REPLACED';
       } else if (command.action === 'deposit') {
         const inventory = this.items.getContainerView(
           'inventory:' + command.playerId,
@@ -852,18 +890,14 @@ export class ExpeditionAuthority {
             actorPlayerId: command.playerId,
             definitionId: def.canonical,
             expectedBuildRevision: this.buildings.getBuildRevision(),
-            placement: {
-              mode: 'free',
-              anchor: { x: plan.x, y: plan.y },
-              orientationQuarterTurns: plan.orientation,
-            },
+            placement: this.planIntent(def.id, plan.x, plan.y, plan.orientation),
           });
           if (typeof reservation === 'string') return reject(reservation);
           const error = this.items.commitPrepaidConstruction({
             playerId: command.playerId,
             expectedInventoryRevision: command.expectedInventoryRevision,
             container: reservation.containerId
-              ? { containerId: reservation.containerId, kind: 'storage-crate' }
+              ? { containerId: reservation.containerId, kind: def.canonical === 'structure:atmospheric-water-condenser' ? 'machine-output' : 'storage-crate' }
               : null,
           });
           if (error) {

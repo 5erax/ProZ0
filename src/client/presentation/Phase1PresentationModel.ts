@@ -1,3 +1,7 @@
+import type { ItemRarity } from '../../content/livingworld/EquipmentContent';
+import type { ItemInspection } from './ItemInspection';
+import type { CharacterInspection } from './CharacterInspection';
+
 export type Phase1SemanticSeverity =
   | 'normal'
   | 'warning'
@@ -21,6 +25,8 @@ export interface Phase1CarryPresentation {
 }
 
 export interface Phase1EquipmentPresentation {
+  readonly rarity?: ItemRarity;
+  readonly stackId?: string;
   readonly name: string;
   readonly condition: number | null;
   readonly conditionMax: number | null;
@@ -41,6 +47,7 @@ export interface Phase1EquipmentSlotsPresentation {
 }
 
 export interface Phase1WorldPresentation {
+  readonly timeSegment?: string;
   readonly timeLabel: string;
   readonly dayPeriod: 'DAY' | 'NIGHT';
   readonly weatherLabel: string;
@@ -65,6 +72,10 @@ export interface Phase1ToastPresentation {
 }
 
 export interface Phase1InventoryItemPresentation {
+  readonly rarity?: ItemRarity;
+  readonly inspection?: ItemInspection;
+  readonly stackWeightKg?: number;
+  readonly stackBulk?: number;
   readonly id: string;
   readonly name: string;
   readonly quantity: number;
@@ -75,6 +86,8 @@ export interface Phase1InventoryItemPresentation {
 }
 
 export interface Phase1InventoryPanelPresentation {
+  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
+  readonly character?: CharacterInspection;
   readonly kind: 'inventory';
   readonly title: string;
   readonly items: readonly Phase1InventoryItemPresentation[];
@@ -94,6 +107,8 @@ export interface Phase1ContainerCapacityPresentation {
 }
 
 export interface Phase1ContainerPanelPresentation {
+  readonly equipment?: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'>;
+  readonly character?: CharacterInspection;
   readonly kind: 'container';
   readonly title: string;
   readonly playerItems: readonly Phase1InventoryItemPresentation[];

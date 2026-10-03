@@ -4,7 +4,7 @@ import {
   composePhase1SaveV2,
 } from '../../src/integration';
 import { createPhase1ContentCatalog } from '../../src/content';
-import { createLegacyPhase1ContentCatalog } from '../../src/content/phase1/Phase1Catalog';
+import { createLegacyPhase1ContentCatalog, createLivingV1ContentCatalog } from '../../src/content/phase1/Phase1Catalog';
 import {
   createPhase1SaveV2Compatibility,
   reconstructPhase1ReopenState,
@@ -139,4 +139,25 @@ it('known additive catalog upgrade preserves old terrain, inventory and clock; u
     await current?.destroy();
     await old.destroy();
   }
+});
+
+it('accepts the previously shipped 29-item living catalog, preserves IDs/state, and saves root items only with the new identity', async () => {
+  const old = await Phase1AuthorityBundle.create({ ...config, catalog: createLivingV1ContentCatalog(), singlePlayerExpeditionEnabled: true });
+  let upgraded: Phase1AuthorityBundle | null = null;
+  try {
+    for (let i = 0; i < 60; i++) await old.stepSolo();
+    const before = portable(old), catalog = createPhase1ContentCatalog(), policy = createPhase1SaveV2Compatibility(catalog, [3, 4]);
+    const result = reconstructPhase1ReopenState(before, policy);
+    expect(result.ok, JSON.stringify(result)).toBe(true); if (!result.ok) throw Error(result.message);
+    upgraded = await Phase1AuthorityBundle.create({ ...config, singlePlayerExpeditionEnabled: true, reopen: result.value });
+    expect(upgraded.livingWorld!.read()).toEqual(old.livingWorld!.read());
+    expect(upgraded.world.getActiveChunkViews().map(c => c.base)).toEqual(old.world.getActiveChunkViews().map(c => c.base));
+    expect(upgraded.items.commitColonyExchange({ operationId: 'fixture:root', playerId: 'solo', expectedInventoryRevision: upgraded.items.getContainerView('inventory:solo').revision, inputs: [], outputs: [{ itemDefinitionId: 'item:root-wild-grass', quantity: 1 }] }).status).toBe('committed');
+    const after = portable(upgraded);
+    expect(after.world.contentCompatibility).toEqual(catalog.compatibility);
+    const restored = reconstructPhase1ReopenState(after, policy);
+    expect(restored.ok).toBe(true); if (!restored.ok) throw Error(restored.message);
+    expect(restored.value.itemLedger).toEqual(upgraded.items.exportLedgerSnapshot());
+    expect(reconstructPhase1ReopenState({ ...after, world: { ...after.world, contentCompatibility: before.world.contentCompatibility } }, policy).ok).toBe(false);
+  } finally { await upgraded?.destroy(); await old.destroy(); }
 });

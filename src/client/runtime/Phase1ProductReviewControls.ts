@@ -72,6 +72,7 @@ export function createPhase1ProductReviewControls(
 
   const rows = Object.freeze([
     'MOVE · WASD / ARROWS',
+    ...(colonyDepth ? ['SHIFT · SPRINT · 8 STAMINA/SEC · FOOD DRAINS 25% FASTER', 'RIGHT CLICK · CANCEL PLACEMENT'] : []),
     'E · PICK UP / GATHER / RECOVER / MACHINE / WORKBENCH',
     'V · CONSUME / CANCEL CONSUME',
     'Q · EQUIP / UNEQUIP BASIC SPEAR',

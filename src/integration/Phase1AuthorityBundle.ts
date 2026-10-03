@@ -1,3 +1,5 @@
+import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
+import { isKnownMeleeEquipment } from '../content/livingworld/EquipmentContent';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
 import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
@@ -13,7 +15,7 @@ import {
 } from '../foundation';
 import { ColonySustenanceAuthority } from '../simulation/sustenance/ColonySustenanceAuthority';
 import { ColonyDepthAuthority, colonyStorageMultiplier } from '../simulation/colony/ColonyDepthAuthority';
-import { colonyWeatherAt } from '../world/phase2/ColonyRegions';
+import { colonyWeatherAt, colonyBiomeAt } from '../world/phase2/ColonyRegions';
 import {
   createPhase1ContentCatalog,
   type ContentCatalogV1,
@@ -365,6 +367,7 @@ export type Phase1RuinRewardClaimResult =
     };
 
 export interface Phase1AuthorityBundleConfig {
+  readonly resourceProfileVersion?: 1;
   readonly singlePlayerExpeditionEnabled?: boolean;
   readonly worldGenerationVersion?: number;
   readonly colonyDepthEnabled?: boolean;
@@ -406,6 +409,8 @@ export class Phase1AuthorityBundle {
 
   private readonly runtimes = new Map<PlayerId, AuthorityRuntime>();
   private readonly registeredSurvival = new Set<PlayerId>();
+  private readonly sprintingPlayers = new Set<PlayerId>();
+  private readonly exhaustedSprinters = new Set<PlayerId>();
   private readonly lastGatherResults = new Map<PlayerId, GatherTickResult>();
   private readonly lastConsumeResults = new Map<PlayerId, ConsumeTickResult>();
   private readonly lastDeathResults =
@@ -457,6 +462,7 @@ export class Phase1AuthorityBundle {
       completeRest:playerId=>survival.completeExpeditionRest(playerId),
       meal:playerId=>survival.applyExpeditionMeal(playerId),
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
+      siteShelter: target => this.colonyDepth.restShelter(target),
       hostileNear:(x,y)=>world.getActiveGeneratedEntities().some(e=>{if(e.type!=='hostile')return false;const predator=world.getPredator(e.entityId);return predator!==null&&predator.health>0&&Math.hypot(predator.position.x-x,predator.position.y-y)<8;}),
     }):null;
     this.livingWorld=this.expedition?new LivingWorldAuthority(items,this.expedition,{
@@ -465,13 +471,27 @@ export class Phase1AuthorityBundle {
       ground:(x,y,ignore)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>f.id!==ignore&&Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
       plotGround:(x,y)=>{const r=buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true);return typeof r==='string'?r:null;},
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
-      weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&s.itemDefinitionId==='item:basic-spear'&&(s.condition??0)>0);},
+      weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&isKnownMeleeEquipment(s.itemDefinitionId)&&(s.condition??0)>0);},
       cancelRest:id=>this.expedition!.cancelRest(id),
+      fishing: {
+        healthMilli: id => survival.getPlayerState(id).healthMilli,
+        water: (x,y) => world.isExploredWater({ x,y }),
+        clearLine: (from,to) => world.hasClearFishingLine(from,to),
+        habitat: (x,y) => Math.hypot(x - 34, y + 18) <= 9 ? 'pond' : colonyBiomeAt(config.worldSeed, { x,y }) === 'mist-marsh' ? 'marsh' : 'river',
+      },
     },config.reopen?.bundle.world.livingWorld):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
-    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
+    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false, config.colonyDepthEnabled===true && this.expedition && config.catalog?.has('item:compost') !== false ? {
+      generationVersion:config.reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
+      available:site=>{
+        if(!world.isExploredPosition(site.position))return false;
+        const structures=[...buildings.exportSnapshot().foothold.structures,...this.expedition!.read().facilities.filter(f=>f.canonicalStructureId===null).map(f=>({definitionId:expeditionFacility(f.definitionId)!.shape,position:{x:f.x,y:f.y},orientationQuarterTurns:f.orientation}))];
+        return !structures.some(s=>{const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[s.definitionId],size=s.orientationQuarterTurns%2===0?profile.footprint:{width:profile.footprint.depth,depth:profile.footprint.width};return Math.abs(s.position.x-site.position.x)<1.5+size.width/2 && Math.abs(s.position.y-site.position.y)<1.5+size.depth/2;});
+      },
+      cancelRest:playerId=>this.expedition!.cancelRest(playerId),
+    } : undefined);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
       multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)*(this.livingWorld?.renewal(position,definitionId)??1),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
@@ -536,6 +556,8 @@ export class Phase1AuthorityBundle {
       chunks: reopen?.chunks.map((entry) => entry.worldSlice) ?? [],
     });
     const worldStore = new Phase1WorldStore({
+      ...(config.resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+      ...(config.colonyDepthEnabled === true ? { calendarVersion: 1 as const } : {}),
       generationVersion: reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       worldSeed: config.worldSeed,
       catalog,
@@ -564,11 +586,12 @@ export class Phase1AuthorityBundle {
     };
     let buildings: Phase1BuildingWorld | null = null;
     let expedition: ExpeditionAuthority|null = null;
+    let capacityAuthority:ColonyDepthAuthority|null=null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
       expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
-      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
+      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5) || (capacityAuthority?.shelteredAt(position,authorityTickRef.value) ?? false),
       colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
@@ -609,7 +632,6 @@ export class Phase1AuthorityBundle {
         : { snapshot: reopenedProgression }),
     });
     const gatherCost = new DeferredGatherCostPort();
-    let capacityAuthority:ColonyDepthAuthority|null=null;
     const items = new Phase1ItemAuthority({
       ...(config.singlePlayerExpeditionEnabled===true?{playerCarryPolicy:EXPEDITION_PLAYER_CARRY}:{}),
       catalog,
@@ -713,6 +735,21 @@ export class Phase1AuthorityBundle {
       worldQuery: this.world,
       initialPlayerPosition: this.positions.get(playerId),
       initialPlayerFacing: reopened?.record.facing ?? 'E',
+      movementMultiplier: (input) => {
+        const moving = input.moveLeft !== input.moveRight || input.moveUp !== input.moveDown;
+        if (!input.sprint || !moving || this.config.colonyDepthEnabled !== true) {
+          this.sprintingPlayers.delete(playerId);
+          if (!input.sprint) this.exhaustedSprinters.delete(playerId);
+          return 1;
+        }
+        const survival = this.survival.getPlayerState(playerId);
+        if (this.exhaustedSprinters.has(playerId) && survival.staminaMilli >= 15000) this.exhaustedSprinters.delete(playerId);
+        const canSprint = !this.exhaustedSprinters.has(playerId) && this.survival.canSpendStamina(playerId, 1) && survival.foodMilli > 0 && survival.waterMilli > 0 && !this.expedition?.restStatus(playerId);
+        if (canSprint) { this.sprintingPlayers.add(playerId); return 1.6; }
+        this.exhaustedSprinters.add(playerId);
+        this.sprintingPlayers.delete(playerId);
+        return 1;
+      },
     });
     this.positions.bind(playerId, runtime);
     this.runtimes.set(playerId, runtime);
@@ -875,6 +912,7 @@ export class Phase1AuthorityBundle {
       const thermalWrapActive =
         this.equipment.isThermalWrapActive(playerId);
       this.survival.stepPlayer(playerId, authorityTick, {
+        sprinting: this.sprintingPlayers.has(playerId) && Math.hypot(this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.x, this.getRuntime(playerId).getSnapshot().player.resolvedVelocity.y) > 0,
         thermalTarget: this.livingWorld?.thermalTarget(this.positions.get(playerId),this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget,exposure.sheltered) ?? (this.config.colonyDepthEnabled === true && !exposure.sheltered ? colonyWeatherAt(this.config.worldSeed,this.positions.get(playerId),authorityTick).thermalTarget : exposure.thermalTarget),
         thermalWrapActive,
         carryState: inventory.playerWeightState ?? 'NORMAL',

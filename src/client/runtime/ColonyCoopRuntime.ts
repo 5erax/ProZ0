@@ -1,4 +1,5 @@
 import { COLONY_ACTIONS } from "../../simulation/sustenance/ColonySustenanceAuthority";
+import { installGameContextMenu } from '../input/GameContextMenu';
 import type { FacingDirection } from "../../simulation";
 import { phase1IsometricFacing } from "./Phase1IsometricProjection";
 import { createColonyAudio } from "../presentation/ColonyAudio";
@@ -1431,6 +1432,16 @@ export async function bootColonyCoop(
     const motions = connection.getPlayerMotions(),
       local = motions.find((p) => p.playerId === connection?.getPlayerId());
     if (!local) return;
+    if (scene.clock) {
+      const brightness = Math.round(scene.clock.brightness * 200) / 200;
+      if (worldLayer.dataset.brightness !== String(brightness)) {
+        worldLayer.style.filter = `brightness(${brightness})`;
+        worldLayer.dataset.brightness = String(brightness);
+      }
+      canvas.dataset.timeSegment = scene.clock.segment;
+      canvas.dataset.calendarDay = String(scene.clock.day);
+      region.title = `${String(Math.floor(scene.clock.minute / 60)).padStart(2, '0')}:${String(scene.clock.minute % 60).padStart(2, '0')} · ${scene.clock.segment} · Day ${scene.clock.day}`;
+    }
     const now = performance.now(),
       blend = 1 - Math.exp(-Math.min(now - lastFrame, 100) / 65);
     lastFrame = now;
@@ -1686,11 +1697,13 @@ export async function bootColonyCoop(
       }
   }
   connect();
+  const removeContextMenu = installGameContextMenu(root);
   render();
   document.title = "ProZ0 — Private colony co-op";
   return {
     destroy() {
       destroyed = true;
+      removeContextMenu();
       if (reconnectTimer) clearTimeout(reconnectTimer);
       clearInterval(inputTimer);
       cancelAnimationFrame(frame);

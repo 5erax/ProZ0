@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
+import { EXPEDITION_FACILITIES } from '../../src/content/singleplayer/ExpeditionContent';
 import { Phase1ItemAuthority } from '../../src/simulation/items';
 import { EXPEDITION_PLAYER_CARRY } from '../../src/simulation/items/ItemCapacity';
 import {
@@ -110,6 +111,60 @@ it('remote blueprint consumes escrow once, survives reconstruction, and becomes 
     true,
   );
   expect(rebuilt.getStructure(crate.structureId)).toEqual(crate);
+});
+it.each(EXPEDITION_FACILITIES)('$id can be planned without supplies and completed through material escrow', (def) => {
+  const f = fixture();
+  if (def.id === 'attached-habitat') { f.actor.x = 0; f.actor.y = 0; }
+  const inventoryBefore = f.items.exportLedgerSnapshot();
+  expect(f.command('matrix-plan', 'plan', def.id, { x: f.actor.x + 2, y: f.actor.y }).status).toBe('committed');
+  expect(f.items.exportLedgerSnapshot()).toEqual(inventoryBefore);
+  expect(f.command('matrix-early', 'complete', 'plan:matrix-plan').message).toBe('MATERIALS_MISSING');
+  expect(f.items.commitColonyExchange({ operationId: 'matrix-supplies', playerId: 'solo', expectedInventoryRevision: 0, inputs: [], outputs: def.costs.map(([itemDefinitionId, quantity]) => ({ itemDefinitionId, quantity })) }).status).toBe('committed');
+  expect(f.command('matrix-deposit', 'deposit', 'plan:matrix-plan').status).toBe('committed');
+  expect(f.command('matrix-finish', 'complete', 'plan:matrix-plan')).toEqual({ status: 'committed', message: 'FACILITY_COMPLETED' });
+  const facility = f.authority.read().facilities[0]!;
+  expect(f.authority.read().plans).toHaveLength(0);
+  expect(facility.definitionId).toBe(def.id);
+  if (def.canonical) {
+    const structure = f.buildings.getStructure(facility.canonicalStructureId!)!;
+    expect(structure.definitionId).toBe(def.canonical);
+    const reopened = new Phase1BuildingWorld(f.spatial, f.buildings.exportSnapshot(), true);
+    expect(reopened.getStructure(structure.structureId)).toEqual(structure);
+    if (structure.containerId) expect(f.items.getContainerView(structure.containerId).kind).toBe(def.id === 'colony-condenser' ? 'machine-output' : 'storage-crate');
+    if (def.id === 'attached-habitat') expect(f.buildings.exportSnapshot().foothold.connections).toHaveLength(1);
+  }
+});
+
+it('changing a funded blueprint keeps its identity and shared escrow, refunds surplus once and rejects blocked or stale changes', () => {
+  const f = fixture();
+  expect(f.command('cache', 'plan', 'supply-cache', { x: 102, y: 100 }).status).toBe('committed');
+  expect(f.command('deposit', 'deposit', 'plan:cache').status).toBe('committed');
+  const change: ExpeditionCommand = { id: 'change', action: 'replace', target: 'plan:cache', replacementDefinition: 'field-workbench', playerId: 'solo', expectedRevision: f.authority.read().revision, expectedInventoryRevision: f.items.getContainerView('inventory:solo').revision };
+  f.spatial.blocking = true;
+  const before = f.authority.read(), bag = f.items.exportLedgerSnapshot();
+  expect(f.authority.execute(change).status).toBe('rejected');
+  expect(f.authority.read()).toEqual(before); expect(f.items.exportLedgerSnapshot()).toEqual(bag);
+  f.spatial.blocking = false;
+  expect(f.authority.execute(change).message).toBe('PLAN_REPLACED');
+  expect(f.authority.read().plans[0]).toMatchObject({ id: 'plan:cache', definitionId: 'field-workbench', paid: { 'item:timber': 2 }, x: 102, y: 100 });
+  expect(f.items.getContainerView('inventory:solo').stacks.map(s => [s.itemDefinitionId, s.quantity])).toEqual([['item:plant-fiber', 2]]);
+  const after = f.items.exportLedgerSnapshot();
+  expect(f.authority.execute(change).message).toBe('PLAN_REPLACED');
+  expect(f.items.exportLedgerSnapshot()).toEqual(after);
+  expect(f.authority.execute({ ...change, id: 'stale' }).message).toBe('STALE_REVISION');
+  const reopened = new ExpeditionAuthority(f.items, f.buildings, () => f.actor, f.authority.read());
+  expect(reopened.execute(change).message).toBe('PLAN_REPLACED');
+  expect(f.command('unfinished', 'complete', 'plan:cache').message).toBe('MATERIALS_MISSING');
+});
+
+it('full inventory retains the original funded blueprint when a replacement would refund materials', () => {
+  const f = fixture();
+  expect(f.command('cache', 'plan', 'supply-cache', { x: 102, y: 100 }).status).toBe('committed');
+  expect(f.command('deposit', 'deposit', 'plan:cache').status).toBe('committed');
+  expect(f.items.commitColonyExchange({ operationId: 'fill', playerId: 'solo', expectedInventoryRevision: 1, inputs: [], outputs: [{ itemDefinitionId: 'item:metal-ore', quantity: 20 }, { itemDefinitionId: 'item:metal-ore', quantity: 12 }] }).status).toBe('committed');
+  const before = f.authority.read(), bag = f.items.exportLedgerSnapshot();
+  expect(f.command('change', 'replace', 'plan:cache', { replacementDefinition: 'field-workbench' }).status).toBe('rejected');
+  expect(f.authority.read()).toEqual(before); expect(f.items.exportLedgerSnapshot()).toEqual(bag);
 });
 it('cancel refunds once; a full bag or obstructed terrain leaves escrow intact', () => {
   const f = fixture();
