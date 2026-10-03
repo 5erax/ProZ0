@@ -36,7 +36,7 @@ S1 làm trước để thực thể nhiều state không lấn màn hình. S2 t�
 - S2: canonical early/growing/mature, finite ore, cut/uproot/transplant và save compatibility đã commit. Canonical ETA hiện khóa duration tại lúc cut; tưới local chưa làm thay đổi tốc độ canonical plant trong thời gian hồi (#222 còn seam cần nối).
 - S3: đất ẩm local version1/persist, 6 grass silhouettes, coherent tile variants và dry-wind warning/rise/peak/fall đã commit. Bản art toàn thể #242/FPS vẫn cần review S8.
 - S4: Hunt dùng weapon profile/cost/wear/cooldown theo player và persist đã commit e68c313. Sáu ô gear, bốn wearable/craft/passive effects, world/avatar/save/old-catalog đã commit 3aba05a. Domain 458 và browser 49 PASS; E2E gear/rarity/wearable PASS. Co-op wearable chưa triển khai theo phạm vi solo ưu tiên.
-- S5: 20 blueprint matrix PASS; footprint riêng version1 cho công trình mới, legacy giữ kích thước cũ; hoàn túi/hòm thật và replay/capacity/save PASS. Domain 461 và ba E2E PASS; đang chốt commit. Natural/FPS cuối và art facilities còn ở S8/#242.
-- S6: cave layout contract có mã nhưng chưa nối runtime; không tính là hang có thể chơi. S7 EN/VI mới phủ lobby, còn gameplay. S8 contract/final CI/FPS/deploy chưa thực hiện.
+- S5: 20 blueprint matrix PASS; footprint riêng version1 cho công trình mới, legacy giữ kích thước cũ; hoàn túi/hòm thật và replay/capacity/save PASS. Domain 461 và ba E2E PASS; đã commit 344a5dc. Natural/FPS cuối và art facilities còn ở S8/#242.
+- S6: cave layout và authority/query router bounded có mã; năm test collision/item/scope/state PASS. Chưa nối Bundle/Save V2/renderer/portal UI; không tính là hang có thể chơi. Có handoff D4.2 và cap death cache cần giải quyết trước khi bật. S7 EN/VI mới phủ lobby, còn gameplay. S8 contract/final CI/FPS/deploy chưa thực hiện.
 
 #244 và các feature issue vẫn OPEN đến tích hợp/deploy. #187/#199/human và Internet co-op giữ ngoài ưu tiên solo hiện tại. Không đóng toàn Phase2 bằng các checkpoint này.
