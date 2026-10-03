@@ -131,8 +131,10 @@ function createProductionWorldPreview(document: Document): HTMLElement {
 function meter(
   document: Document,
   presentation: Phase1MeterPresentation,
+  identity: 'health' | 'stamina' | 'food' | 'water' | 'temperature',
 ): HTMLElement {
   const row = createElement(document, 'div', 'p1-meter');
+  row.dataset.meter = identity;
   row.dataset.severity = presentation.severity;
   row.dataset.stateLabel = presentation.stateLabel;
   row.dataset.value = String(presentation.value);
@@ -1481,11 +1483,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const survival = createElement(this.document, 'section', 'p1-survival p1-box p1-context-hud');
     survival.dataset.region = 'survival';
     survival.append(
-      meter(this.document, state.health),
-      meter(this.document, state.stamina),
-      meter(this.document, state.food),
-      meter(this.document, state.water),
-      meter(this.document, state.temperature),
+      meter(this.document, state.health, 'health'),
+      meter(this.document, state.stamina, 'stamina'),
+      meter(this.document, state.food, 'food'),
+      meter(this.document, state.water, 'water'),
+      meter(this.document, state.temperature, 'temperature'),
     );
 
     const world = createElement(this.document, 'section', 'p1-world p1-box p1-context-hud');
