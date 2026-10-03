@@ -12,6 +12,8 @@ import {
 import type { Phase1ItemAuthority } from '../items';
 import { renewablePlant, forageGrowthView, plantGrowthView } from './PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
+import { FishingAuthority, type FishingServices } from './FishingAuthority';
 import type {
   ExpeditionAuthority,
   ExpeditionActor,
@@ -32,6 +34,7 @@ export interface LivingServices {
   weather(x: number, y: number): string;
   weapon(id: string): boolean;
   cancelRest(id: string): void;
+  fishing?: Pick<FishingServices, 'water' | 'clearLine' | 'habitat'> & { healthMilli(id: string): number };
 }
 export interface LivingCommand {
   id: string;
@@ -66,6 +69,7 @@ export interface LivingCommand {
 }
 export class LivingWorldAuthority {
   private state: LivingWorldState;
+  public readonly fishing: FishingAuthority;
   constructor(
     private readonly items: Phase1ItemAuthority,
     private readonly expedition: ExpeditionAuthority,
@@ -75,6 +79,14 @@ export class LivingWorldAuthority {
     this.state = validateLivingWorld(
       saved ?? emptyLivingWorld(services.tick()),
     );
+    this.fishing = new FishingAuthority(items, {
+      seed: services.seed, tick: () => services.tick(),
+      actor: id => ({ ...services.actor(id), healthMilli: services.fishing?.healthMilli(id) ?? 100000 }),
+      water: (x,y) => services.fishing?.water(x,y) ?? false,
+      clearLine: (from,to) => services.fishing?.clearLine(from,to) ?? false,
+      habitat: (x,y) => services.fishing?.habitat(x,y) ?? 'pond',
+      cancelRest: id => services.cancelRest(id),
+    }, this.state.fishing);
   }
   private snapshot: LivingWorldState | null = null;
   private reconcile() {
@@ -121,7 +133,9 @@ export class LivingWorldAuthority {
   }
   public read() {
     this.reconcile();
-    return structuredClone(this.state);
+    const state = structuredClone(this.state), fishing = this.fishing.read();
+    if (fishing) state.fishing = fishing;
+    return state;
   }
   public season() {
     return seasonAt(this.services.tick());
@@ -277,6 +291,7 @@ export class LivingWorldAuthority {
     };
   }
   public tick() {
+    this.fishing.tick();
     const tick = this.services.tick();
     if (tick - this.state.lastTick < 60) return;
     // No offline or unbounded catch-up: the bundle invokes this every active second.
@@ -633,7 +648,7 @@ export class LivingWorldAuthority {
       return s;
     };
     if (c.action === 'craft') {
-      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES].find((r) => r.id === c.target);
+      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES].find((r) => r.id === c.target);
       if (!r) return reject('UNKNOWN_RECIPE');
       if (r.station && !this.near(actor, r.station))
         return reject('NEARBY_STATION_REQUIRED');

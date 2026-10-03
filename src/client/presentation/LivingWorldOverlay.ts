@@ -12,6 +12,8 @@ import { LivingMotion } from './LivingMotion';
 import { worldDepthOrder } from './WorldDepth';
 import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
+import type { FishingCommand } from '../../simulation/livingworld/FishingAuthority';
 import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
 import type { LivingCommand } from '../../simulation/livingworld/LivingWorldAuthority';
 import {
@@ -60,6 +62,17 @@ export function createLivingWorldOverlay(
   markers.style.display = 'contents';
   worldStage.append(markers);
   const motion = new LivingMotion();
+  const fishingStatus = document.createElement('div'), fishingLabel = document.createElement('span'), reelButton = document.createElement('button'), cancelFishButton = document.createElement('button'), bobber = document.createElement('span');
+  fishingStatus.className = 'lw-fishing-status'; fishingStatus.hidden = true;
+  fishingStatus.style.cssText = 'position:absolute;bottom:150px;left:50%;transform:translateX(-50%);background:#102029ef;border:1px solid #90c1c5;padding:8px;pointer-events:auto;z-index:950000;max-width:85%;display:flex;gap:8px;align-items:center';
+  // Keep the DOM stable during the reaction window, including keyboard focus.
+  reelButton.textContent = 'Reel [Space]'; reelButton.type = 'button'; cancelFishButton.textContent = 'Cancel [Esc]'; cancelFishButton.type = 'button';
+  reelButton.onclick = () => fishingAction('reel'); cancelFishButton.onclick = () => fishingAction('cancel');
+  fishingStatus.append(fishingLabel, reelButton, cancelFishButton); layer.append(fishingStatus);
+  bobber.dataset.fishingBobber = 'true'; bobber.style.cssText = 'position:absolute;width:24px;height:16px;pointer-events:none';
+  bobber.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" shape-rendering="crispEdges"><path fill="none" stroke="#a9d9ce" d="m2 10 10-4 10 4-10 4z"/><path fill="#df875e" d="M10 4h4v4h-4z"/><path fill="#f0e2b8" d="M10 8h4v3h-4z"/></svg>';
+  bobber.hidden = true; markers.append(bobber);
+  style.textContent += '.lw-fishing-status[hidden]{display:none!important}.lw-fishing-status button{font:12px monospace;background:#263e47;border:1px solid #acc8c5;color:#e9eee0;padding:7px}.lw-fishing-status[data-phase=bite]{border-color:#d9d98c}.lw-fishing-status[data-phase=bite] span{font-weight:bold;color:#fff1ad}';
   layer.append(style, season, panel, ghost, hint);
   root.append(layer, menu);
   let opened = false,
@@ -68,6 +81,10 @@ export function createLivingWorldOverlay(
     focus = '',
     signature = '',
     placementRoot: string | null = null,
+    placingFishing = false,
+    fishFlashUntil = 0,
+    lastFishMessage = '',
+    fishingError = '',
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -82,6 +99,7 @@ export function createLivingWorldOverlay(
     opened = false;
     layer.style.zIndex = '15';
     placing = false;
+    placingFishing = false;
     ghost.hidden = true;
     hint.hidden = true;
     panel.hidden = true;
@@ -124,7 +142,27 @@ export function createLivingWorldOverlay(
       FIRE_LIT: 'Fire burning: stay within 4 m for warmth.',
       TANK_FILLED: 'Irrigation reservoir filled.',
       MISSING_INPUT: 'Bring the required materials.',
+      FISHING_ROD_REQUIRED: 'Craft a Field Fishing Rod first.',
+      FISHING_BAIT_REQUIRED: 'Craft or carry Plant Fishing Bait before casting.',
+      FISHING_WATER_REQUIRED: 'Choose explored water within 4 m.',
+      FISHING_LINE_BLOCKED: 'The line is blocked. Try a clear bank.',
+      FISHING_STAND_ON_BANK: 'Stand on dry bank ground before casting.',
+      FISHING_CAST: 'Bait cast. Stay still and watch for the bite.',
+      FISHING_WAIT_FOR_BITE: 'Wait for the bite before reeling.',
+      FISHING_STOCK_RECOVERING: 'Fish population depleted or reserved; let this area recover.',
+      FISHING_INTERRUPTED_MOVE: 'Fishing cancelled because you moved. The cast bait is spent.',
+      FISHING_INTERRUPTED_DAMAGE: 'Fishing cancelled because you took damage.',
+      FISHING_MISSED_BITE: 'The fish escaped. Reel within four seconds of the bite.',
+      FISHING_CANCELLED: 'Fishing cancelled. The cast bait is spent.',
+      TARGET_CAPACITY_WEIGHT: 'Too heavy to land the fish. Free bag space before the bite window closes.',
+      TARGET_CAPACITY_VOLUME: 'No room to land the fish. Free bag space before the bite window closes.',
     })[v] ?? v.replaceAll('_', ' ').toLowerCase();
+  const fishingAction = (action: FishingCommand['action'], extra: Partial<FishingCommand> = {}) => {
+    const result = authority.fishing.execute({ id: 'fish:' + crypto.randomUUID(), playerId: player, expectedRevision: authority.fishing.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:' + player).revision, action, ...extra });
+    feedback = result.message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(result.message.slice('FISHING_CAUGHT:'.length)).displayName : result.message.startsWith('NEED item:fishing-bait') ? 'Craft or carry Plant Fishing Bait before casting.' : statusText(result.message);
+    fishingError = result.status === 'rejected' ? feedback : '';
+    signature = ''; render(); return result.status === 'committed';
+  };
   const execute = (
     action: LivingCommand['action'],
     target: string,
@@ -173,6 +211,7 @@ export function createLivingWorldOverlay(
     hint.hidden = false;
     hint.textContent = 'Click explored dry ground within 4 m · Escape cancel';
   };
+  const startFishing = () => { close(); placing = true; placingFishing = true; hint.hidden = false; hint.textContent = 'Click explored water within 4 m · 1 bait per cast · Escape / right-click cancel'; };
   const growthText = (v: ReturnType<typeof forageGrowthView>) => v.stage === 'mature'
     ? 'Maximum growth reached · best yield ' + v.maximumYield + ' · ' + (v.condition === 'normal' ? 'Normal' : 'Needs water')
     : (v.stage === 'early' ? 'Early growth' : 'Growing') + ' · ' + (v.nextStageSeconds === null ? 'Growth paused: water needed' : 'Next stage ≈ ' + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? 'Needs water' : 'Normal') + ' · yield ' + v.harvestYield + '/' + v.maximumYield;
@@ -188,6 +227,20 @@ export function createLivingWorldOverlay(
       p = bundle.getPlayerPosition(player),
       s = authority.season(),
       inventory = bundle.items.getContainerView('inventory:' + player);
+    const fish = authority.fishing.session(player);
+    const message = authority.fishing.message(player);
+    if (message !== lastFishMessage) { lastFishMessage = message; fishFlashUntil = now + 4000; fishingError = ''; }
+    fishingStatus.hidden = !fish && now >= fishFlashUntil; bobber.hidden = !fish;
+    reelButton.hidden = !fish; cancelFishButton.hidden = !fish;
+    if (fish) {
+      const biting = bundle.authorityTick >= fish.biteTick;
+      fishingStatus.dataset.phase = biting ? 'bite' : 'waiting';
+      const label = (biting ? 'BITE! Reel within ' + Math.max(0, Math.ceil((fish.endTick - bundle.authorityTick) / 60)) + 's' : 'Waiting for a bite · stay still') + (fishingError ? ' · ' + fishingError : '');
+      if (fishingLabel.textContent !== label) fishingLabel.textContent = label;
+      reelButton.disabled = !biting;
+      const at = projectPhase1Isometric(fish, rasterOrigin);
+      bobber.style.left = 320 + at.x - 12 + 'px'; bobber.style.top = 180 + at.y - 8 + (biting ? Math.floor(bundle.authorityTick / 8) % 2 * 2 : 0) + 'px'; bobber.style.zIndex = worldDepthOrder(fish, 2);
+    } else if (message) fishingLabel.textContent = message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(message.slice('FISHING_CAUGHT:'.length)).displayName : statusText(message);
     season.dataset.season = s.id;
     if (root.dataset.livingSeason !== s.id) root.dataset.livingSeason = s.id;
     for (let i = 0; i < particles.length; i++) {
@@ -324,13 +377,19 @@ export function createLivingWorldOverlay(
           },
           p,
         ),
-        x = Math.round(point.x * 4) / 4,
-        y = Math.round(point.y * 4) / 4;
+        x = placingFishing ? Math.floor(point.x / 2) * 2 + 1 : Math.round(point.x * 4) / 4,
+        y = placingFishing ? Math.floor(point.y / 2) * 2 + 1 : Math.round(point.y * 4) / 4;
       ghost.hidden = false;
       ghost.style.left = cursor.x - base.left + 'px';
       ghost.style.top = cursor.y - base.top + 'px';
       ghost.dataset.x = String(x);
       ghost.dataset.y = String(y);
+      if (placingFishing) {
+        const reason = authority.fishing.assessCast(player,x,y), valid = reason === null;
+        ghost.dataset.valid = String(valid); ghost.style.borderColor = valid ? '#a8e1b3' : '#e89c83';
+        const population = authority.fishing.water(x,y) ? authority.fishing.population(x,y) : null;
+        hint.textContent = (reason ? statusText(reason) : 'Cast here · 1 bait') + (population ? ' · Fish ' + population.stock + '/' + population.capacity + (population.recoverySeconds === null ? '' : ' · next fish ≈ ' + population.recoverySeconds + 's') : '') + ' · Escape cancel';
+      }
     }
     if (!opened) return;
     const next = JSON.stringify([
@@ -340,6 +399,8 @@ export function createLivingWorldOverlay(
       Math.floor(p.y),
       feedback,
       focus,
+      state.revision,
+      authority.fishing.message(player),
     ]);
     if (next === signature) return;
     signature = next;
@@ -362,6 +423,9 @@ export function createLivingWorldOverlay(
       ),
     );
     const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
+    panel.append(button('Fish nearby water', startFishing));
+    const fishFeedback = authority.fishing.message(player);
+    if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length)).displayName : statusText(fishFeedback)));
     for (const rootItem of roots) panel.append(button('Replant ' + rootItem.displayName, () => {
       close(); placing = true; placementRoot = rootItem.id; hint.hidden = false;
       hint.textContent = 'Replant on explored ground within 4 m · Escape / right-click cancel';
@@ -544,11 +608,11 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length) + ' recipes',
+        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length) + ' recipes',
       ),
     );
     panel.append(craft);
-    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES]) {
+    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
       craft.append(a);
       const icon = document.createElement('span'),
@@ -591,7 +655,7 @@ export function createLivingWorldOverlay(
       !placing ||
       !(e.target instanceof Element) ||
       e.target.closest(
-        '.lw-panel,.lw-menu,.p1-ui,.p2-settings,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
+        '.lw-panel,.lw-menu,.lw-fishing-status,.p1-ui,.p2-settings,.p2-colony-controls,.sp-expedition-panel,[data-colony-settings]',
       )
     )
       return;
@@ -608,6 +672,11 @@ export function createLivingWorldOverlay(
     cursor = { x: e.clientX, y: e.clientY };
     signature = '';
     render();
+    if (placingFishing) {
+      if (fishingAction('cast', { x: Number(ghost.dataset.x), y: Number(ghost.dataset.y) })) close();
+      else hint.textContent = feedback + ' · choose another position';
+      return;
+    }
     if (
       execute(placementRoot ? 'replant' : 'till', placementRoot ?? 'ground', {
         x: Number(ghost.dataset.x),
@@ -621,9 +690,12 @@ export function createLivingWorldOverlay(
   const key = (e: KeyboardEvent) => {
     if (
       e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement
+      e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)
     )
       return;
+    if (authority.fishing.session(player) && (e.code === 'Escape' || (e.code === 'Space' && !opened && root.dataset.productReviewPanelOpen !== 'true' && root.dataset.colonySettingsOpen !== 'true'))) {
+      e.preventDefault(); e.stopImmediatePropagation(); fishingAction(e.code === 'Escape' ? 'cancel' : 'reel'); return;
+    }
     if (
       e.code === 'KeyF' &&
       !root.dataset.colonySettingsOpen?.includes('true')
@@ -701,7 +773,7 @@ export function createLivingWorldOverlay(
   return {
     open,
     close,
-    cancelPlacement: () => { if (placing) close(); },
+    cancelPlacement: () => { if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); },
     render,
     destroy: () => {
       root.removeEventListener('pointermove', pointer);

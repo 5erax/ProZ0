@@ -77,6 +77,8 @@ jobs:
             test-results/item-character-inspection/
             test-results/living-camera-world.png
             test-results/blueprint-replacement.png
+            test-results/river-ui/
+            test-results/fishing-ui/
           if-no-files-found: ignore
           retention-days: 30
 

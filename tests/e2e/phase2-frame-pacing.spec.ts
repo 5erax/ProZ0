@@ -10,7 +10,7 @@ import {
   validatePortableSaveBundleV2,
 } from "../../src/persistence";
 import { colonySurveySites } from "../../src/world/phase2/ColonyRegions";
-import { colonyRiverLandmarks } from '../../src/world/phase2/ColonyHydrology';
+import { colonyRiverLandmarks, colonyRiverTerrainAt } from '../../src/world/phase2/ColonyHydrology';
 
 test("full scene frame pacing: colony regions, recurring weather and moving authority preserve the accepted budget", async ({
   page,
@@ -53,6 +53,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       dayPeriod: 'night',
     },
     { name: 'river-crossing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day' },
+    { name: 'river-fishing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day', fishing: true },
     { name: 'legacy-v4-sized', position: { x: 18, y: 10 }, tick: 1, weather: 'clear', dayPeriod: 'day', generationVersion: 4 },
   ]) {
     const dbName = "p2-fps:" + scene.name;
@@ -72,12 +73,28 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     try {
       bundle.getRuntime("observer").relocatePlayer(scene.position);
       await bundle.stepSolo();
+      if (scene.fishing) {
+        const inventory = bundle.items.getContainerView('inventory:observer');
+        expect(bundle.items.commitColonyExchange({ operationId: 'fixture:fish-performance', playerId: 'observer', expectedInventoryRevision: inventory.revision, inputs: [], outputs: [{ itemDefinitionId: 'item:fishing-rod', quantity: 1 }, { itemDefinitionId: 'item:fishing-bait', quantity: 1 }] }).status).toBe('committed');
+        const center = { x: Math.floor(scene.position.x / 2) * 2 + 1, y: Math.floor(scene.position.y / 2) * 2 + 1 };
+        const authority = bundle.livingWorld!.fishing;
+        let water: { x: number; y: number } | undefined;
+        search: for (let dy = -12; dy <= 12; dy += 2) for (let dx = -12; dx <= 12; dx += 2) {
+          const bank = { x: center.x + dx, y: center.y + dy }; if (colonyRiverTerrainAt('p1-world-golden',bank) !== 'ground') continue;
+          bundle.getRuntime('observer').relocatePlayer(bank); await bundle.stepSolo();
+          water = [{ x: bank.x + 2, y: bank.y }, { x: bank.x - 2, y: bank.y }, { x: bank.x, y: bank.y + 2 }, { x: bank.x, y: bank.y - 2 }].find(p => authority.assessCast('observer',p.x,p.y) === null);
+          if (water) break search;
+        }
+        expect(water).toBeDefined();
+        expect(authority.execute({ id: 'fixture:active-cast', playerId: 'observer', expectedRevision: authority.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:observer').revision, action: 'cast', ...water! }).status).toBe('committed');
+      }
       request = composePhase1SaveV2(bundle, {
         nowUtc: "2026-09-30T00:00:00.000Z",
       });
     } finally {
       await bundle.destroy();
     }
+    const sceneTick = scene.fishing ? request.world.authorityTick : scene.tick;
     const save = {
       ...request,
       formatId: request.world.formatId,
@@ -85,9 +102,9 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       recordKind: "portable-bundle" as const,
       world: {
         ...request.world,
-        authorityTick: scene.tick,
-        environment: { ...request.world.environment, activeTick: scene.tick },
-        singlePlayerExpedition: { ...request.world.singlePlayerExpedition!, nextEventTick: scene.tick + 7200 },
+        authorityTick: sceneTick,
+        environment: { ...request.world.environment, activeTick: sceneTick },
+        singlePlayerExpedition: { ...request.world.singlePlayerExpedition!, nextEventTick: sceneTick + 7200 },
       },
     };
     // A labeled scene fixture accelerates weather setup; all measurements run the real game and authority.
@@ -169,6 +186,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     );
     await expect(page.locator('canvas')).toHaveAttribute('data-day-period', scene.dayPeriod);
     if (scene.name === 'river-crossing') await expect(page.locator('[data-world-role="terrain"][data-water-kind="river"]').first()).toBeVisible();
+    if (scene.fishing) await expect(page.locator('[data-fishing-bobber]')).toBeVisible();
     if(scene.weather==='dry-wind'){
       await expect(page.locator('[data-weather-effect="cold-rain"]')).toHaveCount(0);
       await expect(page.locator('[data-weather-effect="dry-wind"]')).toBeVisible();
@@ -259,6 +277,10 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       expect(report.p95Ms).toBeLessThanOrEqual(34);
       expect(report.authorityTicks).toBeGreaterThan(100);
       if (moving) expect(report.distance).toBeGreaterThan(0.2);
+      if (scene.fishing) {
+        if (moving) await expect(page.locator('[data-fishing-bobber]')).toBeHidden();
+        else await expect(page.locator('[data-fishing-bobber]')).toBeVisible();
+      }
     }
     for(const scale of [1,3]){
       await page.setViewportSize({width:640*scale,height:360*scale});

@@ -1126,6 +1126,22 @@ export class Phase1VerticalSliceWorldAdapter
     return this.isPositionBuildable(position)?1:0.7;
   }
 
+  /** Fishing reads canonical explored terrain, never presentation color or an unloaded chunk. */
+  public isExploredWater(position: WorldPosition): boolean {
+    return this.activeChunks.has(toChunkKey(fromWorldPosition(position))) && this.isPositionExplored(position) && !this.isPositionBuildable(position);
+  }
+  public hasClearFishingLine(from: WorldPosition, to: WorldPosition): boolean {
+    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / .2));
+    if (steps > 21) return false;
+    let prior = from;
+    for (let i = 1; i <= steps; i++) {
+      const point = createWorldPosition(from.x + (to.x - from.x) * i / steps, from.y + (to.y - from.y) * i / steps);
+      if (!this.isMovementPassable(point, { halfWidth: .05, halfDepth: .05 }) || this.blocksExpeditionMotion(prior, point, { halfWidth: .05, halfDepth: .05 })) return false;
+      prior = point;
+    }
+    return true;
+  }
+
   private isPositionBuildable(position: WorldPosition): boolean {
     if(this.options.colonyTerrainRulesEnabled)for(const structure of this.options.structures())if(positionInsideFootprint(position,structure.position,PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],structure.orientationQuarterTurns))return true;
     const view = this.activeChunks.get(toChunkKey(fromWorldPosition(position)));

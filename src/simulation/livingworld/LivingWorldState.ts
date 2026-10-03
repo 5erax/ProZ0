@@ -3,6 +3,7 @@ import {
   speciesDefinition,
   forageDefinition,
 } from '../../content/livingworld/LivingWorldContent';
+import { validateFishingState, type FishingState } from './FishingState';
 export interface LivingPlot {
   id: string;
   owner: string;
@@ -63,6 +64,7 @@ export interface LivingWorldState {
   forage: LivingForage[];
   stations: LivingStation[];
   receipts: { id: string; signature: string; message: string }[];
+  fishing?: FishingState;
 }
 export const emptyLivingWorld = (tick = 0): LivingWorldState => ({
   version: 1,
@@ -111,6 +113,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
   )
     throw Error('Invalid living world');
   const ids = new Set<string>();
+  if (s.fishing !== undefined) validateFishingState(s.fishing);
   for (const e of [...s.plots, ...s.animals, ...s.forage, ...s.stations]) {
     if (
       !e ||

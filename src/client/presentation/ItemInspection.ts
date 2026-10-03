@@ -1,6 +1,7 @@
 import type { ContentCatalogV1, ItemDefinitionV1 } from '../../content';
 import { CROPS, FORAGE, LIVING_RECIPES } from '../../content/livingworld/LivingWorldContent';
 import { LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { FISHING_RECIPES, FISH_SPECIES } from '../../content/livingworld/FishingContent';
 
 export interface ItemInspection {
   readonly purpose: string;
@@ -18,6 +19,8 @@ const specific: Readonly<Record<string, string>> = {
   'item:compost': 'Fertilize a cultivated plot to improve its fertility.',
   'item:raw-meat': 'A hunting ingredient. Cook or preserve it at the relevant station.',
   'item:raw-hide': 'A hunting ingredient. Process it into leather at a Tannery.',
+  'item:fishing-rod': 'Keep this rod and plant bait in your bag. Homestead → Fish nearby water, then click explored water within 4 m. Wait for the bite and reel with Space. Moving or taking damage interrupts fishing.',
+  'item:fishing-bait': 'One bait is used by a successful cast. Cancelling or missing the bite does not return it. Nearby water cells share a finite population that recovers during active world time.',
 };
 const categoryPurpose: Readonly<Record<ItemDefinitionV1['category'], string>> = {
   'raw-resource': 'A gathered material used in crafting or construction.',
@@ -55,10 +58,11 @@ export function inspectItem(catalog: ContentCatalogV1, id: string): ItemInspecti
   ];
   const recipes = [
     ...catalog.list('recipe').filter(r => r.inputs.some(i => i.itemId === id)).map(r => r.displayName),
-    ...[...LIVING_RECIPES, ...LIVING_ROOT_RECIPES].filter(r => r.costs.some(([i]) => i === id)).map(r => r.name),
+    ...[...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES].filter(r => r.costs.some(([i]) => i === id)).map(r => r.name),
   ];
   for (const recipe of catalog.list('recipe').filter(r => r.outputs.some(i => i.itemId === id))) sources.push('Craft ' + recipe.displayName + (recipe.requiredStationStructureId ? ' at ' + catalog.get(recipe.requiredStationStructureId).displayName : ' by hand'));
-  for (const recipe of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES].filter(r => r.output === id)) sources.push('Craft ' + recipe.name + (recipe.station ? ' at ' + recipe.station.replaceAll('-', ' ') : ' by hand'));
+  for (const recipe of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES].filter(r => r.output === id)) sources.push('Craft ' + recipe.name + (recipe.station ? ' at ' + recipe.station.replaceAll('-', ' ') : ' by hand'));
+  if (FISH_SPECIES.some(f => f.itemId === id)) sources.push('Fish explored water with a Field Fishing Rod and Plant Fishing Bait. Cook at a campfire; raw fish is not directly consumable.');
   const result = Object.freeze({ purpose: specific[id] ?? (id.startsWith('item:root-') ? 'A living wild-plant root for relocation and regrowth.' : categoryPurpose[item.category]), facts: Object.freeze(facts), sources: Object.freeze([...new Set(sources)]), recipes: Object.freeze([...new Set(recipes)]), canEquip: item.capabilities.includes('equippable') && (profile?.type === 'melee-weapon' || profile?.type === 'thermal-protection'), canConsume: item.capabilities.includes('consumable') && profile?.type === 'restore-stat' });
   definitions.set(id, result); return result;
 }

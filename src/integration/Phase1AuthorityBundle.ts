@@ -13,7 +13,7 @@ import {
 } from '../foundation';
 import { ColonySustenanceAuthority } from '../simulation/sustenance/ColonySustenanceAuthority';
 import { ColonyDepthAuthority, colonyStorageMultiplier } from '../simulation/colony/ColonyDepthAuthority';
-import { colonyWeatherAt } from '../world/phase2/ColonyRegions';
+import { colonyWeatherAt, colonyBiomeAt } from '../world/phase2/ColonyRegions';
 import {
   createPhase1ContentCatalog,
   type ContentCatalogV1,
@@ -470,6 +470,12 @@ export class Phase1AuthorityBundle {
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
       weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&s.itemDefinitionId==='item:basic-spear'&&(s.condition??0)>0);},
       cancelRest:id=>this.expedition!.cancelRest(id),
+      fishing: {
+        healthMilli: id => survival.getPlayerState(id).healthMilli,
+        water: (x,y) => world.isExploredWater({ x,y }),
+        clearLine: (from,to) => world.hasClearFishingLine(from,to),
+        habitat: (x,y) => Math.hypot(x - 34, y + 18) <= 9 ? 'pond' : colonyBiomeAt(config.worldSeed, { x,y }) === 'mist-marsh' ? 'marsh' : 'river',
+      },
     },config.reopen?.bundle.world.livingWorld):null;
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
