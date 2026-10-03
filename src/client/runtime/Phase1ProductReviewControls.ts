@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
 import { createColonySettings } from './ColonySettings';
 export interface Phase1ProductReviewControls {
   toggle(): void;
@@ -36,25 +38,25 @@ export function createPhase1ProductReviewControls(
 
   const hint = document.createElement('div');
   hint.className = 'p1-product-controls-hint';
-  hint.textContent = 'H · CONTROLS';
+  bindUiText(hint,"textContent",uiText("ui.5939517c"));
   layer.append(hint);
 
   const fullscreen = document.createElement('button');
   fullscreen.type = 'button';
   fullscreen.className = 'p1-fullscreen';
-  fullscreen.textContent = 'FULLSCREEN';
-  fullscreen.setAttribute('aria-label', 'Toggle fullscreen');
+  bindUiText(fullscreen,"textContent",'FULLSCREEN');
+  bindUiText(fullscreen,"aria-label",uiText("ui.7d698ce6"));
   fullscreen.style.cssText = 'position:absolute;right:8px;top:76px;pointer-events:auto;font:inherit;color:inherit;background:#0a0e16;border:1px solid #778094;padding:4px;cursor:pointer';
   const toggleFullscreen = async (): Promise<void> => {
     try {
       if (document.fullscreenElement !== null) await document.exitFullscreen();
       else await root.requestFullscreen();
     } catch {
-      fullscreen.textContent = 'FULLSCREEN UNAVAILABLE · USE F11';
+      bindUiText(fullscreen,"textContent",uiText("ui.56970fc8"));
     }
   };
   const updateFullscreen = (): void => {
-    fullscreen.textContent = document.fullscreenElement === null ? 'FULLSCREEN' : 'EXIT FULLSCREEN';
+    bindUiText(fullscreen,"textContent",document.fullscreenElement === null ? 'FULLSCREEN' : uiText("ui.acfe0046"));
   };
   fullscreen.addEventListener('click', () => { void toggleFullscreen(); });
   document.addEventListener('fullscreenchange', updateFullscreen);
@@ -63,34 +65,34 @@ export function createPhase1ProductReviewControls(
   const panel = document.createElement('section');
   panel.className = 'p1-product-controls-panel';
   panel.hidden = true;
-  panel.setAttribute('aria-label', 'Product Review controls');
+  bindUiText(panel,"aria-label",uiText("ui.9ae0296a"));
 
   const title = document.createElement('div');
   title.className = 'p1-product-controls-title';
-  title.textContent = 'PRODUCT REVIEW CONTROLS · H TO CLOSE';
+  bindUiText(title,"textContent",uiText("ui.ca993b84"));
   panel.append(title);
 
   const rows = Object.freeze([
-    'MOVE · WASD / ARROWS',
-    ...(colonyDepth ? ['SHIFT · SPRINT · 8 STAMINA/SEC · FOOD DRAINS 25% FASTER', 'RIGHT CLICK · CANCEL PLACEMENT'] : []),
-    'E · PICK UP / GATHER / RECOVER / MACHINE / WORKBENCH',
-    'V · CONSUME / CANCEL CONSUME',
-    'Q · EQUIP / UNEQUIP BASIC SPEAR',
-    'T · EQUIP / UNEQUIP THERMAL WRAP',
-    'SPACE · ATTACK',
-    'C · CRAFT · CLICK CRAFT / 1–6 · [ / ] OR PGUP / PGDN PAGE',
-    'INVENTORY · CLICK ITEM / ↑↓ SELECT · X EQUIP · G DROP',
-    'B · BUILD · TAB STRUCTURE · R ROTATE · ENTER PLACE',
-    'BUILD · CLICK FACILITY · PREPARE KIT · POINT & CLICK WORLD',
-    'HABITAT · CONNECTOR ARROWS · CLICK PLACE',
-    'I · INVENTORY · M · MAP · P · PROGRESSION',
-    'N · COLONY · GROW FOOD / CARE FOR GRAZER · E CAPTURE',
-    'ESC · CLOSE ACTIVE PANEL',
+    uiText("ui.899850d"),
+    ...(colonyDepth ? [uiText("ui.80757c8f"), uiText("ui.6be35005")] : []),
+    uiText("ui.d6c46050"),
+    uiText("ui.30f6de19"),
+    uiText("ui.3a381566"),
+    uiText("ui.76860a07"),
+    uiText("ui.efe9f674"),
+    uiText("ui.2099532b"),
+    uiText("ui.ca74032a"),
+    uiText("ui.7b047d93"),
+    uiText("ui.ba9ddea0"),
+    uiText("ui.e4d901e2"),
+    uiText("ui.e97743bb"),
+    uiText("ui.cf6a2b04"),
+    uiText("ui.3bcb9901"),
   ]);
   for (const text of rows) {
     const row = document.createElement('div');
     row.className = 'p1-product-controls-row';
-    row.textContent = text;
+    bindUiText(row,"textContent",text);
     panel.append(row);
   }
   layer.append(panel);

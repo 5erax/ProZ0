@@ -41,6 +41,7 @@ export interface LivingServices {
   canonicalRoots?: {
     get(id: string): {x:number;y:number;revision:number;cut:boolean;rootItemId:string} | null;
     commit(id: string, revision: number): string | null;
+    water?(id:string,revision:number):string|null;
   };
   fishing?: Pick<FishingServices, 'water' | 'clearLine' | 'habitat'> & { healthMilli(id: string): number };
 }
@@ -60,6 +61,7 @@ export interface LivingCommand {
     | 'water-forage'
     | 'uproot'
     | 'uproot-canonical'
+    | 'water-canonical'
     | 'replant'
     | 'hunt'
     | 'loot'
@@ -674,6 +676,14 @@ export class LivingWorldAuthority {
       for (const [id, q] of r.costs) consume(id, q);
       produce(r.output, r.quantity);
       message = 'CRAFTED';
+    } else if (c.action === 'water-canonical') {
+      const roots=this.services.canonicalRoots,target=roots?.get(c.target);
+      if(!roots?.water||!target)return reject('SOURCE_MISSING');
+      if(target.revision!==c.resourceRevision)return reject('STALE_RESOURCE_REVISION');
+      if(distance(target)>near)return reject('OUT_OF_RANGE');
+      next.soil??={version:1,patches:[]};
+      if(!wetSoilCell(next.soil,target,10000))return reject('SOIL_PATCH_CAPACITY');
+      consume('item:clean-water');commitWorld=()=>roots.water!(c.target,target.revision);message='WATERED';
     } else if (c.action === 'uproot-canonical') {
       const roots = this.services.canonicalRoots, target = roots?.get(c.target);
       if (!roots || !target) return reject('SOURCE_MISSING');

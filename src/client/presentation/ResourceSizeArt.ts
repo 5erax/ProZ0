@@ -10,6 +10,12 @@ export function sizedResourceHitShape(id: string, size: ResourceSize, depleted: 
   const rock = id === 'resource:stone-outcrop' || id === 'resource:metal-ore-node';
   const top = depleted ? tree ? 64 : 69 : tree ? [34, 20, 4][rank]! : rock ? [62, 55, 44][rank]! : 48 - rank * 5;
   const left = tree ? [14, 8, 0][rank]! : rock ? [21, 15, 8][rank]! : [16, 12, 8][rank]!;
+  if (rock && !depleted) {
+    // Match the native rock silhouette: its empty upper corners and ground shadow
+    // must not steal pointer input from a small plant behind/next to the deposit.
+    const right = 64 - left;
+    return 'polygon(' + [[left,72],[left+4,top+5],[33,top],[right,top+10],[right,74],[32,79]].map(([x,y]) => x!/64*100+'% '+y!/80*100+'%').join(',') + ')';
+  }
   return 'polygon(' + left / 64 * 100 + '% ' + top / 80 * 100 + '%,' + (64 - left) / 64 * 100 + '% ' + top / 80 * 100 + '%,' + (64 - left) / 64 * 100 + '% 100%,' + left / 64 * 100 + '% 100%)';
 }
 

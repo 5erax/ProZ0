@@ -1,3 +1,6 @@
+import { lobbyText } from '../localization/LobbyMessages';
+import { bindLocalized, locale, onLocaleChange, setLocale } from '../localization/Locale';
+import { coreText } from '../localization/CoreMessages';
 import { lastSavedReviewUrl } from "./Phase1SavedReview";
 import {
   normalizePilotEndpoint,
@@ -61,7 +64,7 @@ export function createGameLobby(root: HTMLElement) {
   brand.textContent = "PROZ0";
   const user = doc.createElement("button");
   user.type = "button";
-  user.textContent = "Đăng nhập";
+  user.textContent = lobbyText("login");
   user.addEventListener("click", () => {
     if (onPages) {
       target.location.assign(
@@ -72,18 +75,27 @@ export function createGameLobby(root: HTMLElement) {
     show(account ? "profile" : "login");
   });
   header.append(brand, user);
+  const language = doc.createElement('select');
+  language.dataset.localeChoice = 'true';
+  bindLocalized(language, 'aria-label', () => coreText('language'));
+  for (const [value, label] of [['en', 'English'], ['vi', 'Tiếng Việt']]) {
+    const option = doc.createElement('option'); option.value = value!; option.textContent = label!; language.append(option);
+  }
+  language.value = locale();
+  language.addEventListener('change', () => setLocale(language.value as 'en' | 'vi'));
+  header.append(language);
   const layout = doc.createElement("div");
   layout.className = "lobby-layout";
   const left = doc.createElement("section");
   left.className = "lobby-left";
   const eyebrow = doc.createElement("div");
   eyebrow.className = "lobby-eyebrow";
-  eyebrow.textContent = "EXPLORE · BUILD · BELONG";
+  eyebrow.textContent = lobbyText("eyebrow");
   const heading = doc.createElement("h1");
-  heading.textContent = "Một thế giới. Dấu chân của bạn.";
+  heading.textContent = lobbyText("heading");
   const pitch = doc.createElement("p");
   pitch.textContent =
-    "Hạ cánh giữa những mảnh đất lơ lửng. Dựng căn cứ đầu tiên và tìm điều gì đang chờ phía sau màn sương.";
+    lobbyText("pitch");
   const diagram = doc.createElement("div");
   diagram.className = "lobby-diagram";
   diagram.setAttribute("aria-hidden", "true");
@@ -98,7 +110,7 @@ export function createGameLobby(root: HTMLElement) {
   content.className = "lobby-content";
   const tabs = doc.createElement("nav");
   tabs.className = "lobby-tabs";
-  tabs.setAttribute("aria-label", "Chế độ chơi");
+  tabs.setAttribute("aria-label", lobbyText("modes"));
   const view = doc.createElement("div");
   view.className = "lobby-view";
   const status = doc.createElement("div");
@@ -106,9 +118,9 @@ export function createGameLobby(root: HTMLElement) {
   status.setAttribute("role", "status");
   const tabButtons: Record<string, HTMLButtonElement> = {};
   for (const [key, label] of [
-    ["single", "Single Player"],
-    ["multi", "Multiplayer"],
-    ["skins", "Skin"],
+    ["single", lobbyText("single")],
+    ["multi", lobbyText("multi")],
+    ["skins", lobbyText("skin")],
   ] as const) {
     const button = doc.createElement("button");
     button.type = "button";
@@ -131,17 +143,17 @@ export function createGameLobby(root: HTMLElement) {
   const footer = doc.createElement("footer");
   footer.className = "lobby-footer";
   const note = doc.createElement("span");
-  note.textContent = "Một mình hoặc cùng tối đa hai người bạn.";
+  note.textContent = lobbyText("note");
   const settings = doc.createElement("button");
   settings.type = "button";
-  settings.textContent = "Toàn màn hình";
+  settings.textContent = lobbyText("fullscreen");
   settings.addEventListener("click", () => {
     void (
       doc.fullscreenElement
         ? doc.exitFullscreen()
         : doc.documentElement.requestFullscreen()
     ).catch(() => {
-      status.textContent = "Trình duyệt chưa cho phép toàn màn hình";
+      status.textContent = lobbyText("fullscreenDenied");
     });
   });
   footer.append(note, settings);
@@ -193,15 +205,15 @@ export function createGameLobby(root: HTMLElement) {
       ...(data === undefined ? {} : { body: JSON.stringify(data) }),
     });
     const result = await response.json();
-    if (!response.ok) throw Error(result.error ?? "Không thể kết nối, thử lại");
+    if (!response.ok) throw Error(result.error ?? lobbyText("connectionError"));
     return result;
   };
   const run = (action: () => Promise<void>) => {
-    status.textContent = "Đang xử lý…";
+    status.textContent = lobbyText("processing");
     void action().catch((error) => {
       if (!destroyed)
         status.textContent =
-          error instanceof Error ? error.message : "Thử lại sau";
+          error instanceof Error ? error.message : lobbyText("retry");
     });
   };
   const enter = (details: ColonyRoomDetails) => {
@@ -246,7 +258,7 @@ export function createGameLobby(root: HTMLElement) {
         url.hash = "";
         const link = doc.createElement("a");
         link.href = url.href;
-        link.textContent = "Tiếp tục thế giới co-op đã lưu";
+        link.textContent = lobbyText("continueCoop");
         view.append(link);
       }
     } catch {
@@ -254,7 +266,7 @@ export function createGameLobby(root: HTMLElement) {
     }
   };
   const updateProfile = () => {
-    user.textContent = account ? account.username : "Đăng nhập";
+    user.textContent = account ? account.username : lobbyText("login");
     avatar.style.filter = playerSkinFilter(selectedPlayerSkin());
   };
   const auth = (kind: string) => {
@@ -262,22 +274,22 @@ export function createGameLobby(root: HTMLElement) {
       recover = kind === "recover";
     title(
       register
-        ? "Tạo tài khoản"
+        ? lobbyText("register")
         : recover
-          ? "Khôi phục tài khoản"
-          : "Đăng nhập",
+          ? lobbyText("recover")
+          : lobbyText("login"),
       register
-        ? "Lưu skin và quản lý phòng chơi của bạn."
+        ? lobbyText("accountHelp")
         : recover
-          ? "Dùng mã khôi phục đã nhận khi tạo tài khoản."
-          : "Single Player có thể chơi ngay; Multiplayer dùng tài khoản của bạn.",
+          ? lobbyText("recoveryHelp")
+          : lobbyText("loginHelp"),
     );
-    const username = field("username", "Tên đăng nhập");
+    const username = field("username", lobbyText("username"));
     username.autocomplete = "username";
     username.maxLength = 24;
     const password = field(
       "password",
-      recover ? "Mật khẩu mới" : "Mật khẩu",
+      recover ? lobbyText("newPassword") : lobbyText("password"),
       "password",
     );
     password.autocomplete =
@@ -285,18 +297,18 @@ export function createGameLobby(root: HTMLElement) {
     password.maxLength = 128;
     if (register || recover) {
       const help = doc.createElement("p");
-      help.textContent = "Mật khẩu tài khoản cần ít nhất 15 ký tự.";
+      help.textContent = lobbyText("passwordHelp");
       view.append(help);
     }
     const code = recover
-      ? field("recoveryCode", "Mã khôi phục", "password")
+      ? field("recoveryCode", lobbyText("recoveryCode"), "password")
       : null;
     const actions = doc.createElement("div");
     actions.className = "lobby-actions";
     view.append(actions);
     const submit = button(
       actions,
-      register ? "Tạo tài khoản" : recover ? "Đặt lại mật khẩu" : "Đăng nhập",
+      register ? lobbyText("register") : recover ? lobbyText("resetPassword") : lobbyText("login"),
       () => {
         submit.disabled = true;
         run(async () => {
@@ -322,11 +334,11 @@ export function createGameLobby(root: HTMLElement) {
               box.className = "lobby-recovery";
               const label = doc.createElement("p");
               label.textContent =
-                "Lưu mã này để khôi phục khi quên mật khẩu. Không chia sẻ với người khác.";
+                lobbyText("recoveryNotice");
               const text = doc.createElement("code");
               text.textContent = result.recoveryCode;
               box.append(label, text);
-              button(box, "Tải mã khôi phục", () => {
+              button(box, lobbyText("downloadCode"), () => {
                 const blob = new Blob(
                     [
                       "ProZ0 account: " +
@@ -347,7 +359,7 @@ export function createGameLobby(root: HTMLElement) {
               view.append(box);
               button(
                 view,
-                "Tôi đã lưu mã · Tiếp tục",
+                lobbyText("codeSaved"),
                 () => show("multi"),
                 true,
               );
@@ -363,25 +375,25 @@ export function createGameLobby(root: HTMLElement) {
     switches.className = "lobby-auth-switch";
     view.append(switches);
     if (!register)
-      button(switches, "Tạo tài khoản mới", () => show("register"));
+      button(switches, lobbyText("newAccount"), () => show("register"));
     if (kind !== "login")
-      button(switches, "Đã có tài khoản", () => show("login"));
-    if (!recover) button(switches, "Quên mật khẩu", () => show("recover"));
+      button(switches, lobbyText("existingAccount"), () => show("login"));
+    if (!recover) button(switches, lobbyText("forgotPassword"), () => show("recover"));
   };
   const roomForm = (kind: "create" | "join" | "manage", room?: Room) => {
     title(
       kind === "create"
-        ? "Tạo phòng"
+        ? lobbyText("createRoom")
         : kind === "manage"
-          ? "Quản lý phòng"
-          : "Vào phòng",
+          ? lobbyText("manageRoom")
+          : lobbyText("joinRoom"),
       kind === "manage"
-        ? "Đổi tên hoặc mật mã. Tiến độ thế giới vẫn được giữ."
-        : "Phòng riêng cho bạn và tối đa hai người bạn.",
+        ? lobbyText("editRoomHelp")
+        : lobbyText("roomHelp"),
     );
     const name = field(
       "roomName",
-      "Tên phòng",
+      lobbyText("roomName"),
       "text",
       room?.name ?? new URLSearchParams(location.search).get("room") ?? "",
     );
@@ -389,8 +401,8 @@ export function createGameLobby(root: HTMLElement) {
     const password = field(
       "roomPassword",
       kind === "manage"
-        ? "Mật mã mới (để trống nếu giữ nguyên)"
-        : "Mật mã phòng",
+        ? lobbyText("optionalPassword")
+        : lobbyText("roomPassword"),
       "password",
     );
     password.maxLength = 64;
@@ -400,10 +412,10 @@ export function createGameLobby(root: HTMLElement) {
     const submit = button(
       actions,
       kind === "create"
-        ? "Tạo phòng và vào game"
+        ? lobbyText("createAndJoin")
         : kind === "manage"
-          ? "Lưu thay đổi"
-          : "Vào game",
+          ? lobbyText("saveChanges")
+          : lobbyText("play"),
       () => {
         submit.disabled = true;
         run(async () => {
@@ -420,7 +432,7 @@ export function createGameLobby(root: HTMLElement) {
             password.value = "";
             if (kind === "manage") {
               show("multi");
-              status.textContent = "Đã cập nhật phòng";
+              status.textContent = lobbyText("roomUpdated");
             } else enter(result);
           } finally {
             submit.disabled = false;
@@ -429,12 +441,12 @@ export function createGameLobby(root: HTMLElement) {
       },
       true,
     );
-    button(actions, "Quay lại", () => show("multi"));
+    button(actions, lobbyText("back"), () => show("multi"));
     if (kind === "manage")
-      button(view, "Xóa phòng", () => {
+      button(view, lobbyText("deleteRoom"), () => {
         if (
           !target.confirm(
-            "Xóa vĩnh viễn thế giới này? Xuất bản sao lưu trong game trước và để mọi người rời phòng.",
+            lobbyText("deleteConfirm"),
           )
         )
           return;
@@ -442,17 +454,17 @@ export function createGameLobby(root: HTMLElement) {
           await call("/lobby/rooms/" + room!.id, "DELETE");
           target.localStorage.removeItem(roomStorageKey(endpoint, room!.id));
           show("multi");
-          status.textContent = "Đã xóa phòng";
+          status.textContent = lobbyText("roomDeleted");
         });
       });
   };
   const multiplayer = () => {
     title(
-      "Cùng nhau đặt chân đến ProZ0",
-      "Tạo phòng bằng tên và mật mã, hoặc vào phòng của bạn bè.",
+      lobbyText("coopHeading"),
+      lobbyText("coopHelp"),
     );
     if (!account) {
-      button(view, "Đăng nhập để chơi Multiplayer", () => show("login"), true);
+      button(view, lobbyText("coopLogin"), () => show("login"), true);
       legacyWorlds();
       return;
     }
@@ -461,7 +473,7 @@ export function createGameLobby(root: HTMLElement) {
     view.append(actions);
     button(
       actions,
-      "Tạo phòng",
+      lobbyText("createRoom"),
       () => {
         view.replaceChildren();
         status.textContent = "";
@@ -469,13 +481,13 @@ export function createGameLobby(root: HTMLElement) {
       },
       true,
     );
-    button(actions, "Vào bằng tên phòng", () => {
+    button(actions, lobbyText("joinByName"), () => {
       view.replaceChildren();
       status.textContent = "";
       roomForm("join");
     });
     const list = doc.createElement("div");
-    list.setAttribute("aria-label", "Danh sách phòng");
+    list.setAttribute("aria-label", lobbyText("rooms"));
     view.append(list);
     legacyWorlds();
     const serial = ++requestSerial;
@@ -485,7 +497,7 @@ export function createGameLobby(root: HTMLElement) {
       status.textContent = "";
       if (!result.rooms.length) {
         const p = doc.createElement("p");
-        p.textContent = "Chưa có phòng. Tạo một phòng để bắt đầu cùng bạn bè.";
+        p.textContent = lobbyText("noRooms");
         list.append(p);
       }
       for (const room of result.rooms as Room[]) {
@@ -496,26 +508,26 @@ export function createGameLobby(root: HTMLElement) {
           meta = doc.createElement("small");
         name.textContent = room.name;
         meta.textContent = room.owned
-          ? "Phòng của bạn · tối đa 3 người"
-          : "Phòng riêng · tối đa 3 người";
+          ? lobbyText("ownedRoom")
+          : lobbyText("privateRoom");
         info.append(name, meta);
         const controls = doc.createElement("div");
         row.append(info, controls);
         if (room.owned) {
-          button(controls, "Tiếp tục", () =>
+          button(controls, lobbyText("continue"), () =>
             run(async () =>
               enter(
                 await call("/lobby/rooms/" + room.id + "/continue", "POST", {}),
               ),
             ),
           );
-          button(controls, "Quản lý", () => {
+          button(controls, lobbyText("manage"), () => {
             view.replaceChildren();
             status.textContent = "";
             roomForm("manage", room);
           });
         } else
-          button(controls, "Vào phòng", () => {
+          button(controls, lobbyText("joinRoom"), () => {
             view.replaceChildren();
             status.textContent = "";
             roomForm("join", room);
@@ -534,20 +546,20 @@ export function createGameLobby(root: HTMLElement) {
     if (["login", "register", "recover"].includes(kind)) auth(kind);
     else if (kind === "single") {
       title(
-        "Single Player",
-        "Bắt đầu hành trình của riêng bạn. Tiến độ được lưu trong trình duyệt này.",
+        lobbyText("single"),
+        lobbyText("soloHelp"),
       );
       const actions = doc.createElement("div");
       actions.className = "lobby-actions";
       view.append(actions);
-      const seedInput=field('worldSeed','Seed thế giới · để trống để tạo ngẫu nhiên');seedInput.maxLength=128;seedInput.placeholder='Ví dụ: mist-expedition-01';seedInput.dataset.singlePlayerSeed='true';
-      const seedHelp=doc.createElement('p');seedHelp.textContent='Cùng seed tạo cùng địa hình và tài nguyên ban đầu. Mỗi thế giới mới có bản lưu riêng; Tiếp tục giữ nguyên seed và tiến độ.';view.append(seedHelp);
+      const seedInput=field('worldSeed',lobbyText("seed"));seedInput.maxLength=128;seedInput.placeholder=lobbyText("seedExample");seedInput.dataset.singlePlayerSeed='true';
+      const seedHelp=doc.createElement('p');seedHelp.textContent=lobbyText("seedHelp");view.append(seedHelp);
       const saved = lastSavedReviewUrl(target);
       if (saved) {
         const link = doc.createElement("a");
         link.href = saved;
         link.className = "lobby-primary";
-        link.textContent = "Tiếp tục thế giới";
+        link.textContent = lobbyText("continueSolo");
         link.dataset.continuePhase1Review = "true";
         actions.append(link);
         const upgraded = new URL(saved);
@@ -557,14 +569,14 @@ export function createGameLobby(root: HTMLElement) {
           upgraded.searchParams.set("proz0Mode", "phase2-colony-review");
           const upgrade = doc.createElement("a");
           upgrade.href = upgraded.href;
-          upgrade.textContent = "Nâng cấp thế giới Colony";
+          upgrade.textContent = lobbyText("upgrade");
           upgrade.dataset.upgradeColonyReview = "true";
           actions.append(upgrade);
         }
       }
       const start = button(
         actions,
-        "Bắt đầu thế giới mới",
+        lobbyText("start"),
         () => {
           const id = target.crypto.randomUUID(),
             url = new URL(location.href);
@@ -586,8 +598,8 @@ export function createGameLobby(root: HTMLElement) {
     } else if (kind === "multi") multiplayer();
     else if (kind === "skins") {
       title(
-        "Skin",
-        "Chọn bộ đồ cho chuyến thám hiểm. Skin chỉ thay đổi hình ảnh.",
+        lobbyText("skin"),
+        lobbyText("skinHelp"),
       );
       const choices = doc.createElement("div");
       choices.className = "lobby-skins";
@@ -629,19 +641,19 @@ export function createGameLobby(root: HTMLElement) {
       if (!account) {
         const p = doc.createElement("p");
         p.textContent =
-          "Skin hiện lưu trên thiết bị này. Đăng nhập để lưu theo tài khoản.";
+          lobbyText("skinLocal");
         view.append(p);
       }
     } else if (kind === "profile") {
-      title(account!.username, "Tài khoản của bạn");
+      title(account!.username, lobbyText("account"));
       const name = field(
         "displayName",
-        "Tên hiển thị trong phòng",
+        lobbyText("displayName"),
         "text",
         account!.displayName ?? account!.username,
       );
       name.maxLength = 48;
-      button(view, "Lưu tên hiển thị", () =>
+      button(view, lobbyText("saveName"), () =>
         run(async () => {
           const result = await call("/auth/profile", "POST", {
             displayName: name.value,
@@ -649,11 +661,11 @@ export function createGameLobby(root: HTMLElement) {
           account = result.account as Account;
           updateProfile();
           status.textContent =
-            "Đã lưu tên hiển thị; áp dụng khi vào lại phòng.";
+            lobbyText("nameSaved");
         }),
       );
-      button(view, "Chọn skin", () => show("skins"));
-      button(view, "Đăng xuất", () =>
+      button(view, lobbyText("chooseSkin"), () => show("skins"));
+      button(view, lobbyText("logout"), () =>
         run(async () => {
           await call("/auth/logout", "POST", {});
           account = null;
@@ -662,9 +674,24 @@ export function createGameLobby(root: HTMLElement) {
         }),
       );
     } else if (kind === "recovery-code")
-      title("Giữ mã khôi phục", "Tài khoản đã sẵn sàng.");
+      title(lobbyText("keepCode"), lobbyText("accountReady"));
   }
   updateProfile();
+  const stopLocale = onLocaleChange(() => {
+    // Preserve unsubmitted input and selection; labels do not become profile data.
+    const focused = doc.activeElement instanceof HTMLInputElement ? doc.activeElement.name : null;
+    const inputs = Array.from(view.querySelectorAll('input')).map(input => ({ name: input.name, value: input.value, start: input.selectionStart, end: input.selectionEnd }));
+    eyebrow.textContent = lobbyText('eyebrow'); heading.textContent = lobbyText('heading'); pitch.textContent = lobbyText('pitch'); note.textContent = lobbyText('note'); settings.textContent = lobbyText('fullscreen');
+    tabs.setAttribute('aria-label', lobbyText('modes'));
+    for (const [id, button] of Object.entries(tabButtons)) button.textContent = lobbyText(id === 'skins' ? 'skin' : id);
+    updateProfile(); show(active);
+    for (const saved of inputs) {
+      const input = Array.from(view.querySelectorAll('input')).find(input => input.name === saved.name);
+      if (!input) continue;
+      input.value = saved.value;
+      if (saved.name === focused) { input.focus(); if (saved.start !== null) input.setSelectionRange(saved.start, saved.end); }
+    }
+  });
   const intent = new URLSearchParams(location.search).get("proz0Lobby");
   show(
     intent === "login"
@@ -685,6 +712,7 @@ export function createGameLobby(root: HTMLElement) {
       .catch(() => {});
   return {
     destroy() {
+      stopLocale();
       destroyed = true;
       root.replaceChildren();
       root.dataset.runtimeStatus = "stopped";

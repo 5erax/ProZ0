@@ -1,3 +1,4 @@
+import { canonicalUiPhrase } from '../localization/UiMessages';
 import { WEARABLE_PROFILES } from '../../content/livingworld/WearableContent';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
 import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
@@ -6,6 +7,7 @@ import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
 const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
 export interface Phase1ProductionSprite {
+  readonly footOffsetY?: number;
   readonly assetPath: string;
   readonly url: string;
   readonly cellWidth: number;
@@ -263,6 +265,7 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
+  name = canonicalUiPhrase(name);
   const wearable = WEARABLE_PROFILES.find(p => p.id === name || p.name === name);
   if (wearable) {
     const shapes = {

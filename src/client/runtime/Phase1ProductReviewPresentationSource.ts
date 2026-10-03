@@ -1,3 +1,4 @@
+import { uiText } from '../localization/UiMessages';
 import type {
   CommandResultV1,
   PlayerMotionViewV1,
@@ -519,7 +520,7 @@ export class Phase1ProductReviewPresentationSource
         equipment.equippedThermalWrapStackId,
       quickUseStackId,
       environment: this.bundle.worldStore.getEnvironmentView(),
-      ...(regionalWeather===null?{}:{weatherOverride:{label:regionalWeather.warning?'WEATHER · FORECAST':regionalWeather.weather.replaceAll('-',' ').toUpperCase(),state:regionalWeather.warning?'FORECAST' as const:regionalWeather.weather==='clear'?'CLEAR' as const:'ACTIVE' as const}}),
+      ...(regionalWeather===null?{}:{weatherOverride:{label:regionalWeather.warning?uiText("ui.2d5538af"):regionalWeather.weather.replaceAll('-',' ').toUpperCase(),state:regionalWeather.warning?'FORECAST' as const:regionalWeather.weather==='clear'?'CLEAR' as const:'ACTIVE' as const}}),
       progression: this.bundle.progression.getPlayerView(this.playerId),
       playerMotions: this.getPlayerMotions(),
       commandFeedback: this.commandFeedback,
@@ -540,9 +541,9 @@ export class Phase1ProductReviewPresentationSource
       projected.firstActionCue === null
       || projected.firstActionCue === undefined
         ? projected.firstActionCue
-        : this.interactionOverride.state === 'AVAILABLE'
-          && this.interactionOverride.verb === 'GATHER'
-          ? 'FIRST STEP · [E] GATHER · '
+        : this.interactionOverride.state === uiText("ui.ef7a53b8")
+          && this.interactionOverride.verb === uiText("ui.94c2b2ca")
+          ? uiText("ui.38b0f809")
             + this.interactionOverride.target
           : projected.firstActionCue;
 

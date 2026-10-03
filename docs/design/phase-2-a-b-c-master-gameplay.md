@@ -1,5 +1,7 @@
 # Phase 2 A+B+C — as-built gameplay contract
 
+Current single-player update: [2026-10-03 release handoff](../phase2-solo-release-handoff-2026-10-03.vi.md). Owner defers multiplayer work and delegates final E2E to another tester. Solo now includes resource size/yield, roots/transplanting, six equipment slots/rarities, field blueprints, soil/moisture-dependent active-tick growth, two mountain profiles and three playable cave layouts. EN/VI preference is local to presentation; remaining composite copy and final visual coverage are listed in the handoff. This update does not approve the earlier profession-lock discrepancy or replace #199/#187 human evidence.
+
 Direct Owner-authorized reconciliation, 2026-10-01. Records delivered behavior, not retroactive A-GD approval of earlier proposals. The Owner prioritizes exploration, visuals and co-op, with public private rooms of 2–3 people. Use the [co-op corrections traceability](../technical/phase-2-coop-corrections-traceability.md) for source/evidence and open acceptance gates. The broader current-main baseline is delivered separately by PR #207 / #165.
 
 ## Player loop and rules

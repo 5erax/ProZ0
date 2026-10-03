@@ -119,6 +119,8 @@ export type Phase1RuinRewardClaimReservationResult =
     };
 
 export interface Phase1VerticalSliceWorldAdapterOptions {
+  readonly elevationAt?: (position:WorldPosition)=>number;
+  readonly foundationAt?: (position:WorldPosition)=>boolean;
   readonly colonyTerrainRulesEnabled?: boolean;
   readonly expeditionCollisionEnabled?: boolean;
   readonly expeditionShelterAt?: (position:WorldPosition)=>boolean;
@@ -370,6 +372,15 @@ export class Phase1VerticalSliceWorldAdapter
       request.center.y
         + (request.axis === 'y' ? request.desiredDelta : 0),
     );
+
+    if(this.options.elevationAt){
+      const count=Math.max(1,Math.ceil(Math.abs(request.desiredDelta)/.125));let prior=request.center,allowed=0;
+      for(let i=1;i<=count;i++){const delta=request.desiredDelta*i/count,next=createWorldPosition(request.center.x+(request.axis==='x'?delta:0),request.center.y+(request.axis==='y'?delta:0));
+        if(Math.abs(this.options.elevationAt(next)-this.options.elevationAt(prior))>.45||!this.isMovementPassable(next,request.footprint)||this.blocksExpeditionMotion(prior,next,request.footprint))return {allowedDelta:allowed,blocked:true,hitSolidId:'mountain-cliff'};
+        prior=next;allowed=delta;
+      }
+      return {allowedDelta:allowed,blocked:false};
+    }
 
     if (this.isMovementPassable(target, request.footprint) && !this.blocksExpeditionMotion(request.center,target,request.footprint)) {
       return Object.freeze({
@@ -874,12 +885,14 @@ export class Phase1VerticalSliceWorldAdapter
     profile: StructurePlacementProfile,
     orientationQuarterTurns: QuarterTurn,
   ): boolean {
-    return this.sampleFootprint(
+    const samples=this.sampleFootprint(
       position,
       profile,
       orientationQuarterTurns,
       true,
-    ).every((sample) => this.isPositionBuildable(sample));
+    );
+    if(this.options.elevationAt){const height=this.options.elevationAt(position);if(samples.some(p=>Math.abs(this.options.elevationAt!(p)-height)>.25||this.options.foundationAt?.(p)===false))return false;}
+    return samples.every((sample) => this.isPositionBuildable(sample));
   }
 
   public hasNonBuildableSurface(
@@ -1056,6 +1069,7 @@ export class Phase1VerticalSliceWorldAdapter
       ),
     ];
 
+    if(this.options.elevationAt){const heights=samples.map(p=>this.options.elevationAt!(p));if(Math.max(...heights)-Math.min(...heights)>.8)return false;}
     if(this.options.colonyTerrainRulesEnabled)return samples.every(sample=>this.activeChunks.has(toChunkKey(fromWorldPosition(sample))));
     if (!samples.every((sample) => this.isPositionBuildable(sample))) {
       return false;

@@ -2,6 +2,7 @@ import { PLAYER_COLLISION_FOOTPRINT } from '../simulation/player/PlayerCollision
 import { SoloCaveAuthority } from '../simulation/worldspaces/SoloCaveAuthority';
 import { SoloWorldspaceWorldAdapter } from './worldspaces/SoloWorldspaceWorldAdapter';
 import { soloCaveRegistry } from '../world/phase2/SoloCaveRegistry';
+import { mountainAt, mountainFoundation } from '../world/phase2/SoloMountain';
 import { wearableThermalTarget } from '../content/livingworld/WearableContent';
 import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
@@ -495,6 +496,7 @@ export class Phase1AuthorityBundle {
           return {...entity.position,revision:state.revision,cut:state.depleted,rootItemId:'item:root-'+kind};
         },
         commit: (id,revision) => { try { return worldStore.commitResourceUproot(id,revision); } catch { return 'RESOURCE_COMMIT_FAILED'; } },
+        water: (id,revision) => worldStore.commitResourceWater(id,revision,this.authorityTick),
       },
       fishing: {
         healthMilli: id => survival.getPlayerState(id).healthMilli,
@@ -517,6 +519,7 @@ export class Phase1AuthorityBundle {
     } : undefined);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
       multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)*(this.livingWorld?.renewal(position,definitionId)??1),
+      ...(this.livingWorld ? {growthMultiplier:(position:WorldPosition,definitionId:string)=>this.colonyDepth.recoveryMultiplier(position,definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)} : {}),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
     });
     this.sustenance = new ColonySustenanceAuthority(items,
@@ -616,7 +619,9 @@ export class Phase1AuthorityBundle {
     let livingWorld: LivingWorldAuthority | null = null;
     let capacityAuthority:ColonyDepthAuthority|null=null;
     const reopenedWorld = initialWorldSnapshot(reopen);
+    const mountains=config.soloCavesEnabled?soloCaveRegistry(config.worldSeed,reopen?.bundle.world.generationVersion??config.worldGenerationVersion??PHASE1_WORLD_GENERATION_VERSION):[];
     const world = new Phase1VerticalSliceWorldAdapter({
+      ...(mountains.length?{elevationAt:(position:WorldPosition)=>mountainAt(position,mountains).height,foundationAt:(position:WorldPosition)=>mountainFoundation(position,mountains)}:{}),
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
       expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
       expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5) || (capacityAuthority?.shelteredAt(position,authorityTickRef.value) ?? false),

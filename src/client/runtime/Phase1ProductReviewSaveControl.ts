@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
 import type {
   SaveResult,
 } from '../../persistence/repository/SaveRepositoryV2';
@@ -45,7 +47,7 @@ export function createPhase1ProductReviewSaveControl(
   box.className = 'p1-product-save-box';
   box.setAttribute('role', 'status');
   box.setAttribute('aria-live', 'polite');
-  box.textContent = 'L · SAVE WORLD';
+  bindUiText(box,"textContent",uiText("ui.29c8b36f"));
   layer.append(box);
   root.append(layer);
   const toast = document.createElement('div');
@@ -62,7 +64,7 @@ export function createPhase1ProductReviewSaveControl(
   const helpRow = document.createElement('div');
   helpRow.className = 'p1-product-controls-row';
   helpRow.dataset.productReviewSaveHelp = 'true';
-  helpRow.textContent = 'L · SAVE WORLD';
+  bindUiText(helpRow,"textContent",uiText("ui.29c8b36f"));
   helpPanel?.append(helpRow);
 
   let destroyed = false;
@@ -93,9 +95,9 @@ export function createPhase1ProductReviewSaveControl(
     text: string,
   ): void => {
     layer.dataset.saveState = state;
-    box.textContent = text;
+    bindUiText(box,"textContent",text);
     toast.hidden = state === 'idle';
-    toast.textContent = text;
+    bindUiText(toast,"textContent",text);
   };
 
   const scheduleIdle = (delayMs: number): void => {
@@ -103,7 +105,7 @@ export function createPhase1ProductReviewSaveControl(
     clearTimer = setTimeout(() => {
       clearTimer = null;
       if (destroyed || pending) return;
-      setState('idle', 'L · SAVE WORLD');
+      setState('idle', uiText("ui.29c8b36f"));
     }, delayMs);
   };
 
@@ -121,14 +123,14 @@ export function createPhase1ProductReviewSaveControl(
       if (result.ok) {
         setState('success', root.dataset.savedReviewBookmark === 'unavailable'
           ? 'World saved — bookmark this page to return; Continue is unavailable.'
-          : auto ? 'World autosaved' : 'World saved');
+          : auto ? uiText("ui.d0eed671") : uiText("ui.acabeb48"));
         scheduleIdle(SAVE_SUCCESS_VISIBLE_MS);
         return;
       }
 
       setState(
         'failure',
-        'Save failed — progress since your last successful save is not durable. Retry Save.',
+        uiText("ui.e96d3967"),
       );
       scheduleIdle(SAVE_FAILURE_VISIBLE_MS);
     } catch {
@@ -136,7 +138,7 @@ export function createPhase1ProductReviewSaveControl(
       pending = false;
       setState(
         'failure',
-        'Save failed — progress since your last successful save is not durable. Retry Save.',
+        uiText("ui.e96d3967"),
       );
       scheduleIdle(SAVE_FAILURE_VISIBLE_MS);
     } finally {
@@ -165,18 +167,18 @@ export function createPhase1ProductReviewSaveControl(
   };
   document.addEventListener('keydown', onKeyDown);
   const settingsPanel=root.querySelector('[data-colony-settings]');
-  const saveButton=document.createElement('button');saveButton.type='button';saveButton.textContent='Save world [L]';
+  const saveButton=document.createElement('button');saveButton.type='button';bindUiText(saveButton,"textContent",uiText("ui.27817d2a"));
   if(settingsPanel!==null){settingsPanel.append(saveButton,box);saveButton.addEventListener('click',()=>{void triggerSave();});}
   const leaveButton = document.createElement('button');
   leaveButton.type = 'button';
-  leaveButton.textContent = 'Lưu và về sảnh';
+  bindUiText(leaveButton,"textContent",uiText("ui.f06abc6a"));
   leaveButton.addEventListener('click', () => {
     if (pending) return;
     leaveButton.disabled = true;
     void triggerSave().then(() => {
       if (layer.dataset.saveState === 'success' && root.dataset.savedReviewBookmark !== 'unavailable')
         targetWindow.location.assign(targetWindow.location.pathname);
-      else if (layer.dataset.saveState === 'success') box.textContent = 'World saved — bookmark this page before leaving.';
+      else if (layer.dataset.saveState === 'success') bindUiText(box,"textContent",uiText("ui.86a19d30"));
     }).finally(() => { leaveButton.disabled = false; });
   });
   settingsPanel?.append(leaveButton);

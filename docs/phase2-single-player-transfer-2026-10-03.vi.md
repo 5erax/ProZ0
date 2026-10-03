@@ -1,5 +1,7 @@
 # Bàn giao single-player — 03/10/2026
 
+Checkpoint lịch sử bên dưới được nối tiếp bởi [release handoff](phase2-solo-release-handoff-2026-10-03.vi.md): hang/núi đã bật trong fresh solo, growth v2 và locale đã có code; final QA được Owner giao người khác. Đọc hồ sơ mới để biết phạm vi release và phần còn lại.
+
 Owner yêu cầu chốt commit công việc đang làm để giao người khác, đóng issue khi đã hoàn thành. Đây là checkpoint bàn giao, không phải nghiệm thu Phase 2 hay phát hành lên production.
 
 ## Điểm bắt đầu cho người tiếp nhận

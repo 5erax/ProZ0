@@ -91,6 +91,7 @@ export class ExpeditionAuthority {
   }
   public hasRemoteLab(playerId: string): boolean {
     const actor = this.actor(playerId);
+    if(actor.spaceId && actor.spaceId!=='surface')return false;
     return this.state.facilities.some(
       (f) =>
         f.definitionId === 'field-lab' &&

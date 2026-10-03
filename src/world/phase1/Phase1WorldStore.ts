@@ -6,6 +6,7 @@ import type {
 } from '../../content';
 import { resourceSizeAt, type ResourceSize } from '../../content/livingworld/ResourceSizeProfiles';
 import { initialResourceLifecycle, resourceGrowthCheckpoint, validateResourceLifecycle } from './ResourceLifecycle';
+import { advancePlantWork, canonicalPlantRate } from './DynamicResourceGrowth';
 import {
   SIMULATION_HZ,
   createWorldPosition,
@@ -469,7 +470,7 @@ export class Phase1WorldStore {
     this.resourceSizes.set(key, size);
     return size;
   }
-  private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
+  private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly growthMultiplier?: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
   public setRenewalPolicy(policy: NonNullable<Phase1WorldStore['renewalPolicy']>): void { this.renewalPolicy = policy; }
   private readonly entries = new Map<string, Phase1WorldChunkEntry>();
   private readonly entityChunk = new Map<string, string>();
@@ -857,6 +858,11 @@ export class Phase1WorldStore {
       const matureTick = authorityTick + duration;
       if (!Number.isSafeInteger(matureTick)) throw Error('Resource lifecycle clock overflow');
       lifecycle = Object.freeze({version:1,kind:'plant',stage:'early',cutTick:authorityTick,matureTick});
+      if(this.renewalPolicy?.growthMultiplier){
+        const durationTicks=Math.max(2,Math.ceil(this.requireRegenerationTicks(definition)*this.renewalPolicy.growthMultiplier(entity.position,entity.definitionId)));
+        const rateMilli=canonicalPlantRate(this.config.worldSeed,entity.position,authorityTick,null);
+        lifecycle=Object.freeze({version:2,kind:'plant',stage:'early',cutTick:authorityTick,matureTick:authorityTick+Math.ceil(durationTicks*1000/Math.max(1,rateMilli)),work:Object.freeze({completedWork:0,progressMilli:0,lastGrowthTick:authorityTick,durationTicks,wateredTick:null,rateMilli})});
+      }
     }
     const regenerationReadyTick = depleted
       ? lifecycle?.kind === 'mineral' ? null
@@ -897,6 +903,25 @@ export class Phase1WorldStore {
     if (!state.depleted || state.uprootedVersion === 1) return 'HARVEST_MATURE_PLANT_FIRST';
     const next = Object.freeze({...state,revision:incrementRevision(state.revision,'Resource revision'),regenerationReadyTick:null,uprootedVersion:1 as const});
     this.publishDeltaMutation(entry,Object.freeze({...entry.delta,resourceStates:Object.freeze(entry.delta.resourceStates.map(value=>value.resourceEntityId === resourceEntityId ? next : value))}));
+    return null;
+  }
+
+  /** Prepared item exchange owns payment; this callback publishes only after guards. */
+  public commitResourceWater(resourceEntityId:string,expectedRevision:number,tick:number):string|null {
+    if (!Number.isSafeInteger(tick) || tick !== this.requireEnvironment().activeTick) return 'INVALID_GROWTH_CLOCK';
+    const entry=this.activeEntryForEntity(resourceEntityId),state=entry?.delta?.resourceStates.find(v=>v.resourceEntityId===resourceEntityId),entity=entry?.base?.entities.find(v=>v.entityId===resourceEntityId);
+    if(!entry?.delta||!state||entity?.type!=='resource'||state.uprootedVersion===1||state.lifecycle?.kind!=='plant')return 'SOURCE_MISSING';
+    if(state.revision!==expectedRevision)return 'STALE_RESOURCE_REVISION';
+    const lifecycle=state.lifecycle;
+    if(lifecycle.stage==='mature')return 'MAXIMUM_GROWTH';
+    const durationTicks=lifecycle.work?.durationTicks??Math.max(2,lifecycle.matureTick-lifecycle.cutTick);
+    const legacyUnits=Math.min(durationTicks*1000000,Math.max(0,(tick-lifecycle.cutTick)*1000000));
+    const current=lifecycle.work?advancePlantWork(lifecycle.work,this.config.worldSeed,entity.position,tick):{completedWork:legacyUnits,progressMilli:legacyUnits/durationTicks,lastGrowthTick:tick,durationTicks,wateredTick:null,rateMilli:1000};
+    const work=Object.freeze({...current,wateredTick:tick,rateMilli:canonicalPlantRate(this.config.worldSeed,entity.position,tick,tick)});
+    const stage=work.progressMilli>=1000000?'mature':work.progressMilli>=500000?'growing':'early';
+    const updated=Object.freeze({...lifecycle,version:2 as const,stage,work,matureTick:tick+Math.max(1,Math.ceil((1000000-work.progressMilli)*durationTicks/Math.max(1,work.rateMilli)/1000))});
+    const next=Object.freeze({...state,revision:incrementRevision(state.revision,'Resource revision'),lifecycle:updated,depleted:stage==='early',remainingGatherActions:state.depleted&&stage!=='early'?this.config.catalog.getAs(entity.definitionId,'resource').maxGatherActions:state.remainingGatherActions,regenerationReadyTick:stage==='early'?resourceGrowthCheckpoint(updated):null});
+    this.publishDeltaMutation(entry,{...entry.delta,resourceStates:entry.delta.resourceStates.map(v=>v.resourceEntityId===resourceEntityId?next:v)});
     return null;
   }
 
@@ -1131,18 +1156,24 @@ export class Phase1WorldStore {
       const lifecycle = state.lifecycle;
       if (lifecycle?.kind === 'mineral') return state;
       if (lifecycle?.kind === 'plant') {
-        const stage = authorityTick >= lifecycle.matureTick ? 'mature' : authorityTick >= resourceGrowthCheckpoint(lifecycle) ? 'growing' : 'early';
-        if (stage === lifecycle.stage) return state;
         const entity = entry.base?.entities.find(candidate => candidate.entityId === state.resourceEntityId);
         if (!entity || entity.type !== 'resource') throw Error('Growing resource lost its generated identity');
+        let updated=lifecycle;
+        if(lifecycle.work&&lifecycle.stage!=='mature'&&Math.floor(authorityTick/60)!==Math.floor(lifecycle.work.lastGrowthTick/60)){
+          const work=advancePlantWork(lifecycle.work,this.config.worldSeed,entity.position,authorityTick);
+          const stage=work.progressMilli>=1000000?'mature':work.progressMilli>=500000?'growing':'early';
+          updated=Object.freeze({...lifecycle,stage,work:Object.freeze(work),matureTick:authorityTick+Math.max(1,Math.ceil((1000000-work.progressMilli)*work.durationTicks/Math.max(1,work.rateMilli)/1000))});
+        }
+        const stage = updated.work ? updated.stage : authorityTick >= lifecycle.matureTick ? 'mature' : authorityTick >= resourceGrowthCheckpoint(lifecycle) ? 'growing' : 'early';
+        if (stage === lifecycle.stage && updated===lifecycle) return state;
         changed = true;
         return Object.freeze({
           ...state,
-          revision: incrementRevision(state.revision, 'Resource revision'),
-          remainingGatherActions: state.depleted ? this.config.catalog.getAs(entity.definitionId,'resource').maxGatherActions : state.remainingGatherActions,
-          depleted: false,
-          regenerationReadyTick: null,
-          lifecycle: Object.freeze({...lifecycle,stage}),
+          revision: stage===lifecycle.stage ? state.revision : incrementRevision(state.revision, 'Resource revision'),
+          remainingGatherActions: state.depleted && stage!=='early' ? this.config.catalog.getAs(entity.definitionId,'resource').maxGatherActions : state.remainingGatherActions,
+          depleted: stage==='early',
+          regenerationReadyTick: stage==='early' ? resourceGrowthCheckpoint(updated) : null,
+          lifecycle: Object.freeze({...updated,stage}),
         });
       }
       if (

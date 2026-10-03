@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-export async function walk(page: Page, x: number, y: number) {
+export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
   let held: string[] = [];
   let previous = '',
     stuck = 0;
@@ -18,7 +18,7 @@ export async function walk(page: Page, x: number, y: number) {
         );
       const dx = x - p.x,
         dy = y - p.y;
-      if (Math.hypot(dx, dy) < 0.65) return;
+      if (Math.hypot(dx, dy) < tolerance) return;
       const keys =
         Math.abs(dx) >= Math.abs(dy)
           ? dx > 0

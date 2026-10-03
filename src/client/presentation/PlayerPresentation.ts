@@ -1,3 +1,4 @@
+import { uiText } from '../localization/UiMessages';
 import { WORLD_PIXELS_PER_UNIT } from '../../foundation';
 import type { PlayerMovementSnapshot } from '../../simulation';
 import type { CameraPresentationPosition } from './CameraPresenter';
@@ -37,10 +38,10 @@ function assertPositiveFinite(value: number, label: string): void {
 export function validatePlayerPresentationFrame(
   frame: PlayerPresentationFrame,
 ): void {
-  assertPositiveFinite(frame.widthPx, 'Player frame width');
-  assertPositiveFinite(frame.heightPx, 'Player frame height');
-  assertPositiveFinite(frame.bodyWidthPx, 'Player body width');
-  assertPositiveFinite(frame.bodyHeightPx, 'Player body height');
+  assertPositiveFinite(frame.widthPx, uiText("ui.8a325339"));
+  assertPositiveFinite(frame.heightPx, uiText("ui.1cc2ed28"));
+  assertPositiveFinite(frame.bodyWidthPx, uiText("ui.2b3f64c0"));
+  assertPositiveFinite(frame.bodyHeightPx, uiText("ui.33e2d977"));
 
   if (frame.bodyWidthPx > frame.widthPx || frame.bodyHeightPx > frame.heightPx) {
     throw new Error('Player body bounds must fit inside the presentation frame.');

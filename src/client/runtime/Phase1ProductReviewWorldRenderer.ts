@@ -1,7 +1,15 @@
+import { uiText } from '../localization/UiMessages';
+import { contentDisplayName } from '../localization/ContentText';
+import { bindUiText } from '../localization/UiMessages';
+import { uiPhrase } from '../localization/UiMessages';
 import { WEARABLE_SLOTS } from '../../content/livingworld/WearableContent';
 import {naturalSoilMoisture, soilCellKey} from '../../simulation/livingworld/SoilMoisture';
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
-import { resourceLifecycleFacts } from '../../world/phase1/ResourceLifecycle';
+import { localizedResourceFacts as resourceLifecycleFacts } from '../localization/ResourceFacts';
+import { createSoloCaveScene } from '../presentation/SoloCaveScene';
+import { mountainAt } from '../../world/phase2/SoloMountain';
+import { fieldFacilitySprite } from '../presentation/FieldFacilityArt';
+import { expeditionFacility } from '../../content/singleplayer/ExpeditionContent';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { sizedResourceSprite, sizedResourceHitShape } from '../presentation/ResourceSizeArt';
 import { moistureState } from '../../simulation/livingworld/PlantGrowth';
@@ -580,6 +588,7 @@ export function createPhase1ProductReviewWorldRenderer(
   const rasterOrigin = bundle.getPlayerPosition(playerId);
   worldStage.dataset.rasterOriginX = String(rasterOrigin.x);
   worldStage.dataset.rasterOriginY = String(rasterOrigin.y);
+  const caveScene = createSoloCaveScene(root, worldStage, bundle, rasterOrigin);
   let cameraDepth = Number.NaN;
   const particles = createAtmosphericParticles(document);
   // Encapsulate the effect's internal raster; #proz0-canvas remains the public game surface.
@@ -686,29 +695,30 @@ export function createPhase1ProductReviewWorldRenderer(
     if (!focused && element.dataset.focusedTarget !== undefined) delete element.dataset.focusedTarget;
     if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
     if (element.dataset.worldId !== id) element.dataset.worldId = id;
-    if (['hostile','structure','survey-site','world-drop','death-cache','ruin'].includes(role)) {
+    if (['hostile','structure','facility','survey-site','world-drop','death-cache','ruin'].includes(role)) {
       if(element.style.pointerEvents!=='auto' && (role!=='survey-site'||!options.data?.poiTemplate))element.style.pointerEvents='auto';
       if(role!=='survey-site'){element.setAttribute('role','button');element.tabIndex=0;}
       bindEntityInspection(element, () => {
+        if(role==='facility'){const f=bundle.expedition?.read().facilities.find(f=>f.id===id);return f?{id,name:uiPhrase(expeditionFacility(f.definitionId)!.name),kind:uiText("ui.8a87bf95"),facts:[uiText("ui.e4948090")+f.orientation*90+'°',uiText("ui.7f1940ab")]}:null;}
         if (role === 'hostile') {
           const target = bundle.world.getPredator(id);
           if (!target || !worldPositionKnown(bundle,target.position)) return null;
-          return {id,name:'Territorial Predator',kind:'Wildlife',facts:['State: '+target.state.replaceAll('_',' ').toLowerCase(),'Health: '+target.health,'Left click / E: interact']};
+          return {id,name:uiText("ui.38671cb3"),kind:uiText("ui.8f8735af"),facts:[uiText("ui.fde1b4ec")+target.state.replaceAll('_',' ').toLowerCase(),uiText("ui.a438be7d")+target.health,uiText("ui.f321724a")]};
         }
         if (!worldPositionKnown(bundle,position)) return null;
         if (role === 'structure') {
           const structure = bundle.buildings.exportSnapshot().foothold.structures.find(v => v.structureId === id);
           if (!structure) return null;
-          const facts = ['Left click / E: interact'];
-          if (structure.containerId) { const inventory = bundle.items.getContainerView(structure.containerId); facts.unshift('Stored weight: '+inventory.totalWeightKg.toFixed(1)+' kg','Stored volume: '+inventory.totalVolume.toFixed(1)); }
-          return {id,name:bundle.catalog.get(structure.definitionId).displayName,kind:'Building',facts};
+          const facts = [uiText("ui.f321724a")];
+          if (structure.containerId) { const inventory = bundle.items.getContainerView(structure.containerId); facts.unshift(uiText("ui.6db47018")+inventory.totalWeightKg.toFixed(1)+' kg',uiText("ui.16c9f886")+inventory.totalVolume.toFixed(1)); }
+          return {id,name:contentDisplayName(bundle.catalog.get(structure.definitionId)),kind:uiText("ui.8a87bf95"),facts};
         }
         if (role === 'survey-site') {
           const site = bundle.colonyDepth.sites().find(value => value.id === id);
           if (!site) return null;
-          return {id,name:site.name,kind:'Exploration site',facts:['State: '+bundle.colonyDepth.siteStage(id),'Biome: '+site.biomeId,'Left click / E: explore']};
+          return {id,name:uiPhrase(site.name),kind:uiText("ui.7655028d"),facts:[uiText("ui.fde1b4ec")+bundle.colonyDepth.siteStage(id),uiText("ui.6c6837e1")+site.biomeId,uiText("ui.c072a99b")]};
         }
-        return {id,name:element.getAttribute('aria-label') ?? role.replaceAll('-',' '),kind:role.replaceAll('-',' '),facts:['E: interact']};
+        return {id,name:element.getAttribute('aria-label') ?? role.replaceAll('-',' '),kind:role.replaceAll('-',' '),facts:[uiText("ui.ae805cdc")]};
       });
     }
     const data = options.data ?? {};
@@ -739,6 +749,8 @@ export function createPhase1ProductReviewWorldRenderer(
       return null;
     }
     appendScene(element);
+    if(spriteDefinition.footOffsetY)element.style.top=Number.parseFloat(element.style.top)+spriteDefinition.footOffsetY+'px';
+    if(bundle.caves?.isSurface())element.style.top=Number.parseFloat(element.style.top)-mountainAt(position,bundle.caves.portals).height*4+'px';
     return element;
   };
 
@@ -847,6 +859,11 @@ export function createPhase1ProductReviewWorldRenderer(
             rasterOrigin,
           )
         ) {
+          const elevation=bundle.caves?mountainAt(position,bundle.caves.portals):null;
+          if(elevation?.height){tile.style.top=Number.parseFloat(tile.style.top)-elevation.height*4+'px';tile.dataset.elevation=String(elevation.height);tile.dataset.mountainProfile=elevation.profile;tile.dataset.ramp=String(elevation.ramp);
+            const lift=Math.round(elevation.height*4);let face=tile.querySelector<SVGSVGElement>('[data-cliff-face]');if(!face){face=document.createElementNS('http://www.w3.org/2000/svg','svg');face.dataset.cliffFace='true';face.style.cssText='position:absolute;left:0;top:0;width:100%;pointer-events:none;z-index:-1';tile.append(face);}
+            if(face.dataset.lift!==String(lift)){face.dataset.lift=String(lift);face.setAttribute('viewBox','0 0 64 '+(32+lift));face.style.height=32+lift+'px';face.innerHTML='<path fill="#31444a" d="M0 16 32 32 64 16V'+(16+lift)+'L32 '+(32+lift)+' 0 '+(16+lift)+'Z"/><path fill="#51605b" d="M32 32 64 16V'+(16+lift)+'L32 '+(32+lift)+'Z"/>';}
+          }
           appendScene(tile);
         }
         }
@@ -1246,7 +1263,31 @@ export function createPhase1ProductReviewWorldRenderer(
       for (const p of living.plots) soilMoistures.set(soilCellKey(p), p.moisture);
     }
     const offset = projectPhase1Isometric(camera, rasterOrigin);
-    worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y) + 'px)';
+    const cameraElevation=bundle.caves?.isSurface()?mountainAt(camera,bundle.caves.portals).height*4:0;
+    worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y+cameraElevation) + 'px)';
+    if (caveScene.render(camera)) {
+      layer.style.backgroundImage = 'none';
+      layer.style.backgroundColor = '#14252e';
+      particleHost.hidden = true;
+      const context = getPresentationContext();
+      renderPlayer(playerId, camera, context, true, 'LOCAL');
+      for (const [key, element] of retained) if (!visibleKeys.has(key)) {element.remove();retained.delete(key);}
+      groundParticleHost.remove();
+      canvas.dataset.playerX = camera.x.toFixed(6);canvas.dataset.playerY = camera.y.toFixed(6);
+      canvas.dataset.authorityTick = String(bundle.authorityTick);canvas.dataset.weatherState = 'clear';
+      canvas.dataset.worldspace = bundle.playerWorldspace();canvas.dataset.fogProjection = 'canonical-cave-fog';
+      return;
+    }
+    canvas.dataset.worldspace = 'surface';
+    layer.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
+    layer.style.backgroundColor = '';
+    particleHost.hidden = false;
+    for(const f of bundle.expedition?.read().facilities??[]){
+      if(f.canonicalStructureId!==null||!worldPositionKnown(bundle,{x:f.x,y:f.y}))continue;
+      const footprint=bundle.expedition!.facilityFootprint(f.id)!;
+      const rendered=renderSprite(fieldFacilitySprite(f.definitionId,footprint.width,footprint.depth,f.orientation),{x:f.x,y:f.y},camera,'facility',f.id);
+      if(rendered){rendered.dataset.facilityDefinition=f.definitionId;rendered.dataset.facilityOrientation=String(f.orientation);bindUiText(rendered,"aria-label",uiPhrase(expeditionFacility(f.definitionId)!.name));}
+    }
     // Atmospheric cloud drift is screen-space; camera motion must not repaint
     // the full viewport backdrop on each simulation tick.
     layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
@@ -1284,7 +1325,7 @@ export function createPhase1ProductReviewWorldRenderer(
           if (!console) { console=document.createElement('button');console.type='button';console.dataset.siteInteraction='true';console.style.cssText='position:absolute;left:15px;top:44px;width:20px;height:20px;padding:0;border:1px solid #aedace55;background:transparent;cursor:pointer;pointer-events:auto';rendered.append(console); }
           const lockerHandle=site.template==='garden'||site.template==='shelter';
           console.style.left=lockerHandle?'58px':'15px';console.style.top=lockerHandle?'49px':'44px';
-          console.setAttribute('aria-label','Explore '+site.name);
+          bindUiText(console,"aria-label",uiText("ui.2cd3c2b4")+uiPhrase(site.name));
 
         }
       }
@@ -1338,18 +1379,18 @@ export function createPhase1ProductReviewWorldRenderer(
         const resourceState = bundle.worldStore.getResourceState(entity.entityId);
         if (size) rendered.style.clipPath = sizedResourceHitShape(entity.definitionId, size, resourceState?.depleted === true, resourceState?.lifecycle?.kind === 'plant' ? resourceState.lifecycle.stage : undefined);
         if (resourceState?.lifecycle?.kind === 'plant') rendered.dataset.growthStage = resourceState.lifecycle.stage;
-        else if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
-        else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
-        const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
+        else if (!size && (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node')) rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
+        else if (!size && entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
+        const name=uiText("ui.7cc2b63e")+contentDisplayName(bundle.catalog.getAs(entity.definitionId,'resource'));
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);
+        if(rendered.getAttribute('aria-label')!==name)bindUiText(rendered,"aria-label",name);
         if (size) rendered.dataset.resourceSize = size;
         rendered.removeAttribute('title');
         bindEntityInspection(rendered, () => {
           if (!worldPositionKnown(bundle, entity.position)) return null;
           const current = bundle.worldStore.getResourceState(entity.entityId);
           const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId,'resource'),size,current?.lifecycle?.kind === 'plant' ? current.lifecycle.stage : undefined);
-          return {id:entity.entityId,name:bundle.catalog.getAs(entity.definitionId,'resource').displayName,kind:'Resource',facts:[...(size ? ['Size: '+RESOURCE_SIZE_PROFILES[size].label] : []),'Yield: '+harvest.output.quantity+' '+bundle.catalog.getAs(harvest.output.itemId,'item').displayName,'Gather time: '+harvest.gatherChannelSeconds+'s',...resourceLifecycleFacts(current?.lifecycle,bundle.authorityTick,current?.remainingGatherActions??null),...(current?.lifecycle ? [] : [current?.depleted ? 'Renewing: '+Math.max(0,Math.ceil(((current.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60))+'s active time' : 'Available']),'Left click / E: interact']};
+          return {id:entity.entityId,name:contentDisplayName(bundle.catalog.getAs(entity.definitionId,'resource')),kind:uiText("ui.23b0d815"),facts:[...(size ? [uiText("ui.adb28456")+RESOURCE_SIZE_PROFILES[size].label] : []),uiText("ui.6ac9b7f4")+harvest.output.quantity+' '+contentDisplayName(bundle.catalog.getAs(harvest.output.itemId,'item')),uiText("ui.53d0e7d5")+harvest.gatherChannelSeconds+'s',...resourceLifecycleFacts(current?.lifecycle,bundle.authorityTick,current?.remainingGatherActions??null),...(current?.lifecycle ? [] : [current?.depleted ? uiText("ui.1e97f9d8")+Math.max(0,Math.ceil(((current.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60))+uiText("ui.3b16e069") : uiText("ui.72402638")]),uiText("ui.f321724a")]};
         });
       }
 
@@ -1364,7 +1405,7 @@ export function createPhase1ProductReviewWorldRenderer(
             ruinInspectMarkerSprite(
               ruin.discoveryState === 'investigated'
                 ? 'INVESTIGATED'
-                : 'AVAILABLE',
+                : "AVAILABLE",
             ),
             markerPosition,
             camera,
@@ -1436,7 +1477,7 @@ export function createPhase1ProductReviewWorldRenderer(
       pad.style.opacity = site.built ? '1' : '.45';
       const label = pad.querySelector('span')!;
       const labelText = (site.id === 'cultivation-bed' ? 'BED' : 'PEN') + (site.built ? '' : ' · N');
-      if (label.textContent !== labelText) label.textContent = labelText;
+      if (label.textContent !== labelText) bindUiText(label,"textContent",labelText);
       appendScene(pad);
       if (site.id === 'cultivation-bed' && colony.cropProgressTicks !== null) {
         for (const offset of [-1, 0, 1]) renderSprite(PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor,
@@ -1513,7 +1554,7 @@ export function createPhase1ProductReviewWorldRenderer(
       const stack = container.stacks[0];
       if (stack !== undefined) {
         const displayName =
-          bundle.catalog.get(stack.itemDefinitionId).displayName;
+          contentDisplayName(bundle.catalog.get(stack.itemDefinitionId));
         const icon = itemIconSprite(displayName);
         if (icon !== null) {
           const iconPosition = Object.freeze({
@@ -1660,6 +1701,7 @@ export function createPhase1ProductReviewWorldRenderer(
       targetWindow.removeEventListener('resize', applyScale);
       layer.remove();
       retained.clear();
+      caveScene.destroy();
       canvas.remove();
     },
   });

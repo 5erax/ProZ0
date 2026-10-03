@@ -1,0 +1,6 @@
+import { message, type MessageDictionary } from './Locale';
+export const coreMessages: MessageDictionary = {
+  en: { settings:'Settings', language:'Language', close:'Close', controls:'Controls [H]', display:'Display size', resolution:'Display resolution', fit:'Fit window', single:'Single Player', multi:'Multiplayer', skin:'Skin', inventory:'Inventory', map:'Map', craft:'Craft', build:'Build base', journal:'Journal', research:'Research', professions:'Professions', save:'Save world [L]', load:'Reopen saved world', saveSuccess:'World saved', saveError:'Saving failed. Try again.', growth:'Growth', moisture:'Moisture', stamina:'Stamina', blueprint:'Blueprint', rarity:'Rarity' },
+  vi: { settings:'Cài đặt', language:'Ngôn ngữ', close:'Đóng', controls:'Điều khiển [H]', display:'Kích thước hiển thị', resolution:'Độ phân giải', fit:'Vừa cửa sổ', single:'Chơi đơn', multi:'Nhiều người chơi', skin:'Trang phục', inventory:'Túi đồ', map:'Bản đồ', craft:'Chế tạo', build:'Xây căn cứ', journal:'Nhật ký', research:'Nghiên cứu', professions:'Nghề nghiệp', save:'Lưu thế giới [L]', load:'Mở lại thế giới đã lưu', saveSuccess:'Đã lưu thế giới', saveError:'Lưu thất bại. Hãy thử lại.', growth:'Sinh trưởng', moisture:'Độ ẩm', stamina:'Thể lực', blueprint:'Bản dựng', rarity:'Độ hiếm' },
+};
+export const coreText = (key: string) => message(coreMessages, key);

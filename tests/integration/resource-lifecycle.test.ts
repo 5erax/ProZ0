@@ -10,6 +10,21 @@ import { createPhase1SaveV2Compatibility, reconstructPhase1ReopenState } from '.
 import { Phase1ItemAuthority } from '../../src/simulation';
 import { Phase1ItemTestWorld } from '../support/Phase1ItemTestWorld';
 
+it('irrigated canonical roots keep exact work across streaming/reopen and stale watering cannot alter progression',async()=>{
+  const catalog=createPhase1ContentCatalog(),persistence=new MemoryPhase1WorldPersistence(),options={worldSeed:'p1-world-golden',catalog,persistence,resourceLifecycleVersion:1 as const};
+  const first=createPhase1WorldStore(options);await first.initialize();first.setRenewalPolicy({multiplier:()=>1,growthMultiplier:()=>1,harvested:()=>{}});
+  const coord=createChunkCoord(0,0),view=await first.requestActive(coord),plant=view.base.entities.find(e=>e.type==='resource'&&e.definitionId==='resource:fiber-plant')!;
+  while(!first.getResourceState(plant.entityId)!.depleted)first.commitResourceGather(plant.entityId,first.getResourceState(plant.entityId)!.revision,0);
+  await first.advanceEnvironment(120);const current=first.getResourceState(plant.entityId)!;
+  expect(first.commitResourceWater(plant.entityId,current.revision,120)).toBeNull();const watered=first.getResourceState(plant.entityId)!;
+  expect(first.commitResourceWater(plant.entityId,current.revision,120)).toBe('STALE_RESOURCE_REVISION');expect(first.getResourceState(plant.entityId)).toEqual(watered);
+  expect(watered.lifecycle).toMatchObject({version:2,work:{wateredTick:120}});
+  await first.flushEnvironment();await first.releaseInterest(coord);await first.advanceEnvironment(43260);await first.flushEnvironment();
+  const reopened=createPhase1WorldStore(options);await reopened.initialize();await reopened.requestActive(coord);
+  await first.requestActive(coord);expect(reopened.getResourceState(plant.entityId)).toEqual(first.getResourceState(plant.entityId));
+  const valid=reopened.getResourceState(plant.entityId)!.lifecycle!;expect(()=>validateResourceLifecycle({...valid,work:{...(valid.kind==='plant'?valid.work:{}),completedWork:-1}})).toThrow();
+});
+
 it('new-world plants grow in bounded stages, including unloaded time, while minerals stay exhausted after reload', async () => {
   const catalog = createPhase1ContentCatalog(), persistence = new MemoryPhase1WorldPersistence();
   const options = {worldSeed:'p1-world-golden',catalog,persistence,resourceLifecycleVersion:1 as const};

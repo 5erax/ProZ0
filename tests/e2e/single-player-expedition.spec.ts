@@ -299,12 +299,12 @@ test('solo launcher rolls distinct default seeds and accepts a reproducible cust
     await page.goto('/');
     if (seed)
       await page
-        .getByLabel('Seed thế giới · để trống để tạo ngẫu nhiên', {
+        .getByLabel('World seed · leave blank for a random world', {
           exact: true,
         })
         .fill(seed);
     await page
-      .getByRole('button', { name: 'Bắt đầu thế giới mới', exact: true })
+      .getByRole('button', { name: 'Start a new world', exact: true })
       .click();
     await page.waitForURL(
       (url) => url.searchParams.get('proz0Mode') === 'phase2-colony-review',

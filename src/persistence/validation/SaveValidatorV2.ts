@@ -1056,7 +1056,7 @@ function globalCrossReferences(
     if (bundle.world.environment.resourceLifecycleVersion !== 1 && chunk.resourceStates.some(resource => resource.lifecycle !== undefined)) {
       return saveFailure('CORRUPT_RECORD', 'Resource lifecycle is not enabled in the world manifest');
     }
-    if (chunk.resourceStates.some(resource => resource.lifecycle?.kind === 'plant' && resource.lifecycle.cutTick > bundle.world.authorityTick)) {
+    if (chunk.resourceStates.some(resource => resource.lifecycle?.kind === 'plant' && (resource.lifecycle.cutTick > bundle.world.authorityTick || (resource.lifecycle.work?.lastGrowthTick ?? 0) > bundle.world.authorityTick))) {
       return saveFailure('CORRUPT_RECORD', 'Resource growth starts after the persisted world clock');
     }
     if (chunk.generationVersion !== bundle.world.generationVersion) {
