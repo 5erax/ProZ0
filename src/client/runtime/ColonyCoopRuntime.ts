@@ -1093,7 +1093,8 @@ export async function bootColonyCoop(
     if (panelKind === "research")
       for (const research of COLONY_RESEARCH) {
         const row = document.createElement("article");
-        row.append(uiPhrase(research.name));
+        row.dataset.researchId=research.id;
+        const name=document.createElement('strong');name.textContent=uiPhrase(research.name);row.append(name);
         const colony = aggregate("colony-depth", "colony");
         const state = colony?.state as { researchIds?: string[] } | undefined;
         let affordable = true;

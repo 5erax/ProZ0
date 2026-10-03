@@ -1519,7 +1519,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     if (weatherIcon !== null) {
       weatherIdentity.append(weatherIcon);
     }
-    weatherIdentity.append(state.world.weatherLabel);
+    bindUiText(weatherIdentity,'textContent',state.world.weatherLabel);
     weatherLine.append(
       weatherIdentity,
       createElement(this.document, 'span', '', String(state.world.teammateCount) + uiText("ui.7876b81e")),

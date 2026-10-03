@@ -239,8 +239,7 @@ test("co-op UI performs real equipment, drop/pickup, storage, research and profe
     await fund([{ itemDefinitionId: "item:stone", quantity: 1 }]);
     await page.keyboard.press("u");
     const researchButton = page
-      .locator(".coop-panel article")
-      .filter({ hasText: "Field Survey" })
+      .locator('.coop-panel article[data-research-id="field-survey"]')
       .getByRole("button", { name: "Research", exact: true });
     await researchButton.hover();
     await page.mouse.down();
