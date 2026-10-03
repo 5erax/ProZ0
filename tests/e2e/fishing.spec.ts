@@ -37,7 +37,7 @@ test('fishing material fixture: craft rod/bait, build a bank campfire, cast/reop
   await page.goto('/?' + new URLSearchParams({ proz0Mode: 'phase2-colony-review', proz0WorldId: worldId, proz0WorldSeed: seed, proz0Players: 'solo', proz0Player: 'solo', proz0SaveDb: name }));
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
   const screen = async (position: { x: number; y: number }) => page.locator('canvas').evaluate((e,p) => { const r = e.getBoundingClientRect(), d = (e as HTMLElement).dataset, dx=p.x-Number(d.playerX),dy=p.y-Number(d.playerY); return { x:r.left+(320+(dx-dy)*16)*r.width/640,y:r.top+(180+(dx+dy)*8)*r.height/360 }; },position);
-  await page.keyboard.press('f'); const farm = page.locator('.lw-panel'); await farm.locator('details summary').click();
+  await page.keyboard.press('f'); const farm = page.locator('.lw-panel'); await farm.locator('[data-living-craft] > summary').click();
   await farm.getByRole('button',{name:'Craft Field Fishing Rod',exact:true}).click(); await expect(farm.getByRole('status')).toContainText('crafted');
   await farm.getByRole('button',{name:'Craft Plant Fishing Bait',exact:true}).click(); await page.keyboard.press('Escape');
   await page.keyboard.press('b'); await page.getByRole('button',{name:'Expedition blueprints · materials later',exact:true}).click();
@@ -57,7 +57,7 @@ test('fishing material fixture: craft rod/bait, build a bank campfire, cast/reop
   for (const f of FISH_SPECIES) if (await inventory.getByRole('button',{name:f.name,exact:true}).count()) caught=f.name;
   expect(caught).not.toBe('');
   await expect(inventory.getByRole('button',{name:'Plant Fishing Bait',exact:true})).toContainText('×3'); await page.keyboard.press('Escape');
-  await page.keyboard.press('f'); await farm.locator('details summary').click(); await farm.getByRole('button',{name:'Craft Cook '+caught,exact:true}).click(); await expect(farm.getByRole('status')).toContainText('crafted');
+  await page.keyboard.press('f'); await farm.locator('[data-living-craft] > summary').click(); await farm.getByRole('button',{name:'Craft Cook '+caught,exact:true}).click(); await expect(farm.getByRole('status')).toContainText('crafted');
   await page.keyboard.press('Escape'); await page.keyboard.press('l'); await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state','success'); await page.reload(); await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready'); await page.keyboard.press('i');
   await expect(inventory.getByRole('button',{name:'Cooked Fish',exact:true})).toContainText('×1'); await expect(inventory.getByRole('button',{name:caught,exact:true})).toHaveCount(0);
   const population = await page.evaluate(async ({name,worldId}) => { const db = await new Promise<IDBDatabase>((resolve,reject)=>{const open=indexedDB.open(name,2);open.onsuccess=()=>resolve(open.result);open.onerror=()=>reject(open.error);}); const world = await new Promise<{livingWorld:{fishing:{spots:{stock:number;ordinal:number}[];sessions:unknown[]}}}>((resolve,reject)=>{const get=db.transaction('worlds','readonly').objectStore('worlds').get(worldId);get.onsuccess=()=>resolve(get.result);get.onerror=()=>reject(get.error);});db.close();return world.livingWorld.fishing;},{name,worldId});

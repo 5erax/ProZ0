@@ -462,7 +462,7 @@ export function createLivingWorldOverlay(
     const restoreUi=capturePanelUi(panel);
     const scrollTop = panel.scrollTop,
       craftOpen =
-        panel.querySelector<HTMLDetailsElement>('details')?.open ??
+        panel.querySelector<HTMLDetailsElement>('[data-living-craft]')?.open ??
         focus === 'craft';
     panel.replaceChildren(
       text('h2', targeted ? uiText("ui.1e2eb9ef") : uiText("ui.d9324124") + uiPhrase(s.name)),
@@ -672,6 +672,7 @@ export function createLivingWorldOverlay(
       );
     }
     const craft = document.createElement('details');
+    craft.dataset.livingCraft='true';
     craft.open = craftOpen;
     craft.append(
       text(
