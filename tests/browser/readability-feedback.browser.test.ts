@@ -29,3 +29,10 @@ it('keeps animals visible amid more forage than the render budget and communicat
  const overlay=createLivingWorldOverlay(root,canvas,bundle,'solo',()=>{});
  try{overlay.render();expect(root.querySelectorAll('[data-living-role]')).toHaveLength(64);const goat=root.querySelector<HTMLElement>('[data-living-id="fixture:goat"]')!;expect(goat).not.toBeNull();expect(goat.getAttribute('aria-label')).toContain('Needs water');expect(goat.querySelector<HTMLElement>('.lw-state-cue')!.hidden).toBe(false);}finally{overlay.destroy();spy.mockRestore();root.remove();}
 });
+import {createPhase1HudOverlay} from '../../src/client/presentation/Phase1HudOverlay';
+import {resolvePhase1PresentationQaFixture} from '../../src/client/qa/Phase1PresentationFixture';
+it('preserves the weather icon while its separate caption changes language',()=>{
+ const root=document.createElement('section'),canvas=document.createElement('canvas');root.append(canvas);document.body.append(root);const fixture=resolvePhase1PresentationQaFixture('?qaPhase1=overview')!;
+ const overlay=createPhase1HudOverlay(root,canvas,{...fixture.state,world:{...fixture.state.world,weatherLabel:'CLEAR'}});
+ try{const weather=root.querySelector('.p1-world-weather')!;expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();setLocale('vi');expect(weather.querySelector('.p1-weather-label')!.textContent).toBe('Trời quang');expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();}finally{overlay.destroy();root.remove();setLocale('en');}
+});
