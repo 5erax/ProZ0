@@ -1,3 +1,6 @@
+import { gameUiText } from '../localization/GameUiMessages';
+import { contentDisplayName } from '../localization/ContentText';
+import { materialSource } from '../presentation/MaterialGuide';
 import { uiPhrase } from '../localization/UiMessages';
 import { COLONY_ACTIONS } from "../../simulation/sustenance/ColonySustenanceAuthority";
 import { installGameContextMenu } from '../input/GameContextMenu';
@@ -927,7 +930,7 @@ export async function bootColonyCoop(
             image = itemImage(cost.itemId);
           if (image) applyProductionSprite(icon, image);
           icon.title =
-            catalog.getAs(cost.itemId, "item").displayName +
+            contentDisplayName(catalog.get(cost.itemId)) +
             " ×" +
             cost.quantity;
           const have = inventory()
@@ -936,6 +939,7 @@ export async function bootColonyCoop(
           if (have < cost.quantity) affordable = false;
           const badge = document.createElement("span");
           badge.className = "coop-cost";
+          badge.title=contentDisplayName(catalog.get(cost.itemId))+' · '+materialSource(catalog,cost.itemId);
           badge.dataset.affordable = String(have >= cost.quantity);
           badge.append(
             icon,
@@ -1089,7 +1093,7 @@ export async function bootColonyCoop(
     if (panelKind === "research")
       for (const research of COLONY_RESEARCH) {
         const row = document.createElement("article");
-        row.append(research.name);
+        row.append(uiPhrase(research.name));
         const colony = aggregate("colony-depth", "colony");
         const state = colony?.state as { researchIds?: string[] } | undefined;
         let affordable = true;
@@ -1107,7 +1111,7 @@ export async function bootColonyCoop(
           badge.dataset.affordable = String(have >= cost.quantity);
           badge.append(
             icon,
-            catalog.getAs(cost.itemDefinitionId, "item").displayName +
+            contentDisplayName(catalog.get(cost.itemDefinitionId)) +
               " " +
               have +
               "/" +
@@ -1139,7 +1143,7 @@ export async function bootColonyCoop(
           !affordable ||
           research.prerequisites.some((p) => !state?.researchIds?.includes(p));
         if (research.prerequisites.length)
-          row.append("Cần: " + research.prerequisites.join(", "));
+          row.append(gameUiText('prerequisite',{name:research.prerequisites.map(id=>uiPhrase(COLONY_RESEARCH.find(r=>r.id===id)?.name??id)).join(', ')}));
         panel.append(row);
       }
     if (panelKind === "journal") {

@@ -14,7 +14,7 @@ test('Phase 1 presentation shell preserves logical layout and semantic states', 
   await expect(ui).toBeVisible();
   await expect(ui).toHaveAttribute('data-presentation-authority', 'derived-read-only');
   await expect(ui).toHaveAttribute('data-production-asset-foundation', 'p1-75-78');
-  await expect(ui).toHaveAttribute('data-display-scale', '2');
+  await expect(ui).toHaveAttribute('data-display-scale', '1');
   await expect(
     ui.locator('[data-production-world-preview="accepted-raster"]'),
   ).toBeVisible();
@@ -22,13 +22,13 @@ test('Phase 1 presentation shell preserves logical layout and semantic states', 
     ui.locator('[data-production-world-asset="player"]'),
   ).toHaveAttribute(
     'data-asset-path',
-    'assets/phase1/actors/player_pioneer.png',
+    'procedural:pioneer-diorama-v2',
   );
   await expect(
     ui.locator('[data-production-world-asset="habitat"]'),
   ).toHaveAttribute(
     'data-asset-path',
-    'assets/phase1/world/structures/habitat_room.png',
+    'procedural:field-facility:habitat-room:2.5:2:0:NORMAL',
   );
   await expect(
     ui.locator(

@@ -20,3 +20,11 @@ export function explorationSiteSprite(template:ExplorationTemplateId,stage:'unre
   const markup='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="80" shape-rendering="crispEdges">'+floor+details+'</svg>';
   const sprite:Phase1ProductionSprite={assetPath:'phase2:exploration:'+key,url:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(markup),cellWidth:96,cellHeight:80,sourceWidth:96,sourceHeight:80,columns:1,index:0};cache.set(key,sprite);return sprite;
 }
+
+/** Small authored traces share a motif with the canonical sites, with no loot or collision. */
+export function explorationTraceSprite(kind:'paving'|'wall'|'conduit'):Phase1ProductionSprite {
+ const key='trace:'+kind,known=cache.get(key);if(known)return known;
+ const path=kind==='paving'?'<path fill="#6f8079" d="m2 18 11-5 9 4-11 6Zm18-9 8-4 9 4-8 4Z"/><path stroke="#36494d" d="m11 17 4 4m12-14 3 4"/>':kind==='wall'?'<path fill="#40585e" d="m8 13 14-7 9 5v13l-14 7-9-5Z"/><path fill="#89958a" d="m8 13 14-7 9 5-14 7Z"/><path fill="#253c43" d="M16 15h4v8h-4Z"/>':'<path fill="none" stroke="#9b9472" stroke-width="2" d="m3 20 11-5 9 5 13-7"/><path fill="#789791" d="M12 12h5v5h-5Z"/>';
+ const markup='<svg xmlns="http://www.w3.org/2000/svg" width="40" height="32" shape-rendering="crispEdges">'+path+'</svg>';
+ const sprite:Phase1ProductionSprite={assetPath:'phase2:'+key,url:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(markup),cellWidth:40,cellHeight:32,sourceWidth:40,sourceHeight:32,columns:1,index:0};cache.set(key,sprite);return sprite;
+}

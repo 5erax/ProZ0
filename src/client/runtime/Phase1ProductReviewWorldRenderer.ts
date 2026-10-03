@@ -1,3 +1,4 @@
+import { fogFrontierSprite } from '../presentation/FogFrontier';
 import { uiText } from '../localization/UiMessages';
 import { contentDisplayName } from '../localization/ContentText';
 import { bindUiText } from '../localization/UiMessages';
@@ -18,7 +19,7 @@ import { colonyWaterSprite } from '../presentation/ColonyWaterArt';
 import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
-import { explorationSiteSprite } from '../presentation/ExplorationArt';
+import { explorationSiteSprite, explorationTraceSprite } from '../presentation/ExplorationArt';
 import { heldSpearSprite, wearableSprite } from '../presentation/EquipmentArt';
 import { worldDepthOrder } from '../presentation/WorldDepth';
 import { bindEntityInspection } from '../presentation/EntityInspection';
@@ -56,7 +57,6 @@ import {
   coldRainSprite,
   condenserSprite,
   deathCacheSprite,
-  fogMaskSprite,
   habitatSprite,
   itemIconSprite,
   playerActorSprite,
@@ -526,7 +526,7 @@ function styleElement(document: Document): HTMLStyleElement {
   style.textContent = [
     '.p1-product-world{position:absolute;left:50%;top:50%;width:640px;height:360px;transform-origin:center;overflow:hidden;pointer-events:none;background:#111821;image-rendering:pixelated;}',
     '.p1-product-sprite,.p1-product-terrain,.p1-product-fog{position:absolute;image-rendering:pixelated;}',
-    '.p1-product-player[data-local-player="true"]{filter:drop-shadow(1px 0 0 #f4f6ef) drop-shadow(-1px 0 0 #f4f6ef) drop-shadow(0 1px 0 #f4f6ef) drop-shadow(0 -1px 0 #f4f6ef);}',
+    '.p1-product-player[data-local-player="true"]{filter:none;}',
     '.p1-product-focused-target{outline:1px solid #f4f6ef;outline-offset:1px;box-shadow:0 0 0 1px #111722;}',
     '.p1-product-focused-target[data-resource-size]{outline:none;box-shadow:none;filter:drop-shadow(1px 0 0 #e6ebcf) drop-shadow(-1px 0 0 #e6ebcf) drop-shadow(0 -1px 0 #e6ebcf);}',
     '.p1-product-critical{z-index:890000!important;}',
@@ -910,22 +910,8 @@ export function createPhase1ProductReviewWorldRenderer(
           fog.dataset.worldRole = 'fog';
           fog.dataset.fogState = 'UNEXPLORED';
           fog.dataset.fogMask = String(mask);
-          applySprite(
-            fog,
-            fogMaskSprite(mask),
-            EXPLORATION_CELL_RASTER_SCALE,
-          );
-          // Preserve the canonical reveal mask while replacing the hatch with layered pixel clouds.
-          fog.style.height = String(EXPLORATION_CELL_LOGICAL_PIXELS / 2) + 'px';
-          fog.style.clipPath = 'polygon(50% -.5%,100.5% 50%,50% 100.5%,-.5% 50%)';
-          fog.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
-          fog.style.backgroundSize = '128px 128px';
-          fog.style.backgroundRepeat = 'repeat';
-          const drift = Math.floor(authorityTick / 120);
-          fog.style.backgroundPosition = String(-(gx - gy) * EXPLORATION_CELL_LOGICAL_PIXELS / 2
-            + EXPLORATION_CELL_LOGICAL_PIXELS / 2 + drift) + 'px '
-            + String(-(gx + gy) * EXPLORATION_CELL_LOGICAL_PIXELS / 4) + 'px';
-          fog.dataset.fogTreatment = 'layered-pixel-clouds';
+          applySprite(fog,fogFrontierSprite(mask),1);
+          fog.dataset.fogTreatment='soft-ground-frontier';
           if (
             setWorldCenter(
               fog,
@@ -933,7 +919,7 @@ export function createPhase1ProductReviewWorldRenderer(
               camera,
               EXPLORATION_CELL_LOGICAL_PIXELS,
               EXPLORATION_CELL_LOGICAL_PIXELS / 2,
-              700000,
+              -50000,
               rasterOrigin,
             )
           ) {
@@ -1316,6 +1302,13 @@ export function createPhase1ProductReviewWorldRenderer(
     if(regionalWeather!==null){
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
       for(const site of bundle.colonyDepth.sites()){
+        if(site.template){
+          // Reveal each trace independently: seeing a trace never reveals its destination.
+          const traces=[[-8,0,'paving'],[-5,1,'paving'],[-3,0,'conduit'],[4,3,'wall'],[5,-3,'wall'],[0,5,'paving']] as const;
+          for(let index=0;index<traces.length;index++){const [dx,dy,kind]=traces[index]!,at={x:site.position.x+dx,y:site.position.y+dy};
+            if(worldPositionKnown(bundle,at)){const trace=renderSprite(explorationTraceSprite(kind),at,camera,'ruin-trace',site.id+':trace:'+index,{zIndex:worldDepthOrder(at,kind==='wall'?-2:-80000),data:Object.freeze({traceKind:kind})});if(trace){trace.style.pointerEvents='none';trace.removeAttribute('role');trace.removeAttribute('tabindex');}}
+          }
+        }
         if(!worldPositionKnown(bundle,site.position))continue;
         const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
         if(rendered && site.template){

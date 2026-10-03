@@ -43,3 +43,64 @@ body { block-size:100dvh; }
 #app .p1-map-resource-glyph { display:inline-block; color:#d4dfb0; font-size:12px; text-shadow:1px 1px #102029; }
 #app :is(.sp-expedition-panel,.lw-panel,.p2-colony-panel) { padding:var(--ui-inset); gap:var(--ui-gap); max-inline-size:calc(100vw - 24px); }
 @media(max-width:720px) { :root { --ui-inset:8px; --ui-gap:6px; } #app .lobby-layout { grid-template-columns:minmax(0,1fr); } }
+/* UI pixels are independent of the world's raster/camera scale. */
+#proz0-phase1-ui { font:13px/1.4 var(--ui-font); text-shadow:none; --ui-native-copy:13px; --ui-native-title:18px; --ui-native-gap:8px; }
+#proz0-phase1-ui .p1-panel { width:min(880px,calc(100% - 32px)); max-height:calc(100% - 148px); padding:16px; font-size:13px; top:50%; left:50%; transform:translate(-50%,-50%); overflow:auto; }
+#proz0-phase1-ui .p1-panel-title { font-size:18px; padding:0 0 12px; }
+#proz0-phase1-ui .p1-panel-skin-corner { display:none; }
+#proz0-phase1-ui :is(.p1-action,.p1-item-row) { font:inherit; line-height:1.4; min-height:36px; padding:6px 10px; }
+#proz0-phase1-ui :is(.p1-panel,.p1-inventory-bag,.p1-build-catalog,.p1-item-list), :is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-coop-panel) { overflow-anchor:none; scroll-behavior:auto; overscroll-behavior:contain; }
+#proz0-phase1-ui .p1-inventory-layout { grid-template-columns:minmax(300px,.95fr) minmax(0,1.2fr); gap:16px; }
+#proz0-phase1-ui .p1-inventory-bag { max-height:none; overflow:visible; }
+#proz0-phase1-ui .p1-inventory-layout .p1-wardrobe { grid-template-columns:1fr 80px 1fr; padding:8px; gap:8px; }
+#proz0-phase1-ui .p1-wardrobe-slot { font-size:12px; min-height:90px; padding:6px; }
+#proz0-phase1-ui .p1-wardrobe-slot .p1-action { font-size:12px; min-height:32px; padding:4px; }
+#proz0-phase1-ui .p1-avatar { width:80px; }
+#proz0-phase1-ui .p1-wardrobe-help { font-size:12px; }
+#proz0-phase1-ui .p1-character-inspection { font-size:13px; padding:8px; }
+#proz0-phase1-ui .p1-item-inspection { padding:12px; font-size:13px; }
+#proz0-phase1-ui .p1-item-inspection h3 { font-size:17px; }
+#proz0-phase1-ui .p1-item-state { font-size:11px; }
+#proz0-phase1-ui .p1-craft-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+#proz0-phase1-ui .p1-craft-row { padding:12px; display:grid; gap:8px; }
+#proz0-phase1-ui .p1-craft-heading { min-height:32px; gap:8px; }
+#proz0-phase1-ui .p1-craft-ingredients { display:flex; flex-wrap:wrap; gap:8px; }
+#proz0-phase1-ui .p1-craft-footer { align-items:center; gap:8px; }
+#proz0-phase1-ui .p1-craft-navigation { display:flex; gap:6px; justify-content:center; padding-bottom:12px; }
+#proz0-phase1-ui .p1-craft-navigation button { min-width:36px; }
+#proz0-phase1-ui .p1-craft-navigation [aria-current=page] { border-color:#d4dfb0; background:#415751; }
+#proz0-phase1-ui .p1-panel[data-panel-kind=build] { width:min(460px,calc(100% - 32px)); }
+#proz0-phase1-ui .p1-build-catalog { max-height:36vh; }
+#proz0-phase1-ui .p1-build-name { display:inline; }
+#proz0-phase1-ui .p1-survival { width:224px!important; padding:8px; gap:4px; }
+#proz0-phase1-ui .p1-survival .p1-meter { grid-template-columns:104px 62px 25px 8px; font-size:12px; }
+#proz0-phase1-ui .p1-world { width:180px; padding:8px; }
+#proz0-phase1-ui :is(.p1-equipment,.p1-carry,.p1-interaction,.p1-first-action,.p1-toasts) { font-size:12px; }
+#proz0-phase1-ui .p1-action-dock { right:16px; bottom:16px; gap:6px; z-index:5; }
+#proz0-phase1-ui .p1-action-dock button { width:48px; height:52px; font:11px/1 var(--ui-font); padding:4px; grid-template-rows:28px 12px; }
+#proz0-phase1-ui .p1-action-dock svg { width:24px; height:24px; }
+#proz0-phase1-ui .p1-ui-controls { font-size:12px; margin:8px 0; }
+:is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-coop-panel) { border-radius:4px; font:13px/1.5 var(--ui-font); }
+:is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-coop-panel) article { display:grid; grid-template-columns:32px minmax(0,1fr) auto; gap:8px; align-items:center; padding:12px; }
+:is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-coop-panel) article :is(p,small) { grid-column:1/-1; margin:4px 0; }
+:is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-coop-panel) article :is(h3,strong) { grid-column:1/-1; margin:0; font-size:14px; }
+:is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-coop-panel) article button { margin:0; font:13px/1.4 var(--ui-font); min-height:36px; }
+:is(.p2-cost,.sp-cost,.coop-cost) { display:inline-flex; align-items:center; gap:6px; min-height:32px; }
+@media(max-width:850px) { #proz0-phase1-ui .p1-inventory-layout { grid-template-columns:minmax(0,1fr); } #proz0-phase1-ui .p1-craft-list { grid-template-columns:minmax(0,1fr); } }
+@media(max-height:500px) { #proz0-phase1-ui .p1-panel { max-height:calc(100% - 84px); padding:10px; } #proz0-phase1-ui .p1-action-dock { bottom:4px; } }
+.p2-material { position:relative; display:inline-block; font-size:12px; }
+.p2-material summary { display:flex; gap:6px; align-items:center; list-style:none; cursor:pointer; background:#1b3037; border:1px solid #68827b; border-radius:3px; padding:4px 8px; min-height:34px; font-variant-numeric:tabular-nums; }
+.p2-material[data-sufficient=false] summary { border-color:#c59176; border-style:dashed; }
+.p2-material[open] { grid-column:1/-1; }
+.p2-material p { padding:8px; margin:4px 0!important; background:#162730; color:#dae4cf; max-width:360px; }
+.p2-material summary::-webkit-details-marker { display:none; }
+.p2-material[open] summary { border-color:#d4dfb0; }
+.p2-colony-controls .p2-colony-panel { width:min(680px,calc(100vw - 32px)); }
+.p2-colony-panel article { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.p2-colony-panel article strong { grid-column:1/-1; }
+.p2-colony-panel article > button { justify-self:start; }
+.p2-material summary:focus-visible { outline:2px solid #d4dfb0; outline-offset:2px; }
+
+.lw-state-cue{position:absolute;right:-4px;top:-12px;background:#172c34;border:1px solid #dfc878;color:#f3d98e;font:12px monospace;min-width:14px;padding:1px;pointer-events:none}.lw-state-cue[hidden]{display:none}.lw-seed-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.lw-seed-choices button{display:flex;align-items:center;gap:6px;margin:0!important;text-align:left}
+
+.lw-panel article,.sp-expedition-panel article{display:flex;flex-wrap:wrap;gap:8px}.lw-panel article :is(h3,p,.lw-seed-choices),.sp-expedition-panel article :is(h3,p){flex-basis:100%}.lw-panel article .lw-seed-choices{width:100%}.lw-panel article>button{flex:1 1 100px}

@@ -5,7 +5,7 @@ import { createPhase1ProductReviewRuntime } from '../../src/client/runtime/Phase
 import { setLocale } from '../../src/client/localization/Locale';
 
 it('keeps primary panels and the document within three viewports in EN/VI, with scrollable hidden bars',async()=>{
-  const root=document.createElement('section');root.id='app';root.style.cssText='position:relative;width:100%;height:100%;';document.body.append(root);
+  const root=document.createElement('section');root.id='app';root.dataset.testid='layout-root';root.style.cssText='position:relative;width:100%;height:100%;';document.body.append(root);
   const runtime=await createPhase1ProductReviewRuntime(root,{worldId:'world:ui-layout',worldSeed:'p1-world-golden',playerIds:['solo'],localPlayerId:'solo',singlePlayerExpeditionEnabled:true,colonyDepthEnabled:true,interactionRangeWorldUnits:1.25,spawnClearanceRadiusWorldUnits:1.25,requiredAccessRadiusWorldUnits:1.25});
   try {
     for(const [width,height] of [[1280,720],[1920,1080],[640,360]]){
@@ -28,7 +28,7 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
           expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width!);
           expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(height!);
           expect(getComputedStyle(panel!).scrollbarWidth).toBe('none');
-          if(key==='i')await page.elementLocator(root).screenshot({path:`../../.vitest/attachments/ui-inventory-${width}-${language}.png`});
+          if(key==='i')await page.getByTestId('layout-root').screenshot({path:`../../.vitest/attachments/ui-inventory-${width}-${language}.png`});
         }
       }
     }

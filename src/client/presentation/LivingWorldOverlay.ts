@@ -1,3 +1,6 @@
+import { gameUiText } from '../localization/GameUiMessages';
+import { materialHint,materialSource } from './MaterialGuide';
+import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
 import { locale } from '../localization/Locale';
 import { uiText } from '../localization/UiMessages';
@@ -322,6 +325,8 @@ export function createLivingWorldOverlay(
         anchor: e.pen ?? `${e.anchorX}:${e.anchorY}`, 
       })),
     ];
+    // Reserve visible budget for animals before abundant forage; never expose hidden nodes.
+    objects.sort((a,b)=>(a.role==='animal'?0:a.role==='plot'?1:2)-(b.role==='animal'?0:b.role==='plot'?1:2)||Math.hypot(a.e.x-p.x,a.e.y-p.y)-Math.hypot(b.e.x-p.x,b.e.y-p.y)||(a.e.id<b.e.id?-1:a.e.id>b.e.id?1:0));
     for (const { e, role, kind, progress, dead, young, anchor } of objects) {
       if (Math.hypot(e.x - p.x, e.y - p.y) > 16 || visible.size >= 64) continue;
       if (!worldPositionKnown(bundle, e)) continue;
@@ -374,6 +379,15 @@ export function createLivingWorldOverlay(
         const svg = b.querySelector('svg')!;
         svg.style.cssText = `position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:${definition.width}px;height:${definition.height}px`;
       }
+      let cue = b.querySelector<HTMLElement>('.lw-state-cue');
+      if (!cue) { cue=document.createElement('span');cue.className='lw-state-cue';b.append(cue); }
+      let cueLabel='', cueIcon='';
+      if(role==='animal') { const animal=state.animals.find(v=>v.id===e.id)!;
+        if(animal.owner===player && animal.health>0) { if(animal.thirst<2500){cueLabel=gameUiText('thirsty');cueIcon='◒';}else if(animal.energy<2500){cueLabel=gameUiText('hungry');cueIcon='♧';} }
+      } else if(role==='plot') {const plot=state.plots.find(v=>v.id===e.id)!;
+        if(!plot.dead&&plot.crop){ if(plot.moisture<2500){cueLabel=gameUiText('thirsty');cueIcon='◒';}else if(progress>=1){cueLabel=gameUiText('ready');cueIcon='✓';} }
+      }
+      cue.hidden=!cueLabel;cue.textContent=cueIcon;cue.setAttribute('aria-hidden','true');b.dataset.careState=cueLabel;
       b.dataset.dead = String(dead);
       b.dataset.livingRole = role;
       b.dataset.livingKind = kind;
@@ -385,7 +399,7 @@ export function createLivingWorldOverlay(
           : role === 'animal'
             ? uiPhrase(speciesDefinition(kind)!.name)
             : uiPhrase(forageDefinition(kind)!.name) ?? "");
-      b.removeAttribute('title');
+      if(cueLabel){b.setAttribute('aria-label',(b.getAttribute('aria-label')??'')+' · '+cueLabel);b.title=cueLabel;}else b.removeAttribute('title');
       if (role === 'plot') {
         const plot = state.plots.find(plot => plot.id === e.id)!;
         b.dataset.moisture = moistureState(plot.moisture);
@@ -445,6 +459,7 @@ export function createLivingWorldOverlay(
     ]);
     if (next === signature) return;
     signature = next;
+    const restoreUi=capturePanelUi(panel);
     const scrollTop = panel.scrollTop,
       craftOpen =
         panel.querySelector<HTMLDetailsElement>('details')?.open ??
@@ -517,13 +532,14 @@ export function createLivingWorldOverlay(
       );
       const growth = authority.plotStatus(plot.id);
       if (growth && !plot.dead && !targeted) a.append(text('p', growthText(growth)));
-      if (!plot.crop)
-        for (const c of CROPS)
-          a.append(
-            button(uiText("ui.3fc2d456") + uiPhrase(c.name), () =>
-              execute('plant', plot.id, { crop: c.id }),
-            ),
-          );
+      const soil = text('p',gameUiText('soil',{name:uiPhrase(soilAt(bundle.config.worldSeed,plot).name),moisture:Math.round(plot.moisture/100),fertility:plot.fertility}));a.append(soil);
+      if (!plot.crop) {
+        const choices=document.createElement('div');choices.className='lw-seed-choices';
+        for(const c of CROPS) {const count=inventory.stacks.filter(v=>v.itemDefinitionId===c.seed).reduce((n,v)=>n+v.quantity,0);
+          const choice=button(gameUiText('seed',{name:uiPhrase(c.name),count}),()=>execute('plant',plot.id,{crop:c.id}));choice.disabled=count===0;choice.dataset.crop=c.id;
+          const icon=document.createElement('span'),sprite=itemIconSprite(c.seed);if(sprite){applyProductionSprite(icon,sprite,1);choice.prepend(icon);}choices.append(choice);
+        } a.append(choices);
+      }
       a.append(
         button(uiText("ui.71d2725c"), () => execute('water', plot.id)),
         button(uiText("ui.ebb18eea"), () => execute('fertilize', plot.id)),
@@ -675,27 +691,10 @@ export function createLivingWorldOverlay(
         applyProductionSprite(icon, sprite, 1.2);
         a.prepend(icon);
       }
-      a.append(
-        text(
-          'p',
-          r.costs
-            .map(
-              ([id, q]) =>
-                contentDisplayName(bundle.catalog.get(id)) +
-                ' ' +
-                inventory.stacks
-                  .filter((s) => s.itemDefinitionId === id)
-                  .reduce((sum, s) => sum + s.quantity, 0) +
-                '/' +
-                q,
-            )
-            .join(' · ') +
-            (r.station ? uiText("ui.73fe98fe") + r.station.replaceAll('-', ' ') : ''),
-        ),
-        button(uiText("ui.93077f53") + uiPhrase(r.name), () => execute('craft', r.id)),
-      );
+      for(const [id,q] of r.costs)a.append(materialHint(document,contentDisplayName(bundle.catalog.get(id)),materialSource(bundle.catalog,id),inventory.stacks.filter(stack=>stack.itemDefinitionId===id).reduce((n,stack)=>n+stack.quantity,0),q,id));
+      a.append(button(uiText("ui.93077f53")+uiPhrase(r.name),()=>execute('craft',r.id)));
     }
-    panel.scrollTop = scrollTop;
+    panel.scrollTop = scrollTop;restoreUi();
   };
   const pointer = (e: PointerEvent) => {
     cursor = { x: e.clientX, y: e.clientY };

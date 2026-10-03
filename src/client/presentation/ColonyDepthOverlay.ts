@@ -1,3 +1,6 @@
+import { gameUiText } from '../localization/GameUiMessages';
+import { materialHint,materialSource } from './MaterialGuide';
+import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
 import { locale } from '../localization/Locale';
 import { uiText } from '../localization/UiMessages';
@@ -16,7 +19,6 @@ import {
 } from "../../world/phase2/ColonyRegions";
 import {
   applyProductionSprite,
-  itemIconSprite,
 } from "./Phase1ProductionAssets";
 import type { ColonyDepthCommand } from "../../simulation/colony/ColonyDepthAuthority";
 import { createColonyAudio } from "./ColonyAudio";
@@ -173,6 +175,7 @@ export function createColonyDepthOverlay(
     if (current === signature) return;
     signature = current;
     content.hidden = panel === null;
+    const restoreUi=capturePanelUi(content);
     content.replaceChildren();
     if (panel === null) return;
     const heading = document.createElement("h2");
@@ -202,16 +205,7 @@ export function createColonyDepthOverlay(
             .filter((s) => s.itemDefinitionId === cost.itemDefinitionId)
             .reduce((sum, s) => sum + s.quantity, 0);
           if (have < cost.quantity) affordable = false;
-          const costNode = document.createElement("span");
-          costNode.className = "p2-cost";
-          bindUiText(costNode,"title",cost.itemDefinitionId);
-          const icon = document.createElement("span");
-          const sprite = itemIconSprite(cost.itemDefinitionId);
-          if (sprite !== null) applyProductionSprite(icon, sprite, 1);
-          costNode.append(
-            icon,
-            document.createTextNode(String(have) + "/" + String(cost.quantity)),
-          );
+          const costNode=materialHint(document,contentDisplayName(bundle.catalog.get(cost.itemDefinitionId)),materialSource(bundle.catalog,cost.itemDefinitionId),have,cost.quantity,cost.itemDefinitionId);
           row.append(costNode);
         }
         const complete = state.researchIds.includes(def.id);
@@ -223,7 +217,7 @@ export function createColonyDepthOverlay(
           complete
             ? uiText("ui.8d997cbb")
             : !eligible
-              ? uiText("ui.753d67cf") + def.prerequisites.join(", ")
+              ? uiText("ui.753d67cf") + def.prerequisites.map(id=>uiPhrase(COLONY_RESEARCH.find(r=>r.id===id)?.name??id)).join(", ")
               : uiText("ui.5caeb9ec"),
           "research",
           def.id,
@@ -262,6 +256,10 @@ export function createColonyDepthOverlay(
         content.append(row);
       }
     if (panel === "journal") {
+      const observedSites=sites.filter(site=>site.template&&state.inspectedSites.includes(site.id));
+      const guidance=document.createElement('p');guidance.dataset.explorationGuidance='true';bindUiText(guidance,'textContent',gameUiText('traceHint'));content.append(guidance);
+      if(observedSites.length>=2){const network=document.createElement('p');network.dataset.observedNetwork='true';bindUiText(network,'textContent',gameUiText('networkHint',{names:observedSites.map(site=>uiPhrase(site.name)).join(' · ')}));content.append(network);}
+
       const discovered=sites.filter(site=>{const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));});
       for(const site of discovered){
         const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
@@ -313,6 +311,7 @@ export function createColonyDepthOverlay(
         content.append(empty);
       }
     }
+    restoreUi();
   }
   const onKey = (event: KeyboardEvent): void => {
     if (
