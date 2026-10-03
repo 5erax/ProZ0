@@ -67,6 +67,7 @@ export interface LivingWorldState {
   receipts: { id: string; signature: string; message: string }[];
   fishing?: FishingState;
   soil?: SoilStateV1;
+  huntCooldowns?: {version:1;until:Record<string,number>};
 }
 export const emptyLivingWorld = (tick = 0): LivingWorldState => ({
   version: 1,
@@ -114,6 +115,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
     s.receipts.length > 96
   )
     throw Error('Invalid living world');
+  if(s.huntCooldowns!==undefined && (!s.huntCooldowns || s.huntCooldowns.version!==1 || !s.huntCooldowns.until || Array.isArray(s.huntCooldowns.until) || typeof s.huntCooldowns.until!=='object' || Object.keys(s.huntCooldowns.until).length>32 || Object.entries(s.huntCooldowns.until).some(([id,tick])=>!id||id.length>120||!n(tick))))throw Error('Invalid hunting cooldowns');
   const ids = new Set<string>();
   if (s.fishing !== undefined) validateFishingState(s.fishing);
   if (s.soil !== undefined) validateSoilState(s.soil);

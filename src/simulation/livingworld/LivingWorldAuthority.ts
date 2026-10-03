@@ -11,6 +11,7 @@ import {
   livingHash,
 } from '../../content/livingworld/LivingWorldContent';
 import type { Phase1ItemAuthority } from '../items';
+import type { PreparedLivingHunt } from '../combat/CombatAuthority';
 import { renewablePlant, forageGrowthView, plantGrowthView } from './PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { GEAR_RECIPES } from '../../content/livingworld/EquipmentContent';
@@ -34,7 +35,7 @@ export interface LivingServices {
   ground(x: number, y: number, ignoreFacility?: string): boolean;
   plotGround(x: number, y: number): string | null;
   weather(x: number, y: number): string;
-  weapon(id: string): boolean;
+  hunt?(id:string,inventoryRevision:number,target:{x:number;y:number}):PreparedLivingHunt|string;
   cancelRest(id: string): void;
   canonicalRoots?: {
     get(id: string): {x:number;y:number;revision:number;cut:boolean;rootItemId:string} | null;
@@ -869,11 +870,15 @@ export class LivingWorldAuthority {
       } else {
         if (a.health === 0) return reject('ANIMAL_DEAD');
         if (c.action === 'hunt') {
-          if (!this.services.weapon(c.playerId))
-            return reject('EQUIP_WEAPON_FIRST');
-          if (this.services.tick() < a.attackTick) return reject('COOLDOWN');
-          a.health = Math.max(0, a.health - 4);
-          a.attackTick = this.services.tick() + 60;
+          const cooldowns=next.huntCooldowns?.until;
+          if (this.services.tick() < (cooldowns && Object.hasOwn(cooldowns,c.playerId)?cooldowns[c.playerId]!:0)) return reject('COOLDOWN');
+          const hunt=this.services.hunt?.(c.playerId,c.expectedInventoryRevision,a);
+          if(hunt===undefined)return reject('HUNT_AUTHORITY_UNAVAILABLE');
+          if(typeof hunt==='string')return reject(hunt);
+          a.health = Math.max(0, a.health - hunt.damage);
+          next.huntCooldowns??={version:1,until:{}};
+          next.huntCooldowns.until={...next.huntCooldowns.until,[c.playerId]:this.services.tick()+hunt.cooldownTicks};
+          toolWear=hunt.toolWear;commitWorld=hunt.commit;
           message = a.health === 0 ? 'HUNTED' : 'HIT';
         } else if (c.action === 'tame') {
           if (a.pen) return reject('ALREADY_TAME');
@@ -933,7 +938,7 @@ export class LivingWorldAuthority {
     }
     // Validate candidate state before paying either side of the item exchange.
     try { validateLivingWorld(next); } catch { return reject('INVALID_LIVING_STATE'); }
-    if (inputs.length || outputs.length) {
+    if (inputs.length || outputs.length || toolWear) {
       const result = this.items.commitColonyExchange({
         operationId: c.id,
         playerId: c.playerId,

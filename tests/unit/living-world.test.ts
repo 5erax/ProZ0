@@ -96,11 +96,12 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
                   'item:edible-plant',
                   'item:grain',
                   'item:plant-fiber',
+                  'item:basic-spear',
                 ].map((id, i) => ({
                   stackId: 'item' + i,
                   itemDefinitionId: id,
-                  quantity: i < 2 ? 1 : 3,
-                  condition: null,
+                  quantity: i < 2 || id === 'item:basic-spear' ? 1 : 3,
+                  condition: id === 'item:basic-spear' ? 100 : null,
                 })),
           },
         ],
@@ -140,7 +141,7 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
     ground: () => !blocked,
     plotGround: () => (blocked ? 'OBSTRUCTED' : null),
     weather: () => (wet ? 'mist-rain' : 'clear'),
-    weapon: () => weapon,
+    hunt: () => weapon ? {damage:4,cooldownTicks:60,toolWear:{stackId:'item10',conditionCost:1},commit:()=>null} : 'EQUIP_WEAPON_FIRST',
     cancelRest: () => {},
   };
   const authority = new LivingWorldAuthority(

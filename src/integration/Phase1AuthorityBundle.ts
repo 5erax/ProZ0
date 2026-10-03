@@ -1,5 +1,4 @@
 import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
-import { isKnownMeleeEquipment } from '../content/livingworld/EquipmentContent';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
 import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
@@ -472,7 +471,7 @@ export class Phase1AuthorityBundle {
       ground:(x,y,ignore)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>f.id!==ignore&&Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
       plotGround:(x,y)=>{const r=buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true);return typeof r==='string'?r:null;},
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
-      weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&isKnownMeleeEquipment(s.itemDefinitionId)&&(s.condition??0)>0);},
+      hunt:(id,revision,target)=>this.combat.prepareLivingHunt(id,revision,target),
       cancelRest:id=>this.expedition!.cancelRest(id),
       canonicalRoots: {
         get: id => {
@@ -683,6 +682,7 @@ export class Phase1AuthorityBundle {
       survival,
       items,
       world,
+      config.reopen?.bundle.world.livingWorld?.huntCooldowns?.until,
     );
     const death = new Phase1DeathAuthority(
       survival,

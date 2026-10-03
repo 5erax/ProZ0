@@ -965,6 +965,7 @@ function globalCrossReferences(
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
   const living=bundle.world.livingWorld;
+  if(living?.huntCooldowns && Object.entries(living.huntCooldowns.until).some(([id,tick])=>!players.has(id)||tick>bundle.world.authorityTick+600))return saveFailure('CORRUPT_RECORD','Invalid saved hunting cooldown references.');
   if (bundle.world.contentCompatibility.canonicalFingerprint !== policy.catalog.compatibility.canonicalFingerprint && (bundle.containers.some(c=>c.stacks.some(stack=>CANONICAL_ROOT_ITEMS.some(item=>item.id===stack.itemDefinitionId))) || living?.forage.some(f=>['timber-tree','fiber-plant','food-plant'].includes(f.kind)))) return saveFailure('CORRUPT_RECORD','Previous content identity cannot contain canonical-root transplants');
   if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
   if(acceptsPreviousLivingCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living?.fishing || bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId))))) return saveFailure('CORRUPT_RECORD', 'Prior living catalog cannot contain newly introduced roots or fishing.');
