@@ -28,6 +28,28 @@ const portable = (b: Phase1AuthorityBundle) => {
     recordKind: 'portable-bundle',
   };
 };
+it('saved watered soil reopens at the same world time, drains on active steps and rejects unknown profiles',async()=>{
+  const source=await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:true});
+  let reopened:Phase1AuthorityBundle|null=null;
+  try {
+    await source.stepSolo();const save=portable(source);
+    save.world.livingWorld!.soil={version:1,patches:[{key:'0:0',moisture:10000}]};
+    const policy=createPhase1SaveV2Compatibility(source.catalog,[3,4]),restored=reconstructPhase1ReopenState(save,policy);
+    expect(restored.ok).toBe(true);if(!restored.ok)throw Error(restored.message);
+    reopened=await Phase1AuthorityBundle.create({...config,singlePlayerExpeditionEnabled:true,reopen:restored.value});
+    expect(reopened.livingWorld!.read().soil).toEqual(save.world.livingWorld!.soil);
+    const ledger=reopened.items.exportLedgerSnapshot();
+    for(let i=0;i<60;i++)await reopened.stepSolo();
+    expect(reopened.livingWorld!.read().soil!.patches[0]!.moisture).toBeLessThan(10000);
+    expect(reopened.items.exportLedgerSnapshot()).toEqual(ledger);
+    const next=portable(reopened),again=reconstructPhase1ReopenState(next,policy);
+    expect(again.ok).toBe(true);if(again.ok)expect(again.value.bundle.world.livingWorld!.soil).toEqual(next.world.livingWorld!.soil);
+    for(const soil of [{version:2,patches:[]},{version:1,patches:[{key:'00:0',moisture:10000}]},{version:1,patches:[{key:'0:0',moisture:10001}]}]){
+      const invalid={...next,world:{...next.world,livingWorld:{...next.world.livingWorld!,soil}}};
+      expect(reconstructPhase1ReopenState(invalid,policy).ok).toBe(false);
+    }
+  } finally {await reopened?.destroy();await source.destroy();}
+});
 it('known additive catalog upgrade preserves old terrain, inventory and clock; unknown fingerprints still reject', async () => {
   const old = await Phase1AuthorityBundle.create({
     ...config,

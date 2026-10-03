@@ -642,3 +642,18 @@ it('tilling clears wild plants and pays remaining forage once; a full bag preser
   expect(full.authority.read()).toEqual(soilBefore);
   expect(full.items.getContainerView('inventory:solo')).toEqual(itemsBefore);
 });
+
+
+it('watering a plot writes the same saved wet-soil cell and replay cannot consume water or create another patch',()=>{
+  const f=fixture({plots:[{id:'plot:wet',owner:'solo',x:102,y:100,crop:'grain',progress:0,moisture:2000,dryTicks:0,dead:false,fertility:0}]});
+  const command={id:'water:ground',playerId:'solo',expectedRevision:f.authority.read().revision,expectedInventoryRevision:f.items.getContainerView('inventory:solo').revision,action:'water' as const,target:'plot:wet'};
+  expect(f.authority.execute(command).status).toBe('committed');
+  const saved=f.authority.read();expect(saved.soil?.patches).toEqual([{key:'25:25',moisture:10000}]);expect(saved.plots[0]!.moisture).toBe(10000);
+  const ledger=f.items.getContainerView('inventory:solo');expect(f.authority.execute(command).status).toBe('committed');expect(f.items.getContainerView('inventory:solo')).toEqual(ledger);expect(f.authority.read().soil).toEqual(saved.soil);
+});
+it('soil patch capacity rejects watering atomically instead of evicting remote water or consuming supplies',()=>{
+  const f=fixture({plots:[{id:'plot:bounded',owner:'solo',x:102,y:100,crop:'grain',progress:0,moisture:2000,dryTicks:0,dead:false,fertility:0}],soil:{version:1,patches:Array.from({length:512},(_,i)=>({key:i+':-100',moisture:10000}))}});
+  const before=f.authority.read(),ledger=f.items.getContainerView('inventory:solo');
+  expect(f.authority.execute({id:'water:capacity',playerId:'solo',expectedRevision:before.revision,expectedInventoryRevision:ledger.revision,action:'water',target:'plot:bounded'}).message).toBe('SOIL_PATCH_CAPACITY');
+  expect(f.authority.read()).toEqual(before);expect(f.items.getContainerView('inventory:solo')).toEqual(ledger);
+});

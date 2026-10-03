@@ -1,3 +1,4 @@
+import {validateSoilState,type SoilStateV1} from './SoilMoisture';
 import {
   cropDefinition,
   speciesDefinition,
@@ -65,6 +66,7 @@ export interface LivingWorldState {
   stations: LivingStation[];
   receipts: { id: string; signature: string; message: string }[];
   fishing?: FishingState;
+  soil?: SoilStateV1;
 }
 export const emptyLivingWorld = (tick = 0): LivingWorldState => ({
   version: 1,
@@ -114,6 +116,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
     throw Error('Invalid living world');
   const ids = new Set<string>();
   if (s.fishing !== undefined) validateFishingState(s.fishing);
+  if (s.soil !== undefined) validateSoilState(s.soil);
   for (const e of [...s.plots, ...s.animals, ...s.forage, ...s.stations]) {
     if (
       !e ||

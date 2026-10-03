@@ -1,3 +1,4 @@
+import {naturalSoilMoisture, soilCellKey} from '../../simulation/livingworld/SoilMoisture';
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
 import { resourceLifecycleFacts } from '../../world/phase1/ResourceLifecycle';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
@@ -17,7 +18,7 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
-import { colonyBiomeAt, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
+import { colonyBiomeAt, colonyWeatherAt, colonyWeatherVisualAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
 import { colonyTerrainSprite, colonyLandmarkSprite, colonyResourceSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
@@ -584,9 +585,22 @@ export function createPhase1ProductReviewWorldRenderer(
   const particleHost = document.createElement('div');
   particleHost.style.cssText = 'position:absolute;inset:0;pointer-events:none';
   particleHost.attachShadow({ mode: 'closed' }).append(particles.canvas);
+  const groundParticleHost = document.createElement('div');
+  groundParticleHost.style.cssText = 'position:absolute;width:640px;height:360px;z-index:-80000;pointer-events:none';
+  groundParticleHost.attachShadow({mode:'closed'}).append(particles.groundCanvas);
   const motionPreference = targetWindow.matchMedia('(prefers-reduced-motion: reduce)');
   const soilMoistures = new Map<string, number>();
   let soilRevision = -1;
+  let soilFieldSecond = -1;
+  const naturalMoistures = new Map<string,number>();
+  const terrainMoisture = (key:string,point:WorldPosition,tick:number):number => {
+    const watered=soilMoistures.get(soilCellKey(point));if(watered!==undefined)return watered;
+    const second=Math.floor(tick/60);
+    if(second!==soilFieldSecond){soilFieldSecond=second;naturalMoistures.clear();}
+    let value=naturalMoistures.get(key);
+    if(value===undefined){value=naturalSoilMoisture(bundle.config.worldSeed,point,second*60);if(naturalMoistures.size>=4096)naturalMoistures.clear();naturalMoistures.set(key,value);}
+    return value;
+  };
 
   root.replaceChildren(canvas, layer);
 
@@ -782,7 +796,7 @@ export function createPhase1ProductReviewWorldRenderer(
         if (known) {
         const tile = sceneElement('terrain:' + String(gx) + ':' + String(gy));
         if (tile.dataset.worldRole !== 'terrain') {
-          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED';
+          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED'; tile.dataset.soilCell=soilCellKey(position);
         }
         if (tile.dataset.terrainState !== terrain) tile.dataset.terrainState = terrain;
         if(bundle.livingWorld && terrain!=='water' && !tile.dataset.soil)tile.dataset.soil=soilAt(bundle.config.worldSeed,position).id;
@@ -807,13 +821,13 @@ export function createPhase1ProductReviewWorldRenderer(
         applySprite(
           tile,
           bundle.config.colonyDepthEnabled===true
-            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', stableDecorHash(gx, gy) % 8, moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
+            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', (stableDecorHash(Math.floor(gx/3),Math.floor(gy/3))+stableDecorHash(gx,gy)%3)%8, moistureState(terrainMoisture(gx+':'+gy,position,authorityTick)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
             : terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
         const filter = night ? 'brightness(.78) saturate(.72)' : '';
         if (tile.style.filter !== filter) tile.style.filter = filter;
-        const moisture = moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000));
+        const moisture = moistureState(terrainMoisture(gx+':'+gy,position,authorityTick));
         if (tile.dataset.moisture !== moisture) tile.dataset.moisture = moisture;
         const raisedShore = groundShore !== 0;
         if (raisedShore && tile.dataset.terrainDepth !== 'raised-shore') {
@@ -1222,8 +1236,8 @@ export function createPhase1ProductReviewWorldRenderer(
     const living = bundle.livingWorld?.presentationSnapshot();
     if (living && living.revision !== soilRevision) {
       soilRevision = living.revision; soilMoistures.clear();
-      for (const f of living.forage) if (!f.cleared && f.growth) soilMoistures.set(Math.floor(f.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(f.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), f.growth.moisture);
-      for (const p of living.plots) soilMoistures.set(Math.floor(p.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(p.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), p.moisture);
+      for (const p of living.soil?.patches ?? []) soilMoistures.set(p.key,p.moisture);
+      for (const p of living.plots) soilMoistures.set(soilCellKey(p), p.moisture);
     }
     const offset = projectPhase1Isometric(camera, rasterOrigin);
     worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y) + 'px)';
@@ -1571,13 +1585,33 @@ export function createPhase1ProductReviewWorldRenderer(
     }
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
-    if (raining || regionalWeather?.weather === 'dry-wind') {
+    const windVisual = regionalWeather ? colonyWeatherVisualAt(bundle.config.worldSeed,camera,bundle.authorityTick) : undefined;
+    const windVisible = regionalWeather?.biomeId === 'ochre-badlands' && windVisual?.phase !== 'calm';
+    if (raining || windVisible) {
       const kind = raining ? 'rain' : 'dry-wind';
       const weather = sceneElement('weather:particles');
       weather.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none';
       weather.dataset.weatherEffect = raining ? 'cold-rain' : 'dry-wind';
       if (particleHost.parentElement !== weather) weather.append(particleHost);
-      particles.render(kind, targetWindow.performance.now() / 1000, projectPhase1Isometric(camera, rasterOrigin), motionPreference.matches);
+      const dustAnchors: {x:number;y:number;salt:number}[] = [];
+      if (kind === 'dry-wind') {
+        // Anchor sparse dust to known dry ground. Water and fog never emit it.
+        const cx=Math.floor(camera.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),cy=Math.floor(camera.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS);
+        for(let y=cy-8;y<=cy+8 && dustAnchors.length<12;y++)for(let x=cx-10;x<=cx+10 && dustAnchors.length<12;x++) {
+          if(!explorationCellKnown(bundle,x,y))continue;
+          const point=worldCell(x,y),base=terrainForCell(bundle,x,y);
+          if(colonyLandscapeTerrainAt(bundle.config.worldSeed,point,base,bundle.config.worldGenerationVersion??1)!=='ground')continue;
+          if(moistureState(terrainMoisture(x+':'+y,point,bundle.authorityTick))!=='dry')continue;
+          const raster=distancePx(point,camera);
+          if(raster.x<0||raster.x>640||raster.y<0||raster.y>360)continue;
+          dustAnchors.push({...raster,salt:stableDecorHash(x,y)});
+        }
+        groundParticleHost.style.left=offset.x+'px';groundParticleHost.style.top=offset.y+'px';
+        worldStage.append(groundParticleHost);
+        weather.dataset.weatherPhase=windVisual!.phase;weather.dataset.weatherIntensity=windVisual!.intensity.toFixed(2);weather.dataset.windDirection=String(windVisual!.direction);
+      } else groundParticleHost.remove();
+      particles.render(kind, targetWindow.performance.now() / 1000, offset, motionPreference.matches, kind==='dry-wind'?windVisual:undefined, dustAnchors);
+      weather.dataset.groundDustCount=particles.groundCanvas.dataset.groundDustCount;
       weather.dataset.rainMotionPhase = particles.canvas.dataset.particlePhase;
       appendScene(weather, true);
       if (raining) {
@@ -1587,6 +1621,8 @@ export function createPhase1ProductReviewWorldRenderer(
         appendScene(haze, true);
       }
     }
+
+    if (!windVisible) groundParticleHost.remove();
 
     // Remove only entities that actually leave the visible canonical scene.
     // Repeated rendering preserves node/texture identity and does not churn DOM.

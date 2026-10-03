@@ -1,3 +1,4 @@
+import {advanceSoilPatches,wetSoilCell,soilCellKey} from './SoilMoisture';
 import {
   FORAGE,
   SPECIES,
@@ -306,6 +307,7 @@ export class LivingWorldAuthority {
     this.state.lastTick = tick;
     for (const id of this.services.players())
       this.discover(this.services.actor(id));
+    if (this.state.soil) advanceSoilPatches(this.state.soil,this.services.seed,tick,p=>this.services.weather(p.x,p.y));
     const season = this.season(),
       facilities = this.expedition.read().facilities;
     this.state.stations = this.state.stations.filter((s) =>
@@ -318,7 +320,9 @@ export class LivingWorldAuthority {
       if (this.services.weather(f.x, f.y) === 'mist-rain' && tick % 600 === 0)
         s.water = Math.min(24, s.water + 1);
     }
+    const wateredCells=new Map(this.state.soil?.patches.map(p=>[p.key,p.moisture])??[]);
     for (const p of this.state.plots) {
+      p.moisture=Math.max(p.moisture,wateredCells.get(soilCellKey(p))??0);
       if (!p.crop || p.dead) continue;
       const soil = soilAt(this.services.seed, p),
         green = this.near(p, 'greenhouse'),
@@ -341,6 +345,8 @@ export class LivingWorldAuthority {
         if (s && s.water > 0) {
           s.water--;
           p.moisture = Math.min(10000, p.moisture + 6500);
+          this.state.soil ??= {version:1,patches:[]};
+          wetSoilCell(this.state.soil,p,p.moisture);
         }
       }
       if (p.moisture === 0) {
@@ -362,6 +368,7 @@ export class LivingWorldAuthority {
     for (const f of this.state.forage) {
       if (f.cleared || !f.growth) continue;
       const g = f.growth, soil = soilAt(this.services.seed, f);
+      g.moisture=Math.max(g.moisture,wateredCells.get(soilCellKey(f))??0);
       const rain = this.services.weather(f.x, f.y) === 'mist-rain';
       // Wild root networks retain more moisture than exposed cultivated plots.
       g.moisture = Math.max(0, Math.min(10000, g.moisture + (rain ? 70 : 0) - Math.round(8 * season.evaporationMilli / soil.retentionMilli)));
@@ -762,6 +769,8 @@ export class LivingWorldAuthority {
       if (c.action === 'water') {
         if (!has('item:watering-can')) return reject('WATERING_CAN_REQUIRED');
         consume('item:clean-water');
+        next.soil ??= {version:1,patches:[]};
+        if(!wetSoilCell(next.soil,p,10000)) return reject('SOIL_PATCH_CAPACITY');
         p.moisture = 10000;
         p.dryTicks = 0;
         message = 'WATERED';
@@ -799,6 +808,8 @@ export class LivingWorldAuthority {
       if (!has('item:watering-can')) return reject('WATERING_CAN_REQUIRED');
       if (!f.growth) return reject('LEGACY_GROWTH_PENDING');
       consume('item:clean-water');
+      next.soil ??= {version:1,patches:[]};
+      if(!wetSoilCell(next.soil,f,10000)) return reject('SOIL_PATCH_CAPACITY');
       f.growth.moisture = 10000;
       f.growth.dryTicks = 0;
       message = 'WATERED';

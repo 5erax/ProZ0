@@ -7,7 +7,7 @@ import {
   forageDefinition,
   soilAt,
 } from '../../content/livingworld/LivingWorldContent';
-import { livingArt } from './LivingWorldArt';
+import { livingArt, livingArtVariant } from './LivingWorldArt';
 import { LivingMotion } from './LivingMotion';
 import { worldDepthOrder } from './WorldDepth';
 import { bindEntityInspection } from './EntityInspection';
@@ -351,8 +351,9 @@ export function createLivingWorldOverlay(
           return {id:e.id,name:label,kind:role,facts};
         });
       }
-      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead].join(':');
-      const definition = livingArt(role, kind, progress, young, dead);
+      const variant = kind === 'wild-grass' ? livingArtVariant(e.id) : 0;
+      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead, variant].join(':');
+      const definition = livingArt(role, kind, progress, young, dead, variant);
       if (b.dataset.art !== key) {
         b.innerHTML = definition.markup;
         b.dataset.art = key;
@@ -362,6 +363,7 @@ export function createLivingWorldOverlay(
       b.dataset.dead = String(dead);
       b.dataset.livingRole = role;
       b.dataset.livingKind = kind;
+      b.dataset.livingArtVariant = String(variant);
       b.dataset.livingYoung = String(young);
       b.style.zIndex = worldDepthOrder(displayed);
       b.setAttribute(
