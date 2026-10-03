@@ -32,7 +32,7 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
         for (const k of keys) await page.keyboard.down(k);
         held = keys;
       }
-      await page.waitForTimeout(Math.hypot(dx, dy) < 2 ? 16 : 80);
+      await page.waitForTimeout(Math.hypot(dx, dy) < 2 ? 16 : 200);
       // Do not keep moving while a slow locator round trip reads the pose.
       for (const k of held.toReversed()) await page.keyboard.up(k);
       held = [];

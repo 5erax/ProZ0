@@ -26,10 +26,14 @@ export async function walkSurface(page: Page, x: number, y: number) {
     return Math.abs(result.allowedDelta-delta)<1e-8;
   };
   const distance=(p:{x:number;y:number})=>Math.abs(p.x-x)+Math.abs(p.y-y);
+  const directCorner={x,y:start.y};
+  if(clear(start,directCorner)&&clear(directCorner,{x,y})){
+    await walk(page,x,start.y,.15);await walk(page,x,y,.15);return;
+  }
   const open=[{p:start,cost:0}],parents=new Map<string,string>(),points=new Map([[key(start),start]]),costs=new Map([[key(start),0]]);
   let finish:string|undefined;
   for(let n=0;open.length&&n<100000;n++){
-    open.sort((a,b)=>b.cost+distance(b.p)-a.cost-distance(a.p));
+    open.sort((a,b)=>Number((b.cost+distance(b.p)-a.cost-distance(a.p)).toFixed(6))||distance(b.p)-distance(a.p));
     const current=open.pop()!,id=key(current.p);
     if(current.cost!==costs.get(id))continue;
     const corner={x,y:current.p.y};

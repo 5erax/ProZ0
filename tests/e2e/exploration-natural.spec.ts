@@ -4,7 +4,8 @@ import {colonyExplorationSites} from '../../src/world/phase2/ColonyExplorationSi
 import { walkSurface as walkTo } from './support/surface-route';
 
 test('three fresh exploration journeys: walk from landing to new lab, mine and shelter without grants or relocation',async({page})=>{
-  test.setTimeout(360_000);mkdirSync('test-results/exploration-natural',{recursive:true});
+  // Three separate fresh-world round trips include ramp routing and save/reopen.
+  test.setTimeout(600_000);mkdirSync('test-results/exploration-natural',{recursive:true});
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
   for(const site of colonyExplorationSites('p1-world-golden',5).slice(5)){
     const worldId='world:natural:'+site.id;
