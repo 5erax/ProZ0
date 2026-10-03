@@ -469,7 +469,7 @@ export class Phase1AuthorityBundle {
     this.livingWorld=this.expedition?new LivingWorldAuthority(items,this.expedition,{
       seed:config.worldSeed,tick:()=>this.authorityTick,players:()=>this.getActivePlayerIds(),
       actor:id=>{const p=positions.get(id);return {...p,alive:survival.getPlayerState(id).lifeState.type==='alive'};},
-      ground:(x,y,ignore)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.read().facilities.some(f=>f.id!==ignore&&Math.abs(f.x-x)<1.1&&Math.abs(f.y-y)<1.1),
+      ground:(x,y,ignore)=>typeof buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true)==='object' && !this.expedition!.blocksFieldGround(x,y,ignore),
       plotGround:(x,y)=>{const r=buildings.assessPlacement('structure:storage-crate',{mode:'free',anchor:{x,y},orientationQuarterTurns:0},true);return typeof r==='string'?r:null;},
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
       hunt:(id,revision,target)=>this.combat.prepareLivingHunt(id,revision,target),
@@ -614,6 +614,7 @@ export class Phase1AuthorityBundle {
       requiredAccessRadiusWorldUnits: config.requiredAccessRadiusWorldUnits,
       structures: () =>
         [...(buildings?.exportSnapshot().foothold.structures ?? []),...(expedition?.read().facilities.filter(f=>f.canonicalStructureId===null).map(f=>({structureId:f.id,definitionId:expeditionFacility(f.definitionId)!.shape,revision:0,position:createWorldPosition(f.x,f.y),orientationQuarterTurns:f.orientation,placedByPlayerId:f.owner,containerId:null,placementOperationFingerprint:null})) ?? [])],
+      structureFootprint: id=>expedition?.facilityFootprint(id) ?? null,
       playerIds: () => Object.freeze([...playerIds]),
       playerInsideStructure: (playerId, structureId) => {
         const structure = buildings?.getStructure(structureId) ?? null;
@@ -634,6 +635,7 @@ export class Phase1AuthorityBundle {
       world,
       buildingSnapshot(reopen),
       config.singlePlayerExpeditionEnabled===true,
+      (position,profile,orientation,ignore)=>expedition?.overlapsBuiltField(position,profile,orientation,ignore) ?? false,
     );
     const itemWorld = new BuildingItemWorldAdapter(world, buildings);
     const reopenedProgression = progressionSnapshot(reopen);

@@ -232,6 +232,7 @@ export class Phase1BuildingWorld {
     private readonly spatial: BuildingSpatialQuery,
     snapshot?: BuildingWorldSnapshot,
     private readonly expeditionEnabled = false,
+    private readonly overlapsFieldFacility?: (position:WorldPosition,profile:StructurePlacementProfile,orientation:QuarterTurn,ignoreId?:string)=>boolean,
   ) {
     if (snapshot === undefined) {
       this.structures.set('structure-instance:landing-module', {
@@ -388,7 +389,10 @@ export class Phase1BuildingWorld {
   }
 
   /** Read-only assessment shared by visible preview and placement command. */
-  public assessPlacement(
+  public assessPlacement(definitionId:Exclude<Phase1StructureDefinitionId,'structure:landing-module'>, placement:PlacementIntent, ignoreDefinitionCap=false, ignoreStructureId?:string) {
+    return this.assessPlacementProfile(definitionId,placement,ignoreDefinitionCap,ignoreStructureId);
+  }
+  private assessPlacementProfile(
     definitionId: Exclude<
       Phase1StructureDefinitionId,
       'structure:landing-module'
@@ -396,6 +400,7 @@ export class Phase1BuildingWorld {
     placement: PlacementIntent,
     ignoreDefinitionCap = false,
     ignoreStructureId?: string,
+    fieldFootprint?: StructurePlacementProfile['footprint'],
   ):
     | Readonly<
         Pick<
@@ -466,6 +471,7 @@ export class Phase1BuildingWorld {
       finalPosition,
       orientation,
       ignoreStructureId,
+      fieldFootprint,
     );
     if (spatialFailure !== null) return spatialFailure;
 
@@ -474,6 +480,22 @@ export class Phase1BuildingWorld {
       orientationQuarterTurns: orientation,
       targetConnectorId,
     });
+  }
+
+  /** Solo field structures use their real footprint with all ordinary terrain/access checks. */
+  public assessFieldPlacement(
+    definitionId: 'structure:storage-crate' | 'structure:workbench',
+    position: WorldPosition,
+    orientation: QuarterTurn,
+    footprint: StructurePlacementProfile['footprint'],
+    ignoreFieldId?:string,
+  ): PlacementRejectionReason | null {
+    if (!this.expeditionEnabled || !Number.isFinite(footprint.width) || !Number.isFinite(footprint.depth)
+      || footprint.width <= 0 || footprint.depth <= 0 || footprint.width > 4 || footprint.depth > 4
+      || !Number.isFinite(position.x) || !Number.isFinite(position.y) || ![0,1,2,3].includes(orientation)) return 'INVALID_TERRAIN';
+    const assessment = this.assessPlacementProfile(definitionId,
+      {mode:'free', anchor:position, orientationQuarterTurns:orientation}, true, ignoreFieldId, footprint);
+    return typeof assessment === 'string' ? assessment : null;
   }
 
   public reservePlacement(request: {
@@ -996,8 +1018,10 @@ export class Phase1BuildingWorld {
     position: WorldPosition,
     orientation: QuarterTurn,
     ignoreStructureId?: string,
+    fieldFootprint?: StructurePlacementProfile['footprint'],
   ): PlacementRejectionReason | null {
-    const profile = PHASE1_STRUCTURE_PLACEMENT_PROFILES[definitionId];
+    const base = PHASE1_STRUCTURE_PLACEMENT_PROFILES[definitionId];
+    const profile = fieldFootprint ? {...base, footprint:fieldFootprint} : base;
     if (!this.spatial.isFootprintExplored(position, profile, orientation))
       return 'UNEXPLORED_AREA';
     if (!this.spatial.isBuildableGround(position, profile, orientation))
@@ -1006,6 +1030,7 @@ export class Phase1BuildingWorld {
       return 'NON_BUILDABLE_SURFACE';
     if (this.spatial.hasBlockingWorldCollision(position, profile, orientation))
       return 'OBSTRUCTED';
+    if(this.overlapsFieldFacility?.(position,profile,orientation,ignoreStructureId)) return 'STRUCTURE_OVERLAP';
 
     for (const structure of this.structures.values()) {
       if (structure.structureId === ignoreStructureId) continue;

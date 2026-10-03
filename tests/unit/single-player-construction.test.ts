@@ -7,6 +7,7 @@ import {
   ExpeditionAuthority,
   type ExpeditionCommand,
 } from '../../src/simulation/expedition/ExpeditionAuthority';
+import {validateExpeditionState} from '../../src/simulation/expedition/ExpeditionState';
 import { Phase1BuildingWorld } from '../../src/world/building/Phase1BuildingWorld';
 import { Phase1BuildingTestSpatial } from '../support/Phase1BuildingTestSpatial';
 import { Phase1ItemTestWorld } from '../support/Phase1ItemTestWorld';
@@ -288,4 +289,30 @@ it('field craft preserves materials on station failure and issues a usable durab
   ).toBe(100);
   expect(f.authority.craft(command).status).toBe('committed');
   expect(f.items.exportLedgerSnapshot()).toEqual(after);
+});
+
+it('large field foundations reject ground under their edge; rotated overlap agrees with preview and legacy footprints stay unchanged',()=>{
+  const f=fixture();
+  const actualGround=f.spatial.isBuildableGround.bind(f.spatial);
+  f.spatial.isBuildableGround=(position,profile,orientation)=>{
+    const width=orientation%2 ? profile.footprint.depth : profile.footprint.width;
+    return actualGround(position,profile,orientation) && position.x-width/2>=101;
+  };
+  expect(f.authority.assessPreview('solo','field-workbench',102,100,0)).toBe(null);
+  expect(f.authority.assessPreview('solo','livestock-pen',102,100,0)).toBe('INVALID_TERRAIN');
+  expect(f.command('bad','plan','livestock-pen',{x:102,y:100}).message).toBe('INVALID_TERRAIN');
+  f.spatial.isBuildableGround=actualGround;
+  expect(f.command('pen','plan','livestock-pen',{x:102,y:100}).status).toBe('committed');
+  expect(f.authority.previewFootprint('livestock-pen',0,'plan:pen')).toEqual({width:3,depth:2.5});
+  expect(f.command('overlap','plan','poultry-coop',{x:99.6,y:100}).message).toBe('PLAN_OVERLAP');
+  expect(f.command('rotate','move','plan:pen',{x:102,y:100,orientation:1}).status).toBe('committed');
+  expect(f.authority.previewFootprint('livestock-pen',1,'plan:pen')).toEqual({width:2.5,depth:3});
+  expect(f.command('separate','plan','poultry-coop',{x:99.6,y:100}).status).toBe('committed');
+  const saved=f.authority.read();
+  expect(()=>validateExpeditionState({...saved,plans:saved.plans.map(p=>({...p,footprintVersion:2}))})).toThrow(/position/);
+  expect(()=>validateExpeditionState({...saved,plans:saved.plans.map(p=>({...p,footprintVersion:null}))})).toThrow(/position/);
+  const legacy=validateExpeditionState({...saved,plans:saved.plans.map(({footprintVersion,...plan})=>{void footprintVersion;return plan;})});
+  const reopened=new ExpeditionAuthority(f.items,f.buildings,()=>f.actor,legacy);
+  expect(reopened.previewFootprint('livestock-pen',1,'plan:pen')).toEqual({width:.75,depth:1.25});
+  expect(reopened.assessPreview('solo','livestock-pen',102,100,1,'plan:pen')).toBe(null);
 });

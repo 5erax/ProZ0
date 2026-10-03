@@ -121,6 +121,9 @@ export function createExpeditionOverlay(
     const messages: Readonly<Record<string, string>> = {
       MATERIALS_DEPOSITED: 'Materials contributed. You can add more later.',
       PLAN_MOVED: 'Blueprint moved. Contributed materials are kept.',
+      PLAN_REPLACED_TO_STORAGE: 'Blueprint changed. Your bag was full; surplus materials were returned to an accessible nearby storage crate.',
+      PLAN_REFUNDED_TO_STORAGE: 'Blueprint cancelled. Your bag was full; materials were returned to an accessible nearby storage crate.',
+      FACILITY_DISMANTLED_TO_STORAGE: 'Building dismantled. Your bag was full; materials were returned to an accessible nearby storage crate.',
       PLAN_REPLACED: 'Blueprint type changed. Shared materials are kept; surplus materials returned to your bag.',
       SAME_BLUEPRINT_TYPE: 'Choose a different facility to change this blueprint.',
       PLAN_REFUNDED:
@@ -201,6 +204,7 @@ export function createExpeditionOverlay(
       focusedEntity = 'facility:' + target;
     signature = '';
     render();
+    panel.querySelector('[role=status]')?.scrollIntoView({block:'nearest'});
     return result.status === 'committed';
   };
   const costs = (
@@ -413,7 +417,7 @@ export function createExpeditionOverlay(
             option.value = replacement.id; option.textContent = replacement.name;
             choice.append(option);
           }
-          change.append(summary, choice, button('Change & refund surplus', () => run('replace', plan.id, { replacementDefinition: choice.value })), text('small', 'Keeps shared materials. Returns the surplus; if your bag is full, the original blueprint stays intact. Missing materials can be added later.'));
+          change.append(summary, choice, button('Change & refund surplus', () => run('replace', plan.id, { replacementDefinition: choice.value })), text('small', 'Keeps shared materials. Returns surplus to your bag or an accessible nearby crate. If neither has enough room, the original blueprint stays intact. Missing materials can be added later.'));
           row.append(change);
           panel.append(row);
         }
@@ -737,6 +741,7 @@ export function createExpeditionOverlay(
       size = authority.previewFootprint(
         placement.definition,
         placement.orientation,
+        placement.relocationId ?? placement.planId,
       )!;
     ghost.hidden = false;
     ghost.dataset.valid = String(reason === null);
@@ -762,6 +767,9 @@ export function createExpeditionOverlay(
       ([dx, dy]) =>
         String(32 + (dx! - dy!) * 16) + ',' + String(32 + (dx! + dy!) * 8),
     );
+    outline.ownerSVGElement!.style.overflow = 'visible';
+    ghost.dataset.footprintWidth=String(size.width);
+    ghost.dataset.footprintDepth=String(size.depth);
     outline.setAttribute('d', 'M' + points.join('L') + 'Z');
     outline.setAttribute('stroke', reason ? '#eb9277' : '#ace5ce');
     outline.setAttribute('fill', reason ? '#eb927744' : '#ace5ce44');
