@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-async function walk(page: Page, x: number, y: number) {
+async function walk(page: Page, x: number, y: number, tolerance = 0.5) {
   let held: string[] = [];
   let last = { x: NaN, y: NaN };
   try {
@@ -14,7 +14,7 @@ async function walk(page: Page, x: number, y: number) {
         dy = y - p.y;
       last = p;
       const remaining = Math.hypot(dx, dy);
-      if (remaining < 0.5) return;
+      if (remaining < tolerance) return;
       const keys =
         Math.abs(dx) >= Math.abs(dy)
           ? dx > 0
@@ -210,7 +210,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
     'true',
   );
   await expect(page.locator('.sp-blueprint[data-plan-id]')).toHaveCount(1);
-  await walk(page, -40, -13);
+  await walk(page, -40, -13, 0.15);
   await page.keyboard.press('i');
   await expect(page.locator('[data-inventory-pane="storage"]')).toContainText(
     'Plant Fiber',
@@ -352,7 +352,7 @@ test('depleted fiber shows active-time renewal instead of inviting another gathe
       i === 3 ? 'BLOCKED' : 'AVAILABLE',
     );
   }
-  await expect(hint).toContainText('RENEWING');
+  await expect(hint).toContainText(/Renewing/i);
   await expect(hint).toContainText('world time');
   await page.keyboard.press('e');
   await expect(hint).toHaveAttribute('data-state', 'BLOCKED');

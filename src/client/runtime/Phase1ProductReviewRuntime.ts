@@ -1526,10 +1526,6 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
-    if(bundle.playerWorldspace()!=='surface'){
-      const resource=resourceTarget(),view=resource?bundle.interactionWorld.getResource(resource.entityId):null;
-      source.setInteraction(resource&&view?{inputLabel:'E',verb:'GATHER',target:contentDisplayName(bundle.catalog.get(resource.definitionId)),state:view.depleted?'BLOCKED':'AVAILABLE',reason:view.depleted?uiText("ui.fd4adefb"):null,progress:null}:null);return;
-    }
     const portal=cavePortalTarget();if(portal){transitionCave(portal);return;}
     if(bundle.playerWorldspace()!=='surface'){if(pickupWorldDrop()||recoverDeathCache())return;beginGather();return;}
     if (pickupWorldDrop()) return;

@@ -69,7 +69,7 @@ body { block-size:100dvh; }
 #proz0-phase1-ui .p1-craft-navigation { display:flex; gap:6px; justify-content:center; padding-bottom:12px; }
 #proz0-phase1-ui .p1-craft-navigation button { min-width:36px; }
 #proz0-phase1-ui .p1-craft-navigation [aria-current=page] { border-color:#d4dfb0; background:#415751; }
-#proz0-phase1-ui .p1-panel[data-panel-kind=build] { width:min(460px,calc(100% - 32px)); }
+#proz0-phase1-ui .p1-panel[data-panel-kind=build] { width:min(360px,42%); top:80px; left:16px; transform:none; }
 #proz0-phase1-ui .p1-build-catalog { max-height:36vh; }
 #proz0-phase1-ui .p1-build-name { display:inline; }
 #proz0-phase1-ui .p1-survival { width:224px!important; padding:8px; gap:4px; }
