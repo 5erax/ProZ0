@@ -12,6 +12,7 @@ import {
 import type { Phase1ItemAuthority } from '../items';
 import { renewablePlant, forageGrowthView, plantGrowthView } from './PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { GEAR_RECIPES } from '../../content/livingworld/EquipmentContent';
 import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
 import { FishingAuthority, type FishingServices } from './FishingAuthority';
 import type {
@@ -648,7 +649,7 @@ export class LivingWorldAuthority {
       return s;
     };
     if (c.action === 'craft') {
-      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES].find((r) => r.id === c.target);
+      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES].find((r) => r.id === c.target);
       if (!r) return reject('UNKNOWN_RECIPE');
       if (r.station && !this.near(actor, r.station))
         return reject('NEARBY_STATION_REQUIRED');

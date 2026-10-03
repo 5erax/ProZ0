@@ -23,6 +23,7 @@ import {
   type Phase1ProductionSprite,
 } from './Phase1ProductionAssets';
 import type { CharacterInspection } from './CharacterInspection';
+import { RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
 import { heldSpearSprite } from './EquipmentArt';
 import { selectedPlayerSkin, playerSkinFilter } from '../runtime/PlayerProfile';
 
@@ -188,6 +189,7 @@ function itemRow(
   row.dataset.selected = String(selected);
   row.dataset.available = String(item.available ?? item.condition !== 0);
   row.draggable = item.inspection?.canEquip === true;
+  if (item.inspection?.canEquip) { row.dataset.rarity = item.rarity ?? 'common'; row.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; row.title = RARITY_STYLE[item.rarity ?? 'common'].label + ' · ' + item.name; }
 
   const icon = assetSprite(
     document,
@@ -214,6 +216,7 @@ function itemRow(
   if (icon !== null) {
     row.append(icon);
   }
+  if (item.inspection?.canEquip) { identity.style.color = RARITY_STYLE[item.rarity ?? 'common'].colour; identity.append(createElement(document, 'small', 'p1-rarity-label', RARITY_STYLE[item.rarity ?? 'common'].label)); }
   row.append(identity, state);
   if (
     item.condition !== null
@@ -261,15 +264,18 @@ function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlo
   body.style.filter = playerSkinFilter(avatar.dataset.skin);
   avatar.append(body);
   if (equipment.protection) { const protection = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(protection, thermalWrapActorSprite('S', 'IDLE', 0).sprite, 2); protection.dataset.avatarEquipment = 'protection'; avatar.append(protection); }
-  if (equipment.weapon) { const weapon = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(weapon, heldSpearSprite('S').sprite, 2); weapon.dataset.avatarEquipment = 'weapon'; avatar.append(weapon); }
+  if (equipment.weapon) { const weapon = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(weapon, heldSpearSprite('S', equipment.weapon.rarity).sprite, 2); weapon.dataset.avatarEquipment = 'weapon'; weapon.dataset.rarity = equipment.weapon.rarity ?? 'common'; avatar.append(weapon); }
   const slot = (kind: 'weapon' | 'protection') => {
     const equipped = equipment[kind], label = kind === 'weapon' ? 'Weapon' : 'Protection';
     const cell = createElement(document, 'div', 'p1-wardrobe-slot'); cell.dataset.equipmentDropSlot = kind;
     cell.append(createElement(document, 'strong', '', label));
     if (equipped) {
+      cell.dataset.rarity = equipped.rarity ?? 'common'; cell.style.borderColor = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
+      const badge = createElement(document, 'small', 'p1-rarity-label', RARITY_STYLE[equipped.rarity ?? 'common'].label); badge.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour; cell.append(badge);
       const icon = assetSprite(document, 'p1-asset-icon', itemIconSprite(equipped.name)); if (icon) cell.append(icon);
       cell.append(createElement(document, 'span', '', equipped.name), createElement(document, 'small', '', equipped.condition === null ? 'Equipped' : 'Durability ' + equipped.condition + '/' + equipped.conditionMax), actionButton(document, 'Unequip ' + label.toLowerCase(), 'unequip-slot:' + kind));
       cell.dataset.equippedStack = equipped.stackId ?? '';
+      const name = cell.querySelector('span:not(.p1-asset-icon)'); if (name instanceof HTMLElement) name.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
     } else cell.append(createElement(document, 'span', '', 'Empty'), actionButton(document, 'Equip selected ' + label.toLowerCase(), 'equip-slot:' + kind));
     cell.title = 'Drag a matching item from your bag here, or select it and use Equip.';
     return cell;
@@ -283,6 +289,7 @@ function itemInspectionCard(document: Document, item: Phase1InventoryItemPresent
   if (!item?.inspection) return card;
   card.setAttribute('aria-label', 'Selected item details');
   card.dataset.inspectedStack = item.id;
+  if (item.inspection.canEquip) { card.dataset.rarity = item.rarity ?? 'common'; card.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; card.style.setProperty('--rarity-colour', RARITY_STYLE[item.rarity ?? 'common'].colour); }
   card.append(createElement(document, 'h3', '', item.name), createElement(document, 'p', '', item.inspection.purpose), createElement(document, 'p', '', 'Selected stack: ' + item.quantity + ' items · ' + (item.stackWeightKg ?? 0).toFixed(2) + ' kg · ' + (item.stackBulk ?? 0).toFixed(2) + ' bulk units'));
   const details = createElement(document, 'details', 'p1-inspection-more');
   details.dataset.inspectionKey = 'item:' + item.id;
@@ -1238,6 +1245,7 @@ function styles(document: Document): HTMLStyleElement {
     '[data-product-review-panel-open=true] .sp-blueprint,[data-product-review-panel-open=true] .lw-menu,[data-product-review-panel-open=true] .lw-season,[data-product-review-panel-open=true] .p2-colony-controls,[data-product-review-help-open=true] .sp-blueprint{visibility:hidden;pointer-events:none;}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
+    '.p1-rarity-label{display:block;font-size:9px;line-height:1.4}.p1-item-inspection[data-rarity] h3{color:var(--rarity-colour)}',
     '.p1-item-row,.p1-craft-row{display:grid;gap:4px;padding:3px;border:1px solid #3b465a;}',
     '.p1-item-row{grid-template-columns:24px 2fr 1fr;align-items:center;min-height:30px;}',
     '.p1-panel[data-panel-kind="inventory"] .p1-item-list{grid-template-columns:repeat(4,1fr);gap:4px;}',

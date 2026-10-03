@@ -1,5 +1,6 @@
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
 import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
+import { GEAR_ITEMS, RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
 const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
@@ -261,6 +262,12 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
+  const gear = GEAR_ITEMS.find(i => i.id === name || i.displayName === name);
+  if (gear?.rarity) {
+    const colour = RARITY_STYLE[gear.rarity].colour;
+    const markup = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges"><path stroke="#aa865f" stroke-width="3" d="m3 21 14-14"/><path fill="' + colour + '" d="m15 6 5-4 2 1-3 6-4 2zM10 12h2v3h-2z"/><path fill="#eee8d2" d="m18 4 2-1-2 4-1 1z"/></svg>';
+    return { assetPath: 'living:gear:' + gear.id, url: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup), cellWidth: 24, cellHeight: 24, sourceWidth: 24, sourceHeight: 24, columns: 1, index: 0 };
+  }
   const fishIndex = FISHING_ITEMS.findIndex(i => i.id === name || i.displayName === name);
   if (fishIndex >= 0) {
     const pigment = ['#d5b983','#9bae64','#b5bf92','#8eaec2','#7fa393','#d5a16e'][fishIndex]!;

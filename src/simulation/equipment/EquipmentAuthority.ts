@@ -1,3 +1,4 @@
+import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import type { PlayerId } from '../../foundation';
 import type {
   ItemStackId,
@@ -236,7 +237,7 @@ export class Phase1EquipmentAuthority {
       (entry) => entry.stackId === stackId,
     );
     if (stack === undefined) return 'SOURCE_MISSING';
-    if (stack.itemDefinitionId !== expectedDefinitionId && !(expectedDefinitionId==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak')) {
+    if (stack.itemDefinitionId !== expectedDefinitionId && !(expectedDefinitionId === 'item:basic-spear' && isKnownMeleeEquipment(stack.itemDefinitionId)) && !(expectedDefinitionId==='item:thermal-wrap'&&stack.itemDefinitionId==='item:warm-cloak')) {
       return 'INVALID_EQUIPMENT';
     }
     return null;

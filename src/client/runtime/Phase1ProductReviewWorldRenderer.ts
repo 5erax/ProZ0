@@ -973,8 +973,10 @@ export function createPhase1ProductReviewWorldRenderer(
 
     const equipment = bundle.equipment.getView(id);
     if (equipment.equippedWeaponStackId !== null && state !== 'SPEAR_ATTACK' && state !== 'DEATH') {
-      const held = heldSpearSprite(phase1IsometricFacing(movement.facing));
-      renderSprite(held.sprite, movement.position, camera, 'held-weapon-overlay', id, { flipX: held.flipX, zIndex: worldDepthOrder(movement.position, 2), className: local ? 'p1-product-player' : 'p1-product-teammate', data: { actorState: state } });
+      const stack = bundle.items.getContainerView('inventory:' + id).stacks.find(s => s.stackId === equipment.equippedWeaponStackId);
+      const rarity = stack ? bundle.catalog.getAs(stack.itemDefinitionId, 'item').rarity : undefined;
+      const held = heldSpearSprite(phase1IsometricFacing(movement.facing), rarity);
+      renderSprite(held.sprite, movement.position, camera, 'held-weapon-overlay', id, { flipX: held.flipX, zIndex: worldDepthOrder(movement.position, 2), className: local ? 'p1-product-player' : 'p1-product-teammate', data: { actorState: state, rarity: rarity ?? 'common' } });
     }
     if (equipment.equippedThermalWrapStackId !== null) {
       const overlayFrame = thermalWrapActorSprite(

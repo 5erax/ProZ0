@@ -1,3 +1,4 @@
+import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import type { ContentCatalogV1 } from '../../content';
 import type { PlayerId, WorldPosition } from '../../foundation';
 import type { SurvivalWorldPort } from '../../world/api/SurvivalWorld';
@@ -67,23 +68,30 @@ export class Phase1CombatAuthority {
     let range = 0.8 * PLAYER_COLLISION_FOOTPRINT.width;
     let cooldown = 48;
     let spear = false;
+    let arcThreshold = Math.SQRT1_2;
+    let conditionCost = 1;
     if (weaponStackId !== null) {
       const inv = this.items.getContainerView(command.inventoryContainerId);
       const stack = inv.stacks.find((entry) => entry.stackId === weaponStackId);
       if (
-        inv.revision !== command.expectedInventoryRevision
+        inv.kind !== 'player-inventory'
+        || inv.ownerPlayerId !== command.playerId
+        || inv.revision !== command.expectedInventoryRevision
         || stack === undefined
-        || stack.itemDefinitionId !== 'item:basic-spear'
+        || !isKnownMeleeEquipment(stack.itemDefinitionId)
         || stack.condition === null
         || stack.condition <= 0
       ) {
         return this.cache(command.attackId, { status:'rejected', attackId:command.attackId, targetEntityId:null, damage:0, reason:'BROKEN_WEAPON' });
       }
-      this.catalog.getAs('item:basic-spear', 'item');
-      staminaCost = 15;
-      damage = 25;
-      range = 1.5 * PLAYER_COLLISION_FOOTPRINT.width;
-      cooldown = 39;
+      const profile = this.catalog.getAs(stack.itemDefinitionId, 'item').useProfile;
+      if (profile?.type !== 'melee-weapon') throw new Error('Equipped weapon has no melee profile.');
+      staminaCost = profile.staminaCost;
+      damage = profile.damage;
+      range = profile.rangeFootprints * PLAYER_COLLISION_FOOTPRINT.width;
+      cooldown = Math.ceil(profile.cooldownSeconds * 60);
+      arcThreshold = Math.cos(profile.frontalArcDegrees * Math.PI / 360);
+      conditionCost = profile.conditionCostOnSuccessfulHit;
       spear = true;
     }
     if (!this.survival.canSpendStamina(command.playerId, staminaCost)) {
@@ -108,7 +116,7 @@ export class Phase1CombatAuthority {
       && (
         (command.facingX * dx + command.facingY * dy)
         / (facingLength * targetLength)
-      ) >= Math.SQRT1_2;
+      ) >= arcThreshold;
     if (distanceSquared > range * range || !inArc) {
       return this.cache(command.attackId, { status:'miss', attackId:command.attackId, targetEntityId:null, damage:0 });
     }
@@ -133,7 +141,7 @@ export class Phase1CombatAuthority {
         inventoryContainerId: command.inventoryContainerId,
         expectedInventoryRevision: command.expectedInventoryRevision,
         targetStackId: weaponStackId,
-        conditionLoss: 1,
+        conditionLoss: conditionCost,
       });
       if (wear.status !== 'committed') {
         throw new Error('Validated spear hit condition mutation failed.');

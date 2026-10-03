@@ -1,3 +1,4 @@
+import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { installGameContextMenu } from '../input/GameContextMenu';
@@ -1591,13 +1592,14 @@ export async function createPhase1ProductReviewRuntime(
     const current = bundle.equipment.reconcile(config.localPlayerId);
     const spear = inventory.stacks.find(
       (stack) =>
-        stack.itemDefinitionId === 'item:basic-spear'
+        isKnownMeleeEquipment(stack.itemDefinitionId)
         && stack.condition !== null
         && stack.condition > 0,
     );
     const next = current.equippedWeaponStackId === null
       ? spear?.stackId ?? null
       : null;
+    const targetWeapon = inventory.stacks.find(stack => stack.stackId === current.equippedWeaponStackId) ?? spear;
     const result = bundle.equipWeapon(config.localPlayerId, next);
     source.setLocalCommandFeedback({
       inputLabel: 'Q',
@@ -1607,7 +1609,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
-      target: 'Basic Spear',
+      target: targetWeapon ? bundle.catalog.get(targetWeapon.itemDefinitionId).displayName : 'Weapon',
     });
     queueMicrotask(() => {
       if (!destroyed) refreshContextInteraction();
@@ -2306,7 +2308,7 @@ export async function createPhase1ProductReviewRuntime(
     }
     const selection = source.getInventoryActionSelection();
     const id = selection.stack?.itemDefinitionId;
-    if (selection.pane !== 'player' || (slot === 'weapon' ? id !== 'item:basic-spear' : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
+    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
     const current = bundle.equipment.reconcile(config.localPlayerId);
     if ((slot === 'weapon' ? current.equippedWeaponStackId : current.equippedThermalWrapStackId) === selection.stack?.stackId) return;
     toggleSelectedEquipment('X');

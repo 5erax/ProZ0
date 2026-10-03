@@ -54,6 +54,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     },
     { name: 'river-crossing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day' },
     { name: 'river-fishing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day', fishing: true },
+    { name: 'equipped-mythic', position: { x:18, y:10 }, tick:1, weather:'clear', dayPeriod:'day', gear:true },
     { name: 'legacy-v4-sized', position: { x: 18, y: 10 }, tick: 1, weather: 'clear', dayPeriod: 'day', generationVersion: 4 },
   ]) {
     const dbName = "p2-fps:" + scene.name;
@@ -87,6 +88,12 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
         }
         expect(water).toBeDefined();
         expect(authority.execute({ id: 'fixture:active-cast', playerId: 'observer', expectedRevision: authority.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:observer').revision, action: 'cast', ...water! }).status).toBe('committed');
+      }
+      if (scene.gear) {
+        expect(bundle.items.commitColonyExchange({ operationId:'fixture:gear-performance', playerId:'observer',expectedInventoryRevision:bundle.items.getContainerView('inventory:observer').revision,inputs:[],outputs:[{itemDefinitionId:'item:mythic-relic-spear',quantity:1},{itemDefinitionId:'item:thermal-wrap',quantity:1}] }).status).toBe('committed');
+        const inventory=bundle.items.getContainerView('inventory:observer');
+        expect(bundle.equipWeapon('observer',inventory.stacks.find(s=>s.itemDefinitionId==='item:mythic-relic-spear')!.stackId).status).toBe('committed');
+        expect(bundle.equipThermalWrap('observer',inventory.stacks.find(s=>s.itemDefinitionId==='item:thermal-wrap')!.stackId).status).toBe('committed');
       }
       request = composePhase1SaveV2(bundle, {
         nowUtc: "2026-09-30T00:00:00.000Z",
@@ -187,6 +194,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     await expect(page.locator('canvas')).toHaveAttribute('data-day-period', scene.dayPeriod);
     if (scene.name === 'river-crossing') await expect(page.locator('[data-world-role="terrain"][data-water-kind="river"]').first()).toBeVisible();
     if (scene.fishing) await expect(page.locator('[data-fishing-bobber]')).toBeVisible();
+    if (scene.gear) { await expect(page.locator('[data-world-role="held-weapon-overlay"]')).toHaveAttribute('data-rarity','mythic'); await expect(page.locator('[data-world-role="thermal-wrap-overlay"]')).toBeVisible(); }
     if(scene.weather==='dry-wind'){
       await expect(page.locator('[data-weather-effect="cold-rain"]')).toHaveCount(0);
       await expect(page.locator('[data-weather-effect="dry-wind"]')).toBeVisible();

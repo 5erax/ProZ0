@@ -74,6 +74,7 @@ jobs:
             test-results/living-world/
             test-results/resource-size/
             test-results/equipment-preview/
+            test-results/rarity-equipment/
             test-results/item-character-inspection/
             test-results/living-camera-world.png
             test-results/blueprint-replacement.png

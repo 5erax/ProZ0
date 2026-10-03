@@ -185,6 +185,7 @@ function inventoryItems(
     return Object.freeze({
       id: stack.stackId,
       name: definition.displayName,
+      rarity: definition.rarity ?? 'common',
       quantity: stack.quantity,
       inspection: inspectItem(catalog, definition.id),
       stackWeightKg: definition.unitWeightKg * stack.quantity,
@@ -211,6 +212,7 @@ function equipment(
   return Object.freeze({
     stackId: stack.stackId,
     name: definition.displayName,
+    rarity: definition.rarity ?? 'common',
     condition: stack.condition,
     conditionMax: definition.conditionMax,
     stateLabel: stack.condition === 0

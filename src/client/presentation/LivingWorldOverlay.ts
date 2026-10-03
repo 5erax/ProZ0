@@ -12,6 +12,7 @@ import { LivingMotion } from './LivingMotion';
 import { worldDepthOrder } from './WorldDepth';
 import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
+import { GEAR_RECIPES, RARITY_STYLE }  from '../../content/livingworld/EquipmentContent';
 import { FISHING_RECIPES } from '../../content/livingworld/FishingContent';
 import type { FishingCommand } from '../../simulation/livingworld/FishingAuthority';
 import { worldPositionKnown } from '../runtime/Phase1ProductReviewWorldRenderer';
@@ -608,12 +609,14 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length) + ' recipes',
+        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length) + ' recipes',
       ),
     );
     panel.append(craft);
-    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES]) {
+    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
+      const definition = bundle.catalog.getAs(r.output, 'item');
+      if (definition.rarity) { a.dataset.rarity = definition.rarity; a.style.borderColor = RARITY_STYLE[definition.rarity].colour; const badge = text('small', RARITY_STYLE[definition.rarity].label); badge.style.color = RARITY_STYLE[definition.rarity].colour; a.append(badge); a.querySelector('h3')?.setAttribute('style', 'color:' + RARITY_STYLE[definition.rarity].colour); }
       craft.append(a);
       const icon = document.createElement('span'),
         sprite = itemIconSprite(r.output);

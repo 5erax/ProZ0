@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
 import { createLegacyPhase1ContentCatalog } from '../../src/content/phase1/Phase1Catalog';
 import { LIVING_ROOT_ITEMS } from '../../src/content/livingworld/LivingRootContent';
+import { GEAR_ITEMS } from '../../src/content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../src/content/livingworld/FishingContent';
 import {
   LIVING_ITEMS,
@@ -183,7 +184,7 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
 it('adds living and root items while preserving every V3/V4 generated entity and seed', () => {
   const old = createLegacyPhase1ContentCatalog(),
     active = createPhase1ContentCatalog();
-  expect(active.size - old.size).toBe(29 + LIVING_ROOT_ITEMS.length + FISHING_ITEMS.length);
+  expect(active.size - old.size).toBe(29 + LIVING_ROOT_ITEMS.length + FISHING_ITEMS.length + GEAR_ITEMS.length);
   expect(LIVING_ITEMS.every((i) => active.has(i.id))).toBe(true);
   expect(active.compatibility.canonicalFingerprint).not.toBe(
     old.compatibility.canonicalFingerprint,

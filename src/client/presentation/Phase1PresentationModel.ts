@@ -1,3 +1,4 @@
+import type { ItemRarity } from '../../content/livingworld/EquipmentContent';
 import type { ItemInspection } from './ItemInspection';
 import type { CharacterInspection } from './CharacterInspection';
 
@@ -24,6 +25,7 @@ export interface Phase1CarryPresentation {
 }
 
 export interface Phase1EquipmentPresentation {
+  readonly rarity?: ItemRarity;
   readonly stackId?: string;
   readonly name: string;
   readonly condition: number | null;
@@ -70,6 +72,7 @@ export interface Phase1ToastPresentation {
 }
 
 export interface Phase1InventoryItemPresentation {
+  readonly rarity?: ItemRarity;
   readonly inspection?: ItemInspection;
   readonly stackWeightKg?: number;
   readonly stackBulk?: number;
