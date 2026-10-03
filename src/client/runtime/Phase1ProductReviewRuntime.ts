@@ -1958,12 +1958,12 @@ export async function createPhase1ProductReviewRuntime(
         case 'ArrowUp':
           event.preventDefault();
           event.stopPropagation();
-          source.cycleInventorySelection(-1);
+          source.cycleInventorySelection(-1);root.querySelector<HTMLElement>('.p1-panel [data-active=true] .p1-item-row[data-selected=true],.p1-panel[data-panel-kind=inventory] .p1-item-row[data-selected=true]')?.scrollIntoView({block:'nearest'});
           return;
         case 'ArrowDown':
           event.preventDefault();
           event.stopPropagation();
-          source.cycleInventorySelection(1);
+          source.cycleInventorySelection(1);root.querySelector<HTMLElement>('.p1-panel [data-active=true] .p1-item-row[data-selected=true],.p1-panel[data-panel-kind=inventory] .p1-item-row[data-selected=true]')?.scrollIntoView({block:'nearest'});
           return;
         case 'Tab':
           event.preventDefault();

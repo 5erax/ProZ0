@@ -486,13 +486,6 @@ function renderPanel(
         const selected = item.id === panel.selectedPlayerItemId;
         const row = itemRow(document, item, selected);
         left.append(row);
-        if (selected) {
-          queueMicrotask(() => {
-            if (row.isConnected) {
-              row.scrollIntoView({ block: 'nearest' });
-            }
-          });
-        }
       }
 
       const right = createElement(
@@ -507,13 +500,6 @@ function renderPanel(
         const selected = item.id === panel.selectedContainerItemId;
         const row = itemRow(document, item, selected);
         right.append(row);
-        if (selected) {
-          queueMicrotask(() => {
-            if (row.isConnected) {
-              row.scrollIntoView({ block: 'nearest' });
-            }
-          });
-        }
       }
 
       panes.append(left, right);
