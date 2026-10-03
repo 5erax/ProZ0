@@ -2,7 +2,10 @@ import { bindLocalized, message, type MessageDictionary } from './Locale';
 import { statusText } from './StatusMessages';
 // Authored glossary. Lookup is exact and only called at source-owned UI boundaries.
 // Player/profile/chat strings never pass through this dictionary.
-const glossary = `Low|Thấp
+const glossary = `CLEAR|Trời quang
+COLD RAIN|Mưa lạnh
+COLD RAIN · FORECAST|Dự báo mưa lạnh
+Low|Thấp
 Carry a Stone Field Tool · open Craft [C] to make one|Cần công cụ đá · mở Chế tạo [C] để làm
 Choose ground near the Landing Module or Habitat to expand your base|Chọn vị trí gần mô-đun hạ cánh hoặc phòng ở để mở rộng căn cứ
 Position obstructed; choose clear ground|Vị trí bị chắn; chọn khoảng đất trống

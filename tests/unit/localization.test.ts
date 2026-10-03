@@ -25,3 +25,5 @@ it('locale presentation retains canonical identities/fingerprint and formats num
   expect(formatNumber(1234.5)).toBe('1.234,5');setLocale('en');expect(contentText(definition).displayName).toBe('Clean Water');expect(catalog.get(definition.id)).toBe(definition);expect(catalog.compatibility.canonicalFingerprint).toBe(before);
   const en=inspectItem(catalog,definition.id);setLocale('vi');const localized=inspectItem(catalog,definition.id);expect(localized).not.toBe(en);expect(localized.facts).not.toEqual(en.facts);expect(uiPhrase('OUT_OF_RANGE')).toBe('Đến gần đối tượng hơn');
 });
+
+it('translates clear and cold-rain weather labels at authored UI boundaries',()=>{setLocale('vi');expect(uiPhrase('CLEAR')).toBe('Trời quang');expect(uiPhrase('COLD RAIN')).toBe('Mưa lạnh');expect(uiPhrase('COLD RAIN · FORECAST')).toBe('Dự báo mưa lạnh');});
