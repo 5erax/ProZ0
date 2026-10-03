@@ -11,6 +11,7 @@ export interface ResourceNodeSaveV2 {
   readonly remainingGatherActions: number | null;
   readonly depleted: boolean;
   readonly regenerationReadyTick: number | null;
+  readonly uprootedVersion?: 1;
   readonly lifecycle?: import('../../../world/phase1/ResourceLifecycle').ResourceLifecycleV1;
 }
 

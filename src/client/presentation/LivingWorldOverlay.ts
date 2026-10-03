@@ -577,6 +577,13 @@ export function createLivingWorldOverlay(
         }
       }
     }
+    if (!targeted) for (const entity of bundle.world.getActiveGeneratedEntities()) {
+      if (entity.type !== 'resource' || !worldPositionKnown(bundle,entity.position) || Math.hypot(entity.position.x-p.x,entity.position.y-p.y)>4) continue;
+      const resource = bundle.worldStore.getResourceState(entity.entityId);
+      if (!resource?.depleted || resource.uprootedVersion === 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId)) continue;
+      const a = row(entity.entityId,bundle.catalog.getAs(entity.definitionId,'resource').displayName+' · cut roots');
+      a.append(button('Uproot · Field Hoe',()=>execute('uproot-canonical',entity.entityId,{resourceRevision:resource.revision})));
+    }
     for (const f of state.forage
       .filter((f) => !f.cleared)
       .filter((e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {

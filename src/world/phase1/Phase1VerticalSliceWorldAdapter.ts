@@ -412,6 +412,7 @@ export class Phase1VerticalSliceWorldAdapter
     if (entity === null || entity.type !== 'resource') return null;
     const state = this.options.store.getResourceState(resourceEntityId);
     if (state === undefined) return null;
+    if (state.uprootedVersion === 1) return null;
     return Object.freeze({
       resourceEntityId,
       resourceDefinitionId: entity.definitionId,

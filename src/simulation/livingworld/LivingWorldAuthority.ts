@@ -35,6 +35,10 @@ export interface LivingServices {
   weather(x: number, y: number): string;
   weapon(id: string): boolean;
   cancelRest(id: string): void;
+  canonicalRoots?: {
+    get(id: string): {x:number;y:number;revision:number;cut:boolean;rootItemId:string} | null;
+    commit(id: string, revision: number): string | null;
+  };
   fishing?: Pick<FishingServices, 'water' | 'clearLine' | 'habitat'> & { healthMilli(id: string): number };
 }
 export interface LivingCommand {
@@ -52,6 +56,7 @@ export interface LivingCommand {
     | 'forage'
     | 'water-forage'
     | 'uproot'
+    | 'uproot-canonical'
     | 'replant'
     | 'hunt'
     | 'loot'
@@ -64,6 +69,7 @@ export interface LivingCommand {
     | 'fuel'
     | 'fill';
   target: string;
+  resourceRevision?: number;
   x?: number;
   y?: number;
   crop?: string;
@@ -636,6 +642,8 @@ export class LivingWorldAuthority {
     const inputs: { itemDefinitionId: string; quantity: number }[] = [],
       outputs: typeof inputs = [];
     let message = 'DONE';
+    let commitWorld: (() => string | null) | undefined;
+    let toolWear: {stackId:string;conditionCost:number} | undefined;
     const consume = (id: string, q = 1) =>
         inputs.push({ itemDefinitionId: id, quantity: q }),
       produce = (id: string, q = 1) =>
@@ -656,6 +664,16 @@ export class LivingWorldAuthority {
       for (const [id, q] of r.costs) consume(id, q);
       produce(r.output, r.quantity);
       message = 'CRAFTED';
+    } else if (c.action === 'uproot-canonical') {
+      const roots = this.services.canonicalRoots, target = roots?.get(c.target);
+      if (!roots || !target) return reject('SOURCE_MISSING');
+      if (target.revision !== c.resourceRevision) return reject('STALE_RESOURCE_REVISION');
+      if (!target.cut) return reject('HARVEST_MATURE_PLANT_FIRST');
+      if (distance(target) > near) return reject('OUT_OF_RANGE');
+      if (!has('item:field-hoe')) return reject('FIELD_HOE_REQUIRED');
+      produce(target.rootItemId);
+      commitWorld = () => roots.commit(c.target,target.revision);
+      message = 'ROOT_UPROOTED';
     } else if (c.action === 'uproot') {
       if (!f || f.cleared || !f.growth || !f.growth.cut) return reject('HARVEST_MATURE_PLANT_FIRST');
       if (distance(f) > near) return reject('OUT_OF_RANGE');
@@ -789,6 +807,11 @@ export class LivingWorldAuthority {
       if (distance(f) > near) return reject('OUT_OF_RANGE');
       if (!f.growth && this.services.tick() < f.readyTick) return reject('RENEWING');
       const d = forageDefinition(f.kind)!;
+      if (f.kind === 'timber-tree') {
+        const tool = inventory.stacks.find(stack=>stack.itemDefinitionId === 'item:stone-field-tool' && (stack.condition ?? 0) > 0);
+        if (!tool) return reject('TOOL_REQUIRED');
+        toolWear = {stackId:tool.stackId,conditionCost:2};
+      }
       const amount = f.growth ? forageGrowthView(f, this.services.tick(), 1).harvestYield : d.quantity;
       if (!amount) return reject('RENEWING');
       produce(d.output, amount);
@@ -906,7 +929,8 @@ export class LivingWorldAuthority {
         expectedInventoryRevision: c.expectedInventoryRevision,
         inputs,
         outputs,
-      });
+        ...(toolWear ? {toolWear} : {}),
+      }, commitWorld);
       if (result.status === 'rejected') return reject(result.reason);
     }
     this.services.cancelRest(c.playerId);

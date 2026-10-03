@@ -520,6 +520,18 @@ it('failed unexplored spawn points retry later without duplicating hunted animal
   expect(rooster.authority.read().animals[0]!.product).toBe(0);
 });
 
+it('transplanted timber requires a functioning tool and pays yield and wear once', () => {
+  const f=fixture({forage:[{id:'timber:sapling',kind:'timber-tree',x:102,y:100,readyTick:0,cleared:false,lineage:'item:root-timber-tree',growth:{version:1,progress:108000,moisture:8000,dryTicks:0,cut:false}}]});
+  const before=f.authority.read(),bag=f.items.exportLedgerSnapshot();
+  expect(f.authority.execute(f.command('forage','timber:sapling'))).toMatchObject({status:'rejected',message:'TOOL_REQUIRED'});
+  expect(f.authority.read()).toEqual(before);expect(f.items.exportLedgerSnapshot()).toEqual(bag);
+  expect(f.items.commitColonyExchange({operationId:'fixture:tree-tool',playerId:'solo',expectedInventoryRevision:f.items.getContainerView('inventory:solo').revision,inputs:[],outputs:[{itemDefinitionId:'item:stone-field-tool',quantity:1}]}).status).toBe('committed');
+  const command=f.command('forage','timber:sapling');expect(f.authority.execute(command).status).toBe('committed');
+  const after=f.items.exportLedgerSnapshot();expect(f.items.getContainerView('inventory:solo').stacks.find(s=>s.itemDefinitionId==='item:stone-field-tool')!.condition).toBe(98);
+  expect(f.authority.read().forage[0]).toMatchObject({growth:{progress:0,cut:true}});
+  expect(f.authority.execute(command).status).toBe('committed');expect(f.items.exportLedgerSnapshot()).toEqual(after);
+});
+
 it('plant harvest resets growth, roots transplant once, and full bags or blocked ground preserve both sides of the transaction', () => {
   const plant = { id: 'forage:berry', kind: 'berry-bush', x: 100, y: 103, readyTick: 0, cleared: false, growth: { version: 1 as const, progress: 10800, moisture: 8000, dryTicks: 0, cut: false } };
   const f = fixture({ forage: [plant] });

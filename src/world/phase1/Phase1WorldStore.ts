@@ -233,6 +233,7 @@ function validateResourceState(
   }
   requireNonNegativeRevision(state.revision, 'Resource revision');
   const lifecycle = state.lifecycle === undefined ? undefined : validateResourceLifecycle(state.lifecycle, entity.definitionId);
+  if (state.uprootedVersion !== undefined && (state.uprootedVersion !== 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId) || !state.depleted || state.regenerationReadyTick !== null)) throw Error('Invalid uprooted resource tombstone');
 
   if (definition.maxGatherActions === null) {
     if (
@@ -258,6 +259,8 @@ function validateResourceState(
 
     if (state.depleted && lifecycle?.kind === 'mineral') {
       if (state.regenerationReadyTick !== null) throw Error('Finite mineral must not retain a renewal clock');
+    } else if (state.uprootedVersion === 1) {
+      if (state.regenerationReadyTick !== null) throw Error('Uprooted plant must not renew');
     } else if (state.depleted) {
       if (
         definition.regenerationActiveSeconds === null
@@ -274,7 +277,7 @@ function validateResourceState(
 
   if (lifecycle?.kind === 'plant') {
     if (state.depleted !== (lifecycle.stage === 'early')) throw Error('Plant stage disagrees with resource availability');
-    if (state.depleted && state.regenerationReadyTick !== resourceGrowthCheckpoint(lifecycle)) throw Error('Plant renewal clock disagrees with growth checkpoint');
+    if (state.depleted && state.uprootedVersion !== 1 && state.regenerationReadyTick !== resourceGrowthCheckpoint(lifecycle)) throw Error('Plant renewal clock disagrees with growth checkpoint');
   }
   return Object.freeze({ ...state, ...(lifecycle ? {lifecycle} : {}) });
 }
@@ -883,6 +886,20 @@ export class Phase1WorldStore {
     return Object.freeze({ changed: true, state: next });
   }
 
+  /** Called inside a prepared item exchange, after capacity and tool validation. */
+  public commitResourceUproot(resourceEntityId: string, expectedRevision: number): string | null {
+    const entry = this.activeEntryForEntity(resourceEntityId);
+    const state = entry?.delta?.resourceStates.find(value => value.resourceEntityId === resourceEntityId);
+    if (!entry?.delta || !state) return 'SOURCE_MISSING';
+    if (state.revision !== expectedRevision) return 'STALE_RESOURCE_REVISION';
+    const entity = entry.base?.entities.find(value => value.entityId === resourceEntityId);
+    if (!entity || entity.type !== 'resource' || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId)) return 'SOURCE_MISSING';
+    if (!state.depleted || state.uprootedVersion === 1) return 'HARVEST_MATURE_PLANT_FIRST';
+    const next = Object.freeze({...state,revision:incrementRevision(state.revision,'Resource revision'),regenerationReadyTick:null,uprootedVersion:1 as const});
+    this.publishDeltaMutation(entry,Object.freeze({...entry.delta,resourceStates:Object.freeze(entry.delta.resourceStates.map(value=>value.resourceEntityId === resourceEntityId ? next : value))}));
+    return null;
+  }
+
   public getRuinState(
     ruinEntityId: string,
   ): Phase1RuinRuntimeState | undefined {
@@ -1110,6 +1127,7 @@ export class Phase1WorldStore {
 
     let changed = false;
     const states = entry.delta.resourceStates.map((state) => {
+      if (state.uprootedVersion === 1) return state;
       const lifecycle = state.lifecycle;
       if (lifecycle?.kind === 'mineral') return state;
       if (lifecycle?.kind === 'plant') {

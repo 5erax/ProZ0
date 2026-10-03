@@ -474,6 +474,16 @@ export class Phase1AuthorityBundle {
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
       weapon:id=>{const idEquipped=equipment.reconcile(id).equippedWeaponStackId;return items.getContainerView('inventory:'+id).stacks.some(s=>s.stackId===idEquipped&&isKnownMeleeEquipment(s.itemDefinitionId)&&(s.condition??0)>0);},
       cancelRest:id=>this.expedition!.cancelRest(id),
+      canonicalRoots: {
+        get: id => {
+          const entity = world.getActiveGeneratedEntities().find(value=>value.entityId === id);
+          const state = worldStore.getResourceState(id);
+          if (!entity || entity.type !== 'resource' || !world.isExploredPosition(entity.position) || !state || state.uprootedVersion === 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId)) return null;
+          const kind = entity.definitionId === 'resource:timber-source' ? 'timber-tree' : entity.definitionId.slice('resource:'.length);
+          return {...entity.position,revision:state.revision,cut:state.depleted,rootItemId:'item:root-'+kind};
+        },
+        commit: (id,revision) => { try { return worldStore.commitResourceUproot(id,revision); } catch { return 'RESOURCE_COMMIT_FAILED'; } },
+      },
       fishing: {
         healthMilli: id => survival.getPlayerState(id).healthMilli,
         water: (x,y) => world.isExploredWater({ x,y }),

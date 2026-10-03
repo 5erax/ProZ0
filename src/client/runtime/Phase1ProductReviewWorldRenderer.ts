@@ -1280,6 +1280,9 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     for (const entity of bundle.world.getActiveGeneratedEntities()) {
+      if (entity.type === 'resource') {
+        if (bundle.worldStore.getResourceState(entity.entityId)?.uprootedVersion === 1) continue;
+      }
       if (entity.type === 'passive-wildlife' && (bundle.livingWorld || entity.entityId === bundle.sustenance.read().animalEntityId)) continue;
       if (
         entity.type !== 'hostile'

@@ -413,7 +413,8 @@ export class Phase1ItemAuthority {
     readonly expectedInventoryRevision: number;
     readonly inputs: readonly { itemDefinitionId: string; quantity: number }[];
     readonly outputs: readonly { itemDefinitionId: string; quantity: number }[];
-  }): { status: 'committed'; inventoryRevision: number } | { status: 'rejected'; reason: string } {
+    readonly toolWear?: {readonly stackId:string;readonly conditionCost:number};
+  }, commitWorld?: () => string | null): { status: 'committed'; inventoryRevision: number } | { status: 'rejected'; reason: string } {
     const draft = this.ledger.createDraft();
     const containerId = 'inventory:' + request.playerId;
     const inventory = draft.getContainer(containerId);
@@ -439,8 +440,20 @@ export class Phase1ItemAuthority {
       if (typeof insertion === 'string') return { status: 'rejected', reason: insertion };
       ordinal = insertion.nextGeneratedOrdinal;
     }
-    const inventoryRevision = request.inputs.length + request.outputs.length > 0
+    if (request.toolWear) {
+      const tool = draft.requireStack(containerId,request.toolWear.stackId);
+      if (!tool || tool.condition === null || tool.condition <= 0) return {status:'rejected',reason:'TOOL_REQUIRED'};
+      if (!Number.isSafeInteger(request.toolWear.conditionCost) || request.toolWear.conditionCost < 0) return {status:'rejected',reason:'INVALID_TOOL_WEAR'};
+      const reason = draft.setCondition(containerId,tool.stackId,Math.max(0,tool.condition-request.toolWear.conditionCost));
+      if (reason) return {status:'rejected',reason};
+    }
+    const inventoryRevision = request.inputs.length + request.outputs.length + (request.toolWear ? 1 : 0) > 0
       ? draft.incrementRevision(containerId) : inventory.revision;
+    // No asynchronous work between the prepared ledger and its world mutation.
+    if (commitWorld) {
+      const reason = commitWorld();
+      if (reason) return {status:'rejected',reason};
+    }
     this.ledger.publish(draft);
     return { status: 'committed', inventoryRevision };
   }

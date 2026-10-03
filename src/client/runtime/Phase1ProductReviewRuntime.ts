@@ -373,6 +373,7 @@ export async function createPhase1ProductReviewRuntime(
   const resourceTarget = () => {
     return bundle.world.getActiveGeneratedEntities()
       .filter((entity) => entity.type === 'resource')
+      .filter(entity => bundle.world.getResource(entity.entityId) !== null)
       .map((entity) => ({
         entity,
         distance: distanceFromPlayerSquared(

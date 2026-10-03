@@ -74,6 +74,14 @@ export function livingArt(role: string, kind: string, progress: number, young = 
     width = a.width; height = a.height;
     if (young) { width = Math.round(width * .65); height = Math.round(height * .65); }
     body = dead ? `<g transform="translate(0 70) scale(1 -.45)">${a.body}</g>` : a.body;
+  } else if (kind === 'timber-tree') {
+    width = 40; height = 50;
+    body = stageKey === 0 ? '<path fill="#765a3d" d="M27 44h9v9h-9Z"/><path fill="#b29663" d="M27 44 31 42 36 44 32 46Z"/><path fill="#729365" d="M34 41h5v4h-5Z"/>' : '<path fill="#51432f" d="M28 22h8v31h-8Z"/><path fill="#9c8053" d="M29 25h3v26h-3Z"/><path fill="#344f3e" d="M8 18h6v-7h10V5h16v6h10v8h6v18h-8v6H17v-7H8Z"/><path fill="#6c8a5b" d="M15 13h17v5h10v7H12v-6h3Z"/><path fill="#4d714c" d="M16 29h12v8h10v6H19v-5h-3Z"/><path fill="#8ea36b" d="M16 14h9v3h-9Zm18 6h9v3h-9Z"/><path fill="#79613d" d="M35 35h5V25h4v-5h3v9h-4v11h-8Z"/>';
+    if (stageKey === 1) body = '<g transform="translate(6.4 10.6) scale(.8)">'+body+'</g>';
+  } else if (kind === 'fiber-plant' || kind === 'food-plant') {
+    width = 32; height = 32;
+    body = plant(kind === 'fiber-plant' ? 'flax' : 'herb',stageKey);
+    if (kind === 'food-plant' && stageKey === 2) body += '<path fill="#d1a56b" d="M18 34h5v5h-5Zm18-7h5v5h-5Z"/>';
   } else if (kind === 'berry-bush') {
     width = 42; height = 38;
     body = '<path fill="#82674d" d="M29 29h5v22h-5zM23 39h12v4H23zM33 36h10v4H33z"/><path fill="#3e604b" d="M9 27h6v-9h14v-6h13v7h10v19H17v-4H9z"/><path fill="#628452" d="M16 19h12v7H16zM30 15h10v7H30zM36 24h13v8H36zM19 30h12v6H19z"/><path fill="#87a469" d="M18 19h7v3h-7zM31 15h6v3h-6zM39 24h6v3h-6z"/>' + (dead || stageKey < 2 ? '' : '<path fill="#b7797b" d="M18 26h4v4h-4zM22 29h4v4h-4zM37 22h4v4h-4zM41 25h4v4h-4zM30 34h4v4h-4z"/><path fill="#e0ada0" d="M18 26h2v2h-2zM37 22h2v2h-2z"/>');

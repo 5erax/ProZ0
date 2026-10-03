@@ -65,6 +65,7 @@ export interface Phase1ResourceRuntimeState {
   readonly remainingGatherActions: number | null;
   readonly depleted: boolean;
   readonly regenerationReadyTick: number | null;
+  readonly uprootedVersion?: 1;
   readonly lifecycle?: import('./ResourceLifecycle').ResourceLifecycleV1;
 }
 

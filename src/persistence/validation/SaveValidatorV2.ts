@@ -2,10 +2,10 @@ import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentConten
 import { resourceGrowthCheckpoint, validateResourceLifecycle } from '../../world/phase1/ResourceLifecycle';
 import {validateLivingWorld} from '../../simulation/livingworld/LivingWorldState';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
-import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog} from '../../content/phase1/Phase1Catalog';
+import {acceptsLegacyCatalog, acceptsPreviousLivingCatalog, acceptsRootV1Catalog, acceptsFishingV1Catalog, acceptsEquipmentV1Catalog} from '../../content/phase1/Phase1Catalog';
 import { GEAR_ITEMS } from '../../content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
-import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
+import { LIVING_ROOT_ITEMS, CANONICAL_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
@@ -163,7 +163,7 @@ function sameContentIdentity(
   if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
-  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint)) {
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsEquipmentV1Catalog(policy.catalog, actual.canonicalFingerprint)) {
     return saveFailure('CONTENT_FINGERPRINT_MISMATCH', 'Saved content fingerprint does not match the active catalog.');
   }
   return null;
@@ -757,13 +757,14 @@ export function validateChunkRecordV2(
       || !nullableTick(resource.regenerationReadyTick)) {
       return saveFailure('CORRUPT_RECORD', 'Chunk resource state is invalid.');
     }
+    if (resource.uprootedVersion !== undefined && (resource.uprootedVersion !== 1 || !resource.depleted || resource.remainingGatherActions !== 0 || resource.regenerationReadyTick !== null)) return saveFailure('CORRUPT_RECORD','Invalid uprooted resource tombstone');
     resourceIds.add(resource.resourceEntityId);
     if (resource.lifecycle !== undefined) {
       try {
         const lifecycle = validateResourceLifecycle(resource.lifecycle);
         if (resource.depleted !== (resource.remainingGatherActions === 0)) throw Error('Resource availability disagrees with remaining actions');
         if (lifecycle.kind === 'mineral' && resource.regenerationReadyTick !== null) throw Error('Mineral must not renew');
-        if (lifecycle.kind === 'plant' && (resource.depleted !== (lifecycle.stage === 'early') || (resource.depleted && resource.regenerationReadyTick !== resourceGrowthCheckpoint(lifecycle)))) throw Error('Plant stage/renewal mismatch');
+        if (lifecycle.kind === 'plant' && (resource.depleted !== (lifecycle.stage === 'early') || (resource.depleted && resource.regenerationReadyTick !== (resource.uprootedVersion === 1 ? null : resourceGrowthCheckpoint(lifecycle))))) throw Error('Plant stage/renewal mismatch');
       } catch (error) { return saveFailure('CORRUPT_RECORD', 'Chunk resource lifecycle is invalid: '+String(error)); }
     }
   }
@@ -964,6 +965,7 @@ function globalCrossReferences(
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
   const living=bundle.world.livingWorld;
+  if (bundle.world.contentCompatibility.canonicalFingerprint !== policy.catalog.compatibility.canonicalFingerprint && (bundle.containers.some(c=>c.stacks.some(stack=>CANONICAL_ROOT_ITEMS.some(item=>item.id===stack.itemDefinitionId))) || living?.forage.some(f=>['timber-tree','fiber-plant','food-plant'].includes(f.kind)))) return saveFailure('CORRUPT_RECORD','Previous content identity cannot contain canonical-root transplants');
   if(acceptsLegacyCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living||bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ITEMS,...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId)))))return saveFailure('CORRUPT_RECORD','Legacy content identity cannot contain living-world content.');
   if(acceptsPreviousLivingCatalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && (living?.fishing || bundle.containers.some(c=>c.stacks.some(s=>[...LIVING_ROOT_ITEMS,...FISHING_ITEMS,...GEAR_ITEMS].some(i=>i.id===s.itemDefinitionId))))) return saveFailure('CORRUPT_RECORD', 'Prior living catalog cannot contain newly introduced roots or fishing.');
   if(acceptsFishingV1Catalog(policy.catalog,bundle.world.contentCompatibility.canonicalFingerprint) && bundle.containers.some(c=>c.stacks.some(s=>GEAR_ITEMS.some(i=>i.id===s.itemDefinitionId)))) return saveFailure('CORRUPT_RECORD', 'Prior fishing catalog cannot contain newly introduced rarity gear.');

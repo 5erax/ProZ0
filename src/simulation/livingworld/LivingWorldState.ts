@@ -182,7 +182,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
       (f.lineage !== undefined && (typeof f.lineage !== 'string' || !f.lineage || f.lineage.length > 180 || !f.growth)) ||
       (f.growth !== undefined && (
         !f.growth || f.growth.version !== 1 ||
-        !(f.kind.startsWith('wild-') || f.kind === 'berry-bush') ||
+          !(f.kind.startsWith('wild-') || ['berry-bush','timber-tree','fiber-plant','food-plant'].includes(f.kind)) ||
         ![f.growth.progress, f.growth.moisture, f.growth.dryTicks].every(n) ||
         f.growth.progress > forageDefinition(f.kind)!.renewalTicks ||
         f.growth.moisture > 10000 || typeof f.growth.cut !== 'boolean'

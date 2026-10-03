@@ -1,7 +1,7 @@
 import { forageDefinition } from '../../content/livingworld/LivingWorldContent';
 import type { LivingForage } from './LivingWorldState';
 
-export const renewablePlant = (kind: string) => kind.startsWith('wild-') || kind === 'berry-bush';
+export const renewablePlant = (kind: string) => kind.startsWith('wild-') || ['berry-bush','timber-tree','fiber-plant','food-plant'].includes(kind);
 export const moistureState = (moisture: number) => moisture < 2500 ? 'dry' : moisture >= 7000 ? 'wet' : 'normal';
 /** Shared gameplay/presentation thresholds. Immature plants yield less and reset to roots. */
 export function plantGrowthView(progress: number, maximum: number, rate: number, moisture: number, maximumYield: number) {
