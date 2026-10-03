@@ -1,5 +1,7 @@
-import { uiText } from '../localization/UiMessages';
-import { onLocaleChange } from '../localization/Locale';
+import { presentationText } from '../localization/PresentationMessages';
+import { mountMapViewport, type MapViewportState } from './MapViewport';
+import { uiText, uiMessageKey } from '../localization/UiMessages';
+import { onLocaleChange, bindLocalized, formatNumber } from '../localization/Locale';
 import { bindUiText } from '../localization/UiMessages';
 import { uiPhrase } from '../localization/UiMessages';
 import { WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
@@ -135,7 +137,11 @@ function meter(
   row.dataset.stateLabel = presentation.stateLabel;
   row.dataset.value = String(presentation.value);
   row.dataset.max = String(presentation.max);
-  bindUiText(row,"title",presentation.label + ' · ' + presentation.stateLabel);
+  row.setAttribute('role','meter');
+  row.setAttribute('aria-valuemin','0'); row.setAttribute('aria-valuemax',String(presentation.max)); row.setAttribute('aria-valuenow',String(presentation.value));
+  const caption=()=>uiText(uiMessageKey(presentation.stateLabel))||uiPhrase(presentation.stateLabel);
+  bindLocalized(row,'title',()=>uiPhrase(presentation.label)+' · '+caption());
+  bindLocalized(row,'aria-label',()=>uiPhrase(presentation.label)+' · '+formatNumber(presentation.value,{maximumFractionDigits:0})+'/'+formatNumber(presentation.max)+' · '+caption());
 
   const label = createElement(document, 'div', 'p1-meter-label');
   const icon = assetSprite(
@@ -146,7 +152,7 @@ function meter(
   if (icon !== null) {
     label.append(icon);
   }
-  label.append(createElement(document, 'span', 'p1-meter-label-copy', presentation.label.toUpperCase()));
+  label.append(createElement(document, 'span', 'p1-meter-label-copy', presentation.label));
 
   const track = createElement(document, 'div', 'p1-meter-track');
   const fill = createElement(document, 'div', 'p1-meter-fill');
@@ -175,6 +181,7 @@ function meter(
     'p1-meter-state p1-visually-hidden',
     presentation.stateLabel,
   );
+  bindLocalized(semanticState,'textContent',caption);
 
   row.append(label, track, value, alert, semanticState);
   return row;
@@ -322,6 +329,7 @@ function itemInspectionCard(document: Document, item: Phase1InventoryItemPresent
   if (item.inspection.sources.length) details.append(createElement(document, 'p', '', uiText("ui.7ae25703") + item.inspection.sources.join(' · ')));
   if (item.inspection.recipes.length) details.append(createElement(document, 'p', '', uiText("ui.ae7b111b") + item.inspection.recipes.join(' · ')));
   card.append(details);
+  if(item.condition!==null&&item.condition<(item.conditionMax??100))card.append(actionButton(document,uiPhrase('Repair selected item [R]'),'inventory-repair'));
   if (item.inspection.canConsume) card.append(actionButton(document, uiText("ui.2495d920"), 'inventory-use'));
   if (item.inspection.canEquip) { const equip = actionButton(document, uiText("ui.6007b81"), 'equip'); equip.disabled = item.condition === 0; if (equip.disabled) bindUiText(equip,"title",uiText("ui.6a653b3e")); card.append(equip); }
   card.append(actionButton(document, uiText("ui.a023707b"), 'inventory-drop'));
@@ -335,7 +343,7 @@ function characterInspectionCard(document: Document, character: CharacterInspect
   details.append(createElement(document, 'summary', '', uiText("ui.6668c5e9") + (character.effects.length ? character.effects.length + uiText("ui.f328f6c1") : uiText("ui.86300d7a"))));
   const values = createElement(document, 'div', 'p1-character-values');
   for (const stat of character.values) values.append(createElement(document, 'span', '', uiPhrase(stat.name) + ': ' + stat.value + '/100'));
-  details.append(values, createElement(document, 'p', '', uiText("ui.49818d5") + character.staminaRegenPenaltyPercent + '% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.'));
+  details.append(values, createElement(document, 'p', '', uiText("ui.49818d5") + character.staminaRegenPenaltyPercent + uiPhrase('% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.')));
   for (const effect of character.effects) {
     const entry = createElement(document, 'article', 'p1-character-effect');
     entry.dataset.effect = effect.id; entry.dataset.severity = effect.severity;
@@ -428,16 +436,7 @@ function renderPanel(
               document,
               'div',
               'p1-panel-capacity',
-              'CARRY · '
-                + capacity.weightCurrent.toFixed(1)
-                + '/'
-                + capacity.weightMax.toFixed(1)
-                + ' kg · '
-                + capacity.volumeCurrent.toFixed(1)
-                + '/'
-                + capacity.volumeMax.toFixed(1)
-                + ' u · '
-                + capacity.stateLabel,
+              presentationText('carry', {weight:formatNumber(capacity.weightCurrent,{minimumFractionDigits:1,maximumFractionDigits:1}),maxWeight:formatNumber(capacity.weightMax,{minimumFractionDigits:1,maximumFractionDigits:1}),bulk:formatNumber(capacity.volumeCurrent,{minimumFractionDigits:1,maximumFractionDigits:1}),maxBulk:formatNumber(capacity.volumeMax,{minimumFractionDigits:1,maximumFractionDigits:1}),state:uiText(uiMessageKey(capacity.stateLabel)) || uiPhrase(capacity.stateLabel)}),
             )]),
         createElement(
           document,
@@ -1047,7 +1046,9 @@ function renderPanel(
             'p1-map-marker',
             mapMarkerSprite(markerState.atlasIndex),
           );
-          if (icon !== null) {
+          if (markerState.kind==='resource') {
+            marker.append(createElement(document,'span','p1-map-resource-glyph','◆'));
+          } else if (icon !== null) {
             marker.append(icon);
           }
 
@@ -1095,7 +1096,7 @@ function renderPanel(
         const seenLegend = new Set<string>();
         for (const markerState of spatial.markers) {
           const key =
-            markerState.kind + ':' + markerState.label;
+            markerState.kind + ':' + (markerState.kind==='resource'?markerState.id:markerState.label);
           if (seenLegend.has(key)) continue;
           seenLegend.add(key);
           const entry = createElement(
@@ -1117,6 +1118,9 @@ function renderPanel(
               markerState.label,
             ),
           );
+          if(markerState.kind==='resource'){
+            const remove=actionButton(document,uiPhrase('Remove resource marker'),'remove-resource-marker');remove.dataset.resourceMarker=markerState.id;entry.append(remove);
+          }
           legend.append(entry);
         }
 
@@ -1255,9 +1259,9 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-action-dock{position:absolute;right:8px;bottom:64px;display:flex;gap:3px;pointer-events:auto;}',
     '.p1-ui[data-panel-open="true"] .p1-action-dock{bottom:4px;z-index:2;}',
     '.p1-action-dock button{display:grid;place-items:center;width:28px;height:32px;padding:2px;background:#111a22;color:#d8e8db;border:1px solid #7d939b;cursor:pointer;font:7px monospace;}',
-    '.p1-survival .p1-meter-label-copy{display:none;}',
-    '.p1-survival{width:96px!important;}',
-    '.p1-survival .p1-meter{grid-template-columns:12px 42px 18px 8px;}',
+    '.p1-survival .p1-meter-label-copy{display:inline;font-weight:400;}',
+    '.p1-survival{width:150px!important;}',
+    '.p1-survival .p1-meter{grid-template-columns:76px 42px 18px 8px;}.p1-survival .p1-meter:nth-child(-n+2){min-height:15px;}.p1-survival .p1-meter:nth-child(-n+2) .p1-meter-label-copy{font-weight:700;}.p1-survival .p1-meter[data-severity=normal] .p1-meter-fill{background:#8db5ac;}.p1-survival .p1-meter[data-severity=warning] .p1-meter-fill{background:#efca83;}.p1-survival .p1-meter[data-severity=critical] .p1-meter-fill{background:#ef9292;}',
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-item-inspection,.p1-character-inspection{border:1px solid #51636d;padding:6px;margin:6px 0;line-height:1.5}.p1-item-inspection h3{font-size:11px;margin:0 0 4px}.p1-item-inspection p,.p1-character-inspection p{margin:4px 0}.p1-inspection-more summary,.p1-character-inspection summary{cursor:pointer;font-weight:bold}.p1-character-values{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0}.p1-character-effect{border-left:2px solid #d6c78d;padding:4px 8px;margin:6px 0}.p1-character-effect[data-severity="critical"]{border-color:#e8a088}.p1-item-inspection button{margin:4px 4px 0 0;}',
@@ -1367,6 +1371,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private readonly canvas: HTMLCanvasElement;
   private currentState: Phase1PresentationState;
   private panelSignature = '';
+  private readonly mapViewport:MapViewportState={zoom:1,x:0,y:0};
   private readonly stopLocale: () => void;
   private displaySignature = '';
   private actionDock: HTMLElement | null = null;
@@ -1429,10 +1434,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.equipmentDragActive = false;
     // Meter text and bars are whole-unit pixels. Keep the exact diagnostic
     // values current without rebuilding the HUD for subpixel survival changes.
-    const meters = [state.health, state.water, state.food, state.stamina, state.temperature];
+    const meters = [state.health, state.stamina, state.food, state.water, state.temperature];
     this.layer.querySelectorAll<HTMLElement>('.p1-survival .p1-meter').forEach((element, index) => {
       const value = String(meters[index]!.value);
-      if (element.dataset.value !== value) element.dataset.value = value;
+      if (element.dataset.value !== value) { element.dataset.value = value; element.setAttribute('aria-valuenow',value); }
     });
     const roundedMeter = (value: Phase1MeterPresentation) => ({ ...value, value: Math.round(value.value) });
     const displaySignature = JSON.stringify({
@@ -1477,9 +1482,9 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     survival.dataset.region = 'survival';
     survival.append(
       meter(this.document, state.health),
-      meter(this.document, state.water),
-      meter(this.document, state.food),
       meter(this.document, state.stamina),
+      meter(this.document, state.food),
+      meter(this.document, state.water),
       meter(this.document, state.temperature),
     );
 
@@ -1778,13 +1783,18 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     if (state.panel !== null && signature !== this.panelSignature) {
       const panel = renderPanel(this.document, state.panel);
       this.layer.append(panel);
+      const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
+      if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
       if (previousPanel?.dataset.panelKind === state.panel.kind) {
         panel.querySelectorAll<HTMLDetailsElement>('details[data-inspection-key]').forEach(e => { e.open = expanded.has(e.dataset.inspectionKey); });
         panel.scrollTop = previousScroll;
         const focus = active?.tagName === 'SUMMARY'
           ? Array.from(panel.querySelectorAll<HTMLElement>('details[data-inspection-key]')).find(e => e.dataset.inspectionKey === activeInspection)?.querySelector<HTMLElement>('summary')
           : Array.from(panel.querySelectorAll<HTMLElement>('button')).find(e => e.textContent === activeLabel && (activeAction ? e.dataset.reviewAction === activeAction : activeItem ? e.dataset.reviewItem === activeItem : false));
-        focus?.focus({ preventScroll: true });
+        const mapFocus = active?.classList.contains('p1-map-viewport') ? panel.querySelector<HTMLElement>('.p1-map-viewport') : null;
+        (focus ?? mapFocus)?.focus({ preventScroll: true });
+      } else if (state.panel.kind === 'map') {
+        panel.querySelector<HTMLElement>('.p1-map-viewport')?.focus({ preventScroll: true });
       }
     }
     this.panelSignature = signature;

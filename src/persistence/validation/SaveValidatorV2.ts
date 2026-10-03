@@ -1,4 +1,8 @@
 import { validateSoloCaveState } from '../../simulation/worldspaces/SoloCaveState';
+import { validateSoloResourceMarkers } from '../../simulation/worldspaces/SoloResourceMarkers';
+import { Phase1ChunkGenerator } from '../../world/phase1/Phase1ChunkGenerator';
+import { fromWorldPosition, toChunkLocalPosition } from '../../world/chunks/ChunkCoord';
+import { isExplorationCellKnown, PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS } from '../../world/phase1/ExplorationGrid';
 import { soloCaveRegistry } from '../../world/phase2/SoloCaveRegistry';
 import { validWearableReferences, wearableSlotFor, WEARABLE_SLOTS, WEARABLE_ITEMS } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
@@ -205,6 +209,7 @@ export function validateWorldManifestV2(
   const invalid = common(input, 'world-manifest');
   if (invalid !== null) return invalid;
   const record = input as unknown as WorldManifestV2;
+  if(record.soloResourceMarkers!==undefined){try{validateSoloResourceMarkers(record.soloResourceMarkers);if(!record.singlePlayerExpedition)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid solo resource markers.');}}
   if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
   if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.soloCaves !== undefined) {
@@ -1004,6 +1009,28 @@ function globalCrossReferences(
   }
 
   const caves = bundle.world.soloCaves;
+  const annotations=bundle.world.soloResourceMarkers;
+  if(annotations){
+    if(players.size!==1||!players.has(annotations.ownerPlayerId))return saveFailure('CROSS_REFERENCE_FAILURE','Markers require the sole solo player.');
+    const generator=new Phase1ChunkGenerator(policy.catalog);
+    for(const marker of annotations.markers){
+      let valid=false;
+      if(marker.spaceId==='surface'){
+        const coord=fromWorldPosition(marker.position),chunk=bundle.chunks.find(c=>c.coord.x===coord.x&&c.coord.y===coord.y);
+        if(chunk){
+          const generated=generator.generate({worldSeed:bundle.world.worldSeed,generationVersion:bundle.world.generationVersion,coord});
+          const node=generated.entities.find(e=>e.type==='resource'&&e.entityId===marker.resourceId&&e.definitionId===marker.definitionId&&e.position.x===marker.position.x&&e.position.y===marker.position.y);
+          const local=toChunkLocalPosition(marker.position,coord);
+          valid=!!node&&isExplorationCellKnown(coord,{regionId:chunk.exploration.regionId,revision:chunk.exploration.revision,words:decodeExplorationWordsV2(chunk.exploration.exploredCellsBase64)},Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));
+        }
+      }else if(caves){
+        const layout=soloCaveRegistry(bundle.world.worldSeed,bundle.world.generationVersion).find(p=>p.layout.spaceId===marker.spaceId)?.layout;
+        const node=layout?.nodes.find(n=>n.id===marker.resourceId&&n.resourceDefinitionId===marker.definitionId&&n.position.x===marker.position.x&&n.position.y===marker.position.y);
+        valid=!!layout&&!!node&&!!caves.spaces.find(s=>s.progress.spaceId===marker.spaceId)?.progress.exploredCellIndices.includes(Math.floor(marker.position.y)*layout.width+Math.floor(marker.position.x));
+      }
+      if(!valid)return saveFailure('CROSS_REFERENCE_FAILURE','Resource marker must reference an explored canonical node.');
+    }
+  }
   if (caves) {
     const actor = players.get(caves.actor.playerId), location = caves.actor.location;
     if (players.size !== 1 || !actor || actor.position.x !== location.position.x || actor.position.y !== location.position.y) return saveFailure('CROSS_REFERENCE_FAILURE','Cave actor must match the sole player and canonical movement position.');

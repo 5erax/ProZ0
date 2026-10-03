@@ -2,7 +2,129 @@ import { bindLocalized, message, type MessageDictionary } from './Locale';
 import { statusText } from './StatusMessages';
 // Authored glossary. Lookup is exact and only called at source-owned UI boundaries.
 // Player/profile/chat strings never pass through this dictionary.
-const glossary = `Settings|Cài đặt
+const glossary = `Low|Thấp
+Carry a Stone Field Tool · open Craft [C] to make one|Cần công cụ đá · mở Chế tạo [C] để làm
+Choose ground near the Landing Module or Habitat to expand your base|Chọn vị trí gần mô-đun hạ cánh hoặc phòng ở để mở rộng căn cứ
+Position obstructed; choose clear ground|Vị trí bị chắn; chọn khoảng đất trống
+Connector is no longer valid; choose another|Điểm nối không còn hợp lệ; chọn điểm nối khác
+Connector is occupied; choose another|Điểm nối đã được sử dụng; chọn điểm nối khác
+Carry a building kit; open Craft [C] to make one|Cần kit xây dựng trong túi; mở Chế tạo [C] để làm
+Item or target changed; reopen the panel and select again|Vật phẩm hoặc đối tượng đã thay đổi; mở lại bảng để chọn lại
+Complete the prerequisite research to unlock|Hoàn thành nghiên cứu trước đó để mở khóa
+Research is complete for the whole room|Nghiên cứu đã hoàn thành cho cả phòng
+Move near a Workbench to craft this recipe|Đến gần bàn chế tạo để làm công thức này
+Save failed; try again before leaving the room|Chưa lưu được; thử lại trước khi rời phòng
+Only explored terrain is shown · yellow: you · blue: teammates|Chỉ hiện địa hình đã khám phá · vàng: bạn · xanh: đồng đội
+Change profession at a laboratory when research and exploration requirements are met.|Có thể đổi nghề tại phòng thí nghiệm khi đủ điều kiện nghiên cứu và khám phá.
+WASD move · E interact · Space attack · I inventory · C craft · B build · M map · U research · P professions · J journal · Enter chat · Escape close. Settings contains world saves and invitations. Voice starts only when you choose it and grant microphone permission.|WASD di chuyển · E tương tác gần bạn · Space tấn công · I túi đồ · C chế tạo · B xây dựng · M bản đồ · U nghiên cứu · P nghề · J nhật ký · Enter chat · Escape đóng. Cài đặt chứa lưu thế giới và lời mời. Voice chỉ bật khi bạn chọn và cho phép mic.
+Click Chat to allow audio playback|Bấm vào Chat để cho phép phát âm thanh
+Voice cannot connect on this network; chat is still available.|Voice không kết nối qua mạng này; bạn vẫn có thể chat.
+Allow microphone access to talk. Direct voice may be blocked by the network.|Cho phép mic nếu bạn muốn nói chuyện. Voice trực tiếp có thể bị mạng chặn.
+Microphone unavailable; check browser permission. Chat is still available.|Chưa bật được mic; kiểm tra quyền trình duyệt. Chat vẫn dùng được.
+Voice interrupted; toggle voice to retry.|Voice bị gián đoạn; tắt/bật voice để thử lại.
+Your bag is too heavy. Store items and return; these supplies will remain here.|Túi quá nặng. Cất bớt đồ rồi quay lại; vật liệu vẫn còn ở đây.
+Your bag has no space. Store items and return; these supplies will remain here.|Túi không còn chỗ. Cất bớt đồ rồi quay lại; vật liệu vẫn còn ở đây.
+No inspected sites yet. Explore outward; inspect visible landmarks nearby.|Chưa khảo sát địa điểm nào. Khám phá xung quanh rồi khảo sát địa danh đã thấy ở gần.
+Blueprint changed. Your bag was full; surplus materials were returned to an accessible nearby storage crate.|Đã đổi bản dựng. Túi đầy nên vật liệu thừa được trả vào rương gần đó có thể tiếp cận.
+Blueprint cancelled. Your bag was full; materials were returned to an accessible nearby storage crate.|Đã hủy bản dựng. Túi đầy nên vật liệu được trả vào rương gần đó có thể tiếp cận.
+Building dismantled. Your bag was full; materials were returned to an accessible nearby storage crate.|Đã tháo công trình. Túi đầy nên vật liệu được trả vào rương gần đó có thể tiếp cận.
+Blueprint type changed. Shared materials are kept; surplus materials returned to your bag.|Đã đổi loại bản dựng. Vật liệu dùng chung được giữ lại; vật liệu thừa trả về túi.
+Use the existing building dismantle action; empty storage first.|Dùng thao tác tháo công trình; lấy hết đồ trong rương trước.
+Rest started. Stay still and safe; closing this panel wakes you up.|Đã bắt đầu nghỉ. Đứng yên ở nơi an toàn; đóng bảng này sẽ thức dậy.
+Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.|Đặt bản dựng trước. Mang vật liệu đến sau, đóng góp đồ đang có rồi hoàn tất. Di chuyển giữ nguyên vật liệu đã góp; hủy sẽ hoàn trả khi túi còn chỗ.
+Automatically used for resource gathering. Keep it in your bag; it is not a weapon.|Tự dùng khi thu thập tài nguyên. Giữ trong túi; đây không phải vũ khí.
+. Slows exposure; does not instantly restore body temperature.|. Làm chậm tác động môi trường; không phục hồi thân nhiệt ngay lập tức.
+. Water and seasonal soil growth rules apply.|. Sinh trưởng phụ thuộc nước và đất theo mùa.
+Fish explored water with a Field Fishing Rod and Plant Fishing Bait. Cook at a campfire; raw fish is not directly consumable.|Câu ở vùng nước đã khám phá bằng cần câu và mồi thực vật. Nấu tại lửa trại; không thể ăn cá sống trực tiếp.
+Bag full. Store some items; harvest and loot are preserved.|Túi đầy. Cất bớt đồ; sản phẩm thu hoạch và chiến lợi phẩm được giữ lại.
+Fish population depleted or reserved; let this area recover.|Cá đã cạn hoặc đang được người khác câu; chờ khu vực hồi phục.
+Uprooting removes this patch permanently; replant the root elsewhere.|Thu gốc sẽ xóa bụi cây tại đây; trồng lại gốc ở nơi khác.
+ percentage points. This condition follows your current body temperature; it has no fixed expiry.| điểm phần trăm. Trạng thái phụ thuộc thân nhiệt hiện tại; không có thời hạn cố định.
+Stop sprinting and attacking. Stamina regenerates after the spending delay; resolve thirst, hunger, temperature and heavy carrying if recovery is slow.|Dừng chạy nhanh và tấn công. Thể lực hồi sau thời gian chờ; xử lý khát, đói, thân nhiệt và túi quá nặng nếu hồi chậm.
+% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.|% (tổng tác động, tối đa 100%). Trạng thái thay đổi khi chỉ số liên quan hồi phục; không có bộ đếm hết hạn.
+World saved — bookmark this page to return; Continue is unavailable.|Đã lưu thế giới — đánh dấu trang này để quay lại; chưa thể dùng Tiếp tục.
+Delete this shared world permanently? Export a backup first and disconnect all players.|Xóa vĩnh viễn thế giới chung này? Xuất bản sao lưu và ngắt kết nối mọi người trước.
+The host owns the shared world save. An invitation admits up to three players; your solo worlds stay separate.|Chủ phòng sở hữu save thế giới chung. Lời mời cho phép tối đa ba người; thế giới solo được lưu riêng.
+Only the host can save this shared world|Chỉ chủ phòng có thể lưu thế giới chung
+Invitation copied · maximum 3 players|Đã sao chép lời mời · tối đa 3 người
+Nearby storage · move a stack in either direction|Rương gần đây · chuyển chồng đồ theo cả hai chiều
+Stand beside a storage crate to put supplies away.|Đứng cạnh rương để cất vật liệu.
+Choose a facility, close this panel, then click the ground nearby. Building uses a crafted kit.|Chọn công trình, đóng bảng rồi nhấp nền đất gần đó. Xây dựng dùng kit đã chế tạo.
+Room full or saved identity rejected. Rejoin with your original invitation.|Phòng đầy hoặc danh tính lưu bị từ chối. Vào lại bằng lời mời ban đầu.
+Connection lost · reconnecting to your colonist…|Mất kết nối · đang kết nối lại nhân vật…
+Click nearby ground to place facility|Nhấp nền đất gần đây để đặt công trình
+Craft a storage kit: 4 Timber + 2 Cordage.|Chế tạo kit rương: 4 gỗ + 2 dây.
+Place a storage crate on explored dry ground near your base.|Đặt rương trên đất khô đã khám phá gần căn cứ.
+Stand beside your crate and open Inventory to move supplies.|Đứng cạnh rương rồi mở Túi đồ để chuyển vật liệu.
+Explore visible landmarks; inspect them from the Journal.|Khám phá địa danh đã thấy; khảo sát trong Nhật ký.
+Recording stopped. Export your record below.|Đã dừng ghi. Xuất bản ghi bên dưới.
+Start recording and play for a few moments first.|Bắt đầu ghi rồi chơi một lúc trước.
+Ten-minute record complete. Export it when ready.|Đã hoàn tất bản ghi mười phút. Xuất khi sẵn sàng.
+Respawn complete|Đã hồi sinh
+Authoritative death consequence pending|Đang xử lý hậu quả khi chết
+No active Death Cache|Không có túi đồ khi chết
+Locate the Ruin|Tìm phế tích
+Inspect the Ruin|Khảo sát phế tích
+Return alive to Landing Module or Habitat Room|Sống sót trở về mô-đun hạ cánh hoặc phòng ở
+Power Unit + Condenser present|Có bộ phát điện và máy ngưng tụ nước
+Interact while powered|Tương tác khi có điện
+Collect 1 Clean Water|Lấy 1 nước sạch
+Inventory / Storage|Túi đồ / Rương
+Map / Recovery|Bản đồ / Thu hồi
+Shared exploration unavailable|Chưa có dữ liệu khám phá chung
+Uninvestigated Ruin|Phế tích chưa khảo sát
+Investigated Ruin|Phế tích đã khảo sát
+Ruin unknown|Chưa biết phế tích
+Progression|Tiến triển
+Shared Discovery|Khám phá chung
+UNLOCKED|ĐÃ MỞ
+LOCKED|CHƯA MỞ
+INCOMPLETE|CHƯA HOÀN THÀNH
+COMMAND REJECTED|Không thể thực hiện thao tác
+STALE / WORLD STATE CHANGED|Trạng thái đã đổi; chọn lại đối tượng
+WORLD STATE CHANGED / POSITION TAKEN|Vị trí vừa được sử dụng; chọn vị trí khác
+WORLD STATE CHANGED / TARGET TAKEN|Đối tượng vừa được lấy; chọn lại
+INVENTORY WEIGHT LIMIT|Vượt sức chứa khối lượng
+INVENTORY VOLUME LIMIT|Vượt sức chứa thể tích
+STACK FULL|Chồng đồ đã đầy
+INSUFFICIENT MATERIAL|Chưa đủ vật liệu
+MISSING / WRONG TOOL|Cần công cụ phù hợp
+ITEM BROKEN|Vật phẩm đã hỏng
+TOO FAR|Đến gần đối tượng hơn
+INVALID REPAIR TARGET|Chọn vật phẩm có thể sửa
+ITEM ALREADY FULL CONDITION|Vật phẩm không cần sửa
+UNEXPLORED AREA|Khám phá khu vực trước
+INVALID TERRAIN|Chọn nền đất phù hợp
+WATER / NON-BUILDABLE SURFACE|Không thể xây trên mặt nước
+OBSTRUCTED|Chọn vị trí không bị chắn
+STRUCTURE OVERLAP|Vị trí chồng lên công trình
+BLOCKS SPAWN|Không được chặn điểm hồi sinh
+BLOCKS REQUIRED DOOR / CONNECTOR|Không được chặn cửa hoặc đầu nối
+OUTSIDE BASE BUILD ZONE|Đến vùng xây dựng căn cứ
+CONNECTOR REQUIRED|Cần đầu nối phòng ở
+INVALID CONNECTOR|Chọn đầu nối phù hợp
+BUILD LIMIT REACHED|Đã đạt giới hạn công trình
+WORLD STATE CHANGED|Trạng thái đã thay đổi
+INSUFFICIENT POWER|Chưa đủ công suất điện
+INVALID BUILD LOCATION|Chọn vị trí xây hợp lệ
+CRITICAL|Nguy kịch
+CRITICAL COLD|Rét nguy kịch
+SEVERE COLD|Rét nặng
+CRITICAL HEAT|Nóng nguy kịch
+SEVERE HEAT|Nóng nặng
+COLD|Lạnh
+HOT|Nóng
+ACTIVE|Đang diễn ra
+FORECAST|Dự báo
+DEAD|Đã chết
+ALIVE|Còn sống
+BROKEN|Hỏng
+MARKER_LIMIT|Đã đạt giới hạn 64 dấu tài nguyên
+Mark resource on map|Đánh dấu tài nguyên trên bản đồ
+Remove resource marker|Xóa dấu tài nguyên
+AUTO-USED WHEN GATHERING · NOT A WEAPON|TỰ DÙNG KHI THU HOẠCH · KHÔNG PHẢI VŨ KHÍ
+Repair selected item [R]|Sửa vật phẩm đã chọn [R]
+Settings|Cài đặt
 Close|Đóng
 Inventory|Túi đồ
 Map|Bản đồ
@@ -409,7 +531,7 @@ Stored volume: |Thể tích lưu trữ:\u0020
  percentage points to the stamina recovery penalty. Bulk and weight are separate limits.| điểm phần trăm giảm tốc độ hồi thể lực. Thể tích và khối lượng có giới hạn riêng.
  recipes| công thức
  recovery caches| kho đồ cần thu hồi
- visited regions · use a laboratory. Choice is permanent.| vùng đã đến · dùng phòng thí nghiệm. Lựa chọn là vĩnh viễn.
+ visited regions · use a laboratory. You can change profession here.| vùng đã đến · dùng phòng thí nghiệm. Có thể đổi nghề tại đây.
  · Carry a usable | · Mang theo vật phẩm còn dùng được:\u0020
  · DONE| · XONG
  · Ecology | · Sinh thái\u0020
@@ -822,7 +944,11 @@ export function uiMessageKey(source: string): string {
   let hash = 2166136261; for (const c of source) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
   return 'ui.' + hash.toString(16);
 }
-const authored = glossary.split('\n').map(row => row.split('|') as [string,string]);
+const authored = glossary.split('\n').map(row => {
+  const pair = row.split('|');
+  if (pair.length !== 2 || !pair[0] || !pair[1]) throw Error('Invalid UI glossary row: ' + row);
+  return pair as [string, string];
+});
 const rowMap = new Map(authored.map(([en,vi])=>[en,vi]));
 for (const [en,vi] of authored) if (!rowMap.has(en.toUpperCase())) rowMap.set(en.toUpperCase(),vi.toUpperCase());
 const rows = [...rowMap];

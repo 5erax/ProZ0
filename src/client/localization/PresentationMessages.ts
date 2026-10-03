@@ -1,0 +1,34 @@
+import { message, type MessageDictionary } from './Locale';
+export const presentationMessages:MessageDictionary = {
+  en: {
+    carry:'CARRY · {weight}/{maxWeight} kg · {bulk}/{maxBulk} u · {state}',
+    capacity:'Weight {weight} / {maxWeight} kg · Volume {bulk} / {maxBulk}',
+    item:'{name} · qty {qty}', condition:' · condition {value}/{max}',
+    stacks:' · {count} stacks · volume is item bulk, not empty slots',
+    inventoryControls:'CLICK / ↑/↓ SELECT · V USE · X EQUIP · R REPAIR · G DROP · [/] QTY {qty}',
+    storageControls:'↑/↓ SELECT · TAB PANE · [/] QTY {qty} · ENTER TRANSFER · V USE · X EQUIP · G DROP',
+    storage:'STORAGE · {weight} kg · {bulk} u',
+    power:'{demand} PU demand · {capacity} PU capacity',output:'{count}/4 {item}',
+    respawn:'Respawn at authority tick {tick}',xpLoss:'−{xp} XP current-level progress',
+    cache:'Death Cache · {id}',level:'Level {level}',quest:'{name} · {done}/{total} · {status}',
+    exploration:'Shared exploration · revision {revision}',
+    sprint:'Sprint: {value} stamina/s',water:'Water: {value}/min',hot:'Hot target: −{value}',cold:'Cold target: +{value}',
+    mapHelp:'Scroll to zoom · +/− zoom · arrows pan · Home reset',zoomIn:'Zoom in',zoomOut:'Zoom out',resetMap:'Reset map',
+  },
+  vi: {
+    carry:'MANG THEO · {weight}/{maxWeight} kg · {bulk}/{maxBulk} đơn vị · {state}',
+    capacity:'Khối lượng {weight} / {maxWeight} kg · Thể tích {bulk} / {maxBulk}',
+    item:'{name} · số lượng {qty}',condition:' · độ bền {value}/{max}',
+    stacks:' · {count} chồng đồ · thể tích là độ cồng kềnh, không phải ô trống',
+    inventoryControls:'NHẤP / ↑/↓ CHỌN · V DÙNG · X TRANG BỊ · R SỬA · G THẢ · [/] SỐ LƯỢNG {qty}',
+    storageControls:'↑/↓ CHỌN · TAB ĐỔI NGĂN · [/] SỐ LƯỢNG {qty} · ENTER CHUYỂN · V DÙNG · X TRANG BỊ · G THẢ',
+    storage:'RƯƠNG · {weight} kg · {bulk} đơn vị',
+    power:'Nhu cầu {demand} PU · Công suất {capacity} PU',output:'{count}/4 {item}',
+    respawn:'Hồi sinh tại nhịp mô phỏng {tick}',xpLoss:'−{xp} XP tiến độ cấp hiện tại',
+    cache:'Túi đồ khi chết · {id}',level:'Cấp {level}',quest:'{name} · {done}/{total} · {status}',
+    exploration:'Khám phá chung · phiên bản {revision}',
+    sprint:'Chạy nhanh: {value} thể lực/giây',water:'Nước: {value}/phút',hot:'Ngưỡng nóng: −{value}',cold:'Ngưỡng lạnh: +{value}',
+    mapHelp:'Cuộn để thu phóng · +/− thu phóng · mũi tên di chuyển · Home đặt lại',zoomIn:'Phóng to',zoomOut:'Thu nhỏ',resetMap:'Đặt lại bản đồ',
+  },
+};
+export const presentationText=(key:string,params:Readonly<Record<string,string|number>>={})=>message(presentationMessages,key,params);

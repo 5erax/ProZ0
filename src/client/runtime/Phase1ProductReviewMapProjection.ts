@@ -1,3 +1,4 @@
+import { contentDisplayName } from '../localization/ContentText';
 import { uiText } from '../localization/UiMessages';
 import { uiPhrase } from '../localization/UiMessages';
 import type {
@@ -469,7 +470,7 @@ export function projectPhase1ProductReviewMapPanel(
       if(known.has(i)&&cave.cells[i]!=='wall')exploredCells.push({cellX,cellY,terrain:cave.cells[i]==='water'?'water':'ground',motif:'none'});
       else unknownBoundaryCells.push({cellX,cellY});
     }
-    return {kind:'map',title:uiText("ui.8ce393b5")+cave.templateId.replaceAll('-',' '),fogLabel:uiText("ui.c285bbb7"),ruinLabel:uiText("ui.4836f36"),deathCacheLabel:state.deathCaches.length?String(state.deathCaches.length)+uiText("ui.1034a3ef"):null,sharedDiscoveryLabel:null,spatial:{cellSizeWorldUnits:1,minCellX:0,maxCellX:cave.width-1,minCellY:0,maxCellY:cave.height-1,exploredCells,unknownBoundaryCells,markers:[{id:playerId,kind:'player',label:uiText("ui.b5bdd13c"),atlasIndex:0,worldX:playerPosition.x,worldY:playerPosition.y,facing:null,distanceBand:null,selected:false,identitySlot:'LOCAL'},{id:cave.portalId,kind:'base',label:uiText("ui.39d49ed8"),atlasIndex:1,worldX:cave.exit.x,worldY:cave.exit.y,facing:null,distanceBand:null,selected:false,identitySlot:null}],selectedDetailLabel:cave.templateId.replaceAll('-',' '),selectedDistanceBand:null,selectableTargetCount:0,knowledgePolicy:'EXPLORED_ONLY'}};
+    return {kind:'map',title:uiText("ui.8ce393b5")+cave.templateId.replaceAll('-',' '),fogLabel:uiText("ui.c285bbb7"),ruinLabel:uiText("ui.4836f36"),deathCacheLabel:state.deathCaches.length?String(state.deathCaches.length)+uiText("ui.1034a3ef"):null,sharedDiscoveryLabel:null,spatial:{cellSizeWorldUnits:1,minCellX:0,maxCellX:cave.width-1,minCellY:0,maxCellY:cave.height-1,exploredCells,unknownBoundaryCells,markers:[...resourceMapMarkers(bundle,cave.spaceId),{id:playerId,kind:'player',label:uiText("ui.b5bdd13c"),atlasIndex:0,worldX:playerPosition.x,worldY:playerPosition.y,facing:null,distanceBand:null,selected:false,identitySlot:'LOCAL'},{id:cave.portalId,kind:'base',label:uiText("ui.39d49ed8"),atlasIndex:1,worldX:cave.exit.x,worldY:cave.exit.y,facing:null,distanceBand:null,selected:false,identitySlot:null}],selectedDetailLabel:cave.templateId.replaceAll('-',' '),selectedDistanceBand:null,selectableTargetCount:0,knowledgePolicy:'EXPLORED_ONLY'}};
   }
   const localMotion = motions.find(
     (motion) => motion.playerId === playerId,
@@ -576,6 +577,7 @@ export function projectPhase1ProductReviewMapPanel(
     })),
   ];
 
+  markers.push(...resourceMapMarkers(bundle,'surface'));
   for (const motion of motions) {
     if (motion.playerId === playerId) continue;
     const identitySlot = teammateIdentitySlot(
@@ -656,4 +658,8 @@ export function projectPhase1ProductReviewMapPanel(
       knowledgePolicy: 'EXPLORED_ONLY' as const,
     }),
   });
+}
+
+function resourceMapMarkers(bundle:Phase1AuthorityBundle,spaceId:string):Phase1MapMarkerPresentation[]{
+  return (bundle.resourceMarkers?.read().markers??[]).filter(m=>m.spaceId===spaceId).map(m=>({id:m.resourceId,kind:'resource',label:contentDisplayName(bundle.catalog.get(m.definitionId)),atlasIndex:6,worldX:m.position.x,worldY:m.position.y,facing:null,distanceBand:null,selected:false,identitySlot:null}));
 }

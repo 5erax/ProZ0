@@ -126,10 +126,10 @@ export function createExpeditionOverlay(
     const messages: Readonly<Record<string, string>> = {
       MATERIALS_DEPOSITED: uiText("ui.10086537"),
       PLAN_MOVED: uiText("ui.b49c9bac"),
-      PLAN_REPLACED_TO_STORAGE: 'Blueprint changed. Your bag was full; surplus materials were returned to an accessible nearby storage crate.',
-      PLAN_REFUNDED_TO_STORAGE: 'Blueprint cancelled. Your bag was full; materials were returned to an accessible nearby storage crate.',
-      FACILITY_DISMANTLED_TO_STORAGE: 'Building dismantled. Your bag was full; materials were returned to an accessible nearby storage crate.',
-      PLAN_REPLACED: 'Blueprint type changed. Shared materials are kept; surplus materials returned to your bag.',
+      PLAN_REPLACED_TO_STORAGE: uiPhrase('Blueprint changed. Your bag was full; surplus materials were returned to an accessible nearby storage crate.'),
+      PLAN_REFUNDED_TO_STORAGE: uiPhrase('Blueprint cancelled. Your bag was full; materials were returned to an accessible nearby storage crate.'),
+      FACILITY_DISMANTLED_TO_STORAGE: uiPhrase('Building dismantled. Your bag was full; materials were returned to an accessible nearby storage crate.'),
+      PLAN_REPLACED: uiPhrase('Blueprint type changed. Shared materials are kept; surplus materials returned to your bag.'),
       SAME_BLUEPRINT_TYPE: uiText("ui.c8a1d2b7"),
       PLAN_REFUNDED:
         uiText("ui.11febead"),
@@ -147,7 +147,7 @@ export function createExpeditionOverlay(
       COLLECT_WATER_FIRST:
         uiText("ui.f9290652"),
       USE_CANONICAL_DISMANTLE:
-        'Use the existing building dismantle action; empty storage first.',
+        uiPhrase('Use the existing building dismantle action; empty storage first.'),
       MATERIALS_MISSING:
         uiText("ui.fcc8b03f"),
       NO_OUTSTANDING_MATERIALS_AVAILABLE:
@@ -155,7 +155,7 @@ export function createExpeditionOverlay(
       OUT_OF_RANGE: uiText("ui.fa6dd432"),
       PLAN_OVERLAP:
         uiText("ui.a502d86e"),
-      REST_STARTED: 'Rest started. Stay still and safe; closing this panel wakes you up.',
+      REST_STARTED: uiPhrase('Rest started. Stay still and safe; closing this panel wakes you up.'),
       REST_COOLDOWN: uiText("ui.23f56f49"),
       FOOD_AND_WATER_REQUIRED:
         uiText("ui.c6fd098d"),
@@ -352,7 +352,7 @@ export function createExpeditionOverlay(
             }),
             text(
               'p',
-              'Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.',
+              uiPhrase('Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.'),
             ),
           );
           const event = authority.currentEvent(
@@ -615,32 +615,6 @@ export function createExpeditionOverlay(
           return {id:plan.id,name:uiPhrase(definition.name),kind:uiText("ui.a1680200"),facts:definition.costs.map(([id,q]) => contentDisplayName(bundle.catalog.get(id))+': '+(current.paid[id]??0)+'/'+q)};
         });
       }
-    }
-    // Management markers stay contextual rather than covering distant structures.
-    if (
-      markers.dataset.buildRevision !==
-      String(bundle.buildings.getBuildRevision())
-    ) {
-      markers.querySelectorAll('[data-managed]').forEach((e) => e.remove());
-      for (const structure of bundle.buildings.exportSnapshot().foothold
-        .structures) {
-        if (structure.placedByPlayerId !== playerId) continue;
-        const facility = state.facilities.find(
-          (f) => f.canonicalStructureId === structure.structureId,
-        );
-        const manage = button(
-          contentDisplayName(bundle.catalog.get(structure.definitionId)) + uiText("ui.4c3520df"),
-          () => open(facility?.id ?? structure.structureId),
-        );
-        manage.className = 'sp-blueprint';
-        manage.dataset.managed = 'true';
-        manage.dataset.x = String(structure.position.x);
-        manage.dataset.y = String(structure.position.y);
-        markers.append(manage);
-      }
-      markers.dataset.buildRevision = String(
-        bundle.buildings.getBuildRevision(),
-      );
     }
     const viewport = bounds.read(), canvasRect = viewport.canvas,
       rootRect = viewport.root,

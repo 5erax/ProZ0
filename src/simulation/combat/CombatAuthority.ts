@@ -20,7 +20,7 @@ export interface AttackResult {
   readonly attackId: string;
   readonly targetEntityId: string | null;
   readonly damage: number;
-  readonly reason?: 'DEAD' | 'EXHAUSTED' | 'COOLDOWN' | 'BROKEN_WEAPON';
+  readonly reason?: 'DEAD' | 'EXHAUSTED' | 'COOLDOWN' | 'BROKEN_WEAPON' | 'OBSTRUCTED';
 }
 
 export interface PreparedLivingHunt {
@@ -48,6 +48,7 @@ export class Phase1CombatAuthority {
     private readonly items: Phase1ItemAuthority,
     private readonly world: SurvivalWorldPort,
     initialCooldowns:Readonly<Record<string,number>> = {},
+    private readonly clearPath:(from:WorldPosition,to:WorldPosition)=>boolean=()=>true,
   ) {
     for(const [id,tick] of Object.entries(initialCooldowns)){
       if(!id||!Number.isSafeInteger(tick)||tick<0)throw Error('Invalid restored combat cooldown');
@@ -58,6 +59,7 @@ export class Phase1CombatAuthority {
   public setEquippedWeapon(playerId: PlayerId, stackId: string | null): void {
     this.equippedWeapon.set(playerId, stackId);
   }
+  public getCooldownUntil(playerId:PlayerId):number {return this.cooldownUntil.get(playerId)??0;}
 
   public prepareLivingHunt(playerId:PlayerId,expectedInventoryRevision:number,target:WorldPosition):PreparedLivingHunt|string {
     const state=this.survival.getPlayerState(playerId),tick=state.tick;
@@ -73,6 +75,7 @@ export class Phase1CombatAuthority {
     // Click/Hunt aims at the selected animal. Include its small physical body radius.
     const reach=profile.rangeFootprints*PLAYER_COLLISION_FOOTPRINT.width+.35;
     if(squaredDistance(this.world.getPlayerPosition(playerId),target)>reach*reach)return 'OUT_OF_WEAPON_RANGE';
+    if(!this.clearPath(this.world.getPlayerPosition(playerId),target))return 'OBSTRUCTED';
     if(!this.survival.canSpendStamina(playerId,profile.staminaCost))return 'EXHAUSTED';
     const cooldownTicks=Math.ceil(profile.cooldownSeconds*60);
     return {
@@ -137,6 +140,8 @@ export class Phase1CombatAuthority {
       conditionCost = profile.conditionCostOnSuccessfulHit;
       spear = true;
     }
+    const targetBefore=this.world.getPredator(predatorEntityId);
+    if(targetBefore&&targetBefore.state!=='dead'&&!this.clearPath(this.world.getPlayerPosition(command.playerId),targetBefore.position))return this.cache(command.attackId,{status:'rejected',attackId:command.attackId,targetEntityId:null,damage:0,reason:'OBSTRUCTED'});
     if (!this.survival.canSpendStamina(command.playerId, staminaCost)) {
       return this.cache(command.attackId, { status:'rejected', attackId:command.attackId, targetEntityId:null, damage:0, reason:'EXHAUSTED' });
     }

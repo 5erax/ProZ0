@@ -1,3 +1,4 @@
+import { uiPhrase } from '../localization/UiMessages';
 export interface ColonyRoomDetails {
   id: string;
   accessToken: string;
@@ -150,7 +151,7 @@ export function mountColonyCoopLauncher(parent: HTMLElement): () => void {
         remove.addEventListener("click", () => {
           if (
             !target.confirm(
-              "Delete this shared world permanently? Export a backup first and disconnect all players.",
+              uiPhrase("Delete this shared world permanently? Export a backup first and disconnect all players."),
             )
           )
             return;
@@ -184,7 +185,7 @@ export function mountColonyCoopLauncher(parent: HTMLElement): () => void {
     }
   }
   hint.textContent =
-    "The host owns the shared world save. An invitation admits up to three players; your solo worlds stay separate.";
+    uiPhrase("The host owns the shared world save. An invitation admits up to three players; your solo worlds stay separate.");
   section.append(controls, status, hint);
   parent.append(section);
   return () => section.remove();

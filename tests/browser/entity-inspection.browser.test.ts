@@ -2,7 +2,7 @@ import {expect,it} from 'vitest';
 import {bindEntityInspection,createEntityInspection} from '../../src/client/presentation/EntityInspection';
 import {installGameContextMenu} from '../../src/client/input/GameContextMenu';
 
-it('inspects only explicit targets, toggles one compact card, preserves text and cleans lifecycle', () => {
+it('inspects only explicit targets, keeps one compact card, preserves text and cleans lifecycle', () => {
   const root=document.createElement('section'),a=document.createElement('button'),b=document.createElement('button'),input=document.createElement('input');
   root.append(a,b,input);document.body.append(root);
   let reads=0,blocked=false;
@@ -15,7 +15,8 @@ it('inspects only explicit targets, toggles one compact card, preserves text and
   right(a);expect(card.hidden).toBe(false);expect(card.dataset.entityId).toBe('plant:a');expect(card.querySelector('img')).toBeNull();
   inspection.render();expect(reads).toBe(1);
   right(b);expect(card.dataset.entityId).toBe('animal:b');expect(card.textContent).not.toContain('fiber');
-  right(b);expect(card.hidden).toBe(true);
+  right(b);expect(card.hidden).toBe(false);expect(card.dataset.entityId).toBe('animal:b');
+  root.click();expect(card.hidden).toBe(true);
   a.focus();a.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,code:'F10',shiftKey:true}));expect(card.hidden).toBe(false);
   document.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,code:'KeyD'}));expect(card.hidden).toBe(false);
   document.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,code:'KeyM'}));expect(card.hidden).toBe(true);

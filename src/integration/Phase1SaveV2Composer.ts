@@ -335,6 +335,7 @@ function composePhase1SaveV2AtRevision(
     worldRevision,
     authorityTick: bundle.authorityTick,
     sustenance: bundle.sustenance.read(),
+    ...(bundle.resourceMarkers?{soloResourceMarkers:bundle.resourceMarkers.read()}:{}),
     ...(bundle.caves?{soloCaves:bundle.caves.read()}:{}),
     ...(bundle.livingWorld?{livingWorld:bundle.livingWorld.read()}:{}),
     ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),

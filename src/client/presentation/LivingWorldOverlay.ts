@@ -139,7 +139,7 @@ export function createLivingWorldOverlay(
       FIELD_HOE_REQUIRED: uiText("ui.9955227e"),
       WATERING_CAN_REQUIRED: uiText("ui.24234a53"),
       CAPACITY_EXCEEDED:
-        'Bag full. Store some items; harvest and loot are preserved.',
+        uiPhrase('Bag full. Store some items; harvest and loot are preserved.'),
       NEARBY_STATION_REQUIRED: uiText("ui.c7b54aa"),
       RENEWING: uiText("ui.171329ec"),
       NOT_READY: uiText("ui.c04bf2c"),
@@ -163,7 +163,7 @@ export function createLivingWorldOverlay(
       FISHING_STAND_ON_BANK: uiText("ui.9b67aaf8"),
       FISHING_CAST: uiText("ui.bba12d3f"),
       FISHING_WAIT_FOR_BITE: uiText("ui.e1c478ad"),
-      FISHING_STOCK_RECOVERING: 'Fish population depleted or reserved; let this area recover.',
+      FISHING_STOCK_RECOVERING: uiPhrase('Fish population depleted or reserved; let this area recover.'),
       FISHING_INTERRUPTED_MOVE: uiText("ui.72ce500c"),
       FISHING_INTERRUPTED_DAMAGE: uiText("ui.4baa12a1"),
       FISHING_MISSED_BITE: uiText("ui.b16a4ce5"),
@@ -567,7 +567,10 @@ export function createLivingWorldOverlay(
           button(uiText("ui.c6fa5794"), () => execute('loot', animal.id)),
         );
       else {
-        a.append(button(uiText("ui.e2cc34c4"), () => execute('hunt', animal.id)));
+        const hunt=button(uiText("ui.e2cc34c4"), () => execute('hunt', animal.id));
+        hunt.disabled=bundle.combat.getCooldownUntil(player)>bundle.authorityTick;
+        if(hunt.disabled)bindUiText(hunt,'title',uiPhrase('COOLDOWN'));
+        a.append(hunt);
         if (!animal.pen && d.tame)
           a.append(button(uiText("ui.e78748a2"), () => execute('tame', animal.id)));
         if (animal.owner === player) {
@@ -616,7 +619,7 @@ export function createLivingWorldOverlay(
       );
       if (f.growth) {
         a.append(button(uiText("ui.cee5b11d"), () => execute('water-forage', f.id)));
-        if (f.growth.cut) a.append(text('p', 'Uprooting removes this patch permanently; replant the root elsewhere.'), button(uiText("ui.6a845a05"), () => execute('uproot', f.id)));
+        if (f.growth.cut) a.append(text('p', uiPhrase('Uprooting removes this patch permanently; replant the root elsewhere.')), button(uiText("ui.6a845a05"), () => execute('uproot', f.id)));
       }
     }
     for (const f of bundle

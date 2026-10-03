@@ -1,3 +1,4 @@
+import { uiPhrase } from '../localization/UiMessages';
 import { COLONY_ACTIONS } from "../../simulation/sustenance/ColonySustenanceAuthority";
 import { installGameContextMenu } from '../input/GameContextMenu';
 import type { FacingDirection } from "../../simulation";
@@ -207,21 +208,21 @@ export async function bootColonyCoop(
   const rejectText = (reason: string) =>
     (
       ({
-        TOOL_REQUIRED: "Cần Stone Field Tool · mở Craft [C] để chế tạo",
+        TOOL_REQUIRED: "Carry a Stone Field Tool · open Craft [C] to make one",
         OUT_OF_RANGE: "Đến gần đối tượng hơn để tương tác",
         INSUFFICIENT_ITEMS: "Chưa đủ nguyên liệu",
         COOLDOWN: "Chờ thao tác hồi lại",
         STALE_REVISION: "Dữ liệu đã thay đổi; thử lại",
         CAPACITY_EXCEEDED: "Túi đầy; cất đồ vào hòm",
-        OUTSIDE_BASE_BUILD_ZONE: "Chọn vị trí gần Landing Module hoặc Habitat để mở rộng căn cứ",
+        OUTSIDE_BASE_BUILD_ZONE: "Choose ground near the Landing Module or Habitat to expand your base",
         OBSTRUCTED: "Vị trí bị chắn; chọn khoảng đất trống",
         INVALID_CONNECTOR: "Điểm nối không còn hợp lệ; chọn điểm nối khác",
         CONNECTOR_OCCUPIED: "Điểm nối đã được sử dụng; chọn điểm nối khác",
-        KIT_UNAVAILABLE: "Cần kit xây dựng trong túi; mở Craft [C] để chế tạo",
+        KIT_UNAVAILABLE: "Carry a building kit; open Craft [C] to make one",
         SOURCE_MISSING: "Vật phẩm hoặc đối tượng đã thay đổi; mở lại bảng để chọn lại",
         RESEARCH_PREREQUISITE: "Hoàn thành nghiên cứu trước đó để mở khóa",
         ALREADY_RESEARCHED: "Nghiên cứu đã hoàn thành cho cả phòng",
-        WORKBENCH_REQUIRED: "Đến gần Workbench để chế tạo công thức này",
+        WORKBENCH_REQUIRED: "Move near a Workbench to craft this recipe",
         NOT_READY: "Chờ kết nối lại",
       }) as Record<string, string>
     )[reason] ?? reason.replaceAll("_", " ");
@@ -453,7 +454,7 @@ export async function bootColonyCoop(
   makeButton(settingsPanel, "Save shared world", () => {
     void (async () => {
       if (!details.ownerToken) {
-        feedback = "Only the host can save this shared world";
+        feedback = uiPhrase("Only the host can save this shared world");
         return;
       }
       const response = await fetch(endpoint + "/rooms/" + id + "/save", {
@@ -502,7 +503,7 @@ export async function bootColonyCoop(
     void navigator.clipboard
       .writeText(url.href)
       .then(() => {
-        saveStatus.textContent = "Invitation copied · maximum 3 players";
+        saveStatus.textContent = uiPhrase("Invitation copied · maximum 3 players");
       })
       .catch(() => {
         saveStatus.textContent = "Clipboard unavailable";
@@ -676,7 +677,7 @@ export async function bootColonyCoop(
         panel.append(row);
       }
       panel.append(
-        "Mỗi nhân vật chọn một nghề cố định. Nghiên cứu và khám phá mở khóa nghề.",
+        "Change profession at a laboratory when research and exploration requirements are met.",
       );
     }
     if (panelKind === "object" && focused) {
@@ -821,8 +822,8 @@ export async function bootColonyCoop(
     if (panelKind === "inventory") {
       const hint = document.createElement("p");
       hint.textContent = storageView
-        ? "Nearby storage · move a stack in either direction"
-        : "Stand beside a storage crate to put supplies away.";
+        ? uiPhrase("Nearby storage · move a stack in either direction")
+        : uiPhrase("Stand beside a storage crate to put supplies away.");
       panel.append(hint);
       for (const stack of [...inventory().stacks].sort((a, b) =>
         a.itemDefinitionId.localeCompare(b.itemDefinitionId),
@@ -998,7 +999,7 @@ export async function bootColonyCoop(
     if (panelKind === "build") {
       const hint = document.createElement("p");
       hint.textContent =
-        "Choose a facility, close this panel, then click the ground nearby. Building uses a crafted kit.";
+        uiPhrase("Choose a facility, close this panel, then click the ground nearby. Building uses a crafted kit.");
       panel.append(hint);
       const farming = document.createElement("details"),
         label = document.createElement("summary");
@@ -1270,7 +1271,7 @@ export async function bootColonyCoop(
           current.close(4000, "Resync");
         } else if (connection?.getState() === "CLOSED") {
           feedback =
-            "Room full or saved identity rejected. Rejoin with your original invitation.";
+            uiPhrase("Room full or saved identity rejected. Rejoin with your original invitation.");
           connectionStatus.textContent = feedback;
           connectionStatus.dataset.coopStatus = "rejected";
           current.close(1000);
@@ -1307,7 +1308,7 @@ export async function bootColonyCoop(
         return;
       connectionStatus.dataset.coopStatus = "reconnecting";
       connectionStatus.textContent =
-        "Connection lost · reconnecting to your colonist…";
+        uiPhrase("Connection lost · reconnecting to your colonist…");
       root.dataset.runtimeStatus = "reconnecting";
       reconnectTimer = setTimeout(
         connect,
@@ -1477,7 +1478,7 @@ export async function bootColonyCoop(
     canvas.dataset.teammateCount = String(motions.length - 1);
 
     connectionStatus.textContent = placing
-      ? "Click nearby ground to place facility"
+      ? uiPhrase("Click nearby ground to place facility")
       : "CO-OP · " + motions.length + "/3";
     for (const [key, row] of statRows) {
       const value = Number(

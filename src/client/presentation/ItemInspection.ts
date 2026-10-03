@@ -18,7 +18,7 @@ export interface ItemInspection {
   readonly canConsume: boolean;
 }
 const specific: Readonly<Record<string, string>> = {
-  'item:stone-field-tool': 'Automatically used for resource gathering. Keep it in your bag; it is not a weapon.',
+  'item:stone-field-tool': uiPhrase('Automatically used for resource gathering. Keep it in your bag; it is not a weapon.'),
   'item:field-hoe': uiText("ui.5adfa2a"),
   'item:watering-can': uiText("ui.bcc5f5c1"),
   'item:animal-feed': uiText("ui.56022d18"),
@@ -55,9 +55,9 @@ export function inspectItem(catalog: ContentCatalogV1, id: string): ItemInspecti
   if (item.category === 'weapon' || item.category === 'equipment') facts.push(uiText("ui.d7f31bb0") + RARITY_STYLE[item.rarity ?? 'common'].label);
   if (profile?.type === 'restore-stat') facts.push(uiText("ui.2376d972") + formatNumber(profile.amount) + ' ' + (locale()==='en'?profile.stat:uiPhrase(profile.stat)) + uiText("ui.abfdf8f9") + formatNumber(profile.channelSeconds) + ' s');
   if (profile?.type === 'melee-weapon') facts.push(uiText("ui.9d2320c0") + profile.damage + uiText("ui.616600c7") + profile.rangeFootprints + uiText("ui.98591fd2") + profile.frontalArcDegrees + '°', uiText("ui.c1babb35") + profile.staminaCost + uiText("ui.b16111da") + profile.cooldownSeconds + uiText("ui.7d95e85f") + profile.conditionCostOnSuccessfulHit);
-  if (profile?.type === 'thermal-protection') facts.push(uiText("ui.c71958f2") + profile.harmfulThermalRateMultiplier + '. Slows exposure; does not instantly restore body temperature.');
+  if (profile?.type === 'thermal-protection') facts.push(uiText("ui.c71958f2") + profile.harmfulThermalRateMultiplier + uiPhrase('. Slows exposure; does not instantly restore body temperature.'));
   const crop = CROPS.find(c => c.seed === id);
-  if (crop) facts.push(uiText("ui.4673e88e") + uiPhrase(crop.name) + '. Water and seasonal soil growth rules apply.');
+  if (crop) facts.push(uiText("ui.4673e88e") + uiPhrase(crop.name) + uiPhrase('. Water and seasonal soil growth rules apply.'));
   if (id.startsWith('item:root-')) facts.push(uiText("ui.c00d6279"));
   const sources = [
     ...catalog.list('resource').filter(r => r.output.itemId === id).map(r => uiText("ui.7cc2b63e") + contentDisplayName(r)),
@@ -70,7 +70,7 @@ export function inspectItem(catalog: ContentCatalogV1, id: string): ItemInspecti
   ];
   for (const recipe of catalog.list('recipe').filter(r => r.outputs.some(i => i.itemId === id))) sources.push(uiText("ui.93077f53") + contentDisplayName(recipe) + (recipe.requiredStationStructureId ? ' at ' + contentDisplayName(catalog.get(recipe.requiredStationStructureId)) : uiText("ui.911c3173")));
   for (const recipe of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES, ...WEARABLE_RECIPES].filter(r => r.output === id)) sources.push(uiText("ui.93077f53") + uiPhrase(recipe.name) + (recipe.station ? ' at ' + recipe.station.replaceAll('-', ' ') : uiText("ui.911c3173")));
-  if (FISH_SPECIES.some(f => f.itemId === id)) sources.push('Fish explored water with a Field Fishing Rod and Plant Fishing Bait. Cook at a campfire; raw fish is not directly consumable.');
+  if (FISH_SPECIES.some(f => f.itemId === id)) sources.push(uiPhrase('Fish explored water with a Field Fishing Rod and Plant Fishing Bait. Cook at a campfire; raw fish is not directly consumable.'));
   const wearable = WEARABLE_PROFILES.find(p => p.id === id);
   if (wearable) facts.push(uiText("ui.691adcc3") + wearable.slot, wearable.effect, uiText("ui.9f94fb56"));
   const result = Object.freeze({ purpose: uiPhrase(specific[id] ?? wearable?.effect ?? (id.startsWith('item:root-') ? uiText("ui.e0c8816d") : categoryPurpose[item.category])), facts: Object.freeze(facts), sources: Object.freeze([...new Set(sources)]), recipes: Object.freeze([...new Set(recipes)]), canEquip: item.capabilities.includes('equippable') && (profile?.type === 'melee-weapon' || profile?.type === 'thermal-protection' || wearable !== undefined), canConsume: item.capabilities.includes('consumable') && profile?.type === 'restore-stat' });

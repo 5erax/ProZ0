@@ -1,3 +1,4 @@
+import { uiPhrase } from '../localization/UiMessages';
 import { uiText } from '../localization/UiMessages';
 import { bindUiText } from '../localization/UiMessages';
 import type {
@@ -122,7 +123,7 @@ export function createPhase1ProductReviewSaveControl(
       pending = false;
       if (result.ok) {
         setState('success', root.dataset.savedReviewBookmark === 'unavailable'
-          ? 'World saved — bookmark this page to return; Continue is unavailable.'
+          ? uiPhrase('World saved — bookmark this page to return; Continue is unavailable.')
           : auto ? uiText("ui.d0eed671") : uiText("ui.acabeb48"));
         scheduleIdle(SAVE_SUCCESS_VISIBLE_MS);
         return;

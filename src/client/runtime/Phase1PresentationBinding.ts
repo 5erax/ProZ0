@@ -1,3 +1,7 @@
+import { presentationText as pt } from '../localization/PresentationMessages';
+import { uiPhrase } from '../localization/UiMessages';
+import { formatNumber as number } from '../localization/Locale';
+import { contentDisplayName } from '../localization/ContentText';
 import { WEARABLE_SLOTS, type WearableReferencesV1 } from '../../content/livingworld/WearableContent';
 import { inspectItem } from '../presentation/ItemInspection';
 import { inspectCharacter } from '../presentation/CharacterInspection';
@@ -175,7 +179,7 @@ function temperatureMeter(value: number): Phase1MeterPresentation {
 }
 
 function itemName(catalog: ContentCatalogV1, id: ContentId): string {
-  return catalog.get(id).displayName;
+  return contentDisplayName(catalog.get(id));
 }
 
 function inventoryItems(
@@ -186,7 +190,7 @@ function inventoryItems(
     const definition = catalog.getAs(stack.itemDefinitionId, 'item');
     return Object.freeze({
       id: stack.stackId,
-      name: definition.displayName,
+      name: contentDisplayName(definition),
       rarity: definition.rarity ?? 'common',
       quantity: stack.quantity,
       inspection: inspectItem(catalog, definition.id),
@@ -213,7 +217,7 @@ function equipment(
   const definition = catalog.getAs(stack.itemDefinitionId, 'item');
   return Object.freeze({
     stackId: stack.stackId,
-    name: definition.displayName,
+    name: contentDisplayName(definition),
     rarity: definition.rarity ?? 'common',
     condition: stack.condition,
     conditionMax: definition.conditionMax,
@@ -255,7 +259,7 @@ function quickUseTargetName(
   );
   return stack === undefined
     ? null
-    : catalog.get(stack.itemDefinitionId).displayName;
+    : contentDisplayName(catalog.get(stack.itemDefinitionId));
 }
 
 const FAILURE_REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -295,7 +299,7 @@ const FAILURE_REASON_LABELS: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export function phase1FailureReasonLabel(reason: string): string {
-  return FAILURE_REASON_LABELS[reason] ?? reason.replaceAll('_', ' ');
+  return uiPhrase(FAILURE_REASON_LABELS[reason] ?? reason);
 }
 
 function commandInteraction(
@@ -322,7 +326,7 @@ function commandToasts(
   const result = feedback.result;
   const actionLabel =
     '[' + feedback.inputLabel + '] '
-    + feedback.verb + ' · ' + feedback.target;
+    + uiPhrase(feedback.verb) + ' · ' + uiPhrase(feedback.target);
 
   if (result.status === 'rejected') {
     return Object.freeze([Object.freeze({
@@ -356,7 +360,7 @@ function commandToasts(
   return Object.freeze([Object.freeze({
     id: `command:${result.operationId}`,
     kind: 'info' as const,
-    title: feedback.verb + ' · COMPLETE',
+    title: uiPhrase(feedback.verb)+' · '+uiPhrase('COMPLETE'),
     detail: actionLabel,
   })]);
 }
@@ -455,13 +459,12 @@ function inventoryPanel(
     items: inventoryItems(input.catalog, input.inventory),
     selectedItemId: selected?.stackId ?? null,
     detail: selected === undefined || selectedDefinition === null
-      ? `Weight ${input.inventory.totalWeightKg.toFixed(1)} / ${input.inventory.playerCarryPolicy?.maxWeightKg ?? PLAYER_MAX_WEIGHT_KG} kg · Volume ${input.inventory.totalVolume.toFixed(1)} / ${input.inventory.playerCarryPolicy?.maxVolume ?? PLAYER_MAX_VOLUME}`
-      : `${selectedDefinition.displayName} · qty ${selected.quantity}${selected.condition === null ? '' : ` · condition ${selected.condition}/${selectedDefinition.conditionMax ?? 100}`}`
-        + (selected.itemDefinitionId === 'item:stone-field-tool' ? ' · AUTO-USED WHEN GATHERING · NOT A WEAPON' : '') + ' · '+input.inventory.stacks.length+' stacks · volume is item bulk, not empty slots',
+      ? pt('capacity',{weight:number(input.inventory.totalWeightKg,{maximumFractionDigits:1}),maxWeight:number(input.inventory.playerCarryPolicy?.maxWeightKg??PLAYER_MAX_WEIGHT_KG),bulk:number(input.inventory.totalVolume,{maximumFractionDigits:1}),maxBulk:number(input.inventory.playerCarryPolicy?.maxVolume??PLAYER_MAX_VOLUME)})
+      : pt('item',{name:contentDisplayName(selectedDefinition),qty:number(selected.quantity)})+(selected.condition===null?'':pt('condition',{value:number(selected.condition),max:number(selectedDefinition.conditionMax??100)}))
+        + (selected.itemDefinitionId === 'item:stone-field-tool' ? ' · '+uiPhrase('AUTO-USED WHEN GATHERING · NOT A WEAPON') : '') +pt('stacks',{count:number(input.inventory.stacks.length)}),
     quantity,
     controls:
-      'CLICK / ↑/↓ SELECT · V USE · X EQUIP · G DROP · [/] QTY '
-      + String(quantity),
+      pt('inventoryControls',{qty:number(quantity)}),
     feedback: feedback === null || feedback === undefined
       ? null
       : feedback.result.status === 'rejected'
@@ -503,16 +506,14 @@ function containerPanel(
     playerItems: inventoryItems(input.catalog, input.inventory),
     containerItems: inventoryItems(input.catalog, container),
     containerLabel: container.kind === 'storage-crate'
-      ? `STORAGE · ${container.totalWeightKg.toFixed(1)} kg · ${container.totalVolume.toFixed(1)} u`
+      ? pt('storage',{weight:number(container.totalWeightKg,{maximumFractionDigits:1}),bulk:number(container.totalVolume,{maximumFractionDigits:1})})
       : container.kind.replaceAll('-', ' ').toUpperCase(),
     selectedPlayerItemId: request.selectedPlayerStackId ?? null,
     selectedContainerItemId: request.selectedContainerStackId ?? null,
     activePane: request.activePane ?? 'player',
     quantity,
     controls:
-      '↑/↓ SELECT · TAB PANE · [/] QTY '
-      + String(quantity)
-      + ' · ENTER TRANSFER · V USE · X EQUIP · G DROP',
+      pt('storageControls',{qty:number(quantity)}),
     feedback: feedback === null || feedback === undefined
       ? null
       : feedback.result.status === 'rejected'
@@ -553,8 +554,8 @@ function machinePanel(
     stateLabel: request.machine.derivedState === 'OUTPUT_FULL'
       ? 'OUTPUT FULL'
       : request.machine.derivedState,
-    powerLabel: `${request.powerDemandPu} PU demand · ${request.power.capacityPu} PU capacity`,
-    outputLabel: `${request.machine.outputCount}/4 Clean Water`,
+    powerLabel: pt('power',{demand:number(request.powerDemandPu),capacity:number(request.power.capacityPu)}),
+    outputLabel: pt('output',{count:number(request.machine.outputCount),item:uiPhrase('Clean Water')}),
     reason,
   });
 }
@@ -575,14 +576,14 @@ function recoveryPanel(
       ? life.deathCause.replaceAll('-', ' ').toUpperCase()
       : 'ALIVE',
     respawnLabel: dead
-      ? `Respawn at authority tick ${life.respawnAtTick}`
+      ? pt('respawn',{tick:number(life.respawnAtTick)})
       : 'Respawn complete',
     consequenceLabel: committedDeath === null
       ? 'Authoritative death consequence pending'
-      : `-${committedDeath.xpLoss} XP current-level progress`,
+      : pt('xpLoss',{xp:number(committedDeath.xpLoss)}),
     cacheLabel: deathCache === null
       ? 'No active Death Cache'
-      : `Death Cache · ${deathCache.containerId}`,
+      : pt('cache',{id:deathCache.containerId}),
   });
 }
 
@@ -675,7 +676,7 @@ function progressionPanel(
   return Object.freeze({
     kind: 'progression',
     title: 'Progression',
-    levelLabel: `Level ${progression.level}`,
+    levelLabel: pt('level',{level:number(progression.level)}),
     xpLabel: next === undefined
       ? `${progression.totalXp} XP`
       : `${progression.totalXp} / ${next.totalXpRequired} XP`,
@@ -688,7 +689,7 @@ function progressionPanel(
     questLabels: Object.freeze(
       progression.quests.map((quest) => {
         const name = itemName(catalog, quest.questId);
-        return `${name} · ${quest.completedObjectives}/${quest.totalObjectives} · ${quest.status.toUpperCase()}`;
+        return pt('quest',{name,done:number(quest.completedObjectives),total:number(quest.totalObjectives),status:uiPhrase(quest.status.toUpperCase())});
       }),
     ),
     rows: Object.freeze(rows),
@@ -710,11 +711,11 @@ function mapPanel(
     title: 'Map / Recovery',
     fogLabel: request.exploration === null
       ? 'Shared exploration unavailable'
-      : `Shared exploration · revision ${request.exploration.revision}`,
+      : pt('exploration',{revision:number(request.exploration.revision)}),
     ruinLabel,
     deathCacheLabel: request.deathCache === null
       ? null
-      : `Death Cache · ${request.deathCache.containerId}`,
+      : pt('cache',{id:request.deathCache.containerId}),
     sharedDiscoveryLabel: request.sharedDiscoveryConfirmed === true
       ? 'Shared Discovery'
       : null,
@@ -843,8 +844,8 @@ export function projectPhase1RuntimePresentation(
     stamina: meter(
       'Stamina',
       input.survival.stamina,
-      'CURRENT',
-      'normal',
+      input.survival.stamina<=0?'EXHAUSTED':input.survival.stamina<=25?'LOW':'CURRENT',
+      input.survival.stamina<=0?'critical':input.survival.stamina<=25?'warning':'normal',
     ),
     temperature: temperatureMeter(input.survival.temperature),
     carry: Object.freeze({
@@ -915,5 +916,5 @@ export function projectPhase1RuntimePresentation(
 function wearablePresentation(input: Phase1RuntimePresentationInput) {
   const slots = Object.fromEntries(WEARABLE_SLOTS.map(slot => [slot, equipment(input.catalog, input.inventory, input.wearables?.[slot])])) as Pick<import('../presentation/Phase1PresentationModel').Phase1EquipmentSlotsPresentation, 'head' | 'legs' | 'feet' | 'accessory'>;
   const active = (slot: typeof WEARABLE_SLOTS[number]) => (slots[slot]?.condition ?? 0) > 0;
-  return {...slots, effects: Object.freeze(['Sprint: ' + (active('feet') ? '6.4' : '8') + ' stamina/s', 'Water: ' + (active('accessory') ? '0.8' : '1') + '/min', 'Hot target: −' + (active('head') ? '8' : '0'), 'Cold target: +' + (active('legs') ? '8' : '0')])};
+  return {...slots, effects: Object.freeze([pt('sprint',{value:number(active('feet')?6.4:8)}),pt('water',{value:number(active('accessory')?.8:1)}),pt('hot',{value:number(active('head')?8:0)}),pt('cold',{value:number(active('legs')?8:0)})])};
 }

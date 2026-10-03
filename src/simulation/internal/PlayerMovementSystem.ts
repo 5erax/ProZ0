@@ -53,6 +53,7 @@ function validateResolvedDelta(desired: number, allowed: number, axis: string): 
 }
 
 export class PlayerMovementSystem {
+  public aimFacing(facing:FacingDirection):void { this.facing=facing; }
   private position: WorldPosition;
   private facing: FacingDirection | null = null;
   private locomotionState: LocomotionState = 'IDLE';

@@ -1,0 +1,45 @@
+:root {
+  --ui-font: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  --ui-copy: 12px;
+  --ui-small: 11px;
+  --ui-title: 16px;
+  --ui-gap: 8px;
+  --ui-inset: 12px;
+  --ui-edge: #789a96;
+  --ui-surface: #102029f5;
+  --ui-text: #e2e8d6;
+  --ui-muted: #adc0af;
+}
+html, body, #app { inline-size:100%; block-size:100%; min-inline-size:0; min-block-size:0; margin:0; overflow:hidden; overscroll-behavior:none; }
+body { block-size:100dvh; }
+#app *, #app *::before, #app *::after { box-sizing:border-box; }
+#app, #app * { scrollbar-width:none; }
+#app::-webkit-scrollbar, #app *::-webkit-scrollbar { display:none; }
+#app :is(.proz0-lobby,.p1-panel,.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection) {
+  scrollbar-width:none;
+  overscroll-behavior:contain;
+  overflow-wrap:anywhere;
+}
+#app :is(.proz0-lobby,.p1-panel,.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection)::-webkit-scrollbar { display:none; }
+#app .proz0-lobby { inline-size:100%; block-size:100%; min-block-size:0; }
+#app :is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection) {
+  font-family:var(--ui-font);
+  font-size:var(--ui-copy);
+  line-height:1.5;
+  color:var(--ui-text);
+  background:var(--ui-surface);
+  border-color:var(--ui-edge);
+}
+#app :is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection) :is(h2,h3) { font-size:var(--ui-title); line-height:1.3; }
+#app :is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection) :is(button,input,select) { font:inherit; min-block-size:32px; max-inline-size:100%; }
+#app :is(.lw-panel,.sp-expedition-panel,.p2-colony-panel,.p2-settings-panel,.p2-entity-inspection) small { font-size:var(--ui-small); color:var(--ui-muted); }
+#app :is(button,input,select,summary,[tabindex]):focus-visible { outline:2px solid #d4dfb0; outline-offset:2px; }
+#app .p1-ui { --ui-native-copy:8px; --ui-native-title:11px; --ui-native-gap:4px; font-family:var(--ui-font); font-size:var(--ui-native-copy); }
+#app .p1-panel { font-size:var(--ui-native-copy); padding:calc(var(--ui-native-gap)*2); }
+#app .p1-panel-title, #app .p1-item-inspection h3 { font-size:var(--ui-native-title); }
+#app .p1-item-name { white-space:normal; overflow-wrap:anywhere; }
+#app .p1-map-zoom-controls { display:flex; gap:var(--ui-native-gap); align-items:center; flex-wrap:wrap; margin-block-end:var(--ui-native-gap); }
+#app .p1-map-zoom-controls button { font:inherit; padding:3px 8px; background:#20343c; color:var(--ui-text); border:1px solid var(--ui-edge); }
+#app .p1-map-resource-glyph { display:inline-block; color:#d4dfb0; font-size:12px; text-shadow:1px 1px #102029; }
+#app :is(.sp-expedition-panel,.lw-panel,.p2-colony-panel) { padding:var(--ui-inset); gap:var(--ui-gap); max-inline-size:calc(100vw - 24px); }
+@media(max-width:720px) { :root { --ui-inset:8px; --ui-gap:6px; } #app .lobby-layout { grid-template-columns:minmax(0,1fr); } }

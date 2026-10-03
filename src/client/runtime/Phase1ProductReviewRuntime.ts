@@ -1,3 +1,6 @@
+import { CombatAssist, type AssistTarget } from '../input/CombatAssist';
+import { traversableSegment } from '../../world/collision/TraversableSegment';
+import { PLAYER_COLLISION_FOOTPRINT } from '../../simulation/player/PlayerCollisionFootprint';
 import { uiText } from '../localization/UiMessages';
 import { contentDisplayName } from '../localization/ContentText';
 import { onLocaleChange } from '../localization/Locale';
@@ -5,7 +8,6 @@ import { uiPhrase } from '../localization/UiMessages';
 import { wearableSlotFor, WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
-import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { installGameContextMenu } from '../input/GameContextMenu';
 import { createEntityInspection } from '../presentation/EntityInspection';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
@@ -335,7 +337,14 @@ export async function createPhase1ProductReviewRuntime(
 
   const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
-  const entityInspection = createEntityInspection(root, () => ['colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'));
+  const entityInspection = createEntityInspection(root, () => ['colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'), view=>{
+    const authority=bundle.resourceMarkers;if(!authority)return [];
+    const spaceId=bundle.caves?.activeLayout()?.spaceId??'surface';
+    const marked=authority.read().markers.some(m=>m.resourceId===view.id&&m.spaceId===spaceId);
+    const known=bundle.caves?.activeLayout()?!!bundle.caves.getResource(view.id):bundle.world.getActiveGeneratedEntities().some(e=>e.entityId===view.id&&e.type==='resource'&&bundle.world.isExploredPosition(e.position));
+    if(!known&&!marked)return [];
+    return [{label:uiPhrase(marked?'Remove resource marker':'Mark resource on map'),run:()=>{const result=authority.set(config.localPlayerId,authority.read().revision,view.id,spaceId,!marked);source.setLocalCommandFeedback({operationId:nextOperationId('resource-marker'),verb:'MARK',target:view.name,status:result==='COMPLETE'?'committed':'rejected',...(result==='COMPLETE'?{}:{reason:result})});}}];
+  });
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
@@ -1178,56 +1187,16 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const interactWithWorkbench = (): boolean => {
-    const workbench = accessibleWorkbench();
-    if (workbench === null) return false;
-
-    const inventory = bundle.items.getContainerView(
-      'inventory:' + config.localPlayerId,
-    );
-    const repairTarget = inventory.stacks.find((stack) => {
-      if (stack.condition === null) return false;
-      const definition = bundle.catalog.getAs(
-        stack.itemDefinitionId,
-        'item',
-      );
-      return definition.conditionMax !== null
-        && stack.condition < definition.conditionMax;
-    });
-
-    if (repairTarget === undefined) {
-      actionPanel = 'craft';
-      craftPage = 0;
-      source.clearCommandFeedback();
-      source.setPresentationPanel(craftPanel());
-      return true;
-    }
-
-    const result = bundle.executeItemCommand({
-      type: 'repair',
-      operationId: nextOperationId('repair'),
-      playerId: config.localPlayerId,
-      inventoryContainerId: inventory.containerId,
-      expectedInventoryRevision: inventory.revision,
-      targetStackId: repairTarget.stackId,
-      workbench: {
-        structureInstanceId: workbench.structureId,
-        expectedRevision: workbench.revision,
-      },
-    });
-    const definition = bundle.catalog.getAs(
-      repairTarget.itemDefinitionId,
-      'item',
-    );
-    source.setLocalCommandFeedback({
-      operationId: result.operationId,
-      status: result.status,
-      ...(result.status === 'rejected'
-        ? { reason: result.reason }
-        : {}),
-      verb: 'REPAIR',
-      target: contentDisplayName(definition),
-    });
-    return true;
+    if (accessibleWorkbench() === null) return false;
+    actionPanel='craft';craftPage=0;source.clearCommandFeedback();source.setPresentationPanel(craftPanel());return true;
+  };
+  const repairSelectedItem = (): void => {
+    const selection=selectedInventoryAction('R','REPAIR'),workbench=accessibleWorkbench();
+    if(!selection)return;
+    if(!workbench){presentInventoryGuard('R','REPAIR','STATION_REQUIRED');return;}
+    if(selection.pane!=='player'||!selection.stack){presentInventoryGuard('R','REPAIR','SOURCE_MISSING');return;}
+    const result=bundle.executeItemCommand({type:'repair',operationId:nextOperationId('repair'),playerId:config.localPlayerId,inventoryContainerId:selection.inventory.containerId,expectedInventoryRevision:selection.inventory.revision,targetStackId:selection.stack.stackId,workbench:{structureInstanceId:workbench.structureId,expectedRevision:workbench.revision}});
+    source.setLocalCommandFeedback({inputLabel:'R',operationId:result.operationId,status:result.status,...(result.status==='rejected'?{reason:result.reason}:{}),verb:'REPAIR',target:contentDisplayName(bundle.catalog.get(selection.stack.itemDefinitionId))});
   };
 
   const presentConsumeStart = (
@@ -1497,33 +1466,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     const workbench = accessibleWorkbench();
-    if (workbench !== null) {
-      const inventory = bundle.items.getContainerView(
-        'inventory:' + config.localPlayerId,
-      );
-      const repairTarget = inventory.stacks.find((stack) => {
-        if (stack.condition === null) return false;
-        const definition = bundle.catalog.getAs(
-          stack.itemDefinitionId,
-          'item',
-        );
-        return definition.conditionMax !== null
-          && stack.condition < definition.conditionMax;
-      });
-      source.setInteraction(Object.freeze({
-        inputLabel: 'E',
-        verb: repairTarget === undefined ? 'CRAFT' : 'REPAIR',
-        target: repairTarget === undefined
-          ? uiText("ui.f4823b5e")
-          : contentDisplayName(bundle.catalog.get(
-              repairTarget.itemDefinitionId,
-            )),
-        state: "AVAILABLE",
-        reason: null,
-        progress: null,
-      }));
-      return;
-    }
+    if(workbench){source.setInteraction({inputLabel:'E',verb:'CRAFT',target:uiText("ui.f4823b5e"),state:'AVAILABLE',reason:null,progress:null});return;}
 
     const resource = resourceTarget();
     if (resource !== null && resource.type === 'resource') {
@@ -1534,14 +1477,12 @@ export async function createPhase1ProductReviewRuntime(
       const resourceState = bundle.worldStore.getResourceState(resource.entityId);
       const renewing = resourceState?.depleted === true;
       const readyTick = resourceState?.regenerationReadyTick;
-      const size = bundle.worldStore.getResourceSize(resource.entityId, resource.definitionId);
-      const harvest = resourceHarvestDefinition(definition, size, resourceState?.lifecycle?.kind === 'plant' ? resourceState.lifecycle.stage : undefined);
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
         verb: renewing ? uiText("ui.e53c4b62") : "GATHER",
         target: contentDisplayName(definition),
         state: renewing ? "BLOCKED" : "AVAILABLE",
-        reason: !renewing ? size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' + harvest.output.quantity + ' ' + contentDisplayName(bundle.catalog.getAs(harvest.output.itemId, 'item')) + ' · ' + harvest.gatherChannelSeconds + 's' : null : readyTick == null ? resourceState?.lifecycle?.kind === 'mineral' ? uiText("ui.a05a3297") : uiText("ui.53113f40") :
+        reason: !renewing ? null : readyTick == null ? resourceState?.lifecycle?.kind === 'mineral' ? uiText("ui.a05a3297") : uiText("ui.53113f40") :
           uiText("ui.a2c2c475") + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + uiText("ui.3ed94090"),
         progress: null,
       }));
@@ -1896,7 +1837,7 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
-  const attackPredator = (entityId?: string): void => {
+  const attackPredator = (entityId?: string, aim?:WorldPosition): void => {
     bundle.expedition?.cancelRest(config.localPlayerId);
     const predator = entityId===undefined ? bundle.world.findGeneratedEntityByDefinition('hostile:territorial-predator') : bundle.world.getActiveGeneratedEntities().find(e=>e.entityId===entityId)??null;
     if (predator === null || predator.type !== 'hostile') {
@@ -1912,7 +1853,7 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     const runtime = bundle.getRuntime(config.localPlayerId);
-    const facing = facingVector(runtime.getSnapshot().player.facing);
+    const facing = aim??facingVector(runtime.getSnapshot().player.facing);
     if (facing === null) {
       source.setInteraction(Object.freeze({
         inputLabel: 'SPACE',
@@ -1961,6 +1902,30 @@ export async function createPhase1ProductReviewRuntime(
     });
   };
 
+  const combatAssist=new CombatAssist({
+    tick:()=>bundle.authorityTick,actor:()=>playerPosition(),clearPath:(from,to)=>traversableSegment(bundle.interactionWorld,from,to,PLAYER_COLLISION_FOOTPRINT),
+    aim:facing=>bundle.getRuntime(config.localPlayerId).aimFacing(facing),
+    targets:()=>{
+      if(bundle.playerWorldspace()!=='surface'||bundle.survival.getPlayerState(config.localPlayerId).lifeState.type!=='alive')return [];
+      const inventory=bundle.items.getContainerView('inventory:'+config.localPlayerId),equipped=bundle.equipment.getView(config.localPlayerId).equippedWeaponStackId;
+      const stack=inventory.stacks.find(s=>s.stackId===equipped),profile=stack&&stack.condition!==0?bundle.catalog.getAs(stack.itemDefinitionId,'item').useProfile:null;
+      const range=profile?.type==='melee-weapon'?profile.rangeFootprints*PLAYER_COLLISION_FOOTPRINT.width:.8*PLAYER_COLLISION_FOOTPRINT.width;
+      const ready=bundle.combat.getCooldownUntil(config.localPlayerId)<=bundle.authorityTick&&bundle.survival.getPlayerView(config.localPlayerId).stamina>=(profile?.type==='melee-weapon'?profile.staminaCost:10);
+      const targets:AssistTarget[]=bundle.world.getActiveGeneratedEntities().filter(e=>e.type==='hostile').flatMap(e=>{const v=bundle.interactionWorld.getPredator(e.entityId);return v&&v.health>0&&distanceFromPlayerSquared(v.position.x,v.position.y)<=64&&bundle.world.isExploredPosition(v.position)?[{id:e.entityId,position:v.position,range,ready}]:[];});
+      if(profile?.type==='melee-weapon')for(const a of bundle.livingWorld?.read().animals??[])if(a.health>0&&!a.pen&&!a.owner&&distanceFromPlayerSquared(a.x,a.y)<=64&&bundle.world.isExploredPosition(a))targets.push({id:a.id,position:{x:a.x,y:a.y},range:Math.min(config.interactionRangeWorldUnits??1.25,range+.35),ready});
+      return targets;
+    },
+    attack:target=>{
+      const animal=bundle.livingWorld?.read().animals.find(a=>a.id===target.id);
+      if(animal){const result=bundle.livingWorld!.execute({id:nextOperationId('auto-hunt'),playerId:config.localPlayerId,expectedRevision:bundle.livingWorld!.read().revision,expectedInventoryRevision:bundle.items.getContainerView('inventory:'+config.localPlayerId).revision,action:'hunt',target:animal.id});
+        if(result.status==='committed')attackPresentation=Object.freeze({action:'SPEAR_ATTACK',startedTick:bundle.authorityTick,untilTick:bundle.authorityTick+20});
+        source.setLocalCommandFeedback({inputLabel:'Space',operationId:nextOperationId('auto-hunt-feedback'),verb:'ATTACK',target:uiPhrase('Animal'),status:result.status,...(result.status==='rejected'?{reason:result.message}:{})});
+      }else{const p=playerPosition();attackPredator(target.id,{x:target.position.x-p.x,y:target.position.y-p.y});}
+    },
+  });
+  const releaseCombat=()=>combatAssist.release();
+  const onCombatKeyUp=(event:KeyboardEvent)=>{if(event.code==='Space')releaseCombat();};
+
   const interactWorldEntity = (element: HTMLElement): void => {
     const id=element.dataset.worldId,role=element.dataset.worldRole;if(!id)return;
     if(role==='cave-portal'){transitionCave(id);return;}
@@ -1985,7 +1950,7 @@ export async function createPhase1ProductReviewRuntime(
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const entity=event.target.closest<HTMLElement>('[data-world-role][data-world-id][data-entity-inspectable]');if(entity){event.preventDefault();interactWorldEntity(entity);return;}}
 
     if (source.isInventoryOpen()) {
-      if ((event.code === 'Enter' || event.code === 'Space') && event.target instanceof HTMLButtonElement) return;
+      if ((event.code === 'Enter' || event.code === 'Space') && event.target instanceof HTMLButtonElement && !(event.code==='Enter'&&event.target.closest('[data-review-item]'))) return;
       switch (event.code) {
         case 'ArrowUp':
           event.preventDefault();
@@ -2027,6 +1992,10 @@ export async function createPhase1ProductReviewRuntime(
           event.preventDefault();
           dropSelectedInventoryQuantity();
           return;
+        case 'KeyR':
+          event.preventDefault();
+          repairSelectedItem();
+          return;
       }
     }
 
@@ -2057,8 +2026,9 @@ export async function createPhase1ProductReviewRuntime(
         beginConsume();
         break;
       case 'Space':
+        if(event.target instanceof Element && event.target.closest('button,input,textarea,select,[contenteditable=true]')) return;
         event.preventDefault();
-        attackPredator();
+        if(!event.repeat)combatAssist.hold();
         break;
       case 'KeyC':
         event.preventDefault();
@@ -2190,6 +2160,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const focusedWorldTargetId = (): string | null => {
+    if(combatAssist.target())return combatAssist.target();
     if(bundle.playerWorldspace()!=='surface')return cavePortalTarget()??worldDropTarget()?.worldDropId??deathCacheTarget()?.entityId??resourceTarget()?.entityId??null;
     const cache = deathCacheTarget();
     if (cache !== null) return cache.entityId;
@@ -2259,7 +2230,10 @@ export async function createPhase1ProductReviewRuntime(
         if (destroyed) return;
         // Sample at execution, so queued steps cannot replay movement after release or a menu opens.
         const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
-        bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
+        const blocked=root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true';
+        if(blocked)combatAssist.release();
+        bundle.submitInput(config.localPlayerId,combatAssist.sample(phase1IsometricInput(sampled)));
+        root.dataset.autoCombatTarget=combatAssist.target()??'';
         await bundle.stepSolo();
         if (config.colonyDepthEnabled === true) {
           const intent = autosaveCrossings.advance(config.worldId, config.localPlayerId, bundle.authorityTick, dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0, bundle.survival.getPlayerState(config.localPlayerId).lifeState.type === 'alive');
@@ -2325,6 +2299,11 @@ export async function createPhase1ProductReviewRuntime(
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
     if(action==='open-expedition'){expeditionOverlay?.open();return;}
     if(action?.startsWith('open-')){livingOverlay?.close();colonyDepthOverlay?.close();expeditionOverlay?.close();}
+    if(action==='inventory-repair'){repairSelectedItem();return;}
+    if(action==='remove-resource-marker'){
+      const id=event.target.closest<HTMLElement>('[data-review-action]')?.dataset.resourceMarker,authority=bundle.resourceMarkers,spaceId=bundle.caves?.activeLayout()?.spaceId??'surface';
+      if(id&&authority){authority.set(config.localPlayerId,authority.read().revision,id,spaceId,false);source.refresh();}return;
+    }
     if(action==='inventory-stack'){
       const selection=source.getInventoryActionSelection(),containerId=selection.source.containerId;
       const view=bundle.items.getContainerView(containerId);let pair:null|[typeof view.stacks[number],typeof view.stacks[number]]=null;
@@ -2450,6 +2429,8 @@ export async function createPhase1ProductReviewRuntime(
     else if (machineStructureId) source.setPresentationPanel(machinePanel(machineStructureId));
     refreshContextInteraction(); refreshWorldPresentationContext();
   });
+  root.ownerDocument.addEventListener('keyup',onCombatKeyUp);
+  root.ownerDocument.defaultView?.addEventListener('blur',releaseCombat);
   host.start();
   root.dataset.runtimeStatus = 'ready';
   root.dataset.productReviewAuthority = 'canonical';
@@ -2480,7 +2461,9 @@ export async function createPhase1ProductReviewRuntime(
       destroy(): void {
         stopLocale();
       destroyed = true;
-      host.stop();
+      host.stop();combatAssist.release();
+      root.ownerDocument.removeEventListener('keyup',onCombatKeyUp);
+      root.ownerDocument.defaultView?.removeEventListener('blur',releaseCombat);
       input.stop();
       removeContextMenu();
       entityInspection.destroy();
