@@ -20,7 +20,8 @@ async function openProductionFixture(
 
   await expect(root).toHaveAttribute('data-runtime-status', 'ready');
   await expect(root).toHaveAttribute('data-phase1-qa-mode', mode);
-  await expect(ui).toHaveAttribute('data-display-scale', String(scale));
+  await expect(ui).toHaveAttribute('data-display-scale', '1');
+  await expect(page.locator('#proz0-canvas')).toHaveAttribute('data-display-scale', String(scale));
   await expect(ui).toHaveAttribute(
     'data-production-asset-foundation',
     'p1-75-78',
