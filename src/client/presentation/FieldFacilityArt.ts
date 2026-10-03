@@ -33,6 +33,8 @@ export function fieldFacilitySprite(id:string,width:number,depth:number,orientat
   }else if(id==='livestock-pen'||id==='poultry-coop'){
     body+='<polygon fill="none" stroke="#ac9871" stroke-width="3" points="'+floor+'"/>';
     for(const [x,y] of corners)body+=wall(x!,y!-12,3,14,'#c3b18a');
+    for(let i=0;i<corners.length;i++){const a=corners[i]!,b=corners[(i+1)%corners.length]!;body+='<path stroke="#a99670" stroke-width="2" fill="none" d="M'+a[0]+' '+(a[1]!-8)+'L'+b[0]+' '+(b[1]!-8)+'M'+a[0]+' '+(a[1]!-4)+'L'+b[0]+' '+(b[1]!-4)+'"/>';}
+
     if(id==='poultry-coop')body+=wall(cx-12,cy-22,24,18,'#715843')+'<path fill="#a59269" d="M'+(cx-16)+' '+(cy-22)+'l16-9 16 9Z"/>';
   }else if(id==='campfire'){
     body+='<ellipse fill="#657a78" cx="'+cx+'" cy="'+cy+'" rx="14" ry="7"/>'+wall(cx-10,cy-4,20,3,'#9e805a')+wall(cx-3,cy-13,7,12,'#b59a62');

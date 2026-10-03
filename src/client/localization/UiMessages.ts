@@ -939,7 +939,8 @@ CURRENT|HIỆN TẠI
 HEALTHY|KHỎE MẠNH
 HYDRATED|ĐỦ NƯỚC
 FED|ĐỦ THỨC ĂN
-COMFORTABLE|DỄ CHỊU`;
+COMFORTABLE|DỄ CHỊU
+Brick|Gạch nung`;
 export function uiMessageKey(source: string): string {
   let hash = 2166136261; for (const c of source) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
   return 'ui.' + hash.toString(16);

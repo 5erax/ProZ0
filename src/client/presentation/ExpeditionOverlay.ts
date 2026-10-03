@@ -1,3 +1,5 @@
+import { materialSource } from './MaterialGuide';
+import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
 import { locale } from '../localization/Locale';
 import { uiText } from '../localization/UiMessages';
@@ -220,6 +222,7 @@ export function createExpeditionOverlay(
     for (const [id, count] of entries) {
       const cost = document.createElement('span');
       cost.className = 'sp-cost';
+      cost.title=contentDisplayName(bundle.catalog.get(id))+' · '+materialSource(bundle.catalog,id);
       const icon = document.createElement('span');
       const sprite = itemIconSprite(id);
       if (sprite) applyProductionSprite(icon, sprite, 0.75);
@@ -318,6 +321,7 @@ export function createExpeditionOverlay(
     if (next !== signature) {
       signature = next;
       panel.hidden = !opened;
+      const restoreUi=capturePanelUi(panel);
       panel.replaceChildren();
       if (opened) {
         const header = document.createElement('header');
@@ -589,6 +593,7 @@ export function createExpeditionOverlay(
           panel.append(row);
         }
       }
+      restoreUi();
       markers.replaceChildren();
       delete markers.dataset.buildRevision;
       const labMarker = button(uiText("ui.4ad23c58"), () => {

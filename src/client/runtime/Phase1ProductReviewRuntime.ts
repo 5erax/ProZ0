@@ -1,3 +1,4 @@
+import { materialSource } from '../presentation/MaterialGuide';
 import { CombatAssist, type AssistTarget } from '../input/CombatAssist';
 import { traversableSegment } from '../../world/collision/TraversableSegment';
 import { PLAYER_COLLISION_FOOTPRINT } from '../../simulation/player/PlayerCollisionFootprint';
@@ -597,6 +598,7 @@ export async function createPhase1ProductReviewRuntime(
 
     return Object.freeze({
       kind: 'craft',
+      page:craftPage,pageCount,
       title:
         uiText("ui.c2d411cd")
         + String(craftPage + 1)
@@ -645,6 +647,7 @@ export async function createPhase1ProductReviewRuntime(
           ingredients: Object.freeze(recipe.inputs.map((input) =>
             Object.freeze({
               name: contentDisplayName(bundle.catalog.get(input.itemId)),
+              itemId:input.itemId,source:materialSource(bundle.catalog,input.itemId),
               have: itemQuantity(input.itemId),
               need: input.quantity,
             }),
@@ -2026,7 +2029,7 @@ export async function createPhase1ProductReviewRuntime(
         beginConsume();
         break;
       case 'Space':
-        if(event.target instanceof Element && event.target.closest('button,input,textarea,select,[contenteditable=true]')) return;
+        if(event.target instanceof Element && event.target.closest('button,summary,input,textarea,select,[contenteditable=true]')) return;
         event.preventDefault();
         if(!event.repeat)combatAssist.hold();
         break;
@@ -2354,6 +2357,7 @@ export async function createPhase1ProductReviewRuntime(
       }
       return;
     }
+    if (action === 'craft-page') { const page=Number(event.target.closest<HTMLElement>('[data-page]')?.dataset.page);if(Number.isInteger(page)&&page>=0&&page<Math.ceil(craftRecipes().length/CRAFT_PAGE_SIZE)){craftPage=page;refreshCraftPanel();}return; }
     if (action === 'craft-previous') changeCraftPage(-1);
     if (action === 'craft-next') changeCraftPage(1);
     if (action?.startsWith('equip-slot:') && source.isInventoryOpen()) equipInventorySlot(action.slice('equip-slot:'.length));

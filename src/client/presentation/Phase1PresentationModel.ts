@@ -130,6 +130,8 @@ export interface Phase1ContainerPanelPresentation {
 }
 
 export interface Phase1CraftIngredientPresentation {
+  readonly itemId?:string;
+  readonly source?:string;
   readonly name: string;
   readonly have: number;
   readonly need: number;
@@ -154,6 +156,8 @@ export interface Phase1CraftRowPresentation {
 
 export interface Phase1CraftPanelPresentation {
   readonly kind: 'craft';
+  readonly page?: number;
+  readonly pageCount?: number;
   readonly title: string;
   readonly rows: readonly Phase1CraftRowPresentation[];
 }

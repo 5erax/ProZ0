@@ -1,3 +1,7 @@
+import { actionGlyph } from './UiActionIcon';
+import { materialHint } from './MaterialGuide';
+import { gameUiText } from '../localization/GameUiMessages';
+import { capturePanelUi } from './PanelUiState';
 import { presentationText } from '../localization/PresentationMessages';
 import { mountMapViewport, type MapViewportState } from './MapViewport';
 import { uiText, uiMessageKey } from '../localization/UiMessages';
@@ -573,10 +577,13 @@ function renderPanel(
 
     case 'craft': {
       const navigation = createElement(document, 'div', 'p1-craft-navigation');
-      navigation.append(
-        actionButton(document, 'Previous page [PgUp]', 'craft-previous'),
-        actionButton(document, 'Next page [PgDn]', 'craft-next'),
-      );
+      const previous=actionButton(document, 'Previous page [PgUp]', 'craft-previous');
+      const next=actionButton(document, 'Next page [PgDn]', 'craft-next');
+      previous.textContent='‹';next.textContent='›';
+      previous.disabled=(panel.page??0)===0;next.disabled=(panel.page??0)>=(panel.pageCount??1)-1;
+      navigation.append(previous);
+      for(let index=0;index<(panel.pageCount??1);index++){const button=actionButton(document,String(index+1),'craft-page');button.dataset.page=String(index);button.setAttribute('aria-current',index===(panel.page??0)?'page':'false');navigation.append(button);}
+      navigation.append(next);
       root.append(navigation);
       const list = createElement(document, 'div', 'p1-craft-list');
       for (const rowState of panel.rows) {
@@ -625,6 +632,7 @@ function renderPanel(
         );
         if ((rowState.ingredients?.length ?? 0) > 0) {
           for (const ingredient of rowState.ingredients ?? []) {
+            if(ingredient.source){ingredients.append(materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId));continue;}
             const token = createElement(
               document,
               'span',
@@ -1424,10 +1432,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   }
 
   private readonly applyScale = (): void => {
-    const scale = Number(this.canvas.dataset.displayScale ?? '1');
-    this.layer.style.transform =
-      'translate(-50%, -50%) scale(' + String(Number.isFinite(scale) ? scale : 1) + ')';
-    this.layer.dataset.displayScale = String(Number.isFinite(scale) ? scale : 1);
+    const bounds = this.canvas.getBoundingClientRect();
+    this.layer.style.width = bounds.width + 'px';
+    this.layer.style.height = bounds.height + 'px';
+    this.layer.style.transform = 'translate(-50%, -50%)';
+    this.layer.dataset.displayScale = '1';
   };
 
   private render(): void {
@@ -1458,6 +1467,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const style = this.layer.querySelector('style');
     const previousPanel = this.layer.querySelector<HTMLElement>('.p1-panel');
     const expanded = new Set(Array.from(previousPanel?.querySelectorAll<HTMLElement>('details[data-inspection-key][open]') ?? [], e => e.dataset.inspectionKey));
+    const restorePanel = previousPanel ? capturePanelUi(previousPanel) : null;
     const previousScroll = previousPanel?.scrollTop ?? 0;
     const active = this.document.activeElement instanceof HTMLElement && previousPanel?.contains(this.document.activeElement) ? this.document.activeElement : null;
     const activeInspection = active?.closest<HTMLElement>('details[data-inspection-key]')?.dataset.inspectionKey;
@@ -1706,17 +1716,16 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       const dock = createElement(this.document, 'nav', 'p1-action-dock');
       this.actionDock = dock;
       bindUiText(dock,"aria-label",uiText("ui.57bffba4"));
-      for (const [label, key, action, sprite, scale] of [
-        [uiText("ui.c8d2dcdf"), 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
-        [uiText("ui.c8f02361"), 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
-        [uiText("ui.8d432504"), 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
-        [uiText("ui.44a7f051"), 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
-        [uiText("ui.23d960bf"), 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
+      for (const [label, key, action] of [
+        [uiText("ui.c8d2dcdf"), 'I', 'open-inventory'],
+        [uiText("ui.c8f02361"), 'C', 'open-craft'],
+        [uiText("ui.8d432504"), 'B', 'open-build'],
+        [uiText("ui.44a7f051"), 'M', 'open-map'],
+        [uiText("ui.23d960bf"), 'N', 'open-colony'],
       ] as const) {
         const button = actionButton(this.document, '', action);
         bindUiText(button,"aria-label",label + ' [' + key + ']'); bindUiText(button,"title",label + ' [' + key + ']');
-        const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
-        if (icon !== null) button.append(icon);
+        button.append(actionGlyph(this.document,action));
         button.append(createElement(this.document, 'span', '', key)); dock.append(button);
       }
       this.layer.append(dock);
@@ -1783,7 +1792,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     if (state.panel !== null && signature !== this.panelSignature) {
-      const panel = renderPanel(this.document, state.panel);
+      const fresh = renderPanel(this.document, state.panel);
+    for(const controls of fresh.querySelectorAll<HTMLElement>('.p1-inventory-controls')){if(controls.closest('details'))continue;const details=this.document.createElement('details'),summary=this.document.createElement('summary');details.className='p1-ui-controls';bindUiText(summary,'textContent',gameUiText('controls'));controls.replaceWith(details);details.append(summary,controls);}
+      const sameKind = previousPanel?.dataset.panelKind === state.panel.kind;
+      const panel = sameKind ? previousPanel! : fresh;
+      if (sameKind) panel.replaceChildren(...Array.from(fresh.childNodes));
       this.layer.append(panel);
       const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
       if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
@@ -1795,6 +1808,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
           : Array.from(panel.querySelectorAll<HTMLElement>('button')).find(e => e.textContent === activeLabel && (activeAction ? e.dataset.reviewAction === activeAction : activeItem ? e.dataset.reviewItem === activeItem : false));
         const mapFocus = active?.classList.contains('p1-map-viewport') ? panel.querySelector<HTMLElement>('.p1-map-viewport') : null;
         (focus ?? mapFocus)?.focus({ preventScroll: true });
+        restorePanel?.();
       } else if (state.panel.kind === 'map') {
         panel.querySelector<HTMLElement>('.p1-map-viewport')?.focus({ preventScroll: true });
       }
