@@ -15,6 +15,7 @@ export interface WeatherEventSaveV2 {
 }
 
 export interface WorldManifestV2 {
+  readonly soloResourceMarkers?: import('../../../simulation/worldspaces/SoloResourceMarkers').SoloResourceMarkersState;
   readonly soloCaves?: import('../../../simulation/worldspaces/SoloCaveState').SoloCaveStateV1;
   readonly livingWorld?: import('../../../simulation/livingworld/LivingWorldState').LivingWorldState;
   readonly singlePlayerExpedition?: import('../../../simulation/expedition/ExpeditionState').ExpeditionState;

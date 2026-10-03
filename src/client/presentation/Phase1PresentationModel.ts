@@ -225,6 +225,7 @@ export type Phase1MapMarkerKind =
   | 'base'
   | 'ruin'
   | 'death-cache'
+  | 'resource'
   | 'teammate';
 
 export type Phase1MapFacing =

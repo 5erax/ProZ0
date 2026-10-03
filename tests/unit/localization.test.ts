@@ -1,3 +1,4 @@
+import {presentationMessages} from '../../src/client/localization/PresentationMessages';
 import {afterEach,expect,it} from 'vitest';
 import {assertDictionaryParity,formatNumber,message,setLocale} from '../../src/client/localization/Locale';
 import {coreMessages} from '../../src/client/localization/CoreMessages';
@@ -10,7 +11,7 @@ import {inspectItem} from '../../src/client/presentation/ItemInspection';
 import {createPhase1ContentCatalog} from '../../src/content';
 afterEach(()=>setLocale('en'));
 it('both dictionaries retain identical keys and parameters and fail safely to English',()=>{
-  for(const dictionary of [coreMessages,lobbyMessages,uiMessages,statusMessages,resourceMessages])assertDictionaryParity(dictionary);
+  for(const dictionary of [coreMessages,lobbyMessages,uiMessages,statusMessages,resourceMessages,presentationMessages])assertDictionaryParity(dictionary);
   const dictionary={en:{hello:'Hello {name}'},vi:{}};setLocale('vi');
   expect(message(dictionary,'hello',{name:'<script>&chat'})).toBe('Hello <script>&chat');
   expect(message(dictionary,'missing',{},'Readable fallback')).toBe('Readable fallback');

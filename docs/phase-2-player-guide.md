@@ -6,7 +6,7 @@ From the lobby choose **Single Player → Bắt đầu thế giới mới**, or 
 
 The Landing grassland stays familiar. Beyond 96 world units, seeded outer regions become Mist Marsh and Ochre Badlands. Their terrain palettes, survey silhouettes, ambient sound, exposure and recurring weather differ. Inspect a visible site from nearby through **Journal [J]**. The journal separates observed details from unresolved questions; only inspected sites enter the map. No coordinates of hidden sites or alien-history answers are granted.
 
-Research [U] spends the materials shown beside each icon. Return within the landing base to invest in Field Survey, Water Stewardship, Expanded Storage and Cultivation, respecting prerequisites. Research belongs to the shared colony. Professions are a permanent choice:
+Research [U] spends the materials shown beside each icon. Return within the landing base to invest in Field Survey, Water Stewardship, Expanded Storage and Cultivation, respecting prerequisites. Research belongs to the shared colony. One profession is active at a time; you can change it at an accessible lab/base when the listed prerequisites are met:
 
 | Profession | Earn it | Effect |
 | --- | --- | --- |

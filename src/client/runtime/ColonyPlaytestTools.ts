@@ -1,3 +1,4 @@
+import { uiPhrase } from '../localization/UiMessages';
 import { bindUiText } from '../localization/UiMessages';
 export interface ColonyPlaytestSample {
   tick: number;
@@ -34,18 +35,18 @@ export function createColonyPlaytestTools(
   bindUiText(title,"textContent","Base guide");
   guide.append(title);
   for (const [icon, text, key] of [
-    ["⚒", "Craft a storage kit: 4 Timber + 2 Cordage.", "KeyC"],
+    ["⚒", uiPhrase("Craft a storage kit: 4 Timber + 2 Cordage."), "KeyC"],
     [
       "⌂",
-      "Place a storage crate on explored dry ground near your base.",
+      uiPhrase("Place a storage crate on explored dry ground near your base."),
       "KeyB",
     ],
     [
       "▣",
-      "Stand beside your crate and open Inventory to move supplies.",
+      uiPhrase("Stand beside your crate and open Inventory to move supplies."),
       "KeyI",
     ],
-    ["◇", "Explore visible landmarks; inspect them from the Journal.", "KeyJ"],
+    ["◇", uiPhrase("Explore visible landmarks; inspect them from the Journal."), "KeyJ"],
   ]) {
     const step = document.createElement("button");
     bindUiText(step,"textContent",icon + " " + text);

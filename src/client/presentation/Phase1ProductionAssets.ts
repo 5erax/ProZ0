@@ -1,3 +1,6 @@
+import { CRAFTED_ITEM_ATLAS_URL } from './CraftedItemArt';
+import { fieldFacilitySprite } from './FieldFacilityArt';
+import { PIONEER_ART_URL, PIONEER_CLOAK_URL } from './PioneerArt';
 import { canonicalUiPhrase } from '../localization/UiMessages';
 import { WEARABLE_PROFILES } from '../../content/livingworld/WearableContent';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
@@ -18,10 +21,7 @@ export interface Phase1ProductionSprite {
   readonly index: number;
 }
 
-const ITEM_ICON_ATLAS_URL = new URL(
-  '../../../assets/phase1/items/item_icon_atlas.png',
-  import.meta.url,
-).href;
+const ITEM_ICON_ATLAS_URL = CRAFTED_ITEM_ATLAS_URL;
 const HUD_STATUS_ATLAS_URL = new URL(
   '../../../assets/phase1/ui/icons/hud_status_icons.png',
   import.meta.url,
@@ -54,44 +54,14 @@ const TERRAIN_ATLAS_URL = new URL(
   '../../../assets/phase1/world/terrain/terrain_diorama_v1.svg',
   import.meta.url,
 ).href;
-const PLAYER_URL = new URL(
-  '../../../assets/phase1/actors/player_pioneer.png',
-  import.meta.url,
-).href;
-const THERMAL_WRAP_URL = new URL(
-  '../../../assets/phase1/actors/player_thermal_wrap_overlay.png',
-  import.meta.url,
-).href;
+const PLAYER_URL = PIONEER_ART_URL;
+const THERMAL_WRAP_URL = PIONEER_CLOAK_URL;
 const PASSIVE_WILDLIFE_URL = new URL(
   '../../../assets/phase1/actors/wildlife_passive_phase1.png',
   import.meta.url,
 ).href;
 const PREDATOR_URL = new URL(
   '../../../assets/phase1/actors/territorial_predator.png',
-  import.meta.url,
-).href;
-const LANDING_MODULE_URL = new URL(
-  '../../../assets/phase1/world/structures/landing_module.png',
-  import.meta.url,
-).href;
-const HABITAT_URL = new URL(
-  '../../../assets/phase1/world/structures/habitat_room.png',
-  import.meta.url,
-).href;
-const STORAGE_CRATE_URL = new URL(
-  '../../../assets/phase1/world/structures/storage_crate.png',
-  import.meta.url,
-).href;
-const WORKBENCH_URL = new URL(
-  '../../../assets/phase1/world/structures/workbench.png',
-  import.meta.url,
-).href;
-const POWER_UNIT_URL = new URL(
-  '../../../assets/phase1/world/structures/compact_power_unit.png',
-  import.meta.url,
-).href;
-const CONDENSER_URL = new URL(
-  '../../../assets/phase1/world/structures/atmospheric_water_condenser.png',
   import.meta.url,
 ).href;
 const FIBER_PLANT_URL = new URL(
@@ -452,7 +422,7 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     0,
   ),
   player: atlasSprite(
-    'assets/phase1/actors/player_pioneer.png',
+    'procedural:pioneer-diorama-v2',
     PLAYER_URL,
     32,
     48,
@@ -462,7 +432,7 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     0,
   ),
   thermalWrap: atlasSprite(
-    'assets/phase1/actors/player_thermal_wrap_overlay.png',
+    'procedural:pioneer-cloak-v2',
     THERMAL_WRAP_URL,
     32,
     48,
@@ -491,66 +461,12 @@ export const PHASE1_PRODUCTION_WORLD_SPRITES = Object.freeze({
     28,
     0,
   ),
-  landingModule: atlasSprite(
-    'assets/phase1/world/structures/landing_module.png',
-    LANDING_MODULE_URL,
-    128,
-    96,
-    256,
-    96,
-    2,
-    0,
-  ),
-  habitat: atlasSprite(
-    'assets/phase1/world/structures/habitat_room.png',
-    HABITAT_URL,
-    128,
-    96,
-    512,
-    288,
-    4,
-    0,
-  ),
-  storageCrate: atlasSprite(
-    'assets/phase1/world/structures/storage_crate.png',
-    STORAGE_CRATE_URL,
-    32,
-    32,
-    32,
-    32,
-    1,
-    0,
-  ),
-  workbench: atlasSprite(
-    'assets/phase1/world/structures/workbench.png',
-    WORKBENCH_URL,
-    48,
-    40,
-    48,
-    40,
-    1,
-    0,
-  ),
-  powerUnit: atlasSprite(
-    'assets/phase1/world/structures/compact_power_unit.png',
-    POWER_UNIT_URL,
-    48,
-    48,
-    240,
-    48,
-    5,
-    0,
-  ),
-  condenser: atlasSprite(
-    'assets/phase1/world/structures/atmospheric_water_condenser.png',
-    CONDENSER_URL,
-    64,
-    64,
-    448,
-    64,
-    7,
-    0,
-  ),
+  landingModule: fieldFacilitySprite('landing-module',1.5,1.25,0),
+  habitat: fieldFacilitySprite('habitat-room',2.5,2,0),
+  storageCrate: fieldFacilitySprite('storage-crate',0.75,0.75,0),
+  workbench: fieldFacilitySprite('workbench',1.25,0.75,0),
+  powerUnit: fieldFacilitySprite('compact-power-unit',1,1,0),
+  condenser: fieldFacilitySprite('atmospheric-water-condenser',1,1,0),
   fiberPlant: atlasSprite(
     'assets/phase1/world/resources/fiber_plant.png',
     FIBER_PLANT_URL,
@@ -962,72 +878,11 @@ export function coldRainSprite(
   );
 }
 
-export function habitatSprite(
-  orientation: 0 | 90 | 180 | 270,
-  state: 'NORMAL' | 'CONNECTOR_TARGET' | 'SHELTER_ACTIVE',
-): Phase1ProductionSprite {
-  const orientationIndex = orientation === 0
-    ? 0
-    : orientation === 90
-      ? 1
-      : orientation === 180
-        ? 2
-        : 3;
-  const stateRow = state === 'NORMAL'
-    ? 0
-    : state === 'CONNECTOR_TARGET'
-      ? 1
-      : 2;
+export function habitatSprite(orientation:0|90|180|270,state:'NORMAL'|'CONNECTOR_TARGET'|'SHELTER_ACTIVE'):Phase1ProductionSprite {return fieldFacilitySprite('habitat-room',2.5,2,orientation/90,state);}
 
-  return productionSpriteFrame(
-    PHASE1_PRODUCTION_WORLD_SPRITES.habitat,
-    stateRow * 4 + orientationIndex,
-  );
-}
+export function powerUnitSprite(state:'OPERATING_0'|'OPERATING_1'|'OPERATING_2'|'OPERATING_3'|'SELECTED'):Phase1ProductionSprite {return fieldFacilitySprite('compact-power-unit',1,1,0,state);}
 
-export function powerUnitSprite(
-  state: 'OPERATING_0' | 'OPERATING_1' | 'OPERATING_2' | 'OPERATING_3' | 'SELECTED',
-): Phase1ProductionSprite {
-  const index = state === 'OPERATING_0'
-    ? 0
-    : state === 'OPERATING_1'
-      ? 1
-      : state === 'OPERATING_2'
-        ? 2
-        : state === 'OPERATING_3'
-          ? 3
-          : 4;
-
-  return productionSpriteFrame(
-    PHASE1_PRODUCTION_WORLD_SPRITES.powerUnit,
-    index,
-  );
-}
-
-export function condenserSprite(
-  state:
-    | 'DISABLED'
-    | 'UNPOWERED'
-    | 'RUNNING_0'
-    | 'RUNNING_1'
-    | 'RUNNING_2'
-    | 'RUNNING_3'
-    | 'OUTPUT_FULL',
-): Phase1ProductionSprite {
-  const order = Object.freeze([
-    'DISABLED',
-    'UNPOWERED',
-    'RUNNING_0',
-    'RUNNING_1',
-    'RUNNING_2',
-    'RUNNING_3',
-    'OUTPUT_FULL',
-  ] as const);
-  return productionSpriteFrame(
-    PHASE1_PRODUCTION_WORLD_SPRITES.condenser,
-    order.indexOf(state),
-  );
-}
+export function condenserSprite(state:'DISABLED'|'UNPOWERED'|'RUNNING_0'|'RUNNING_1'|'RUNNING_2'|'RUNNING_3'|'OUTPUT_FULL'):Phase1ProductionSprite {return fieldFacilitySprite('atmospheric-water-condenser',1,1,0,state);}
 
 export function applyProductionSprite(
   element: HTMLElement,

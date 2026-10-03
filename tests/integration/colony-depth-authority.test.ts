@@ -83,7 +83,7 @@ describe("Colony-depth real authority transactions", () => {
       await bundle.destroy();
     }
   });
-  it("all research costs commit before permanent specialization; cultivator advances real planted crops faster", async () => {
+  it("research gates reversible specialization; only the current profession applies and survives save", async () => {
     const bundle = await create();
     try {
       await bundle.stepSolo();
@@ -118,7 +118,7 @@ describe("Colony-depth real authority transactions", () => {
       }
       const specialize = (targetId: string) =>
         bundle.colonyDepth.execute({
-          operationId: "specialize:" + targetId,
+          operationId: "specialize:" + targetId + ':' + String(++ordinal),
           playerId: "colonist",
           expectedRevision: bundle.colonyDepth.read().revision,
           expectedInventoryRevision:
@@ -128,9 +128,11 @@ describe("Colony-depth real authority transactions", () => {
         });
       expect(specialize("cultivator").status).toBe("committed");
       expect(specialize("engineer")).toMatchObject({
-        status: "rejected",
-        reason: "SPECIALIZATION_LOCKED",
+        status: "committed",
       });
+      expect(bundle.colonyDepth.profession('colonist')).toBe('engineer');
+      expect(specialize('cultivator').status).toBe('committed');
+      expect(bundle.colonyDepth.profession('colonist')).toBe('cultivator');
       bundle.getRuntime("colonist").relocatePlayer({ x: -6, y: 4 });
       await bundle.stepSolo();
       fund([

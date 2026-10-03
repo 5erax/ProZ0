@@ -385,8 +385,6 @@ export class ColonyDepthAuthority {
         return reject("RETURN_TO_BASE");
       if (next.professions[command.playerId] === id)
         return reject("ALREADY_SPECIALIZED");
-      if (next.professions[command.playerId] !== undefined)
-        return reject("SPECIALIZATION_LOCKED");
       next = {
         ...next,
         professions: { ...next.professions, [command.playerId]: id },

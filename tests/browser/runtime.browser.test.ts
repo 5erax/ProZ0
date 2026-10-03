@@ -330,7 +330,7 @@ describe('Phase 0 browser runtime', () => {
     expect(
       root.querySelector(
         '[data-world-role="player"]'
-        + '[data-asset-path="assets/phase1/actors/player_pioneer.png"]',
+        + '[data-asset-path="procedural:pioneer-diorama-v2"]',
       ),
     ).not.toBeNull();
     expect(root.querySelector('[data-production-world-preview]')).toBeNull();

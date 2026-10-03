@@ -31,8 +31,8 @@ export function createColonyDepthOverlay(
 ): { render(): void; close(): void; openSite(id: string): void; destroy(): void } {
   const document = root.ownerDocument;
   const reasonText: Record<string,string> = {
-    TARGET_CAPACITY_WEIGHT:'Your bag is too heavy. Store items and return; these supplies will remain here.',
-    TARGET_CAPACITY_VOLUME:'Your bag has no space. Store items and return; these supplies will remain here.',
+    TARGET_CAPACITY_WEIGHT:uiPhrase('Your bag is too heavy. Store items and return; these supplies will remain here.'),
+    TARGET_CAPACITY_VOLUME:uiPhrase('Your bag has no space. Store items and return; these supplies will remain here.'),
     OUT_OF_RANGE:uiText("ui.cdc49fb2"), SITE_BLOCKED_OR_UNEXPLORED:uiText("ui.7d13ce8c"),
     INSPECT_SITE_FIRST:uiText("ui.9d04e6f8"), RESTORE_SITE_FIRST:uiText("ui.ba746f06"), FIELD_TOOL_REQUIRED:uiText("ui.3bb63e9c"),
     ALREADY_RESTORED:uiText("ui.ab7e0ce2"), SUPPLIES_ALREADY_RECOVERED:uiText("ui.1ee94d7b"),
@@ -248,7 +248,7 @@ export function createColonyDepthOverlay(
           def.requiredResearch.replaceAll("-", " ") +
           " · " +
           String(def.requiredRegions) +
-          uiText("ui.a0977b4d"));
+          uiText("ui.a49ab1ed"));
         row.append(requirement);
         addButton(
           row,
@@ -256,7 +256,7 @@ export function createColonyDepthOverlay(
           "specialize",
           id,
           !eligible ||
-            state.professions[playerId] !== undefined ||
+            state.professions[playerId] === id ||
             Math.hypot(position.x, position.y) > 7.5 && !labNearby,
         );
         content.append(row);

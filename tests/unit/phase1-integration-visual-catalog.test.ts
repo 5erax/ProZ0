@@ -50,7 +50,7 @@ describe('Phase 1 integration production visual catalog', () => {
     for (const key of PHASE1_VERTICAL_SLICE_REQUIRED_VISUALS) {
       const sprite = PHASE1_PRODUCTION_WORLD_SPRITES[key];
 
-      expect(sprite.assetPath).toMatch(/^assets\/phase1\//);
+      expect(sprite.assetPath).toMatch(/^(assets\/phase1\/|procedural:)/);
       expect(sprite.url.length).toBeGreaterThan(0);
       expect(sprite.sourceWidth % sprite.cellWidth).toBe(0);
       expect(sprite.sourceHeight % sprite.cellHeight).toBe(0);
@@ -99,16 +99,13 @@ describe('Phase 1 integration production visual catalog', () => {
     expect(coldRainSprite('GROUND_SPLASH', 0).index).toBe(4);
     expect(coldRainSprite('GROUND_SPLASH', 3).index).toBe(7);
 
-    expect(habitatSprite(0, 'NORMAL').index).toBe(0);
-    expect(habitatSprite(90, 'CONNECTOR_TARGET').index).toBe(5);
-    expect(habitatSprite(270, 'SHELTER_ACTIVE').index).toBe(11);
-
-    expect(powerUnitSprite('OPERATING_0').index).toBe(0);
-    expect(powerUnitSprite('SELECTED').index).toBe(4);
-
-    expect(condenserSprite('DISABLED').index).toBe(0);
-    expect(condenserSprite('UNPOWERED').index).toBe(1);
-    expect(condenserSprite('RUNNING_3').index).toBe(5);
-    expect(condenserSprite('OUTPUT_FULL').index).toBe(6);
+    const room=habitatSprite(0,'NORMAL'),rotated=habitatSprite(90,'NORMAL');
+    expect(room.cellWidth).toBe(rotated.cellWidth);expect(room.footOffsetY).toBe(rotated.footOffsetY);
+    expect(room.url).not.toBe(rotated.url);
+    expect(habitatSprite(90,'CONNECTOR_TARGET').url).not.toBe(rotated.url);
+    expect(habitatSprite(270,'SHELTER_ACTIVE').url).not.toBe(habitatSprite(270,'NORMAL').url);
+    expect(powerUnitSprite('SELECTED').url).not.toBe(powerUnitSprite('OPERATING_0').url);
+    expect(condenserSprite('RUNNING_3').url).not.toBe(condenserSprite('DISABLED').url);
+    expect(condenserSprite('OUTPUT_FULL').url).not.toBe(condenserSprite('RUNNING_3').url);
   });
 });

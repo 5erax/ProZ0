@@ -122,6 +122,17 @@ describe('Phase 1 survival fixed-step authority', () => {
 });
 
 describe('Phase 1 combat authority', () => {
+  it('rejects obstructed attacks without damage, stamina, wear or cooldown', () => {
+    const { catalog, world, items, survival } = setup();
+    world.setPlayerPosition('p1', createWorldPosition(0,0));
+    world.addPredator({entityId:'blocked',position:createWorldPosition(.4,0),encounterAnchor:createWorldPosition(.4,0),revision:0,health:75,state:'idle',targetPlayerId:null,stateUntilTick:null,outsideLeashTicks:0});
+    const combat = new Phase1CombatAuthority(catalog,survival,items,world,{},()=>false);
+    const before=items.exportLedgerSnapshot();
+    expect(combat.submitAttack({attackId:'blocked-hit',playerId:'p1',inventoryContainerId:'inventory:p1',expectedInventoryRevision:0,facingX:1,facingY:0},'blocked')).toMatchObject({status:'rejected',reason:'OBSTRUCTED',damage:0});
+    expect(world.getPredator('blocked')?.health).toBe(75);
+    expect(survival.getPlayerView('p1').stamina).toBe(100);
+    expect(combat.getCooldownUntil('p1')).toBe(0);expect(items.exportLedgerSnapshot()).toEqual(before);
+  });
   it('AttackId is idempotent and authoritative hit mutates predator once', () => {
     const { catalog, world, items, survival } = setup();
     world.setPlayerPosition('p1', createWorldPosition(0,0));

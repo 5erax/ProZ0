@@ -74,6 +74,8 @@ export class FixedStepRuntime implements AuthorityRuntime {
     this.movement.relocate(position, facing);
   }
 
+  public aimFacing(facing:FacingDirection):void { this.movement.aimFacing(facing); }
+
   public getSnapshot(): Readonly<SimulationSnapshot> {
     return Object.freeze({
       tick: this.tick,

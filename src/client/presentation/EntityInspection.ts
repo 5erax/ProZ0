@@ -9,6 +9,7 @@ export interface EntityInspectionView {
   readonly facts: readonly string[];
 }
 type Reader = () => EntityInspectionView | null;
+export interface EntityInspectionAction {readonly label:string;readonly run:()=>void;}
 const readers = new WeakMap<Element, Reader>();
 
 /** Ephemeral presentation binding; never stores or changes simulation state. */
@@ -20,7 +21,7 @@ export function bindEntityInspection(element: HTMLElement, read: Reader): void {
   element.removeAttribute('title');
 }
 
-export function createEntityInspection(root: HTMLElement, blocked: () => boolean) {
+export function createEntityInspection(root: HTMLElement, blocked: () => boolean, actions:(view:EntityInspectionView)=>readonly EntityInspectionAction[]=()=>[]) {
   const document = root.ownerDocument;
   const style = document.createElement('style');
   style.textContent = '.p2-entity-inspection{position:absolute;right:12px;top:112px;width:min(320px,calc(100% - 24px));max-height:min(280px,45vh);overflow:auto;box-sizing:border-box;z-index:1000030;background:#102029f2;border:1px solid #92ada9;padding:12px;color:#e2e8d6;font:12px monospace;pointer-events:auto;line-height:1.45}.p2-entity-inspection[hidden]{display:none}.p2-entity-inspection h2{font-size:14px;margin:0 30px 8px 0}.p2-entity-inspection p{margin:5px 0}.p2-entity-inspection button{position:absolute;right:6px;top:6px;background:#223a43;color:#e2e8d6;border:1px solid #8da5a2;cursor:pointer;padding:3px 7px}@media(max-height:450px){.p2-entity-inspection{top:84px;width:min(280px,44%);max-height:45vh;font-size:11px;padding:8px}}';
@@ -42,16 +43,17 @@ export function createEntityInspection(root: HTMLElement, blocked: () => boolean
     if (!selected || selected.hidden || !root.contains(selected) || blocked()) { close(); return; }
     const now = performance.now(); if (now - lastRefresh < 250) return; lastRefresh = now;
     const view = readers.get(selected)?.(); if (!view) { close(); return; }
-    const next = locale()+JSON.stringify(view); if (next === signature) return; signature = next;
+    const commands=actions(view);
+    const next = locale()+JSON.stringify(view)+JSON.stringify(commands.map(c=>c.label)); if (next === signature) return; signature = next;
     bindUiText(heading,"textContent",uiPhrase(view.name)); bindUiText(kind,"textContent",view.kind);
     facts.replaceChildren(...view.facts.slice(0, 12).map(value => { const p = document.createElement('p'); bindUiText(p,"textContent",value); return p; }));
+    for(const command of commands){const button=document.createElement('button');button.type='button';button.style.position='static';bindUiText(button,'textContent',command.label);button.onclick=()=>{command.run();signature='';lastRefresh=-Infinity;render();};facts.append(button);}
     card.dataset.entityId = view.id; card.hidden = false;
   };
   const inspect = (event: MouseEvent | KeyboardEvent): void => {
     if (blocked()) { close(); return; }
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-entity-inspectable]') : null;
     if (!target || !root.contains(target) || !readers.has(target)) { close(); return; }
-    if (selected === target) { close(); return; }
     selected = target; lastRefresh = -Infinity; signature = ''; render();
   };
   const key = (event: KeyboardEvent) => {

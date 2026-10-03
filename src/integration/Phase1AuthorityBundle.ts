@@ -1,4 +1,7 @@
+import { traversableSegment } from '../world/collision/TraversableSegment';
 import { PLAYER_COLLISION_FOOTPRINT } from '../simulation/player/PlayerCollisionFootprint';
+import { SoloResourceMarkers } from '../simulation/worldspaces/SoloResourceMarkers';
+
 import { SoloCaveAuthority } from '../simulation/worldspaces/SoloCaveAuthority';
 import { SoloWorldspaceWorldAdapter } from './worldspaces/SoloWorldspaceWorldAdapter';
 import { soloCaveRegistry } from '../world/phase2/SoloCaveRegistry';
@@ -396,6 +399,7 @@ export interface Phase1AuthorityBundleConfig {
 }
 
 export class Phase1AuthorityBundle {
+  public readonly resourceMarkers: SoloResourceMarkers | null;
   private readonly pinnedChunkKeys = new Set<string>();
   public readonly catalog: ContentCatalogV1;
   public readonly worldPersistence: Phase1SessionWorldPersistence;
@@ -461,6 +465,12 @@ export class Phase1AuthorityBundle {
     this.worldPersistence = worldPersistence;
     this.worldStore = worldStore;
     this.world = world;
+    this.resourceMarkers=config.singlePlayerExpeditionEnabled===true?new SoloResourceMarkers(config.playerIds[0]!,id=>{
+      const cave=caves?.activeLayout();
+      if(cave){const node=cave.nodes.find(n=>n.id===id);return node&&caves!.getResource(id)?{resourceId:id,definitionId:node.resourceDefinitionId,position:node.position,spaceId:cave.spaceId}:null;}
+      const entity=world.getActiveGeneratedEntities().find(e=>e.entityId===id);
+      return entity?.type==='resource'&&world.isExploredPosition(entity.position)?{resourceId:id,definitionId:entity.definitionId,position:entity.position,spaceId:'surface'}:null;
+    },config.reopen?.bundle.world.soloResourceMarkers):null;
     for (const view of world.getActiveChunkViews()) {
       this.pinnedChunkKeys.add(String(view.base.coord.x) + ':' + String(view.base.coord.y));
     }
@@ -724,6 +734,7 @@ export class Phase1AuthorityBundle {
       items,
       interactionWorld,
       config.reopen?.bundle.world.livingWorld?.huntCooldowns?.until,
+      (from,to)=>traversableSegment(interactionWorld,from,to,PLAYER_COLLISION_FOOTPRINT),
     );
     const death = new Phase1DeathAuthority(
       survival,
