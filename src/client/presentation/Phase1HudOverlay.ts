@@ -1791,7 +1791,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     for(const controls of fresh.querySelectorAll<HTMLElement>('.p1-inventory-controls')){if(controls.closest('details'))continue;const details=this.document.createElement('details'),summary=this.document.createElement('summary');details.className='p1-ui-controls';bindUiText(summary,'textContent',gameUiText('controls'));controls.replaceWith(details);details.append(summary,controls);}
       const sameKind = previousPanel?.dataset.panelKind === state.panel.kind;
       const panel = sameKind ? previousPanel! : fresh;
-      if (sameKind) panel.replaceChildren(...Array.from(fresh.childNodes));
+      if (sameKind) {
+        for(const attribute of Array.from(panel.attributes))if(!fresh.hasAttribute(attribute.name))panel.removeAttribute(attribute.name);
+        for(const attribute of Array.from(fresh.attributes))panel.setAttribute(attribute.name,attribute.value);
+        panel.replaceChildren(...Array.from(fresh.childNodes));
+      }
       this.layer.append(panel);
       const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
       if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
