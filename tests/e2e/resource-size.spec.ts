@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { walk } from './support/solo-actions';
 
-test('resource sizes: fresh-world hover yield matches actual harvest and survives save/reopen', async ({ page }) => {
+test('resource sizes: explicit inspection yield matches actual harvest and survives save/reopen', async ({ page }) => {
   test.setTimeout(120000);
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:size-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=size-ui');
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
@@ -16,10 +16,34 @@ test('resource sizes: fresh-world hover yield matches actual harvest and survive
   await walk(page, 18, 10);
   const target = page.locator('[data-world-role="resource"][data-focused-target="true"]');
   await expect(target).toHaveAttribute('aria-label', 'Gather Fiber Plant');
-  const identity = await target.getAttribute('data-world-id'), size = await target.getAttribute('data-resource-size'), title = await target.getAttribute('title');
+  const identity = await target.getAttribute('data-world-id'), size = await target.getAttribute('data-resource-size');
   expect(['small', 'medium', 'large']).toContain(size);
-  const yieldCount = Number(title?.match(/· (\d+) Plant Fiber/)?.[1]); expect(yieldCount).toBeGreaterThan(0);
+  await expect(target).not.toHaveAttribute('title');
+  await target.click({button:'right'});
+  const inspection = page.getByRole('region',{name:'Entity statistics',exact:true});
+  await expect(inspection).toContainText('Fiber Plant');
+  const yieldCount = Number((await inspection.innerText()).match(/Yield: (\d+) Plant Fiber/)?.[1]); expect(yieldCount).toBeGreaterThan(0);
+  await expect(page.locator('[data-region="interaction"]')).not.toHaveAttribute('data-state','CHANNELING');
+  const box = await inspection.boundingBox(); expect(box!.width).toBeLessThanOrEqual(320);expect(box!.height).toBeLessThanOrEqual(280);
+  mkdirSync('test-results/entity-inspection', { recursive: true });
+  await page.screenshot({ path: 'test-results/entity-inspection/desktop.png' });
+  await page.setViewportSize({ width: 640, height: 360 });
+  await expect(inspection).toBeVisible();
+  const compactBox = await inspection.boundingBox();
+  expect(compactBox!.x).toBeGreaterThanOrEqual(0);
+  expect(compactBox!.x + compactBox!.width).toBeLessThanOrEqual(640);
+  expect(compactBox!.height).toBeLessThanOrEqual(162);
+  await page.screenshot({ path: 'test-results/entity-inspection/compact.png' });
+  await page.keyboard.press('Escape');
+  await expect(inspection).toBeHidden();
+  await target.focus(); await page.keyboard.press('Shift+F10');
+  await expect(inspection).toBeVisible();
+  await page.keyboard.press('m');
+  await expect(inspection).toBeHidden();
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1280, height: 720 });
   await target.click();
+  await expect(inspection).toBeHidden();
   const interaction = page.locator('[data-region="interaction"]');
   await expect(interaction).toHaveAttribute('data-state', 'CHANNELING');
   await expect(interaction).toHaveAttribute('data-state', 'AVAILABLE', { timeout: 5000 });

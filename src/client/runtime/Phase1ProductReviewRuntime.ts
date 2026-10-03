@@ -2,6 +2,7 @@ import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentConten
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { installGameContextMenu } from '../input/GameContextMenu';
+import { createEntityInspection } from '../presentation/EntityInspection';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
@@ -326,6 +327,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const entityInspection = createEntityInspection(root, () => ['colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'));
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
@@ -2201,7 +2203,7 @@ export async function createPhase1ProductReviewRuntime(
     },
     onRender: () => {
       // Present only the most recent completed authority state once per frame.
-      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();}
+      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();entityInspection.render();}
     },
   });
 
@@ -2335,16 +2337,20 @@ export async function createPhase1ProductReviewRuntime(
     const id = event.dataTransfer?.getData('application/x-proz0-inventory-stack');
     if (id && id.length < 512) equipInventorySlot(slot, id);
   };
-  const removeContextMenu = installGameContextMenu(root, () => {
-    livingOverlay?.cancelPlacement();
-    expeditionOverlay?.cancelPlacement();
+  const removeContextMenu = installGameContextMenu(root, (event) => {
+    const livingCancelled = livingOverlay?.cancelPlacement() ?? false;
+    const expeditionCancelled = expeditionOverlay?.cancelPlacement() ?? false;
+    if (livingCancelled || expeditionCancelled) { entityInspection.close(); return; }
     if (actionPanel === 'build') {
       actionPanel = null;
       buildAnchor = null;
       source.setPresentationPanel(null);
       refreshWorldPresentationContext();
       worldRenderer.render();
+      entityInspection.close();
+      return;
     }
+    entityInspection.inspect(event);
   });
   root.addEventListener('click', onPanelClick);
   root.addEventListener('dragstart', onGearDragStart);
@@ -2384,6 +2390,7 @@ export async function createPhase1ProductReviewRuntime(
       host.stop();
       input.stop();
       removeContextMenu();
+      entityInspection.destroy();
       root.removeEventListener('click', onPanelClick);
       root.removeEventListener('dragstart', onGearDragStart);
       root.removeEventListener('dragover', onGearDragOver);

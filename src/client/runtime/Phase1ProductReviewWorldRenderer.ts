@@ -10,6 +10,7 @@ import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import { explorationSiteSprite } from '../presentation/ExplorationArt';
 import { heldSpearSprite } from '../presentation/EquipmentArt';
 import { worldDepthOrder } from '../presentation/WorldDepth';
+import { bindEntityInspection } from '../presentation/EntityInspection';
 import {
   WORLD_PIXELS_PER_UNIT,
   type WorldPosition,
@@ -669,6 +670,30 @@ export function createPhase1ProductReviewWorldRenderer(
     if (!focused && element.dataset.focusedTarget !== undefined) delete element.dataset.focusedTarget;
     if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
     if (element.dataset.worldId !== id) element.dataset.worldId = id;
+    if (['hostile','structure','survey-site','world-drop','death-cache','ruin'].includes(role)) {
+      element.style.pointerEvents = 'auto';
+      bindEntityInspection(element, () => {
+        if (role === 'hostile') {
+          const target = bundle.world.getPredator(id);
+          if (!target || !worldPositionKnown(bundle,target.position)) return null;
+          return {id,name:'Territorial Predator',kind:'Wildlife',facts:['State: '+target.state.replaceAll('_',' ').toLowerCase(),'Health: '+target.health,'Left click / E: interact']};
+        }
+        if (!worldPositionKnown(bundle,position)) return null;
+        if (role === 'structure') {
+          const structure = bundle.buildings.exportSnapshot().foothold.structures.find(v => v.structureId === id);
+          if (!structure) return null;
+          const facts = ['Left click / E: interact'];
+          if (structure.containerId) { const inventory = bundle.items.getContainerView(structure.containerId); facts.unshift('Stored weight: '+inventory.totalWeightKg.toFixed(1)+' kg','Stored volume: '+inventory.totalVolume.toFixed(1)); }
+          return {id,name:bundle.catalog.get(structure.definitionId).displayName,kind:'Building',facts};
+        }
+        if (role === 'survey-site') {
+          const site = bundle.colonyDepth.sites().find(value => value.id === id);
+          if (!site) return null;
+          return {id,name:site.name,kind:'Exploration site',facts:['State: '+bundle.colonyDepth.siteStage(id),'Biome: '+site.biomeId,'Left click / E: explore']};
+        }
+        return {id,name:element.getAttribute('aria-label') ?? role.replaceAll('-',' '),kind:role.replaceAll('-',' '),facts:['E: interact']};
+      });
+    }
     const data = options.data ?? {};
     for (const key of spriteDataKeys.get(element) ?? []) {
       if (!(key in data)) delete element.dataset[key];
@@ -1232,7 +1257,7 @@ export function createPhase1ProductReviewWorldRenderer(
         const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
         if(rendered && site.template){
           rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';
-          rendered.setAttribute('aria-label','Explore '+site.name);rendered.title='Explore '+site.name+' · approach to inspect';
+          rendered.setAttribute('aria-label','Explore '+site.name);rendered.removeAttribute('title');
           rendered.style.clipPath='polygon(0 25%,100% 25%,100% 100%,0 100%)';
         }
       }
@@ -1285,10 +1310,15 @@ export function createPhase1ProductReviewWorldRenderer(
         else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
         const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);
+        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);
         if (size) rendered.dataset.resourceSize = size;
         const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId, 'resource'), size);
-        rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':(size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' : '') + name + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's · approach to interact';
+        rendered.removeAttribute('title');
+        bindEntityInspection(rendered, () => {
+          if (!worldPositionKnown(bundle, entity.position)) return null;
+          const current = bundle.worldStore.getResourceState(entity.entityId);
+          return {id:entity.entityId,name:bundle.catalog.getAs(entity.definitionId,'resource').displayName,kind:'Resource',facts:[...(size ? ['Size: '+RESOURCE_SIZE_PROFILES[size].label] : []),'Yield: '+harvest.output.quantity+' '+bundle.catalog.getAs(harvest.output.itemId,'item').displayName,'Gather time: '+harvest.gatherChannelSeconds+'s',current?.depleted ? 'Renewing: '+Math.max(0,Math.ceil(((current.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60))+'s active time' : 'Available','Left click / E: interact']};
+        });
       }
 
       if (entity.type === 'ruin') {
@@ -1336,7 +1366,7 @@ export function createPhase1ProductReviewWorldRenderer(
         const container=bundle.items.getContainerView(structure.containerId),capacity=bundle.catalog.getAs(structure.definitionId,'structure').container!;
         const multiplier=container.storageCapacityMultiplier??1,fill=Math.min(1,Math.max(container.totalWeightKg/(capacity.maxWeightKg*multiplier),container.totalVolume/(capacity.maxVolume*multiplier))),percent=Math.round(fill*100);
         let indicator=structureElement.querySelector<HTMLElement>('[data-storage-fill]');if(!indicator){indicator=document.createElement('div');indicator.dataset.storageFill='';indicator.style.cssText='position:absolute;bottom:2px;left:8px;width:24px;height:3px;border:1px solid #a7b8ae;pointer-events:none';structureElement.append(indicator);}
-        if(indicator.dataset.storageFill!==String(percent)){indicator.dataset.storageFill=String(percent);indicator.style.background='linear-gradient(to right,'+(percent>=90?'#dda36b':'#8ac7a0')+' '+percent+'%,#21343a '+percent+'%)';structureElement.title='Storage '+percent+'% · open Inventory nearby';}
+        if(indicator.dataset.storageFill!==String(percent)){indicator.dataset.storageFill=String(percent);indicator.style.background='linear-gradient(to right,'+(percent>=90?'#dda36b':'#8ac7a0')+' '+percent+'%,#21343a '+percent+'%)';structureElement.removeAttribute('title');}
       }
     }
 

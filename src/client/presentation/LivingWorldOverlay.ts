@@ -10,6 +10,7 @@ import {
 import { livingArt } from './LivingWorldArt';
 import { LivingMotion } from './LivingMotion';
 import { worldDepthOrder } from './WorldDepth';
+import { bindEntityInspection } from './EntityInspection';
 import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { GEAR_RECIPES, RARITY_STYLE }  from '../../content/livingworld/EquipmentContent';
@@ -57,6 +58,7 @@ export function createLivingWorldOverlay(
   hint.hidden = true;
   style.textContent =
     '.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:110px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:110px}.lw-season{top:95px}}';
+  style.textContent += '.lw-panel[data-targeted=true]{inset:auto 12px auto auto;top:112px;width:min(320px,calc(100% - 24px));max-height:45vh;padding:12px;box-sizing:border-box}.lw-panel[data-targeted=true] h2{font-size:14px}.lw-panel[data-targeted=true] article{padding:4px 0;border:0}.lw-panel[data-targeted=true] h3{margin:4px 0;font-size:13px}@media(max-height:450px){.lw-panel[data-targeted=true]{top:84px;width:min(280px,44%)}}';
   const worldStage = root.querySelector<HTMLElement>('.p1-product-world-stage');
   if (!worldStage) throw new Error('Living presentation requires the canonical world stage.');
   const rasterOrigin = { x: Number(worldStage.dataset.rasterOriginX), y: Number(worldStage.dataset.rasterOriginY) };
@@ -86,6 +88,7 @@ export function createLivingWorldOverlay(
     fishFlashUntil = 0,
     lastFishMessage = '',
     fishingError = '',
+    interactionFlashUntil = 0,
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -216,8 +219,16 @@ export function createLivingWorldOverlay(
   const growthText = (v: ReturnType<typeof forageGrowthView>) => v.stage === 'mature'
     ? 'Maximum growth reached · best yield ' + v.maximumYield + ' · ' + (v.condition === 'normal' ? 'Normal' : 'Needs water')
     : (v.stage === 'early' ? 'Early growth' : 'Growing') + ' · ' + (v.nextStageSeconds === null ? 'Growth paused: water needed' : 'Next stage ≈ ' + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? 'Needs water' : 'Normal') + ' · yield ' + v.harvestYield + '/' + v.maximumYield;
+  const interact = (id: string) => {
+    if (placing || opened || root.dataset.colonySettingsOpen === 'true' || root.dataset.productReviewPanelOpen === 'true') return;
+    const f = authority.presentationSnapshot().forage.find(f => f.id === id && !f.cleared);
+    if (f) {
+      execute('forage', id); hint.textContent = feedback; hint.hidden = false; interactionFlashUntil = performance.now() + 3500;
+    } else open(id);
+  };
   const render = () => {
     const now = performance.now();
+    if (!placing && !opened && interactionFlashUntil && now >= interactionFlashUntil) { hint.hidden = true; interactionFlashUntil = 0; }
     if (root.dataset.colonySettingsOpen === 'true') {
       close();
       placing = false;
@@ -318,10 +329,27 @@ export function createLivingWorldOverlay(
         b.dataset.livingId = e.id;
         b.onclick = (event) => {
           event.stopPropagation();
-          open(e.id);
+          interact(e.id);
         };
         objectNodes.set(e.id, b);
         markers.append(b);
+        bindEntityInspection(b, () => {
+          const snapshot = authority.presentationSnapshot();
+          const current = role === 'plot' ? snapshot.plots.find(v => v.id === e.id) : role === 'animal' ? snapshot.animals.find(v => v.id === e.id) : snapshot.forage.find(v => v.id === e.id && !v.cleared);
+          if (!current || !worldPositionKnown(bundle, current)) return null;
+          const label = role === 'plot' ? 'Farm plot' : role === 'animal' ? speciesDefinition(kind)!.name : forageDefinition(kind)!.name;
+          const facts: string[] = [];
+          if (role === 'animal') {
+            const animal = snapshot.animals.find(v => v.id === e.id)!, def = speciesDefinition(animal.species)!;
+            facts.push('Health: '+animal.health+'/'+def.health, 'Feed: '+Math.round(animal.energy/100)+'% · Water: '+Math.round(animal.thirst/100)+'%', animal.health === 0 ? 'Carcass' : animal.age >= def.matureSeconds*60 ? 'Adult' : 'Young', animal.pen ? 'Domestic' : 'Wild');
+          } else {
+            const growth = role === 'plot' ? authority.plotStatus(e.id) : authority.forageStatus(e.id);
+            if (growth) facts.push(growthText(growth));
+            if (role === 'plot') { const plot = snapshot.plots.find(v => v.id === e.id)!; facts.push('Moisture: '+Math.round(plot.moisture/100)+'%', plot.dead ? 'Withered' : plot.crop ? cropDefinition(plot.crop)!.name : 'Empty soil'); }
+          }
+          facts.push('Soil: '+soilAt(bundle.config.worldSeed,current).name, 'Left click / E: interact · F: manage');
+          return {id:e.id,name:label,kind:role,facts};
+        });
       }
       const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead].join(':');
       const definition = livingArt(role, kind, progress, young, dead);
@@ -344,11 +372,7 @@ export function createLivingWorldOverlay(
             ? speciesDefinition(kind)!.name
             : forageDefinition(kind)!.name,
       );
-      if (Math.hypot(e.x - p.x, e.y - p.y) <= 4 && role === 'forage' && renewablePlant(kind)) {
-        const growth = authority.forageStatus(e.id)!;
-        const label = (b.getAttribute('aria-label') ?? '') + ' · ' + growthText(growth);
-        if (b.title !== label) b.title = label;
-      } else b.title = b.getAttribute('aria-label') ?? '';
+      b.removeAttribute('title');
       if (role === 'plot') {
         const plot = state.plots.find(plot => plot.id === e.id)!;
         b.dataset.moisture = moistureState(plot.moisture);
@@ -393,6 +417,9 @@ export function createLivingWorldOverlay(
       }
     }
     if (!opened) return;
+    if (focus && focus !== 'craft' && !objects.some(v => v.e.id === focus)) { close(); return; }
+    const targeted = focus !== '' && focus !== 'craft';
+    panel.dataset.targeted = String(targeted);
     const next = JSON.stringify([
       Math.floor(state.lastTick / 60),
       inventory.revision,
@@ -410,29 +437,29 @@ export function createLivingWorldOverlay(
         panel.querySelector<HTMLDetailsElement>('details')?.open ??
         focus === 'craft';
     panel.replaceChildren(
-      text('h2', 'HOMESTEAD · ' + s.name),
+      text('h2', targeted ? 'Interact' : 'HOMESTEAD · ' + s.name),
       button('Close', close),
-      button('Till a new plot', startPlot),
+      ...(!targeted ? [button('Till a new plot', startPlot)] : []),
     );
     const status = text('p', feedback);
     status.setAttribute('role', 'status');
-    panel.append(
-      status,
+    panel.append(status);
+    if (!targeted) panel.append(
       text(
         'p',
         'Spring +35% growth · Summer: water regularly · Autumn +25% harvest · Winter: fire and shelter. Each season lasts 12 active minutes.',
       ),
     );
     const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
-    panel.append(button('Fish nearby water', startFishing));
+    if (!targeted) panel.append(button('Fish nearby water', startFishing));
     const fishFeedback = authority.fishing.message(player);
     if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length)).displayName : statusText(fishFeedback)));
-    for (const rootItem of roots) panel.append(button('Replant ' + rootItem.displayName, () => {
+    for (const rootItem of targeted ? [] : roots) panel.append(button('Replant ' + rootItem.displayName, () => {
       close(); placing = true; placementRoot = rootItem.id; hint.hidden = false;
       hint.textContent = 'Replant on explored ground within 4 m · Escape / right-click cancel';
     }));
     const soil = soilAt(bundle.config.worldSeed, p);
-    panel.append(
+    if (!targeted) panel.append(
       text(
         'p',
         'Local soil: ' +
@@ -452,14 +479,14 @@ export function createLivingWorldOverlay(
       return a;
     };
     for (const plot of state.plots.filter(
-      (e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus,
+      (e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8,
     )) {
       const crop = cropDefinition(plot.crop ?? ''),
         a = row(
           plot.id,
-          'Plot · ' + soilAt(bundle.config.worldSeed, plot).name,
+          (crop ? crop.name : 'Empty plot') + ' · ' + soilAt(bundle.config.worldSeed, plot).name,
         );
-      a.append(
+      if (!targeted) a.append(
         text(
           'p',
           plot.dead
@@ -476,7 +503,7 @@ export function createLivingWorldOverlay(
         ),
       );
       const growth = authority.plotStatus(plot.id);
-      if (growth && !plot.dead) a.append(text('p', growthText(growth)));
+      if (growth && !plot.dead && !targeted) a.append(text('p', growthText(growth)));
       if (!plot.crop)
         for (const c of CROPS)
           a.append(
@@ -492,7 +519,7 @@ export function createLivingWorldOverlay(
       );
     }
     for (const animal of state.animals.filter(
-      (e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus,
+      (e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8,
     )) {
       const d = speciesDefinition(animal.species)!,
         a = row(
@@ -505,7 +532,7 @@ export function createLivingWorldOverlay(
                 ? 'Adult'
                 : 'Young'),
         );
-      a.append(
+      if (!targeted) a.append(
         text(
           'p',
           'Health ' +
@@ -552,10 +579,10 @@ export function createLivingWorldOverlay(
     }
     for (const f of state.forage
       .filter((f) => !f.cleared)
-      .filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus)) {
+      .filter((e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
       const a = row(f.id, forageDefinition(f.kind)!.name);
       const growth = authority.forageStatus(f.id)!;
-      if (renewablePlant(f.kind)) a.append(text('p', growthText(growth)));
+      if (renewablePlant(f.kind) && !targeted) a.append(text('p', growthText(growth)));
       a.append(
         button(
           (f.growth ? growth.harvestYield === 0 : f.readyTick > bundle.authorityTick)
@@ -573,7 +600,7 @@ export function createLivingWorldOverlay(
     }
     for (const f of bundle
       .expedition!.read()
-      .facilities.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
+      .facilities.filter((e) => !targeted && Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
       if (f.definitionId !== 'campfire' && f.definitionId !== 'irrigation-tank')
         continue;
       const a = row(
@@ -612,8 +639,8 @@ export function createLivingWorldOverlay(
         'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length) + ' recipes',
       ),
     );
-    panel.append(craft);
-    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
+    if (!targeted) panel.append(craft);
+    for (const r of targeted ? [] : [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
       const a = row('recipe:' + r.id, r.name);
       const definition = bundle.catalog.getAs(r.output, 'item');
       if (definition.rarity) { a.dataset.rarity = definition.rarity; a.style.borderColor = RARITY_STYLE[definition.rarity].colour; const badge = text('small', RARITY_STYLE[definition.rarity].label); badge.style.color = RARITY_STYLE[definition.rarity].colour; a.append(badge); a.querySelector('h3')?.setAttribute('style', 'color:' + RARITY_STYLE[definition.rarity].colour); }
@@ -745,7 +772,7 @@ export function createLivingWorldOverlay(
         if (!canonical) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          open(near.id);
+          interact(near.id);
         }
       }
     } else if (e.code === 'Escape' && (opened || placing)) {
@@ -776,7 +803,7 @@ export function createLivingWorldOverlay(
   return {
     open,
     close,
-    cancelPlacement: () => { if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); },
+    cancelPlacement: () => { const active = placing || Boolean(authority.fishing.session(player)); if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); return active; },
     render,
     destroy: () => {
       root.removeEventListener('pointermove', pointer);

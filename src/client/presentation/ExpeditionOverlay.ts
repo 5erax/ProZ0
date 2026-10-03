@@ -17,6 +17,7 @@ import {
 
 import { expeditionSprite } from './ExpeditionAssets';
 import { createCanvasBounds } from './CanvasBounds';
+import { bindEntityInspection } from './EntityInspection';
 
 /** Presentation only: every material change runs through the solo authority. */
 export function createExpeditionOverlay(
@@ -580,6 +581,7 @@ export function createExpeditionOverlay(
       labMarker.dataset.x = '0';
       labMarker.dataset.y = '0';
       markers.append(labMarker);
+      bindEntityInspection(labMarker, () => ({id:'landing-lab',name:'Landing Lab',kind:'Building',facts:['Emergency supplies · safe rest · base services','Left click / E: interact']}));
       for (const plan of state.plans) {
         const marker = button(
           expeditionFacility(plan.definitionId)!.name + ' · blueprint',
@@ -590,6 +592,11 @@ export function createExpeditionOverlay(
         marker.dataset.x = String(plan.x);
         marker.dataset.y = String(plan.y);
         markers.append(marker);
+        bindEntityInspection(marker, () => {
+          const current = authority.read().plans.find(v => v.id === plan.id); if (!current) return null;
+          const definition = expeditionFacility(current.definitionId)!;
+          return {id:plan.id,name:definition.name,kind:'Blueprint',facts:definition.costs.map(([id,q]) => bundle.catalog.get(id).displayName+': '+(current.paid[id]??0)+'/'+q)};
+        });
       }
       for (const facility of state.facilities.filter(
         (f) => f.canonicalStructureId === null,
@@ -604,6 +611,7 @@ export function createExpeditionOverlay(
         marker.dataset.x = String(facility.x);
         marker.dataset.y = String(facility.y);
         markers.append(marker);
+        bindEntityInspection(marker, () => { const current = authority.read().facilities.find(v => v.id === facility.id); return current ? {id:current.id,name:expeditionFacility(current.definitionId)!.name,kind:'Building',facts:['Built · orientation '+current.orientation,'Left click / E: manage']} : null; });
       }
     }
     // Management markers stay contextual rather than covering distant structures.
@@ -830,7 +838,7 @@ export function createExpeditionOverlay(
   return {
     open,
     close,
-    cancelPlacement: () => { if (placement) close(); },
+    cancelPlacement: () => { const active = placement !== null; if (placement) close(); return active; },
     render,
     destroy() {
       bounds.destroy();
