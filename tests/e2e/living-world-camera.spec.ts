@@ -11,6 +11,7 @@ test('living plants share the terrain raster anchor through continuous camera mo
   const before = await retained.evaluate(element => ({ left: (element as HTMLElement).style.left, top: (element as HTMLElement).style.top, stage: !!element.closest('.p1-product-world-stage') }));
   expect(before.stage).toBe(true);
   const cameraBefore = await page.locator('.p1-product-world-stage').evaluate(element => (element as HTMLElement).style.transform);
+  const depthOrigin = await page.locator('.p1-product-world-stage').evaluate(element => (element as HTMLElement).style.getPropertyValue('--world-camera-depth'));
   await expect(page.locator('[data-world-role="player"]')).toHaveCSS('z-index', '100000');
   for (const direction of ['d', 's', 'a', 'w']) {
     await page.keyboard.down(direction);
@@ -44,6 +45,7 @@ test('living plants share the terrain raster anchor through continuous camera mo
   await page.keyboard.up('d');
   await page.keyboard.up('s');
   expect(await page.locator('.p1-product-world-stage').evaluate(element => (element as HTMLElement).style.transform)).not.toBe(cameraBefore);
+  expect(await page.locator('.p1-product-world-stage').evaluate(element => (element as HTMLElement).style.getPropertyValue('--world-camera-depth'))).toBe(depthOrigin);
   await page.setViewportSize({ width: 1280, height: 720 });
   await expect(retained).toBeVisible();
   expect(await retained.evaluate(element => ({ left: (element as HTMLElement).style.left, top: (element as HTMLElement).style.top }))).toEqual({ left: before.left, top: before.top });

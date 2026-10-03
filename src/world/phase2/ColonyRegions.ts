@@ -93,7 +93,9 @@ export function colonySurveySites(seed: string): readonly ColonySurveySite[] {
 }
 export type ColonyWeather = "clear" | "mist-rain" | "dry-wind";
 /** Content-v2 surface rules are a separate overlay: generated v3/v4 bases and entity IDs stay unchanged. */
-export function colonyLandscapeTerrainAt(seed:string,point:WorldPosition,base:'ground'|'water'):'ground'|'water'{
+export function colonyLandscapeTerrainAt(seed:string,point:WorldPosition,base:'ground'|'water',generationVersion=4):'ground'|'water'{
+  // V5 stores its river raster in the generated base; do not add legacy stripes.
+  if(generationVersion>=5)return base;
   if(base==='water'||colonyBiomeAt(seed,point)!=='mist-marsh'||Math.hypot(point.x,point.y)<110)return base;
   const cell={x:Math.floor(point.x/4)*4+2,y:Math.floor(point.y/4)*4+2},oriented=rotate(cell,seedQuadrant(seed));
   const bend=((Math.floor(oriented.y/32)%3)+3)%3;

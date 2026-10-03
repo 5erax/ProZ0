@@ -197,6 +197,7 @@ export class Phase1VerticalSliceWorldAdapter
     WorldCollisionQuery {
   private readonly activeChunks = new Map<string, Phase1WorldChunkView>();
   private readonly activeCoords = new Map<string, ChunkCoord>();
+  private generatedEntities: readonly Readonly<Phase1GeneratedWorldEntity>[] | null = null;
   private readonly drops = new Map<string, MutableWorldDrop>();
   private readonly predators = new Map<string, MutablePredator>();
   private readonly dropReservations = new Map<string, WorldPosition>();
@@ -271,6 +272,7 @@ export class Phase1VerticalSliceWorldAdapter
     const view = await this.options.store.requestActive(coord);
     this.activeChunks.set(key, view);
     this.activeCoords.set(key, coord);
+    this.generatedEntities = null;
     this.indexHostiles(view);
     return view;
   }
@@ -279,6 +281,7 @@ export class Phase1VerticalSliceWorldAdapter
     const coords = [...this.activeCoords.values()];
     this.activeChunks.clear();
     this.activeCoords.clear();
+    this.generatedEntities = null;
 
     for (const coord of coords) {
       await this.options.store.releaseInterest(coord);
@@ -291,6 +294,7 @@ export class Phase1VerticalSliceWorldAdapter
     await this.options.store.releaseInterest(coord);
     this.activeChunks.delete(key);
     this.activeCoords.delete(key);
+    this.generatedEntities = null;
   }
 
   public getActiveChunkViews(): readonly Readonly<Phase1WorldChunkView>[] {
@@ -308,13 +312,15 @@ export class Phase1VerticalSliceWorldAdapter
   }
 
   public getActiveGeneratedEntities(): readonly Readonly<Phase1GeneratedWorldEntity>[] {
+    const allActive = [...this.activeCoords.values()].every(coord => this.options.store.getMeta(coord)?.lifecycle === 'ACTIVE');
+    if (this.generatedEntities && allActive) return this.generatedEntities;
     const values: Phase1GeneratedWorldEntity[] = [];
     for (const coord of this.activeCoords.values()) {
       const view = this.options.store.query(coord);
       if (view === undefined) continue;
       values.push(...view.base.entities);
     }
-    return Object.freeze(
+    const result = Object.freeze(
       values
         .sort((left, right) => left.entityId.localeCompare(right.entityId))
         .map((entry) => Object.freeze({
@@ -322,6 +328,8 @@ export class Phase1VerticalSliceWorldAdapter
           position: createWorldPosition(entry.position.x, entry.position.y),
         })),
     );
+    this.generatedEntities = allActive ? result : null;
+    return result;
   }
 
   public findGeneratedEntityByDefinition(
@@ -1135,7 +1143,7 @@ export class Phase1VerticalSliceWorldAdapter
     const base=view.base.terrain.cells[
       cellY * view.base.terrain.cellsPerAxis + cellX
     ]!;
-    return (this.options.colonyTerrainRulesEnabled?colonyLandscapeTerrainAt(this.options.colonyWorldSeed!,position,base):base)==='ground';
+    return (this.options.colonyTerrainRulesEnabled?colonyLandscapeTerrainAt(this.options.colonyWorldSeed!,position,base,view.base.generationVersion):base)==='ground';
   }
 
   private isPositionExplored(position: WorldPosition): boolean {

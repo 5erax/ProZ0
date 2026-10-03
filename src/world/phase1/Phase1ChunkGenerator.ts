@@ -5,6 +5,7 @@ import type {
   ContentId,
 } from '../../content';
 import {colonyBiomeAt} from '../phase2/ColonyRegions';
+import { colonyRiverTerrainAt } from '../phase2/ColonyHydrology';
 import {
   DeterministicRng,
   RNG_ALGORITHM_VERSION,
@@ -40,6 +41,7 @@ import type {
 
 export const PHASE1_WORLD_GENERATION_VERSION = 3 as const;
 export const COLONY_WORLD_GENERATION_VERSION = 4 as const;
+export const COLONY_RIVER_GENERATION_VERSION = 5 as const;
 // The Phase 1 generator-version identity is intentionally the same version.
 // Any intentional change to deterministic generated base/entity identity must
 // increment PHASE1_WORLD_GENERATION_VERSION.
@@ -283,7 +285,7 @@ function waterAt(position: WorldPosition): boolean {
   return dx * dx + dy * dy <= WATER_RADIUS_WORLD_UNITS ** 2;
 }
 
-function generateTerrain(coord: ChunkCoord) {
+function generateTerrain(coord: ChunkCoord, seed: string, generationVersion: number) {
   const cells: Phase1TerrainCell[] = [];
 
   for (
@@ -302,7 +304,7 @@ function generateTerrain(coord: ChunkCoord) {
         coord.y * CHUNK_SPAN_WORLD_UNITS
           + (cellY + 0.5) * PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,
       );
-      cells.push(waterAt(position) ? 'water' : 'ground');
+      cells.push(waterAt(position) || (generationVersion === COLONY_RIVER_GENERATION_VERSION && colonyRiverTerrainAt(seed, position) === 'water') ? 'water' : 'ground');
     }
   }
 
@@ -628,6 +630,7 @@ function baseFingerprint(
   content: ContentCompatibilityIdentityV1,
   terrainCells: readonly Phase1TerrainCell[],
   entities: readonly Phase1GeneratedWorldEntity[],
+  identityVersion: number = PHASE1_WORLD_GENERATION_VERSION,
 ): string {
   const hash = fnv1a32(
     canonicalBaseDescription(terrainCells, entities),
@@ -636,7 +639,7 @@ function baseFingerprint(
   return [
     'phase1-base-v1',
     PHASE1_BASE_FINGERPRINT_ALGORITHM,
-    `generation-${PHASE1_WORLD_GENERATION_VERSION}`,
+    `generation-${identityVersion}`,
     content.canonicalFingerprint,
     hash,
   ].join(':');
@@ -669,7 +672,7 @@ export class Phase1ChunkGenerator implements ChunkGenerator {
   public generate(
     request: ChunkGenerationRequest,
   ): Phase1GeneratedChunkBase {
-    if (request.generationVersion !== PHASE1_WORLD_GENERATION_VERSION && request.generationVersion !== COLONY_WORLD_GENERATION_VERSION) {
+    if (request.generationVersion !== PHASE1_WORLD_GENERATION_VERSION && request.generationVersion !== COLONY_WORLD_GENERATION_VERSION && request.generationVersion !== COLONY_RIVER_GENERATION_VERSION) {
       throw new RangeError(
         `Unsupported Phase 1 generation version ${request.generationVersion}; expected ${PHASE1_WORLD_GENERATION_VERSION}.`,
       );
@@ -696,15 +699,20 @@ export class Phase1ChunkGenerator implements ChunkGenerator {
       rng.nextUint32(),
     ]) as readonly [number, number, number, number];
 
-    const terrain = generateTerrain(coord);
+    const terrain = generateTerrain(coord, request.worldSeed, request.generationVersion);
     const legacyEntities = generateEntities(
       request.worldSeed,
       coord,
       this.catalog,
     );
-    const entities=request.generationVersion===COLONY_WORLD_GENERATION_VERSION
+    const colonyEntities=request.generationVersion>=COLONY_WORLD_GENERATION_VERSION
       ? Object.freeze([...legacyEntities,...colonyResourceClusters(request.worldSeed,coord,this.catalog,legacyEntities)].sort((a,b)=>a.entityId.localeCompare(b.entityId)))
       : legacyEntities;
+    // V5 has a new deterministic terrain contract. Existing IDs are retained for
+    // candidates on dry ground; plants/minerals are never generated in the river.
+    const entities = request.generationVersion === COLONY_RIVER_GENERATION_VERSION
+      ? Object.freeze(colonyEntities.filter(entity => entity.type !== 'resource' || entity.definitionId === 'resource:potable-water-source' || colonyRiverTerrainAt(request.worldSeed, entity.position) === 'ground'))
+      : colonyEntities;
 
     return Object.freeze({
       coord,
@@ -718,6 +726,7 @@ export class Phase1ChunkGenerator implements ChunkGenerator {
         this.catalog.compatibility,
         terrain.cells,
         entities,
+        request.generationVersion === COLONY_RIVER_GENERATION_VERSION ? COLONY_RIVER_GENERATION_VERSION : PHASE1_WORLD_GENERATION_VERSION,
       ),
       terrain,
       entities,

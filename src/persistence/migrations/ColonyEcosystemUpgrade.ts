@@ -1,5 +1,5 @@
 import type {ContentCatalogV1} from '../../content';
-import {Phase1ChunkGenerator,COLONY_WORLD_GENERATION_VERSION,PHASE1_WORLD_GENERATION_VERSION} from '../../world/phase1/Phase1ChunkGenerator';
+import {Phase1ChunkGenerator,COLONY_WORLD_GENERATION_VERSION,COLONY_RIVER_GENERATION_VERSION,PHASE1_WORLD_GENERATION_VERSION} from '../../world/phase1/Phase1ChunkGenerator';
 import {createChunkCoord} from '../../world/chunks/ChunkCoord';
 import {reconstructPhase1ReopenState,type Phase1ReopenState} from '../integration/Phase1ReopenState';
 import {createPhase1SaveV2Compatibility} from '../validation/SaveValidatorV2';
@@ -7,7 +7,7 @@ import {createPhase1SaveV2Compatibility} from '../validation/SaveValidatorV2';
 /** Explicit additive v3 -> v4 upgrade: legacy terrain, identities and deltas stay;
  * only new ecosystem nodes receive initial state. Saved inventory is never granted. */
 export function upgradeColonyEcosystem(reopen:Phase1ReopenState,catalog:ContentCatalogV1):Phase1ReopenState{
-  if(reopen.bundle.world.generationVersion===COLONY_WORLD_GENERATION_VERSION)return reopen;
+  if(reopen.bundle.world.generationVersion===COLONY_WORLD_GENERATION_VERSION || reopen.bundle.world.generationVersion===COLONY_RIVER_GENERATION_VERSION)return reopen;
   if(reopen.bundle.world.generationVersion!==PHASE1_WORLD_GENERATION_VERSION)throw Error('Unsupported ecosystem upgrade source');
   const generator=new Phase1ChunkGenerator(catalog);
   const chunks=reopen.bundle.chunks.map(record=>{

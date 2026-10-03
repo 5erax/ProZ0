@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 async function walk(page: Page, x: number, y: number) {
   let held: string[] = [];
+  let last = { x: NaN, y: NaN };
   try {
     for (let n = 0; n < 1500; n++) {
       const p = await page.locator('canvas').evaluate((e) => ({
@@ -11,7 +12,9 @@ async function walk(page: Page, x: number, y: number) {
       }));
       const dx = x - p.x,
         dy = y - p.y;
-      if (Math.hypot(dx, dy) < 0.15) return;
+      last = p;
+      const remaining = Math.hypot(dx, dy);
+      if (remaining < 0.2) return;
       const keys =
         Math.abs(dx) >= Math.abs(dy)
           ? dx > 0
@@ -25,9 +28,11 @@ async function walk(page: Page, x: number, y: number) {
         for (const k of keys) await page.keyboard.down(k);
         held = keys;
       }
-      await page.waitForTimeout(80);
+      // Shorten the final approach rather than oscillating past a close target
+      // on runners that process several authority ticks per browser command.
+      await page.waitForTimeout(remaining < .75 ? 20 : 80);
     }
-    throw Error('Natural walk could not reach ' + String(x) + ',' + String(y));
+    throw Error('Natural walk could not reach ' + String(x) + ',' + String(y) + '; last ' + last.x + ',' + last.y);
   } finally {
     for (const k of held) await page.keyboard.up(k);
   }

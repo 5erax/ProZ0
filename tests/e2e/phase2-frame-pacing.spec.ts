@@ -10,6 +10,7 @@ import {
   validatePortableSaveBundleV2,
 } from "../../src/persistence";
 import { colonySurveySites } from "../../src/world/phase2/ColonyRegions";
+import { colonyRiverLandmarks } from '../../src/world/phase2/ColonyHydrology';
 
 test("full scene frame pacing: colony regions, recurring weather and moving authority preserve the accepted budget", async ({
   page,
@@ -17,6 +18,8 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
   test.setTimeout(120_000);
   const directory = resolve("test-results/phase2-frame-pacing");
   mkdirSync(directory, { recursive: true });
+  const profiler = process.env.P2_PROFILE === '1' ? await page.context().newCDPSession(page) : null;
+  if (profiler) await profiler.send('Profiler.enable');
   const sites = colonySurveySites("p1-world-golden");
   const reports: unknown[] = [];
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -26,31 +29,37 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       position: { x: 18, y: 10 },
       tick: 1,
       weather: "clear",
+      dayPeriod: 'day',
     },
     {
       name: "marsh-rain",
       position: sites[0]!.position,
-      tick: 153_000,
+      tick: 99_000,
       weather: "mist-rain",
+      dayPeriod: 'day',
     },
     {
       name: "badlands-wind",
       position: sites[1]!.position,
-      tick: 153_000,
+      tick: 99_000,
       weather: "dry-wind",
+      dayPeriod: 'day',
     },
     {
       name: "marsh-night-rain",
       position: sites[0]!.position,
-      tick: 135_000,
+      tick: 153_000,
       weather: "mist-rain",
+      dayPeriod: 'night',
     },
+    { name: 'river-crossing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day' },
+    { name: 'legacy-v4-sized', position: { x: 18, y: 10 }, tick: 1, weather: 'clear', dayPeriod: 'day', generationVersion: 4 },
   ]) {
     const dbName = "p2-fps:" + scene.name;
     const bundle = await Phase1AuthorityBundle.create({
       worldId: dbName,
       worldSeed: "p1-world-golden",
-      worldGenerationVersion: 4,
+      worldGenerationVersion: scene.generationVersion ?? 5,
       resourceProfileVersion: 1,
       playerIds: ["observer"],
       colonyDepthEnabled: true,
@@ -158,6 +167,8 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
       "data-regional-weather",
       scene.weather,
     );
+    await expect(page.locator('canvas')).toHaveAttribute('data-day-period', scene.dayPeriod);
+    if (scene.name === 'river-crossing') await expect(page.locator('[data-world-role="terrain"][data-water-kind="river"]').first()).toBeVisible();
     if(scene.weather==='dry-wind'){
       await expect(page.locator('[data-weather-effect="cold-rain"]')).toHaveCount(0);
       await expect(page.locator('[data-weather-effect="dry-wind"]')).toBeVisible();
@@ -169,6 +180,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     await page.waitForTimeout(500);
     await page.screenshot({ path: resolve(directory, scene.name + ".png") });
     for (const moving of [false, true]) {
+      if (profiler) await profiler.send('Profiler.start');
       const report = await page.evaluate(async (move) => {
         const canvas = document.querySelector<HTMLCanvasElement>("canvas")!;
         const tick = Number(canvas.dataset.authorityTick),
@@ -226,13 +238,14 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
           viewport: [innerWidth, innerHeight],
         };
       }, moving);
-      reports.push({ scene: scene.name, moving, ...report });
+      if (profiler) writeFileSync(resolve(directory, scene.name + '-' + String(moving) + '.cpuprofile'), JSON.stringify((await profiler.send('Profiler.stop')).profile));
+      reports.push({ scene: scene.name, moving, generationVersion: request.world.generationVersion, resourceProfileVersion: request.world.environment.resourceProfileVersion, ...report });
       writeFileSync(
         resolve(directory, "frames.json"),
         JSON.stringify(
           {
             sourceHeadSha: process.env.P0_TEST_HEAD_SHA ?? "local-working-tree",
-            fixture: "canonical Save V2 scene setup; generation 4; resource profiles v1; expedition/living enabled",
+            fixture: "canonical Save V2 scene setup; generation 5 plus legacy v4; resource profiles v1; expedition/living enabled",
             generationVersion: request.world.generationVersion,
             resourceProfileVersion: request.world.environment.resourceProfileVersion,
             threshold: { fpsMinimum: 50, p95MaximumMs: 34 },

@@ -71,6 +71,7 @@ export function colonyHostedScene(
             Math.floor(local.y / view.base.terrain.cellSizeWorldUnits) * axis +
               Math.floor(local.x / view.base.terrain.cellSizeWorldUnits)
           ]!,
+          view.base.generationVersion,
         ),
       });
     }
@@ -240,6 +241,7 @@ export function colonyHostedMap(bundle: Phase1AuthorityBundle) {
             bundle.config.worldSeed,
             { x: wx, y: wy },
             base,
+            view.base.generationVersion,
           ),
         });
       }

@@ -16,6 +16,7 @@ import {
 } from './Phase1ProductionAssets';
 
 import { expeditionSprite } from './ExpeditionAssets';
+import { createCanvasBounds } from './CanvasBounds';
 
 /** Presentation only: every material change runs through the solo authority. */
 export function createExpeditionOverlay(
@@ -27,6 +28,7 @@ export function createExpeditionOverlay(
 ) {
   const document = root.ownerDocument,
     authority = bundle.expedition!;
+  const bounds = createCanvasBounds(root, canvas);
   const style = document.createElement('style');
   style.textContent =
     '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-ghost{position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;z-index:1}.sp-ghost svg{position:absolute;inset:0}.sp-ghost .sp-facility-art{position:absolute;left:16px;bottom:20px;opacity:.65}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
@@ -630,8 +632,8 @@ export function createExpeditionOverlay(
         bundle.buildings.getBuildRevision(),
       );
     }
-    const canvasRect = canvas.getBoundingClientRect(),
-      rootRect = root.getBoundingClientRect(),
+    const viewport = bounds.read(), canvasRect = viewport.canvas,
+      rootRect = viewport.root,
       camera = bundle.getPlayerPosition(playerId);
     renderPreview();
     for (const marker of Array.from(markers.children) as HTMLElement[]) {
@@ -666,8 +668,8 @@ export function createExpeditionOverlay(
       ghost.hidden = true;
       return;
     }
-    const rect = canvas.getBoundingClientRect(),
-      base = root.getBoundingClientRect();
+    const viewport = bounds.read(), rect = viewport.canvas,
+      base = viewport.root;
     const sx = ((cursor.x - rect.left) * 640) / rect.width,
       sy = ((cursor.y - rect.top) * 360) / rect.height;
     if (sx < 0 || sx > 640 || sy < 0 || sy > 360) {
@@ -764,7 +766,7 @@ export function createExpeditionOverlay(
       )
     )
       return;
-    const rect = canvas.getBoundingClientRect();
+    const rect = bounds.read().canvas;
     const x = ((event.clientX - rect.left) * 640) / rect.width,
       y = ((event.clientY - rect.top) * 360) / rect.height;
     if (x < 0 || x > 640 || y < 0 || y > 360) return;
@@ -831,6 +833,7 @@ export function createExpeditionOverlay(
     cancelPlacement: () => { if (placement) close(); },
     render,
     destroy() {
+      bounds.destroy();
       root.removeEventListener('pointermove', pointer);
       root.removeEventListener('click', click, true);
       document.removeEventListener('keydown', key, true);

@@ -3,6 +3,8 @@ import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content
 import { sizedResourceSprite, sizedResourceHitShape } from '../presentation/ResourceSizeArt';
 import { moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { colonyGroundSprite } from '../presentation/ColonySoilArt';
+import { colonyWaterSprite } from '../presentation/ColonyWaterArt';
+import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import { heldSpearSprite } from '../presentation/EquipmentArt';
@@ -546,6 +548,7 @@ export function createPhase1ProductReviewWorldRenderer(
   getPlayerMotions: () => readonly Readonly<PlayerMotionViewV1>[] =
     () => Object.freeze([]),
 ): Phase1ProductReviewWorldRenderer {
+  const generationVersion = bundle.getWorldCompatibility().worldGenerationVersion;
   const document = root.ownerDocument;
   const targetWindow = document.defaultView ?? window;
   const canvas = document.createElement('canvas');
@@ -608,7 +611,7 @@ export function createPhase1ProductReviewWorldRenderer(
   };
   const applySprite = (element: HTMLElement, definition: Phase1ProductionSprite,
     scale = 1, flipX = false): void => {
-    const key = [definition.url, definition.index, definition.cellWidth,
+    const key = [definition.assetPath, definition.index, definition.cellWidth,
       definition.cellHeight, definition.sourceWidth, definition.sourceHeight, scale, flipX].join(':');
     if (spriteKeys.get(element) === key) return;
     applyProductionSprite(element, definition, scale, flipX);
@@ -652,26 +655,26 @@ export function createPhase1ProductReviewWorldRenderer(
   ): HTMLElement | null => {
     if (!inViewport(position, camera)) return null;
     const element = sceneElement('sprite:' + role + ':' + id);
-    element.className =
+    const className =
       'p1-product-sprite'
       + (options.className === undefined
         ? ''
-        : ' ' + options.className);
+        : ' ' + options.className) + (id === getPresentationContext().focusedWorldTargetId ? ' p1-product-focused-target' : '');
+    if (element.className !== className) element.className = className;
     const focused = id === getPresentationContext().focusedWorldTargetId;
     if (focused) {
-      element.classList.add('p1-product-focused-target');
-      element.dataset.focusedTarget = 'true';
+      if (element.dataset.focusedTarget !== 'true') element.dataset.focusedTarget = 'true';
     }
-    if (!focused) delete element.dataset.focusedTarget;
-    element.dataset.worldRole = role;
-    element.dataset.worldId = id;
+    if (!focused && element.dataset.focusedTarget !== undefined) delete element.dataset.focusedTarget;
+    if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
+    if (element.dataset.worldId !== id) element.dataset.worldId = id;
     const data = options.data ?? {};
     for (const key of spriteDataKeys.get(element) ?? []) {
       if (!(key in data)) delete element.dataset[key];
     }
     spriteDataKeys.set(element, Object.keys(data));
     for (const [key, value] of Object.entries(data)) {
-      element.dataset[key] = value;
+      if (element.dataset[key] !== value) element.dataset[key] = value;
     }
     applySprite(
       element,
@@ -743,36 +746,52 @@ export function createPhase1ProductReviewWorldRenderer(
         const baseTerrain = known
           ? terrainForCell(bundle, gx, gy)
           : 'ground';
-        const terrain=known&&bundle.config.colonyDepthEnabled===true?colonyLandscapeTerrainAt(bundle.config.worldSeed,position,baseTerrain):baseTerrain;
+        const terrain=known&&bundle.config.colonyDepthEnabled===true?colonyLandscapeTerrainAt(bundle.config.worldSeed,position,baseTerrain,generationVersion):baseTerrain;
         const variant = terrain === 'water'
           ? Math.floor(authorityTick / 15)
           : (stableDecorHash(Math.floor(gx / 3), Math.floor(gy / 3))
             + (stableDecorHash(gx, gy) % 7 === 0 ? 1 : 0)) % 4;
         if (known) {
         const tile = sceneElement('terrain:' + String(gx) + ':' + String(gy));
-        tile.className = 'p1-product-terrain';
-        tile.dataset.worldRole = 'terrain';
-        tile.dataset.terrainState = terrain;
+        if (tile.dataset.worldRole !== 'terrain') {
+          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED';
+        }
+        if (tile.dataset.terrainState !== terrain) tile.dataset.terrainState = terrain;
         if(bundle.livingWorld && terrain!=='water' && !tile.dataset.soil)tile.dataset.soil=soilAt(bundle.config.worldSeed,position).id;
-        if(bundle.config.colonyDepthEnabled===true)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
-        tile.dataset.explorationState =
-          known ? 'EXPLORED' : 'UNEXPLORED';
+        if(bundle.config.colonyDepthEnabled===true && !tile.dataset.biome)tile.dataset.biome=colonyBiomeAt(bundle.config.worldSeed,position);
+        let groundShore = 0;
+        if (terrain === 'ground') for (const [bit, dx, dy] of [[1,1,0],[2,0,1]] as const) {
+          if (!explorationCellKnown(bundle, gx + dx, gy + dy)) continue;
+          const neighbor = worldCell(gx + dx, gy + dy), base = terrainForCell(bundle, gx + dx, gy + dy);
+          if ((bundle.config.colonyDepthEnabled === true ? colonyLandscapeTerrainAt(bundle.config.worldSeed, neighbor, base, generationVersion) : base) === 'water') groundShore |= 1 << bit;
+        }
+        let waterArt: Phase1ProductionSprite | null = null;
+        if (terrain === 'water' && generationVersion >= 5) {
+          const sample = colonyWaterAt(bundle.config.worldSeed, position);
+          let shoreMask = 0;
+          for (const [bit, dx, dy] of [[0,0,-1],[1,1,0],[2,0,1],[3,-1,0]] as const) {
+            if (explorationCellKnown(bundle, gx + dx, gy + dy) && terrainForCell(bundle, gx + dx, gy + dy) === 'ground') shoreMask |= 1 << bit;
+          }
+          const flowDirection = sample ? (Math.abs(sample.flow.x) > Math.abs(sample.flow.y) ? sample.flow.x > 0 ? 0 : 2 : sample.flow.y > 0 ? 1 : 3) : 0;
+          waterArt = colonyWaterSprite(colonyBiomeAt(bundle.config.worldSeed, position), shoreMask, Math.floor(authorityTick / 15), flowDirection, sample?.crossing ?? false);
+          if (!tile.dataset.waterKind) { tile.dataset.waterKind = sample?.kind ?? 'spring'; tile.dataset.waterDepth = sample ? sample.depthMeters.toFixed(2) : 'shallow'; }
+        }
         applySprite(
           tile,
           bundle.config.colonyDepthEnabled===true
-            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', stableDecorHash(gx, gy) % 8, moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000))) : colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
+            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', stableDecorHash(gx, gy) % 8, moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
             : terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
-        tile.style.filter = night ? 'brightness(.78) saturate(.72)' : '';
-        tile.dataset.moisture = moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000));
-        tile.style.boxShadow = '';
-        delete tile.dataset.terrainDepth;
-        if (known && terrain === 'ground' && explorationCellKnown(bundle, gx, gy + 1)
-          && terrainForCell(bundle, gx, gy + 1) === 'water') {
-          tile.style.boxShadow = '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e';
-          tile.style.zIndex = '-90000';
-          tile.dataset.terrainDepth = 'raised-shore';
+        const filter = night ? 'brightness(.78) saturate(.72)' : '';
+        if (tile.style.filter !== filter) tile.style.filter = filter;
+        const moisture = moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000));
+        if (tile.dataset.moisture !== moisture) tile.dataset.moisture = moisture;
+        const raisedShore = groundShore !== 0;
+        if (raisedShore && tile.dataset.terrainDepth !== 'raised-shore') {
+          tile.style.boxShadow = bundle.config.colonyDepthEnabled === true ? '' : '0 3px 0 #38483f,0 6px 0 #203332,0 7px 0 #17282e'; tile.dataset.terrainDepth = 'raised-shore';
+        } else if (!raisedShore && tile.dataset.terrainDepth !== undefined) {
+          tile.style.boxShadow = ''; delete tile.dataset.terrainDepth;
         }
         if (known &&
           setWorldCenter(
@@ -1166,7 +1185,10 @@ export function createPhase1ProductReviewWorldRenderer(
 
     const camera = bundle.getPlayerPosition(playerId);
     const nextCameraDepth = Math.round((camera.x + camera.y) * 1000);
-    if (nextCameraDepth !== cameraDepth) { cameraDepth = nextCameraDepth; worldStage.style.setProperty('--world-camera-depth', String(cameraDepth)); }
+    // The shared depth origin only prevents large-coordinate underflow; relative
+    // ordering does not depend on following each camera step. Rebase with 32 m
+    // hysteresis so motion does not invalidate every descendant's z-index at 60 Hz.
+    if (!Number.isFinite(cameraDepth) || Math.abs(nextCameraDepth - cameraDepth) > 32000) { cameraDepth = nextCameraDepth; worldStage.style.setProperty('--world-camera-depth', String(cameraDepth)); }
     const living = bundle.livingWorld?.presentationSnapshot();
     if (living && living.revision !== soilRevision) {
       soilRevision = living.revision; soilMoistures.clear();
@@ -1182,8 +1204,16 @@ export function createPhase1ProductReviewWorldRenderer(
     if (environment.brightness !== undefined) {
       const brightness = Math.round(environment.brightness * 200) / 200;
       if (worldStage.dataset.brightness !== String(brightness)) {
-        worldStage.style.filter = `brightness(${brightness})`;
         worldStage.dataset.brightness = String(brightness);
+      }
+      // An ancestor brightness filter re-rasterizes the entire moving SVG/DOM
+      // world when an actor changes. A screen-space black alpha layer gives the
+      // same RGB attenuation without putting the world inside a filter surface.
+      if (brightness < 1) {
+        const daylight = sceneElement('daylight');
+        daylight.style.cssText = 'position:absolute;inset:0;z-index:740000;pointer-events:none;background:rgba(0,0,0,' + String(1 - brightness) + ')';
+        daylight.dataset.worldLighting = 'calendar';
+        appendScene(daylight, true);
       }
       canvas.dataset.timeSegment = environment.timeSegment;
       canvas.dataset.calendarDay = String(environment.dayIndex);

@@ -187,9 +187,7 @@ export function createLivingWorldOverlay(
     const state = authority.presentationSnapshot(),
       p = bundle.getPlayerPosition(player),
       s = authority.season(),
-      inventory = bundle.items.getContainerView('inventory:' + player),
-      rect = canvas.getBoundingClientRect(),
-      base = root.getBoundingClientRect();
+      inventory = bundle.items.getContainerView('inventory:' + player);
     season.dataset.season = s.id;
     if (root.dataset.livingSeason !== s.id) root.dataset.livingSeason = s.id;
     for (let i = 0; i < particles.length; i++) {
@@ -318,6 +316,7 @@ export function createLivingWorldOverlay(
       }
     motion.retain(visible);
     if (placing && cursor) {
+      const rect = canvas.getBoundingClientRect(), base = root.getBoundingClientRect();
       const point = unprojectPhase1Isometric(
           {
             x: ((cursor.x - rect.left) * 640) / rect.width - 320,
