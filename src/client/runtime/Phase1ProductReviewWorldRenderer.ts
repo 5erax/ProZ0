@@ -7,6 +7,7 @@ import { colonyWaterSprite } from '../presentation/ColonyWaterArt';
 import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
+import { explorationSiteSprite } from '../presentation/ExplorationArt';
 import { heldSpearSprite } from '../presentation/EquipmentArt';
 import { worldDepthOrder } from '../presentation/WorldDepth';
 import {
@@ -14,7 +15,7 @@ import {
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
-import { colonyBiomeAt, colonySurveySites, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
+import { colonyBiomeAt, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
 import { colonyTerrainSprite, colonyLandmarkSprite, colonyResourceSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
@@ -1226,9 +1227,14 @@ export function createPhase1ProductReviewWorldRenderer(
     const raining = regionalWeather === null ? environment.coldRainStatus === 'active' : regionalWeather.weather === 'mist-rain';
     if(regionalWeather!==null){
       canvas.dataset.biome=regionalWeather.biomeId;canvas.dataset.regionalWeather=regionalWeather.weather;
-      for(const site of colonySurveySites(bundle.config.worldSeed)){
+      for(const site of bundle.colonyDepth.sites()){
         if(!worldPositionKnown(bundle,site.position))continue;
-        renderSprite(colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED'})});
+        const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
+        if(rendered && site.template){
+          rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';
+          rendered.setAttribute('aria-label','Explore '+site.name);rendered.title='Explore '+site.name+' · approach to inspect';
+          rendered.style.clipPath='polygon(0 25%,100% 25%,100% 100%,0 100%)';
+        }
       }
     }
 

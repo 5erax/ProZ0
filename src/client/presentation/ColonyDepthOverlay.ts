@@ -1,3 +1,5 @@
+import { EXPLORATION_TEMPLATES } from '../../content/phase2/ExplorationContent';
+import { explorationSiteSprite } from './ExplorationArt';
 import type { Phase1AuthorityBundle } from "../../integration";
 import {
   COLONY_BIOMES,
@@ -5,7 +7,6 @@ import {
   COLONY_RESEARCH,
 } from "../../content/phase2/ColonyDepthContent";
 import {
-  colonySurveySites,
   colonyWeatherAt,
 } from "../../world/phase2/ColonyRegions";
 import {
@@ -22,8 +23,18 @@ export function createColonyDepthOverlay(
   bundle: Phase1AuthorityBundle,
   playerId: string,
   onOpen: () => void = () => {},
-): { render(): void; close(): void; destroy(): void } {
+): { render(): void; close(): void; openSite(id: string): void; destroy(): void } {
   const document = root.ownerDocument;
+  const reasonText: Record<string,string> = {
+    TARGET_CAPACITY_WEIGHT:'Your bag is too heavy. Store items and return; these supplies will remain here.',
+    TARGET_CAPACITY_VOLUME:'Your bag has no space. Store items and return; these supplies will remain here.',
+    OUT_OF_RANGE:'Move closer to this site.', SITE_BLOCKED_OR_UNEXPLORED:'Explore this site and clear buildings from its approach first.',
+    INSPECT_SITE_FIRST:'Inspect this site first.', RESTORE_SITE_FIRST:'Restore this site first.', FIELD_TOOL_REQUIRED:'Carry a usable Stone Field Tool.',
+    ALREADY_RESTORED:'This site has already been restored.', SUPPLIES_ALREADY_RECOVERED:'These finite supplies have already been recovered.',
+    STALE_REVISION:'The world changed. Please try again.', STALE_INVENTORY_REVISION:'Your bag changed. Please try again.', PLAYER_DEAD:'You cannot do this while incapacitated.',
+    RETURN_TO_BASE:'Use the landing lab or a restored field laboratory.',
+  };
+  const explain = (reason: string): string => {const missing=/^NEED (item:[a-z-]+) ×(\d+)$/.exec(reason);return missing && bundle.catalog.has(missing[1]!) ? 'Need '+missing[2]+' '+bundle.catalog.get(missing[1]!).displayName+'.' : reasonText[reason] ?? reason.replaceAll('_',' ');};
   const container = document.createElement("section");
   container.className = "p2-colony-controls";
   container.setAttribute("aria-label", "Colony depth actions");
@@ -81,8 +92,8 @@ export function createColonyDepthOverlay(
     });
     feedback =
       result.status === "committed"
-        ? "✓ " + targetId.replaceAll("-", " ")
-        : result.reason.replaceAll("_", " ");
+        ? "✓ " + (bundle.colonyDepth.sites().find(s=>s.id===targetId)?.name ?? targetId.replaceAll("-", " "))
+        : explain(result.reason);
     signature = "";
     render();
   };
@@ -96,12 +107,15 @@ export function createColonyDepthOverlay(
     const button = document.createElement("button");
     button.textContent = label;
     button.disabled = disabled;
+    if(disabled)button.title='Move within interaction range and meet the displayed requirements.';
     button.dataset.colonyAction = action + ":" + targetId;
     button.addEventListener("click", () => run(action, targetId));
     parent.append(button);
   };
-  const sites = colonySurveySites(bundle.config.worldSeed);
+  const sites = bundle.colonyDepth.sites();
   function render(): void {
+    if(root.dataset.colonySettingsOpen === 'true') panel=null;
+    root.dataset.colonyDepthPanelOpen=String(panel!==null);
     const state = bundle.colonyDepth.read();
     const position = bundle.getPlayerPosition(playerId);
     const weather = colonyWeatherAt(
@@ -137,13 +151,19 @@ export function createColonyDepthOverlay(
           position.y - site.position.y,
         ) <= 1.25,
     );
+    const lab=bundle.colonyDepth.restoredSite('laboratory');
+    const labNearby=!!lab && Math.hypot(position.x-lab.position.x,position.y-lab.position.y)<=7.5 || (bundle.expedition?.hasRemoteLab(playerId) ?? false);
     const current = JSON.stringify([
       panel,
       state.revision,
       inventory.revision,
       nearSite?.id,
+      labNearby,
+      sites.map(s=>Math.hypot(position.x-s.position.x,position.y-s.position.y)<=4),
       Math.hypot(position.x, position.y) <= 7.5,
       feedback,
+      Math.ceil((bundle.expedition?.restStatus(playerId)?.remainingTicks ?? 0)/60),
+      bundle.expedition?.read().restCooldown[playerId],
     ]);
     if (current === signature) return;
     signature = current;
@@ -205,7 +225,7 @@ export function createColonyDepthOverlay(
           complete ||
             !eligible ||
             !affordable ||
-            Math.hypot(position.x, position.y) > 7.5,
+            Math.hypot(position.x, position.y) > 7.5 && !labNearby,
         );
         content.append(row);
       }
@@ -224,7 +244,7 @@ export function createColonyDepthOverlay(
           def.requiredResearch.replaceAll("-", " ") +
           " · " +
           String(def.requiredRegions) +
-          " visited regions · return to base. Choice is permanent.";
+          " visited regions · use a laboratory. Choice is permanent.";
         row.append(requirement);
         addButton(
           row,
@@ -233,7 +253,7 @@ export function createColonyDepthOverlay(
           id,
           !eligible ||
             state.professions[playerId] !== undefined ||
-            Math.hypot(position.x, position.y) > 7.5,
+            Math.hypot(position.x, position.y) > 7.5 && !labNearby,
         );
         content.append(row);
       }
@@ -243,6 +263,29 @@ export function createColonyDepthOverlay(
         const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
         row.dataset.discoveredLandmark=site.id;row.append(site.name+' · '+distance+' m');
         if(!state.inspectedSites.includes(site.id))addButton(row,'Inspect','inspect-site',site.id,Math.hypot(position.x-site.position.x,position.y-site.position.y)>1.25);
+        const template=EXPLORATION_TEMPLATES.find(t=>t.siteId===site.id),stage=bundle.colonyDepth.siteStage(site.id);
+        if(template && site.template){
+          const art=document.createElement('span');applyProductionSprite(art,explorationSiteSprite(site.template,stage),.75);row.prepend(art);
+          row.dataset.poiTemplate=site.template;row.dataset.poiStage=stage;
+          const objective=document.createElement('p');objective.textContent=template.objective;row.append(objective);
+          if(state.inspectedSites.includes(site.id)){
+            const effect=document.createElement('p');effect.textContent=stage==='unrestored'?'After restoration: '+template.effect:template.effect;row.append(effect);
+            if(stage==='unrestored'){
+              const costs=document.createElement('p');costs.textContent='Needs: '+template.costs.map(([id,q])=>bundle.catalog.get(id).displayName+' '+inventory.stacks.filter(s=>s.itemDefinitionId===id).reduce((sum,s)=>sum+s.quantity,0)+'/'+q).join(' · ')+(template.tool?' · Carry a usable '+bundle.catalog.get(template.tool).displayName:'');row.append(costs);
+              addButton(row,template.restoreLabel,'restore-site',site.id,Math.hypot(position.x-site.position.x,position.y-site.position.y)>4);
+            }else if(stage==='restored'){
+              const reward=document.createElement('p');reward.textContent='Finite supplies: '+template.reward.map(([id,q])=>q+' '+bundle.catalog.get(id).displayName).join(' · ');row.append(reward);addButton(row,'Recover supplies','recover-site',site.id,Math.hypot(position.x-site.position.x,position.y-site.position.y)>4);
+            }else { const exhausted=document.createElement('p');exhausted.textContent='Supplies recovered · this site does not refill.';row.append(exhausted); }
+            if(site.template==='shelter' && stage!=='unrestored'){
+              const sleep=document.createElement('button');sleep.textContent='Sleep / rest · 8s';sleep.disabled=Math.hypot(position.x-site.position.x,position.y-site.position.y)>4;sleep.addEventListener('click',()=>{const result=bundle.expedition!.interact({id:'poi:rest:'+bundle.authorityTick+':'+ ++ordinal,playerId,target:site.id,action:'rest',expectedRevision:bundle.expedition!.read().revision,expectedInventoryRevision:inventory.revision});feedback=result.status==='committed'?'Rest started · moving or danger cancels it.':explain(result.message);signature='';render();});row.append(sleep);
+              const rest=document.createElement('p');rest.dataset.poiRest='status';const remaining=bundle.expedition?.restStatus(playerId)?.remainingTicks;
+              rest.textContent=remaining!==undefined?'Resting · '+Math.ceil(remaining/60)+'s remaining':(bundle.expedition!.read().restCooldown[playerId]??0)>bundle.authorityTick?'Rest complete · recovery cooldown active.':'Rest available when safe and fed.';row.append(rest);
+            }
+            if(site.template==='relay' && stage!=='unrestored'){
+              const target=sites.find(s=>s.template==='laboratory')!,dx=target.position.x-position.x,dy=target.position.y-position.y;const signal=document.createElement('p');signal.dataset.relaySignal=target.id;signal.textContent='Recovered coordinate: '+target.name+' · '+Math.round(Math.hypot(dx,dy))+' m · '+(dy<0?'N':'S')+(dx<0?'W':'E')+' · '+target.position.x+', '+target.position.y;row.append(signal);
+            }
+          }
+        }
         content.append(row);
       }
       const regions = document.createElement("p");
@@ -299,10 +342,17 @@ export function createColonyDepthOverlay(
   render();
   return {
     render,
+    openSite(id: string) {
+      if(!sites.some(site=>site.id===id && bundle.world.isExploredPosition(site.position)))return;
+      panel='journal';feedback='';onOpen();signature='';render();
+      const row=Array.from(content.querySelectorAll<HTMLElement>('[data-discovered-landmark]')).find(e=>e.dataset.discoveredLandmark===id);
+      row?.scrollIntoView({block:'nearest'});row?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({preventScroll:true});
+    },
     close() { panel = null; signature = ''; render(); },
     destroy() {
       document.removeEventListener("keydown", onKey);
       audio.destroy();
+      delete root.dataset.colonyDepthPanelOpen;
       container.remove();
     },
   };

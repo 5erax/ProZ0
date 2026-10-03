@@ -9,9 +9,12 @@ import {
   createPhase1SaveV2Compatibility,
   validatePortableSaveBundleV2,
 } from "../../src/persistence";
+import { colonyExplorationSites } from '../../src/world/phase2/ColonyExplorationSites';
+import { EXPLORATION_TEMPLATES } from '../../src/content/phase2/ExplorationContent';
 import { colonySurveySites } from "../../src/world/phase2/ColonyRegions";
 import { colonyRiverLandmarks, colonyRiverTerrainAt } from '../../src/world/phase2/ColonyHydrology';
 
+interface FrameScene {name:string;position:{x:number;y:number};tick:number;weather:string;dayPeriod:string;generationVersion?:number;fishing?:boolean;gear?:boolean;poi?:'laboratory'|'garden'|'array'}
 test("full scene frame pacing: colony regions, recurring weather and moving authority preserve the accepted budget", async ({
   page,
 }) => {
@@ -23,7 +26,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
   const sites = colonySurveySites("p1-world-golden");
   const reports: unknown[] = [];
   await page.setViewportSize({ width: 1280, height: 720 });
-  for (const scene of [
+  const scenes:readonly FrameScene[] = [
     {
       name: "landing-clear",
       position: { x: 18, y: 10 },
@@ -55,8 +58,10 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     { name: 'river-crossing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day' },
     { name: 'river-fishing', position: colonyRiverLandmarks('p1-world-golden').crossings[0]!, tick: 1, weather: 'clear', dayPeriod: 'day', fishing: true },
     { name: 'equipped-mythic', position: { x:18, y:10 }, tick:1, weather:'clear', dayPeriod:'day', gear:true },
+    ...(['laboratory','garden','array'] as const).map(poi=>({name:'restored-'+poi,position:colonyExplorationSites('p1-world-golden',5).find(s=>s.template===poi)!.position,tick:poi==='array'?99_000:1,weather:poi==='array'?'dry-wind': 'clear',dayPeriod:'day',poi})),
     { name: 'legacy-v4-sized', position: { x: 18, y: 10 }, tick: 1, weather: 'clear', dayPeriod: 'day', generationVersion: 4 },
-  ]) {
+  ];
+  for (const scene of scenes) {
     const dbName = "p2-fps:" + scene.name;
     const bundle = await Phase1AuthorityBundle.create({
       worldId: dbName,
@@ -88,6 +93,11 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
         }
         expect(water).toBeDefined();
         expect(authority.execute({ id: 'fixture:active-cast', playerId: 'observer', expectedRevision: authority.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:observer').revision, action: 'cast', ...water! }).status).toBe('committed');
+      }
+      if (scene.poi) {
+        const template=EXPLORATION_TEMPLATES.find(t=>t.id===scene.poi)!;
+        expect(bundle.items.commitColonyExchange({operationId:'fixture:poi-performance',playerId:'observer',expectedInventoryRevision:bundle.items.getContainerView('inventory:observer').revision,inputs:[],outputs:template.costs.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity}))}).status).toBe('committed');
+        for(const action of ['inspect-site','restore-site'] as const)expect(bundle.colonyDepth.execute({operationId:'fixture:'+action,playerId:'observer',expectedRevision:bundle.colonyDepth.read().revision,expectedInventoryRevision:bundle.items.getContainerView('inventory:observer').revision,action,targetId:template.siteId}).status).toBe('committed');
       }
       if (scene.gear) {
         expect(bundle.items.commitColonyExchange({ operationId:'fixture:gear-performance', playerId:'observer',expectedInventoryRevision:bundle.items.getContainerView('inventory:observer').revision,inputs:[],outputs:[{itemDefinitionId:'item:mythic-relic-spear',quantity:1},{itemDefinitionId:'item:thermal-wrap',quantity:1}] }).status).toBe('committed');
@@ -193,6 +203,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
     );
     await expect(page.locator('canvas')).toHaveAttribute('data-day-period', scene.dayPeriod);
     if (scene.name === 'river-crossing') await expect(page.locator('[data-world-role="terrain"][data-water-kind="river"]').first()).toBeVisible();
+    if (scene.poi) await expect(page.locator('[data-world-role="survey-site"][data-poi-template="'+scene.poi+'"]')).toHaveAttribute('data-poi-stage','restored');
     if (scene.fishing) await expect(page.locator('[data-fishing-bobber]')).toBeVisible();
     if (scene.gear) { await expect(page.locator('[data-world-role="held-weapon-overlay"]')).toHaveAttribute('data-rarity','mythic'); await expect(page.locator('[data-world-role="thermal-wrap-overlay"]')).toBeVisible(); }
     if(scene.weather==='dry-wind'){

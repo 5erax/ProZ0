@@ -80,6 +80,9 @@ jobs:
             test-results/blueprint-replacement.png
             test-results/river-ui/
             test-results/fishing-ui/
+            test-results/exploration-sites/
+            test-results/exploration-natural/
+            test-results/exploration-narrow.png
           if-no-files-found: ignore
           retention-days: 30
 

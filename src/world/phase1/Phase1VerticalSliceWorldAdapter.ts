@@ -1127,6 +1127,7 @@ export class Phase1VerticalSliceWorldAdapter
   }
 
   /** Fishing reads canonical explored terrain, never presentation color or an unloaded chunk. */
+  public isExploredPosition(position: WorldPosition): boolean { return this.activeChunks.has(toChunkKey(fromWorldPosition(position))) && this.isPositionExplored(position); }
   public isExploredWater(position: WorldPosition): boolean {
     return this.activeChunks.has(toChunkKey(fromWorldPosition(position))) && this.isPositionExplored(position) && !this.isPositionBuildable(position);
   }

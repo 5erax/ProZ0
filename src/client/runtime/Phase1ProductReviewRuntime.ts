@@ -1392,7 +1392,9 @@ export async function createPhase1ProductReviewRuntime(
     return true;
   };
 
+  const explorationSiteTarget = () => bundle.colonyDepth.sites().find(site=>site.template && bundle.world.isExploredPosition(site.position) && distanceFromPlayerSquared(site.position.x,site.position.y)<=1.25**2);
   const refreshContextInteraction = (): void => {
+    if(root.dataset.colonyDepthPanelOpen==='true'){source.setInteraction(null);return;}
     if (activeGather !== null || activeConsume !== null) return;
 
     const drop = worldDropTarget();
@@ -1516,6 +1518,8 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
+    const exploration=explorationSiteTarget();
+    if(exploration){source.setInteraction(Object.freeze({inputLabel:'E',verb:'EXPLORE',target:exploration.name,state:'AVAILABLE',reason:null,progress:null}));return;}
     const site = colonySiteTarget();
     if (site !== null) {
       source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'COLONY', target: site,
@@ -1543,6 +1547,7 @@ export async function createPhase1ProductReviewRuntime(
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
     if (interactWithWorkbench()) return;
+    if(resourceTarget()===null){const site=explorationSiteTarget();if(site){colonyDepthOverlay?.openSite(site.id);return;}}
     if (colonySiteTarget() !== null) { actionPanel = 'colony'; refreshColonyPanel(); return; }
     beginGather();
   };
@@ -1897,7 +1902,8 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true')return;
+    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true')return;
+    if((event.code==='Enter'||event.code==='Space') && event.target instanceof Element && actionPanel===null){const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){event.preventDefault();colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}}
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
 
     if (source.isInventoryOpen()) {
@@ -2163,7 +2169,7 @@ export async function createPhase1ProductReviewRuntime(
   const autosaveCrossings = new ColonyAutosaveCrossings(dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0);
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
@@ -2220,7 +2226,8 @@ export async function createPhase1ProductReviewRuntime(
 
   const onPanelClick = (event: MouseEvent): void => {
     if (!(event.target instanceof Element)) return;
-    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true'){
+    if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true' && root.dataset.expeditionPanelOpen!=='true' && root.dataset.colonyDepthPanelOpen!=='true' && root.dataset.productReviewPanelOpen!=='true' && root.dataset.productReviewHelpOpen!=='true'){
+      const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}
       const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){beginGather(resource.dataset.worldId);return;}
     }
     const item = event.target.closest<HTMLElement>('[data-review-item]');

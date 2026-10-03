@@ -68,6 +68,7 @@ export interface ExpeditionServices {
   meal(playerId: string): boolean;
   weather(x: number, y: number): string;
   hostileNear(x: number, y: number): boolean;
+  siteShelter?(target: string): { readonly x: number; readonly y: number } | null;
 }
 export class ExpeditionAuthority {
   private readonly resting = new Map<
@@ -218,10 +219,11 @@ export class ExpeditionAuthority {
     const actor = this.actor(command.playerId);
     if (!actor.alive) return reject('PLAYER_DEAD');
     const facility = this.state.facilities.find((f) => f.id === command.target),
-      lab = command.target === 'landing-lab';
-    if (!facility && !lab) return reject('FACILITY_MISSING');
-    const x = lab ? 0 : facility!.x,
-      y = lab ? 0 : facility!.y;
+      lab = command.target === 'landing-lab',
+      siteShelter = command.action === 'rest' ? this.services.siteShelter?.(command.target) : null;
+    if (!facility && !lab && !siteShelter) return reject('FACILITY_MISSING');
+    const x = lab ? 0 : (facility ?? siteShelter)!.x,
+      y = lab ? 0 : (facility ?? siteShelter)!.y;
     if (Math.hypot(actor.x - x, actor.y - y) > 4) return reject('OUT_OF_RANGE');
     const inventory = this.items.getContainerView(
       'inventory:' + command.playerId,
@@ -231,7 +233,7 @@ export class ExpeditionAuthority {
     let next = this.state;
     let message: string;
     if (command.action === 'rest') {
-      if (!lab && facility?.definitionId !== 'camp-bed' && facility?.definitionId !== 'field-cabin')
+      if (!lab && !siteShelter && facility?.definitionId !== 'camp-bed' && facility?.definitionId !== 'field-cabin')
         return reject('BED_REQUIRED');
       if (this.resting.has(command.playerId)) return reject('ALREADY_RESTING');
       const survival = this.services.survival(command.playerId);

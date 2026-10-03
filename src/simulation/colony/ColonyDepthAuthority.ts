@@ -1,3 +1,6 @@
+import { EXPLORATION_TEMPLATES, NEW_EXPLORATION_SITE_IDS, validateExplorationProgress, type ExplorationProgress } from '../../content/phase2/ExplorationContent';
+import { colonyExplorationSites, type ColonyExplorationSite } from '../../world/phase2/ColonyExplorationSites';
+import { colonyWeatherAt } from '../../world/phase2/ColonyRegions';
 import type { PlayerId, WorldPosition } from "../../foundation";
 import {
   COLONY_BIOMES,
@@ -18,6 +21,7 @@ import {
 import type { Phase1ItemAuthority } from "../items";
 
 export interface ColonyDepthState {
+  readonly exploration?: ExplorationProgress;
   readonly contentVersion: typeof COLONY_DEPTH_CONTENT_VERSION;
   readonly revision: number;
   readonly discoveredBiomes: readonly ColonyBiomeId[];
@@ -73,7 +77,7 @@ export function validateColonyDepthState(value: unknown): ColonyDepthState {
     ) ||
     !unique(state.inspectedSites) ||
     state.inspectedSites.some(
-      (id) => !(COLONY_SURVEY_SITE_IDS as readonly string[]).includes(id),
+      (id) => ![...COLONY_SURVEY_SITE_IDS,...NEW_EXPLORATION_SITE_IDS].includes(id as typeof COLONY_SURVEY_SITE_IDS[number]),
     ) ||
     typeof state.professions !== "object" ||
     state.professions === null ||
@@ -131,8 +135,10 @@ export function validateColonyDepthState(value: unknown): ColonyDepthState {
     )
   )
     throw new Error("Invalid colony receipt.");
+  const exploration = state.exploration === undefined ? undefined : validateExplorationProgress(state.exploration, state.inspectedSites);
   return Object.freeze({
     ...state,
+    ...(exploration === undefined ? {} : { exploration }),
     contentVersion: COLONY_DEPTH_CONTENT_VERSION,
     discoveredBiomes: Object.freeze([...state.discoveredBiomes]),
     inspectedSites: Object.freeze([...state.inspectedSites]),
@@ -147,7 +153,7 @@ export interface ColonyDepthCommand {
   readonly playerId: PlayerId;
   readonly expectedRevision: number;
   readonly expectedInventoryRevision: number;
-  readonly action: "research" | "specialize" | "inspect-site";
+  readonly action: "research" | "specialize" | "inspect-site" | "restore-site" | "recover-site";
   readonly targetId: string;
 }
 export type ColonyDepthResult =
@@ -162,6 +168,12 @@ export type ColonyDepthResult =
       readonly reason: string;
     };
 
+export interface ColonyExplorationServices {
+  readonly generationVersion: number;
+  /** Canonical explored terrain and current player-building occupancy. */
+  available(site: ColonyExplorationSite): boolean;
+  cancelRest(playerId: string): void;
+}
 export class ColonyDepthAuthority {
   private state: ColonyDepthState;
   public constructor(
@@ -173,6 +185,7 @@ export class ColonyDepthAuthority {
     },
     initial?: ColonyDepthState,
     private readonly remoteLabAccess?: (playerId:PlayerId)=>boolean,
+    private readonly explorationServices?: ColonyExplorationServices,
   ) {
     validateColonyDepthContent();
     this.state =
@@ -183,6 +196,15 @@ export class ColonyDepthAuthority {
   public read(): ColonyDepthState {
     return this.state;
   }
+  public sites(): readonly ColonyExplorationSite[] { return this.explorationServices ? colonyExplorationSites(this.seed,this.explorationServices.generationVersion) : colonySurveySites(this.seed); }
+  public siteStage(id: string): 'unrestored' | 'restored' | 'recovered' { return this.state.exploration?.entries.find(e=>e.siteId===id)?.stage ?? 'unrestored'; }
+  public restoredSite(template: string) { return this.explorationServices && this.state.exploration?.entries.length ? this.sites().find(s=>s.template===template && this.siteStage(s.id)!=='unrestored' && this.explorationServices!.available(s)) : undefined; }
+  public restShelter(id: string): WorldPosition | null { const site=this.restoredSite('shelter'); return site?.id===id ? site.position : null; }
+  public shelteredAt(position: WorldPosition,tick: number): boolean {
+    const shelter=this.restoredSite('shelter');if(shelter&&Math.hypot(shelter.position.x-position.x,shelter.position.y-position.y)<=3)return true;
+    const array=this.restoredSite('array');return !!array && Math.hypot(array.position.x-position.x,array.position.y-position.y)<=3 && colonyWeatherAt(this.seed,position,tick).weather==='dry-wind';
+  }
+  private restoredLabAccess(playerId: string): boolean { const site=this.restoredSite('laboratory'),p=this.actor(playerId).position;return !!site && Math.hypot(site.position.x-p.x,site.position.y-p.y)<=7.5; }
   public discover(playerId: PlayerId): void {
     const actor = this.actor(playerId);
     if (!actor.alive) return;
@@ -245,8 +267,10 @@ export class ColonyDepthAuthority {
       String(Math.floor(position.y / 64));
     const harvests =
       this.state.pressure.find((p) => p.regionKey === key)?.harvests ?? 0;
+    const garden = this.restoredSite('garden');
+    const gardenBoost = garden && ['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(resourceDefinitionId ?? '') && Math.hypot(garden.position.x-position.x,garden.position.y-position.y)<=16 ? .8 : 1;
     return (
-      COLONY_BIOMES[colonyBiomeAt(this.seed, position)].recoveryMultiplier *
+      gardenBoost * COLONY_BIOMES[colonyBiomeAt(this.seed, position)].recoveryMultiplier *
       (resourceDefinitionId === undefined ? 1 : COLONY_RESOURCE_RENEWAL[colonyBiomeAt(this.seed, position)][resourceDefinitionId] ?? 1) *
       (1 + harvests / 8) *
       (this.state.researchIds.includes("water-stewardship") ? 0.8 : 1)
@@ -306,12 +330,33 @@ export class ColonyDepthAuthority {
       return reject("UNKNOWN_PLAYER");
     }
     if (!actor.alive) return reject("PLAYER_DEAD");
+    if (command.action==='restore-site' || command.action==='recover-site') {
+      if (!this.explorationServices) return reject('EXPLORATION_UNAVAILABLE');
+      const site=this.sites().find(s=>s.id===command.targetId),template=EXPLORATION_TEMPLATES.find(t=>t.siteId===command.targetId);
+      if(!site || !template)return reject('UNKNOWN_SITE');
+      if(!this.state.inspectedSites.includes(site.id))return reject('INSPECT_SITE_FIRST');
+      if(Math.hypot(actor.position.x-site.position.x,actor.position.y-site.position.y)>4)return reject('OUT_OF_RANGE');
+      if(!this.explorationServices.available(site))return reject('SITE_BLOCKED_OR_UNEXPLORED');
+      const inventory=this.items.getContainerView('inventory:'+command.playerId);
+      if(inventory.revision!==command.expectedInventoryRevision)return reject('STALE_INVENTORY_REVISION');
+      const stage=this.siteStage(site.id),restore=command.action==='restore-site';
+      if(restore && stage!=='unrestored')return reject('ALREADY_RESTORED');
+      if(!restore && stage==='unrestored')return reject('RESTORE_SITE_FIRST');
+      if(stage==='recovered')return reject('SUPPLIES_ALREADY_RECOVERED');
+      if(restore && template.tool && !inventory.stacks.some(s=>s.itemDefinitionId===template.tool && (s.condition===null || s.condition>0)))return reject('FIELD_TOOL_REQUIRED');
+      const revision=this.state.revision+1;
+      const candidate=validateColonyDepthState({...this.state,revision,exploration:{version:1,entries:[...(this.state.exploration?.entries ?? []).filter(e=>e.siteId!==site.id),{siteId:site.id,stage:restore?'restored':'recovered'}]},receipts:[...this.state.receipts,{operationId:command.operationId,signature,revision}].slice(-96)});
+      const result=this.items.commitColonyExchange({operationId:command.operationId,playerId:command.playerId,expectedInventoryRevision:command.expectedInventoryRevision,inputs:restore?template.costs.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity})):[],outputs:restore?[]:template.reward.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity}))});
+      if(result.status==='rejected')return reject(result.reason);
+      this.state=candidate;this.explorationServices.cancelRest(command.playerId);
+      return Object.freeze({status:'committed',operationId:command.operationId,revision});
+    }
     let next = { ...this.state };
     if (command.action === "research") {
       const def = COLONY_RESEARCH.find((d) => d.id === command.targetId);
       if (def === undefined) return reject("UNKNOWN_RESEARCH");
       if (this.hasResearch(def.id)) return reject("ALREADY_RESEARCHED");
-      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId))
+      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId) && !this.restoredLabAccess(command.playerId))
         return reject("RETURN_TO_BASE");
       if (def.prerequisites.some((id) => !this.hasResearch(id)))
         return reject("RESEARCH_PREREQUISITE");
@@ -334,7 +379,7 @@ export class ColonyDepthAuthority {
         this.state.discoveredBiomes.length < def.requiredRegions
       )
         return reject("PROFESSION_PREREQUISITE");
-      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId))
+      if (Math.hypot(actor.position.x, actor.position.y) > 7.5 && !this.remoteLabAccess?.(command.playerId) && !this.restoredLabAccess(command.playerId))
         return reject("RETURN_TO_BASE");
       if (next.professions[command.playerId] === id)
         return reject("ALREADY_SPECIALIZED");
@@ -345,7 +390,7 @@ export class ColonyDepthAuthority {
         professions: { ...next.professions, [command.playerId]: id },
       };
     } else if (command.action === "inspect-site") {
-      const site = colonySurveySites(this.seed).find(
+      const site = this.sites().find(
         (s) => s.id === command.targetId,
       );
       if (site === undefined) return reject("UNKNOWN_SITE");
@@ -356,6 +401,7 @@ export class ColonyDepthAuthority {
         ) > 1.25
       )
         return reject("OUT_OF_RANGE");
+      if(site.template && this.explorationServices && !this.explorationServices.available(site))return reject('SITE_BLOCKED_OR_UNEXPLORED');
       if (next.inspectedSites.includes(site.id))
         return reject("ALREADY_INSPECTED");
       next = {

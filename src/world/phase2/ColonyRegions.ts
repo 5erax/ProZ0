@@ -36,6 +36,7 @@ function rotate(point: WorldPosition, quadrant: number): WorldPosition {
       return point;
   }
 }
+export function colonyRegionPosition(seed: string, point: WorldPosition): WorldPosition { return rotate(point, (4-seedQuadrant(seed))%4); }
 export function colonyBiomeAt(
   seed: string,
   point: WorldPosition,

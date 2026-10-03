@@ -1,3 +1,4 @@
+import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
 import { isKnownMeleeEquipment } from '../content/livingworld/EquipmentContent';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
@@ -461,6 +462,7 @@ export class Phase1AuthorityBundle {
       completeRest:playerId=>survival.completeExpeditionRest(playerId),
       meal:playerId=>survival.applyExpeditionMeal(playerId),
       weather:(x,y)=>colonyWeatherAt(config.worldSeed,{x,y},this.authorityTick).weather,
+      siteShelter: target => this.colonyDepth.restShelter(target),
       hostileNear:(x,y)=>world.getActiveGeneratedEntities().some(e=>{if(e.type!=='hostile')return false;const predator=world.getPredator(e.entityId);return predator!==null&&predator.health>0&&Math.hypot(predator.position.x-x,predator.position.y-y)<8;}),
     }):null;
     this.livingWorld=this.expedition?new LivingWorldAuthority(items,this.expedition,{
@@ -481,7 +483,15 @@ export class Phase1AuthorityBundle {
     this.colonyDepth = new ColonyDepthAuthority(config.worldSeed, items, (playerId) => {
       const state = survival.getPlayerState(playerId);
       return { position: this.positions.get(playerId), alive: state.lifeState.type === 'alive' && state.healthMilli > 0 };
-    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false);
+    }, config.reopen?.bundle.world.colonyDepth,playerId=>this.expedition?.hasRemoteLab(playerId)??false, config.colonyDepthEnabled===true && this.expedition && config.catalog?.has('item:compost') !== false ? {
+      generationVersion:config.reopen?.bundle.world.generationVersion ?? config.worldGenerationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
+      available:site=>{
+        if(!world.isExploredPosition(site.position))return false;
+        const structures=[...buildings.exportSnapshot().foothold.structures,...this.expedition!.read().facilities.filter(f=>f.canonicalStructureId===null).map(f=>({definitionId:expeditionFacility(f.definitionId)!.shape,position:{x:f.x,y:f.y},orientationQuarterTurns:f.orientation}))];
+        return !structures.some(s=>{const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[s.definitionId],size=s.orientationQuarterTurns%2===0?profile.footprint:{width:profile.footprint.depth,depth:profile.footprint.width};return Math.abs(s.position.x-site.position.x)<1.5+size.width/2 && Math.abs(s.position.y-site.position.y)<1.5+size.depth/2;});
+      },
+      cancelRest:playerId=>this.expedition!.cancelRest(playerId),
+    } : undefined);
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
       multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)*(this.livingWorld?.renewal(position,definitionId)??1),
       harvested: (position,tick) => this.colonyDepth.recordHarvest(position,tick),
@@ -576,11 +586,12 @@ export class Phase1AuthorityBundle {
     };
     let buildings: Phase1BuildingWorld | null = null;
     let expedition: ExpeditionAuthority|null = null;
+    let capacityAuthority:ColonyDepthAuthority|null=null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const world = new Phase1VerticalSliceWorldAdapter({
       colonyTerrainRulesEnabled: config.colonyDepthEnabled === true,
       expeditionCollisionEnabled:config.singlePlayerExpeditionEnabled===true,
-      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5)??false,
+      expeditionShelterAt:position=>expedition?.read().facilities.some(f=>(f.definitionId==='camp-bed'||f.definitionId==='field-cabin')&&Math.hypot(f.x-position.x,f.y-position.y)<=1.5) || (capacityAuthority?.shelteredAt(position,authorityTickRef.value) ?? false),
       colonyWorldSeed: config.worldSeed,
       catalog,
       store: worldStore,
@@ -621,7 +632,6 @@ export class Phase1AuthorityBundle {
         : { snapshot: reopenedProgression }),
     });
     const gatherCost = new DeferredGatherCostPort();
-    let capacityAuthority:ColonyDepthAuthority|null=null;
     const items = new Phase1ItemAuthority({
       ...(config.singlePlayerExpeditionEnabled===true?{playerCarryPolicy:EXPEDITION_PLAYER_CARRY}:{}),
       catalog,
