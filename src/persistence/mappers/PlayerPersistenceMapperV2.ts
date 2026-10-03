@@ -1,3 +1,4 @@
+import type { WearableReferencesV1 } from '../../content/livingworld/WearableContent';
 import type { ContentCatalogV1 } from '../../content';
 import type { PlayerId, WorldPosition } from '../../foundation';
 import type { PlayerProgressionSnapshot } from '../../simulation/progression';
@@ -15,6 +16,7 @@ export interface PlayerPersistenceSourceV2 {
   readonly position: WorldPosition;
   readonly facing: PlayerFacingV1;
   readonly inventoryContainerId: string;
+  readonly wearables?: WearableReferencesV1;
   readonly equippedWeaponStackId: string | null;
   readonly equippedThermalWrapStackId: string | null;
   readonly survival: PlayerSurvivalState;
@@ -50,6 +52,7 @@ export function playerStateToRecordV2(
     facing: source.facing,
     inventoryContainerId: source.inventoryContainerId,
     equipment: Object.freeze({
+      ...(source.wearables ? {wearables: source.wearables} : {}),
       equippedWeaponStackId: source.equippedWeaponStackId,
       equippedThermalWrapStackId: source.equippedThermalWrapStackId,
     }),

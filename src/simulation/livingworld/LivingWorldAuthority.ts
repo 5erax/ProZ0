@@ -1,3 +1,5 @@
+import { WEARABLE_RECIPES } from '../../content/livingworld/WearableContent';
+import {advanceSoilPatches,wetSoilCell,soilCellKey} from './SoilMoisture';
 import {
   FORAGE,
   SPECIES,
@@ -10,6 +12,7 @@ import {
   livingHash,
 } from '../../content/livingworld/LivingWorldContent';
 import type { Phase1ItemAuthority } from '../items';
+import type { PreparedLivingHunt } from '../combat/CombatAuthority';
 import { renewablePlant, forageGrowthView, plantGrowthView } from './PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { GEAR_RECIPES } from '../../content/livingworld/EquipmentContent';
@@ -33,8 +36,13 @@ export interface LivingServices {
   ground(x: number, y: number, ignoreFacility?: string): boolean;
   plotGround(x: number, y: number): string | null;
   weather(x: number, y: number): string;
-  weapon(id: string): boolean;
+  hunt?(id:string,inventoryRevision:number,target:{x:number;y:number}):PreparedLivingHunt|string;
   cancelRest(id: string): void;
+  canonicalRoots?: {
+    get(id: string): {x:number;y:number;revision:number;cut:boolean;rootItemId:string} | null;
+    commit(id: string, revision: number): string | null;
+    water?(id:string,revision:number):string|null;
+  };
   fishing?: Pick<FishingServices, 'water' | 'clearLine' | 'habitat'> & { healthMilli(id: string): number };
 }
 export interface LivingCommand {
@@ -52,6 +60,8 @@ export interface LivingCommand {
     | 'forage'
     | 'water-forage'
     | 'uproot'
+    | 'uproot-canonical'
+    | 'water-canonical'
     | 'replant'
     | 'hunt'
     | 'loot'
@@ -64,6 +74,7 @@ export interface LivingCommand {
     | 'fuel'
     | 'fill';
   target: string;
+  resourceRevision?: number;
   x?: number;
   y?: number;
   crop?: string;
@@ -300,6 +311,7 @@ export class LivingWorldAuthority {
     this.state.lastTick = tick;
     for (const id of this.services.players())
       this.discover(this.services.actor(id));
+    if (this.state.soil) advanceSoilPatches(this.state.soil,this.services.seed,tick,p=>this.services.weather(p.x,p.y));
     const season = this.season(),
       facilities = this.expedition.read().facilities;
     this.state.stations = this.state.stations.filter((s) =>
@@ -312,7 +324,9 @@ export class LivingWorldAuthority {
       if (this.services.weather(f.x, f.y) === 'mist-rain' && tick % 600 === 0)
         s.water = Math.min(24, s.water + 1);
     }
+    const wateredCells=new Map(this.state.soil?.patches.map(p=>[p.key,p.moisture])??[]);
     for (const p of this.state.plots) {
+      p.moisture=Math.max(p.moisture,wateredCells.get(soilCellKey(p))??0);
       if (!p.crop || p.dead) continue;
       const soil = soilAt(this.services.seed, p),
         green = this.near(p, 'greenhouse'),
@@ -335,6 +349,8 @@ export class LivingWorldAuthority {
         if (s && s.water > 0) {
           s.water--;
           p.moisture = Math.min(10000, p.moisture + 6500);
+          this.state.soil ??= {version:1,patches:[]};
+          wetSoilCell(this.state.soil,p,p.moisture);
         }
       }
       if (p.moisture === 0) {
@@ -356,6 +372,7 @@ export class LivingWorldAuthority {
     for (const f of this.state.forage) {
       if (f.cleared || !f.growth) continue;
       const g = f.growth, soil = soilAt(this.services.seed, f);
+      g.moisture=Math.max(g.moisture,wateredCells.get(soilCellKey(f))??0);
       const rain = this.services.weather(f.x, f.y) === 'mist-rain';
       // Wild root networks retain more moisture than exposed cultivated plots.
       g.moisture = Math.max(0, Math.min(10000, g.moisture + (rain ? 70 : 0) - Math.round(8 * season.evaporationMilli / soil.retentionMilli)));
@@ -618,6 +635,7 @@ export class LivingWorldAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const inventory = this.items.getContainerView('inventory:' + c.playerId);
     if (inventory.revision !== c.expectedInventoryRevision)
       return reject('STALE_INVENTORY_REVISION');
@@ -636,6 +654,8 @@ export class LivingWorldAuthority {
     const inputs: { itemDefinitionId: string; quantity: number }[] = [],
       outputs: typeof inputs = [];
     let message = 'DONE';
+    let commitWorld: (() => string | null) | undefined;
+    let toolWear: {stackId:string;conditionCost:number} | undefined;
     const consume = (id: string, q = 1) =>
         inputs.push({ itemDefinitionId: id, quantity: q }),
       produce = (id: string, q = 1) =>
@@ -649,13 +669,31 @@ export class LivingWorldAuthority {
       return s;
     };
     if (c.action === 'craft') {
-      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES].find((r) => r.id === c.target);
+      const r = [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES, ...WEARABLE_RECIPES].find((r) => r.id === c.target);
       if (!r) return reject('UNKNOWN_RECIPE');
       if (r.station && !this.near(actor, r.station))
         return reject('NEARBY_STATION_REQUIRED');
       for (const [id, q] of r.costs) consume(id, q);
       produce(r.output, r.quantity);
       message = 'CRAFTED';
+    } else if (c.action === 'water-canonical') {
+      const roots=this.services.canonicalRoots,target=roots?.get(c.target);
+      if(!roots?.water||!target)return reject('SOURCE_MISSING');
+      if(target.revision!==c.resourceRevision)return reject('STALE_RESOURCE_REVISION');
+      if(distance(target)>near)return reject('OUT_OF_RANGE');
+      next.soil??={version:1,patches:[]};
+      if(!wetSoilCell(next.soil,target,10000))return reject('SOIL_PATCH_CAPACITY');
+      consume('item:clean-water');commitWorld=()=>roots.water!(c.target,target.revision);message='WATERED';
+    } else if (c.action === 'uproot-canonical') {
+      const roots = this.services.canonicalRoots, target = roots?.get(c.target);
+      if (!roots || !target) return reject('SOURCE_MISSING');
+      if (target.revision !== c.resourceRevision) return reject('STALE_RESOURCE_REVISION');
+      if (!target.cut) return reject('HARVEST_MATURE_PLANT_FIRST');
+      if (distance(target) > near) return reject('OUT_OF_RANGE');
+      if (!has('item:field-hoe')) return reject('FIELD_HOE_REQUIRED');
+      produce(target.rootItemId);
+      commitWorld = () => roots.commit(c.target,target.revision);
+      message = 'ROOT_UPROOTED';
     } else if (c.action === 'uproot') {
       if (!f || f.cleared || !f.growth || !f.growth.cut) return reject('HARVEST_MATURE_PLANT_FIRST');
       if (distance(f) > near) return reject('OUT_OF_RANGE');
@@ -744,6 +782,8 @@ export class LivingWorldAuthority {
       if (c.action === 'water') {
         if (!has('item:watering-can')) return reject('WATERING_CAN_REQUIRED');
         consume('item:clean-water');
+        next.soil ??= {version:1,patches:[]};
+        if(!wetSoilCell(next.soil,p,10000)) return reject('SOIL_PATCH_CAPACITY');
         p.moisture = 10000;
         p.dryTicks = 0;
         message = 'WATERED';
@@ -781,6 +821,8 @@ export class LivingWorldAuthority {
       if (!has('item:watering-can')) return reject('WATERING_CAN_REQUIRED');
       if (!f.growth) return reject('LEGACY_GROWTH_PENDING');
       consume('item:clean-water');
+      next.soil ??= {version:1,patches:[]};
+      if(!wetSoilCell(next.soil,f,10000)) return reject('SOIL_PATCH_CAPACITY');
       f.growth.moisture = 10000;
       f.growth.dryTicks = 0;
       message = 'WATERED';
@@ -789,6 +831,11 @@ export class LivingWorldAuthority {
       if (distance(f) > near) return reject('OUT_OF_RANGE');
       if (!f.growth && this.services.tick() < f.readyTick) return reject('RENEWING');
       const d = forageDefinition(f.kind)!;
+      if (f.kind === 'timber-tree') {
+        const tool = inventory.stacks.find(stack=>stack.itemDefinitionId === 'item:stone-field-tool' && (stack.condition ?? 0) > 0);
+        if (!tool) return reject('TOOL_REQUIRED');
+        toolWear = {stackId:tool.stackId,conditionCost:2};
+      }
       const amount = f.growth ? forageGrowthView(f, this.services.tick(), 1).harvestYield : d.quantity;
       if (!amount) return reject('RENEWING');
       produce(d.output, amount);
@@ -835,11 +882,15 @@ export class LivingWorldAuthority {
       } else {
         if (a.health === 0) return reject('ANIMAL_DEAD');
         if (c.action === 'hunt') {
-          if (!this.services.weapon(c.playerId))
-            return reject('EQUIP_WEAPON_FIRST');
-          if (this.services.tick() < a.attackTick) return reject('COOLDOWN');
-          a.health = Math.max(0, a.health - 4);
-          a.attackTick = this.services.tick() + 60;
+          const cooldowns=next.huntCooldowns?.until;
+          if (this.services.tick() < (cooldowns && Object.hasOwn(cooldowns,c.playerId)?cooldowns[c.playerId]!:0)) return reject('COOLDOWN');
+          const hunt=this.services.hunt?.(c.playerId,c.expectedInventoryRevision,a);
+          if(hunt===undefined)return reject('HUNT_AUTHORITY_UNAVAILABLE');
+          if(typeof hunt==='string')return reject(hunt);
+          a.health = Math.max(0, a.health - hunt.damage);
+          next.huntCooldowns??={version:1,until:{}};
+          next.huntCooldowns.until={...next.huntCooldowns.until,[c.playerId]:this.services.tick()+hunt.cooldownTicks};
+          toolWear=hunt.toolWear;commitWorld=hunt.commit;
           message = a.health === 0 ? 'HUNTED' : 'HIT';
         } else if (c.action === 'tame') {
           if (a.pen) return reject('ALREADY_TAME');
@@ -899,14 +950,15 @@ export class LivingWorldAuthority {
     }
     // Validate candidate state before paying either side of the item exchange.
     try { validateLivingWorld(next); } catch { return reject('INVALID_LIVING_STATE'); }
-    if (inputs.length || outputs.length) {
+    if (inputs.length || outputs.length || toolWear) {
       const result = this.items.commitColonyExchange({
         operationId: c.id,
         playerId: c.playerId,
         expectedInventoryRevision: c.expectedInventoryRevision,
         inputs,
         outputs,
-      });
+        ...(toolWear ? {toolWear} : {}),
+      }, commitWorld);
       if (result.status === 'rejected') return reject(result.reason);
     }
     this.services.cancelRest(c.playerId);

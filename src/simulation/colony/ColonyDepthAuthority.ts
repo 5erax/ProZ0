@@ -182,6 +182,7 @@ export class ColonyDepthAuthority {
     private readonly actor: (playerId: PlayerId) => {
       readonly position: WorldPosition;
       readonly alive: boolean;
+      readonly spaceId?: string;
     },
     initial?: ColonyDepthState,
     private readonly remoteLabAccess?: (playerId:PlayerId)=>boolean,
@@ -330,6 +331,7 @@ export class ColonyDepthAuthority {
       return reject("UNKNOWN_PLAYER");
     }
     if (!actor.alive) return reject("PLAYER_DEAD");
+    if (actor.spaceId && actor.spaceId !== "surface") return reject("WRONG_WORLDSPACE");
     if (command.action==='restore-site' || command.action==='recover-site') {
       if (!this.explorationServices) return reject('EXPLORATION_UNAVAILABLE');
       const site=this.sites().find(s=>s.id===command.targetId),template=EXPLORATION_TEMPLATES.find(t=>t.siteId===command.targetId);

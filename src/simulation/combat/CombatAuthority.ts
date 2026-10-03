@@ -23,6 +23,14 @@ export interface AttackResult {
   readonly reason?: 'DEAD' | 'EXHAUSTED' | 'COOLDOWN' | 'BROKEN_WEAPON';
 }
 
+export interface PreparedLivingHunt {
+  readonly damage: number;
+  readonly cooldownTicks: number;
+  readonly toolWear: {readonly stackId:string;readonly conditionCost:number};
+  /** Called synchronously only after the item ledger and living candidate validate. */
+  readonly commit: () => string | null;
+}
+
 function squaredDistance(a: WorldPosition, b: WorldPosition): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -39,10 +47,45 @@ export class Phase1CombatAuthority {
     private readonly survival: Phase1SurvivalAuthority,
     private readonly items: Phase1ItemAuthority,
     private readonly world: SurvivalWorldPort,
-  ) {}
+    initialCooldowns:Readonly<Record<string,number>> = {},
+  ) {
+    for(const [id,tick] of Object.entries(initialCooldowns)){
+      if(!id||!Number.isSafeInteger(tick)||tick<0)throw Error('Invalid restored combat cooldown');
+      this.cooldownUntil.set(id,tick);
+    }
+  }
 
   public setEquippedWeapon(playerId: PlayerId, stackId: string | null): void {
     this.equippedWeapon.set(playerId, stackId);
+  }
+
+  public prepareLivingHunt(playerId:PlayerId,expectedInventoryRevision:number,target:WorldPosition):PreparedLivingHunt|string {
+    const state=this.survival.getPlayerState(playerId),tick=state.tick;
+    if(state.lifeState.type!=='alive')return 'PLAYER_DEAD';
+    if((this.cooldownUntil.get(playerId)??0)>tick)return 'COOLDOWN';
+    const inventory=this.items.getContainerView('inventory:'+playerId);
+    if(inventory.revision!==expectedInventoryRevision)return 'STALE_INVENTORY_REVISION';
+    const stack=inventory.stacks.find(s=>s.stackId===this.equippedWeapon.get(playerId));
+    if(!stack || !isKnownMeleeEquipment(stack.itemDefinitionId))return 'EQUIP_WEAPON_FIRST';
+    if(stack.condition===null||stack.condition<=0)return 'BROKEN_WEAPON';
+    const profile=this.catalog.getAs(stack.itemDefinitionId,'item').useProfile;
+    if(profile?.type!=='melee-weapon')return 'EQUIP_WEAPON_FIRST';
+    // Click/Hunt aims at the selected animal. Include its small physical body radius.
+    const reach=profile.rangeFootprints*PLAYER_COLLISION_FOOTPRINT.width+.35;
+    if(squaredDistance(this.world.getPlayerPosition(playerId),target)>reach*reach)return 'OUT_OF_WEAPON_RANGE';
+    if(!this.survival.canSpendStamina(playerId,profile.staminaCost))return 'EXHAUSTED';
+    const cooldownTicks=Math.ceil(profile.cooldownSeconds*60);
+    return {
+      // Existing living wildlife uses a smaller health scale; preserve basic spear's 4 damage.
+      damage:Math.max(1,Math.round(profile.damage/6)),cooldownTicks,
+      toolWear:{stackId:stack.stackId,conditionCost:profile.conditionCostOnSuccessfulHit},
+      commit:()=>{
+        if((this.cooldownUntil.get(playerId)??0)>tick)return 'COOLDOWN';
+        if(!this.survival.canSpendStamina(playerId,profile.staminaCost))return 'EXHAUSTED';
+        this.survival.commitStaminaSpend(playerId,profile.staminaCost,tick);
+        this.cooldownUntil.set(playerId,tick+cooldownTicks);return null;
+      },
+    };
   }
 
   public submitAttack(

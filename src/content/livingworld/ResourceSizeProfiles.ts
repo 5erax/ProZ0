@@ -17,8 +17,8 @@ export function resourceSizeAt(worldSeed: string, entityId: string, definitionId
   return percentile < 30 ? 'small' : percentile < 75 ? 'medium' : 'large';
 }
 
-export function resourceHarvestDefinition(definition: Readonly<ResourceNodeDefinitionV1>, size?: ResourceSize): Readonly<ResourceNodeDefinitionV1> {
-  if (size === undefined) return definition;
-  const profile = RESOURCE_SIZE_PROFILES[size];
-  return Object.freeze({ ...definition, gatherChannelSeconds: definition.gatherChannelSeconds * profile.workMultiplier, toolConditionCostPerSuccessfulGather: definition.toolConditionCostPerSuccessfulGather * profile.wearMultiplier, output: Object.freeze({ ...definition.output, quantity: definition.output.quantity * profile.yieldMultiplier }) });
+export function resourceHarvestDefinition(definition: Readonly<ResourceNodeDefinitionV1>, size?: ResourceSize, stage?: 'early' | 'growing' | 'mature'): Readonly<ResourceNodeDefinitionV1> {
+  if (size === undefined && stage !== 'growing') return definition;
+  const profile = size === undefined ? RESOURCE_SIZE_PROFILES.small : RESOURCE_SIZE_PROFILES[size];
+  return Object.freeze({ ...definition, gatherChannelSeconds: definition.gatherChannelSeconds * profile.workMultiplier, toolConditionCostPerSuccessfulGather: definition.toolConditionCostPerSuccessfulGather * profile.wearMultiplier, output: Object.freeze({ ...definition.output, quantity: stage === 'growing' ? Math.max(1, Math.floor(definition.output.quantity * profile.yieldMultiplier / 2)) : definition.output.quantity * profile.yieldMultiplier }) });
 }

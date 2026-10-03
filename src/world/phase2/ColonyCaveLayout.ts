@@ -26,6 +26,11 @@ export interface CaveLayout {
   readonly exit:WorldPosition;
   readonly nodes:readonly CaveNode[];
 }
+export interface CavePortal {
+  readonly id: string;
+  readonly position: WorldPosition;
+  readonly layout: CaveLayout;
+}
 function portalKey(id:string):string {
   if(typeof id!=='string'||!/^portal:[a-z0-9][a-z0-9:-]{0,95}$/.test(id))throw Error('Invalid cave portal ID');
   return 'cave:'+id;

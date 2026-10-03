@@ -9,6 +9,8 @@ export interface ExpeditionPlan {
   readonly x: number;
   readonly y: number;
   readonly orientation: 0 | 1 | 2 | 3;
+  /** Absent in older saves: retain the former shape footprint. */
+  readonly footprintVersion?: 1;
   readonly paid: Readonly<Record<string, number>>;
 }
 export interface ExpeditionFacility {
@@ -18,6 +20,8 @@ export interface ExpeditionFacility {
   readonly x: number;
   readonly y: number;
   readonly orientation: 0 | 1 | 2 | 3;
+  /** Absent in older saves: retain the former shape footprint. */
+  readonly footprintVersion?: 1;
   readonly canonicalStructureId: string | null;
   readonly water: number;
   readonly progress: number;
@@ -101,7 +105,8 @@ export function validateExpeditionState(value: unknown): ExpeditionState {
       !Number.isFinite(item.y) ||
       Math.abs(item.x) > 1e7 ||
       Math.abs(item.y) > 1e7 ||
-      ![0, 1, 2, 3].includes(item.orientation)
+      ![0, 1, 2, 3].includes(item.orientation) ||
+      (Object.prototype.hasOwnProperty.call(item, 'footprintVersion') && item.footprintVersion !== 1)
     )
       throw Error('Invalid expedition identity/position');
     ids.add(item.id);

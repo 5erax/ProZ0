@@ -1,3 +1,4 @@
+import { WEARABLE_RECIPES } from '../../src/content/livingworld/WearableContent';
 import { expect, it } from 'vitest';
 import { createContentCatalogV1, createPhase1ContentCatalog } from '../../src/content';
 import { PHASE1_CONTENT_PACK } from '../../src/content/phase1/Phase1ContentPack';
@@ -33,10 +34,10 @@ it.each(['item:basic-spear', ...GEAR_ITEMS.map(i => i.id)])('%s equips and uses 
   const after = items.exportLedgerSnapshot(); expect(combat.submitAttack(command,'predator:p').status).toBe('duplicate'); expect(items.exportLedgerSnapshot()).toEqual(after); expect(world.getPredator('predator:p')!.health).toBe(75-profile.damage);
 });
 
-it.each(GEAR_RECIPES)('$name upgrades one prior weapon at the right station, rejects range/missing inputs atomically, and does not duplicate on replay', recipe => {
+it.each([...GEAR_RECIPES, ...WEARABLE_RECIPES])('$name crafts bounded gear at the right station, rejects range/missing inputs atomically, and does not duplicate on replay', recipe => {
   const { items } = fixture(recipe.costs); const actor = { x: 20, y: 20, alive: true };
   const expedition = new ExpeditionAuthority(items, new Phase1BuildingWorld(new Phase1BuildingTestSpatial(),undefined,true), () => actor, { ...emptyExpeditionState(), facilities: [{ id:'station', owner:'p', definitionId:recipe.station as 'field-lab', x:0, y:0, orientation:0, canonicalStructureId: recipe.station === 'field-workbench' ? 'fixture:canonical-workbench' : null, water:0, progress:0 }] });
-  const living = new LivingWorldAuthority(items, expedition, { seed:'rarity', tick:()=>0, actor:()=>actor, players:()=>[], ground:()=>true, plotGround:()=>null, weather:()=> 'clear', weapon:()=>true, cancelRest:()=>{} });
+  const living = new LivingWorldAuthority(items, expedition, { seed:'rarity', tick:()=>0, actor:()=>actor, players:()=>[], ground:()=>true, plotGround:()=>null, weather:()=> 'clear', cancelRest:()=>{} });
   const command = () => ({ id:'craft:' + recipe.id, playerId:'p', expectedRevision:living.read().revision, expectedInventoryRevision:items.getContainerView('inventory:p').revision, action:'craft' as const, target:recipe.id });
   const before = items.exportLedgerSnapshot(); expect(living.execute(command())).toMatchObject({ status:'rejected', message:'NEARBY_STATION_REQUIRED' }); expect(items.exportLedgerSnapshot()).toEqual(before);
   actor.x=0; actor.y=0;

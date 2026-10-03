@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
 import type { ColonyWeather } from '../../world/phase2/ColonyRegions';
 
 // Owner policy: silence except this explicitly supplied rain loop.
@@ -30,14 +32,14 @@ export function createColonyAudio(parent: HTMLElement): {
   slider.max = '1';
   slider.step = '.05';
   slider.value = String(volume);
-  slider.setAttribute('aria-label', 'Sound volume');
+  bindUiText(slider,"aria-label",uiText("ui.1f071c3e"));
   slider.style.width = '80px';
   const status = document.createElement('span');
   status.setAttribute('role', 'status');
   status.dataset.rainAudioStatus = '';
   const update = (): void => {
     rain.volume = enabled && raining ? volume : 0;
-    button.textContent = enabled ? 'Mute sound' : 'Enable sound';
+    bindUiText(button,"textContent",enabled ? uiText("ui.fd592b03") : uiText("ui.8f456c61") ?? "");
     button.setAttribute('aria-pressed', String(enabled));
     controls.dataset.rainActive = String(enabled && raining);
   };
@@ -51,7 +53,7 @@ export function createColonyAudio(parent: HTMLElement): {
     enabled = false;
     stop();
     update();
-    status.textContent = 'Rain audio unavailable. Enable sound to retry.';
+    bindUiText(status,"textContent",uiText("ui.d7ce752"));
   };
   const play = (): void => {
     const request = ++generation;
@@ -70,7 +72,7 @@ export function createColonyAudio(parent: HTMLElement): {
   const toggle = (): void => {
     if (destroyed) return;
     enabled = !enabled;
-    status.textContent = '';
+    bindUiText(status,"textContent",'');
     update();
     if (enabled) {
       if (!rain.hasAttribute('src')) rain.src = rainUrl;

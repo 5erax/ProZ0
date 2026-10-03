@@ -139,3 +139,24 @@ export function colonyWeatherAt(
     cycle: Math.floor(tick / cycleTicks),
   });
 }
+
+
+const windDirections = new Map<string, -1 | 1>();
+export interface ColonyWeatherVisual {
+  readonly phase: 'calm' | 'warning' | 'rise' | 'peak' | 'fall';
+  readonly intensity: number;
+  readonly direction: -1 | 1;
+}
+/** Read-only envelope. Does not draw from gameplay RNG or change weather/thermal timing. */
+export function colonyWeatherVisualAt(seed: string, point: WorldPosition, tick: number): ColonyWeatherVisual {
+  const weather=colonyWeatherAt(seed,point,tick), phase=tick%18000;
+  const end=weather.biomeId==='landing-grassland'?12000:15000;
+  const key=seed+':'+weather.cycle;
+  let direction=windDirections.get(key);
+  if(direction===undefined){direction=(new DeterministicRng(deriveSeedState({worldSeed:seed,namespace:'colony:weather-art:v1',stableIdentifiers:[String(weather.cycle)]})).nextUint32()%2)?1:-1;if(windDirections.size>=16)windDirections.clear();windDirections.set(key,direction);}
+  if(weather.warning) return {phase:'warning',intensity:.08+.1*(phase-7200)/1800,direction};
+  if(weather.weather==='clear') return {phase:'calm',intensity:0,direction};
+  if(phase<9900) return {phase:'rise',intensity:.18+.82*(phase-9000)/900,direction};
+  if(phase>end-1200) return {phase:'fall',intensity:Math.max(0,(end-phase)/1200),direction};
+  return {phase:'peak',intensity:1,direction};
+}

@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
 const INTERNAL_WIDTH = 640;
 const INTERNAL_HEIGHT = 360;
 
@@ -16,8 +18,7 @@ class ViewportPresentationGuardImpl implements ViewportPresentationGuard {
     this.targetWindow = root.ownerDocument.defaultView ?? window;
     this.warning = root.ownerDocument.createElement('div');
     this.warning.id = 'proz0-viewport-warning';
-    this.warning.textContent =
-      'Viewport too small · ProZ0 requires at least 640×360 logical pixels.';
+    bindUiText(this.warning,"textContent",uiText("ui.d5a32fe6"));
     this.warning.style.position = 'absolute';
     this.warning.style.left = '50%';
     this.warning.style.top = '50%';

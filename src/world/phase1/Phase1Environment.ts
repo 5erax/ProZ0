@@ -44,6 +44,7 @@ export function createPhase1EnvironmentState(
   catalog: ContentCatalogV1,
   calendarVersion?: 1,
   resourceProfileVersion?: 1,
+  resourceLifecycleVersion?: 1,
 ): Phase1EnvironmentState {
   if (worldSeed.length === 0) {
     throw new RangeError('World seed must not be empty.');
@@ -89,6 +90,7 @@ export function createPhase1EnvironmentState(
   return Object.freeze({
     activeTick: 0,
     ...(resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+    ...(resourceLifecycleVersion === 1 ? { resourceLifecycleVersion: 1 as const } : {}),
     ...(calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: PHASE1_NEW_WORLD_START_LOCAL_MINUTE,
     weatherEvents: Object.freeze([event]),
@@ -100,6 +102,7 @@ export function validatePhase1EnvironmentState(
   catalog: ContentCatalogV1,
 ): Phase1EnvironmentState {
   requireTick(state.activeTick, 'Environment activeTick');
+  if (state.resourceLifecycleVersion !== undefined && state.resourceLifecycleVersion !== 1) throw new Error('Unsupported resource lifecycle version.');
   if (state.resourceProfileVersion !== undefined && state.resourceProfileVersion !== 1) throw new Error('Unsupported resource profile version.');
   if (state.calendarVersion !== undefined && state.calendarVersion !== 1) throw new Error('Unsupported world calendar version.');
 
@@ -159,6 +162,7 @@ export function validatePhase1EnvironmentState(
   return Object.freeze({
     activeTick: state.activeTick,
     ...(state.resourceProfileVersion === 1 ? { resourceProfileVersion: 1 as const } : {}),
+    ...(state.resourceLifecycleVersion === 1 ? { resourceLifecycleVersion: 1 as const } : {}),
     ...(state.calendarVersion === 1 ? { calendarVersion: 1 as const } : {}),
     cycleStartLocalMinute: state.cycleStartLocalMinute,
     weatherEvents: Object.freeze([

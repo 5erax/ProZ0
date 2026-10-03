@@ -407,13 +407,40 @@ export class Phase1ItemAuthority {
     return this.ledger.exportSnapshot();
   }
 
-  public commitColonyExchange(request: {
+  public commitColonyExchange(request: Parameters<Phase1ItemAuthority['commitColonyExchangeTo']>[0], commitWorld?: () => string | null) {
+    return this.commitColonyExchangeTo(request,commitWorld);
+  }
+
+  /** Return construction escrow to the bag, then a real accessible crate if the bag is full.
+   * Each candidate is an isolated draft; no partial outputs are published on rejection.
+   * Replay identity belongs to the calling ExpeditionAuthority receipt.
+   */
+  public commitColonyRefund(request: {
+    readonly operationId:string; readonly playerId:PlayerId; readonly expectedInventoryRevision:number;
+    readonly outputs:readonly {itemDefinitionId:string;quantity:number}[];
+  }): {status:'committed';destinationContainerId:string}|{status:'rejected';reason:string} {
+    const exchange={...request,inputs:[]};
+    const bag=this.commitColonyExchangeTo(exchange);
+    if(bag.status==='committed')return {status:'committed',destinationContainerId:'inventory:'+request.playerId};
+    if(!['TARGET_CAPACITY_VOLUME','TARGET_CAPACITY_WEIGHT','STACK_LIMIT'].includes(bag.reason))return bag;
+    const candidates=this.ledger.exportSnapshot().containers.filter(c=>c.kind==='storage-crate'
+      && this.canPlayerAccessContainer(request.playerId,c)).sort((a,b)=>compareStrings(a.containerId,b.containerId));
+    for(const crate of candidates){
+      const result=this.commitColonyExchangeTo(exchange,undefined,crate.containerId);
+      if(result.status==='committed')return {status:'committed',destinationContainerId:crate.containerId};
+      if(!['TARGET_CAPACITY_VOLUME','TARGET_CAPACITY_WEIGHT','STACK_LIMIT'].includes(result.reason))return result;
+    }
+    return bag;
+  }
+
+  private commitColonyExchangeTo(request: {
     readonly operationId: string;
     readonly playerId: PlayerId;
     readonly expectedInventoryRevision: number;
     readonly inputs: readonly { itemDefinitionId: string; quantity: number }[];
     readonly outputs: readonly { itemDefinitionId: string; quantity: number }[];
-  }): { status: 'committed'; inventoryRevision: number } | { status: 'rejected'; reason: string } {
+    readonly toolWear?: {readonly stackId:string;readonly conditionCost:number};
+  }, commitWorld?: () => string | null, outputContainerId?: ContainerId): { status: 'committed'; inventoryRevision: number } | { status: 'rejected'; reason: string } {
     const draft = this.ledger.createDraft();
     const containerId = 'inventory:' + request.playerId;
     const inventory = draft.getContainer(containerId);
@@ -432,15 +459,34 @@ export class Phase1ItemAuthority {
       }
       if (remaining > 0) return { status: 'rejected', reason: 'NEED ' + input.itemDefinitionId + ' ×' + String(input.quantity) };
     }
+    const destinationId=outputContainerId ?? containerId;
+    if(outputContainerId){
+      const destination=draft.getContainer(destinationId);
+      if(request.inputs.length || request.toolWear || !destination || destination.kind!=='storage-crate'
+        || !this.canPlayerAccessContainer(request.playerId,destination))return {status:'rejected',reason:'TARGET_NOT_ACCESSIBLE'};
+    }
     let ordinal = 0;
     for (const output of request.outputs) {
-      const insertion = draft.insert({ containerId, itemDefinitionId: output.itemDefinitionId,
+      const insertion = draft.insert({ containerId:destinationId, itemDefinitionId: output.itemDefinitionId,
         quantity: output.quantity, condition: this.options.catalog.getAs(output.itemDefinitionId, 'item').conditionMax, operationId: request.operationId, generatedOrdinal: ordinal });
       if (typeof insertion === 'string') return { status: 'rejected', reason: insertion };
       ordinal = insertion.nextGeneratedOrdinal;
     }
-    const inventoryRevision = request.inputs.length + request.outputs.length > 0
+    if (request.toolWear) {
+      const tool = draft.requireStack(containerId,request.toolWear.stackId);
+      if (!tool || tool.condition === null || tool.condition <= 0) return {status:'rejected',reason:'TOOL_REQUIRED'};
+      if (!Number.isSafeInteger(request.toolWear.conditionCost) || request.toolWear.conditionCost < 0) return {status:'rejected',reason:'INVALID_TOOL_WEAR'};
+      const reason = draft.setCondition(containerId,tool.stackId,Math.max(0,tool.condition-request.toolWear.conditionCost));
+      if (reason) return {status:'rejected',reason};
+    }
+    const inventoryRevision = request.inputs.length + (destinationId===containerId ? request.outputs.length : 0) + (request.toolWear ? 1 : 0) > 0
       ? draft.incrementRevision(containerId) : inventory.revision;
+    if(destinationId!==containerId && request.outputs.length)draft.incrementRevision(destinationId);
+    // No asynchronous work between the prepared ledger and its world mutation.
+    if (commitWorld) {
+      const reason = commitWorld();
+      if (reason) return {status:'rejected',reason};
+    }
     this.ledger.publish(draft);
     return { status: 'committed', inventoryRevision };
   }
@@ -2177,7 +2223,7 @@ export class Phase1ItemAuthority {
     if (baseDefinition === null) {
       return 'SOURCE_MISSING';
     }
-    const definition = resourceHarvestDefinition(baseDefinition, resource.size);
+    const definition = resourceHarvestDefinition(baseDefinition, resource.size, resource.growthStage);
 
     const toolFailure = this.validateGatherTool(
       inventory.stacks,

@@ -1,3 +1,4 @@
+import { WEARABLE_ITEMS } from '../../src/content/livingworld/WearableContent';
 import { expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
 import { createLegacyPhase1ContentCatalog } from '../../src/content/phase1/Phase1Catalog';
@@ -96,11 +97,12 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
                   'item:edible-plant',
                   'item:grain',
                   'item:plant-fiber',
+                  'item:basic-spear',
                 ].map((id, i) => ({
                   stackId: 'item' + i,
                   itemDefinitionId: id,
-                  quantity: i < 2 ? 1 : 3,
-                  condition: null,
+                  quantity: i < 2 || id === 'item:basic-spear' ? 1 : 3,
+                  condition: id === 'item:basic-spear' ? 100 : null,
                 })),
           },
         ],
@@ -140,7 +142,7 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
     ground: () => !blocked,
     plotGround: () => (blocked ? 'OBSTRUCTED' : null),
     weather: () => (wet ? 'mist-rain' : 'clear'),
-    weapon: () => weapon,
+    hunt: () => weapon ? {damage:4,cooldownTicks:60,toolWear:{stackId:'item10',conditionCost:1},commit:()=>null} : 'EQUIP_WEAPON_FIRST',
     cancelRest: () => {},
   };
   const authority = new LivingWorldAuthority(
@@ -184,7 +186,7 @@ function fixture(saved: Partial<LivingWorldState> = {}, full = false) {
 it('adds living and root items while preserving every V3/V4 generated entity and seed', () => {
   const old = createLegacyPhase1ContentCatalog(),
     active = createPhase1ContentCatalog();
-  expect(active.size - old.size).toBe(29 + LIVING_ROOT_ITEMS.length + FISHING_ITEMS.length + GEAR_ITEMS.length);
+  expect(active.size - old.size).toBe(29 + LIVING_ROOT_ITEMS.length + FISHING_ITEMS.length + GEAR_ITEMS.length + WEARABLE_ITEMS.length);
   expect(LIVING_ITEMS.every((i) => active.has(i.id))).toBe(true);
   expect(active.compatibility.canonicalFingerprint).not.toBe(
     old.compatibility.canonicalFingerprint,
@@ -520,6 +522,18 @@ it('failed unexplored spawn points retry later without duplicating hunted animal
   expect(rooster.authority.read().animals[0]!.product).toBe(0);
 });
 
+it('transplanted timber requires a functioning tool and pays yield and wear once', () => {
+  const f=fixture({forage:[{id:'timber:sapling',kind:'timber-tree',x:102,y:100,readyTick:0,cleared:false,lineage:'item:root-timber-tree',growth:{version:1,progress:108000,moisture:8000,dryTicks:0,cut:false}}]});
+  const before=f.authority.read(),bag=f.items.exportLedgerSnapshot();
+  expect(f.authority.execute(f.command('forage','timber:sapling'))).toMatchObject({status:'rejected',message:'TOOL_REQUIRED'});
+  expect(f.authority.read()).toEqual(before);expect(f.items.exportLedgerSnapshot()).toEqual(bag);
+  expect(f.items.commitColonyExchange({operationId:'fixture:tree-tool',playerId:'solo',expectedInventoryRevision:f.items.getContainerView('inventory:solo').revision,inputs:[],outputs:[{itemDefinitionId:'item:stone-field-tool',quantity:1}]}).status).toBe('committed');
+  const command=f.command('forage','timber:sapling');expect(f.authority.execute(command).status).toBe('committed');
+  const after=f.items.exportLedgerSnapshot();expect(f.items.getContainerView('inventory:solo').stacks.find(s=>s.itemDefinitionId==='item:stone-field-tool')!.condition).toBe(98);
+  expect(f.authority.read().forage[0]).toMatchObject({growth:{progress:0,cut:true}});
+  expect(f.authority.execute(command).status).toBe('committed');expect(f.items.exportLedgerSnapshot()).toEqual(after);
+});
+
 it('plant harvest resets growth, roots transplant once, and full bags or blocked ground preserve both sides of the transaction', () => {
   const plant = { id: 'forage:berry', kind: 'berry-bush', x: 100, y: 103, readyTick: 0, cleared: false, growth: { version: 1 as const, progress: 10800, moisture: 8000, dryTicks: 0, cut: false } };
   const f = fixture({ forage: [plant] });
@@ -629,4 +643,19 @@ it('tilling clears wild plants and pays remaining forage once; a full bag preser
   ).toBe('rejected');
   expect(full.authority.read()).toEqual(soilBefore);
   expect(full.items.getContainerView('inventory:solo')).toEqual(itemsBefore);
+});
+
+
+it('watering a plot writes the same saved wet-soil cell and replay cannot consume water or create another patch',()=>{
+  const f=fixture({plots:[{id:'plot:wet',owner:'solo',x:102,y:100,crop:'grain',progress:0,moisture:2000,dryTicks:0,dead:false,fertility:0}]});
+  const command={id:'water:ground',playerId:'solo',expectedRevision:f.authority.read().revision,expectedInventoryRevision:f.items.getContainerView('inventory:solo').revision,action:'water' as const,target:'plot:wet'};
+  expect(f.authority.execute(command).status).toBe('committed');
+  const saved=f.authority.read();expect(saved.soil?.patches).toEqual([{key:'25:25',moisture:10000}]);expect(saved.plots[0]!.moisture).toBe(10000);
+  const ledger=f.items.getContainerView('inventory:solo');expect(f.authority.execute(command).status).toBe('committed');expect(f.items.getContainerView('inventory:solo')).toEqual(ledger);expect(f.authority.read().soil).toEqual(saved.soil);
+});
+it('soil patch capacity rejects watering atomically instead of evicting remote water or consuming supplies',()=>{
+  const f=fixture({plots:[{id:'plot:bounded',owner:'solo',x:102,y:100,crop:'grain',progress:0,moisture:2000,dryTicks:0,dead:false,fertility:0}],soil:{version:1,patches:Array.from({length:512},(_,i)=>({key:i+':-100',moisture:10000}))}});
+  const before=f.authority.read(),ledger=f.items.getContainerView('inventory:solo');
+  expect(f.authority.execute({id:'water:capacity',playerId:'solo',expectedRevision:before.revision,expectedInventoryRevision:ledger.revision,action:'water',target:'plot:bounded'}).message).toBe('SOIL_PATCH_CAPACITY');
+  expect(f.authority.read()).toEqual(before);expect(f.items.getContainerView('inventory:solo')).toEqual(ledger);
 });

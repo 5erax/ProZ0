@@ -15,7 +15,7 @@ async function walkTo(page: Page, x: number, y: number): Promise<void> {
       }));
       const dx = x - position.x;
       const dy = y - position.y;
-      if (Math.hypot(dx, dy) <= 0.65) return;
+      if (Math.hypot(dx, dy) <= 0.5) return;
       const current = position.x.toFixed(2) + "," + position.y.toFixed(2);
       stuck = current === previous ? stuck + 1 : 0;
       previous = current;
@@ -41,7 +41,7 @@ async function walkTo(page: Page, x: number, y: number): Promise<void> {
         for (const key of keys) await page.keyboard.down(key);
         held = keys;
       }
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(Math.hypot(dx,dy)<.75?20:100);
     }
     throw new Error(
       "Normal movement failed toward " +
@@ -66,7 +66,7 @@ test('three fresh exploration journeys: walk from landing to new lab, mine and s
     await expect(page.locator('[data-world-role="survey-site"]')).toHaveCount(0);
     await walkTo(page,0,12);await walkTo(page,site.position.x,site.position.y);
     const sprite=page.locator('[data-world-role="survey-site"][data-site-id="'+site.id+'"]');await expect(sprite).toBeVisible();
-    await sprite.click();const row=page.locator('[data-discovered-landmark="'+site.id+'"]');await row.getByRole('button',{name:'Inspect',exact:true}).click();
+    await sprite.locator('[data-site-interaction]').click();const row=page.locator('[data-discovered-landmark="'+site.id+'"]');await expect(row.getByRole('button',{name:'Inspect',exact:true})).toBeEnabled({timeout:5000});await row.getByRole('button',{name:'Inspect',exact:true}).click();
     await expect(row.getByRole('button',{name:'Inspect',exact:true})).toHaveCount(0);await expect(row).toContainText('Needs:');
     await page.keyboard.press('Escape');await page.keyboard.press('l');await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state','success');
     await page.reload();await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');await page.keyboard.press('j');

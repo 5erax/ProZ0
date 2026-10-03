@@ -33,7 +33,7 @@ export function canonicalizePortableSaveBundleV2(
       .map((player) => Object.freeze({
         ...player,
         position: Object.freeze({ ...player.position }),
-        equipment: Object.freeze({ ...player.equipment }),
+        equipment: Object.freeze({ ...player.equipment, ...(player.equipment.wearables ? {wearables: Object.freeze({...player.equipment.wearables})} : {}) }),
         survival: Object.freeze({ ...player.survival }),
         lifeState: Object.freeze({ ...player.lifeState }),
         progression: Object.freeze({

@@ -28,10 +28,14 @@ test('root UI fixture: mature harvest, uproot, ground preview, transplant and sa
     await new Promise<void>((resolve, reject) => { const tx = db.transaction(['worlds', 'players', 'containers', 'chunks', 'footholds', 'structures'], 'readwrite'); tx.objectStore('worlds').put(request.world); for (const key of ['players', 'containers', 'chunks', 'footholds', 'structures'] as const) for (const record of request[key]) tx.objectStore(key).put(record); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); db.close();
   }, save);
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:root-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=root-ui');
-  await page.locator('[data-living-id="fixture:berry"]').click();
+  const target = page.locator('[data-living-id="fixture:berry"]');
+  await target.click({button:'right'});
+  await expect(page.getByRole('region',{name:'Entity statistics',exact:true})).toContainText('Maximum growth reached');
+  await expect(page.locator('.lw-panel')).toBeHidden();
+  await target.click();
+  await expect(page.locator('.lw-panel')).toBeHidden();
+  await page.keyboard.press('f');
   const panel = page.locator('.lw-panel'), row = panel.locator('[data-living-row="fixture:berry"]');
-  await expect(row).toContainText('Maximum growth reached');
-  await row.getByRole('button', { name: 'Gather', exact: true }).click();
   await expect(row).toContainText('Early growth');
   await row.getByRole('button', { name: 'Uproot · Field Hoe', exact: true }).click();
   await expect(row).toHaveCount(0);

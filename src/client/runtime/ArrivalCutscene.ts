@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
 export async function playArrivalCutscene(
   root: HTMLElement,
   query: URLSearchParams,
@@ -22,7 +24,7 @@ export async function playArrivalCutscene(
     overlay = doc.createElement("section");
   overlay.className = "proz0-arrival";
   overlay.setAttribute("role", "dialog");
-  overlay.setAttribute("aria-label", "Đặt chân đến ProZ0");
+  bindUiText(overlay,"aria-label",uiText("ui.fffaa29b"));
   overlay.setAttribute("aria-modal", "true");
   const style = doc.createElement("style");
   style.textContent =
@@ -40,31 +42,31 @@ export async function playArrivalCutscene(
   actions.className = "arrival-actions";
   const next = doc.createElement("button"),
     skip = doc.createElement("button");
-  next.textContent = "Tiếp tục";
-  skip.textContent = "Bỏ qua";
+  bindUiText(next,"textContent",uiText("ui.ab43d664"));
+  bindUiText(skip,"textContent",uiText("ui.c197c7e2"));
   actions.append(next, skip);
   frame.append(art, heading, caption, actions);
   overlay.append(style, frame);
   root.append(overlay);
   const shots = [
     [
-      "TÍN HIỆU ĐẾN",
-      "Tàu khảo sát tiến vào quỹ đạo một thế giới chưa có trên bản đồ. Bên dưới: những mảnh đất lơ lửng trong màn sương.",
+      uiText("ui.c9ebed7b"),
+      uiText("ui.4d1f858c"),
     ],
     [
-      "HẠ CÁNH",
-      "Khoang tiên phong chạm đất. Nguồn dự trữ chỉ đủ cho bước đầu; hành trình còn lại nằm trong tay bạn.",
+      uiText("ui.8db6a0bc"),
+      uiText("ui.2fbaecea"),
     ],
     [
-      "MỘT CĂN CỨ MỚI",
-      "Tìm nước, thu thập vật liệu và dựng nơi trú. Khám phá những dấu vết còn lại — một mình, hoặc cùng bạn bè.",
+      uiText("ui.667480b"),
+      uiText("ui.2da7b534"),
     ],
   ];
   await new Promise<void>((resolve) => {
     let index = 0, finished = false;
     const show = () => {
-      heading.textContent = shots[index]![0]!;
-      caption.textContent = shots[index]![1]!;
+      bindUiText(heading,"textContent",shots[index]![0]!);
+      bindUiText(caption,"textContent",shots[index]![1]!);
       art.dataset.shot = String(index);
       art.style.filter =
         index === 0
@@ -72,8 +74,7 @@ export async function playArrivalCutscene(
           : index === 1
             ? "brightness(.9)"
             : "none";
-      next.textContent =
-        index === shots.length - 1 ? "Bắt đầu hành trình" : "Tiếp tục";
+      bindUiText(next,"textContent",index === shots.length - 1 ? uiText("ui.d07f2e12") : uiText("ui.ab43d664"));
     };
     const finish = () => {
       if (finished) return;

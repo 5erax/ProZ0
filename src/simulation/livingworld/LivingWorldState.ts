@@ -1,3 +1,4 @@
+import {validateSoilState,type SoilStateV1} from './SoilMoisture';
 import {
   cropDefinition,
   speciesDefinition,
@@ -65,6 +66,8 @@ export interface LivingWorldState {
   stations: LivingStation[];
   receipts: { id: string; signature: string; message: string }[];
   fishing?: FishingState;
+  soil?: SoilStateV1;
+  huntCooldowns?: {version:1;until:Record<string,number>};
 }
 export const emptyLivingWorld = (tick = 0): LivingWorldState => ({
   version: 1,
@@ -112,8 +115,10 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
     s.receipts.length > 96
   )
     throw Error('Invalid living world');
+  if(s.huntCooldowns!==undefined && (!s.huntCooldowns || s.huntCooldowns.version!==1 || !s.huntCooldowns.until || Array.isArray(s.huntCooldowns.until) || typeof s.huntCooldowns.until!=='object' || Object.keys(s.huntCooldowns.until).length>32 || Object.entries(s.huntCooldowns.until).some(([id,tick])=>!id||id.length>120||!n(tick))))throw Error('Invalid hunting cooldowns');
   const ids = new Set<string>();
   if (s.fishing !== undefined) validateFishingState(s.fishing);
+  if (s.soil !== undefined) validateSoilState(s.soil);
   for (const e of [...s.plots, ...s.animals, ...s.forage, ...s.stations]) {
     if (
       !e ||
@@ -182,7 +187,7 @@ export function validateLivingWorld(value: unknown): LivingWorldState {
       (f.lineage !== undefined && (typeof f.lineage !== 'string' || !f.lineage || f.lineage.length > 180 || !f.growth)) ||
       (f.growth !== undefined && (
         !f.growth || f.growth.version !== 1 ||
-        !(f.kind.startsWith('wild-') || f.kind === 'berry-bush') ||
+          !(f.kind.startsWith('wild-') || ['berry-bush','timber-tree','fiber-plant','food-plant'].includes(f.kind)) ||
         ![f.growth.progress, f.growth.moisture, f.growth.dryTicks].every(n) ||
         f.growth.progress > forageDefinition(f.kind)!.renewalTicks ||
         f.growth.moisture > 10000 || typeof f.growth.cut !== 'boolean'

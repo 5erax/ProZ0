@@ -119,6 +119,8 @@ export type Phase1RuinRewardClaimReservationResult =
     };
 
 export interface Phase1VerticalSliceWorldAdapterOptions {
+  readonly elevationAt?: (position:WorldPosition)=>number;
+  readonly foundationAt?: (position:WorldPosition)=>boolean;
   readonly colonyTerrainRulesEnabled?: boolean;
   readonly expeditionCollisionEnabled?: boolean;
   readonly expeditionShelterAt?: (position:WorldPosition)=>boolean;
@@ -131,7 +133,9 @@ export interface Phase1VerticalSliceWorldAdapterOptions {
   readonly spawnClearanceRadiusWorldUnits: number;
   readonly requiredAccessRadiusWorldUnits: number;
   readonly structures: () => readonly Readonly<StructureRuntimeState>[];
+  readonly structureFootprint?: (structureId:string)=>StructurePlacementProfile['footprint']|null;
   readonly playerIds: () => readonly PlayerId[];
+  readonly playerOnSurface?: (playerId:PlayerId)=>boolean;
   readonly playerInsideStructure?: (
     playerId: PlayerId,
     structureId: string,
@@ -348,6 +352,12 @@ export class Phase1VerticalSliceWorldAdapter
     return this.options.playerPositions.get(playerId);
   }
 
+  public isPlayerOnSurface(playerId:PlayerId):boolean { return this.options.playerOnSurface?.(playerId) !== false; }
+
+  public canStandAt(position: WorldPosition, footprint:AxisSweepRequest['footprint']): boolean {
+    return this.isPositionBuildable(position) && this.isMovementPassable(position,footprint) && !this.blocksExpeditionMotion(position,position,footprint);
+  }
+
   public sweepAabbAxis(request: AxisSweepRequest): AxisSweepResult {
     if (!Number.isFinite(request.desiredDelta)) {
       throw new RangeError('Movement desiredDelta must be finite.');
@@ -362,6 +372,15 @@ export class Phase1VerticalSliceWorldAdapter
       request.center.y
         + (request.axis === 'y' ? request.desiredDelta : 0),
     );
+
+    if(this.options.elevationAt){
+      const count=Math.max(1,Math.ceil(Math.abs(request.desiredDelta)/.125));let prior=request.center,allowed=0;
+      for(let i=1;i<=count;i++){const delta=request.desiredDelta*i/count,next=createWorldPosition(request.center.x+(request.axis==='x'?delta:0),request.center.y+(request.axis==='y'?delta:0));
+        if(Math.abs(this.options.elevationAt(next)-this.options.elevationAt(prior))>.45||!this.isMovementPassable(next,request.footprint)||this.blocksExpeditionMotion(prior,next,request.footprint))return {allowedDelta:allowed,blocked:true,hitSolidId:'mountain-cliff'};
+        prior=next;allowed=delta;
+      }
+      return {allowedDelta:allowed,blocked:false};
+    }
 
     if (this.isMovementPassable(target, request.footprint) && !this.blocksExpeditionMotion(request.center,target,request.footprint)) {
       return Object.freeze({
@@ -383,6 +402,7 @@ export class Phase1VerticalSliceWorldAdapter
     containerId: string,
   ): boolean {
     if (containerId === 'inventory:' + playerId) return true;
+    if (this.options.playerOnSurface?.(playerId) === false) return false;
 
     const drop = [...this.drops.values()].find(
       (entry) => entry.containerId === containerId && entry.available,
@@ -412,6 +432,7 @@ export class Phase1VerticalSliceWorldAdapter
     if (entity === null || entity.type !== 'resource') return null;
     const state = this.options.store.getResourceState(resourceEntityId);
     if (state === undefined) return null;
+    if (state.uprootedVersion === 1) return null;
     return Object.freeze({
       resourceEntityId,
       resourceDefinitionId: entity.definitionId,
@@ -419,6 +440,7 @@ export class Phase1VerticalSliceWorldAdapter
       revision: state.revision,
       remainingActions: state.remainingGatherActions,
       depleted: state.depleted,
+      growthStage: state.lifecycle?.kind === 'plant' ? state.lifecycle.stage : undefined,
     });
   }
 
@@ -427,7 +449,7 @@ export class Phase1VerticalSliceWorldAdapter
     entityId: string,
   ): boolean {
     const entity = this.findGeneratedEntity(entityId);
-    return entity !== null
+    return this.options.playerOnSurface?.(playerId) !== false && entity !== null
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
         entity.position,
@@ -439,7 +461,7 @@ export class Phase1VerticalSliceWorldAdapter
     resourceEntityId: string,
   ): boolean {
     const entity = this.findGeneratedEntity(resourceEntityId);
-    return entity !== null
+    return this.options.playerOnSurface?.(playerId) !== false && entity !== null
       && entity.type === 'resource'
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
@@ -798,11 +820,16 @@ export class Phase1VerticalSliceWorldAdapter
     }
     if(position.x!==predator.position.x||position.y!==predator.position.y){predator.position=position;predator.revision+=1;}
   }
+  private placementProfile(structure:Readonly<StructureRuntimeState>):StructurePlacementProfile {
+    const base=PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId];
+    const footprint=this.options.structureFootprint?.(structure.structureId);
+    return footprint ? {...base,footprint} : base;
+  }
   private blocksExpeditionMotion(previous:WorldPosition,next:WorldPosition,footprint:AxisSweepRequest['footprint']):boolean{
     if(!this.options.expeditionCollisionEnabled)return false;
     return this.options.structures().some(structure=>{
       if(structure.definitionId==='structure:landing-module'||structure.definitionId==='structure:habitat-room')return false;
-      const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],rotated=structure.orientationQuarterTurns%2!==0;
+      const profile=this.placementProfile(structure),rotated=structure.orientationQuarterTurns%2!==0;
       const halfWidth=(rotated?profile.footprint.depth:profile.footprint.width)/2+footprint.halfWidth,halfDepth=(rotated?profile.footprint.width:profile.footprint.depth)/2+footprint.halfDepth;
       const overlaps=(p:WorldPosition)=>Math.abs(p.x-structure.position.x)<halfWidth&&Math.abs(p.y-structure.position.y)<halfDepth;
       return overlaps(next)&&(!overlaps(previous)||distanceSquared(next,structure.position)<=distanceSquared(previous,structure.position));
@@ -849,6 +876,7 @@ export class Phase1VerticalSliceWorldAdapter
       position,
       profile,
       orientationQuarterTurns,
+      true,
     ).every((sample) => this.isPositionExplored(sample));
   }
 
@@ -857,11 +885,14 @@ export class Phase1VerticalSliceWorldAdapter
     profile: StructurePlacementProfile,
     orientationQuarterTurns: QuarterTurn,
   ): boolean {
-    return this.sampleFootprint(
+    const samples=this.sampleFootprint(
       position,
       profile,
       orientationQuarterTurns,
-    ).every((sample) => this.isPositionBuildable(sample));
+      true,
+    );
+    if(this.options.elevationAt){const height=this.options.elevationAt(position);if(samples.some(p=>Math.abs(this.options.elevationAt!(p)-height)>.25||this.options.foundationAt?.(p)===false))return false;}
+    return samples.every((sample) => this.isPositionBuildable(sample));
   }
 
   public hasNonBuildableSurface(
@@ -992,7 +1023,7 @@ export class Phase1VerticalSliceWorldAdapter
     structureId: string,
   ): boolean {
     const structure = this.structureById(structureId);
-    return structure !== null
+    return this.options.playerOnSurface?.(playerId) !== false && structure !== null
       && this.inInteractionRange(
         this.getPlayerPosition(playerId),
         structure.position,
@@ -1038,6 +1069,7 @@ export class Phase1VerticalSliceWorldAdapter
       ),
     ];
 
+    if(this.options.elevationAt){const heights=samples.map(p=>this.options.elevationAt!(p));if(Math.max(...heights)-Math.min(...heights)>.8)return false;}
     if(this.options.colonyTerrainRulesEnabled)return samples.every(sample=>this.activeChunks.has(toChunkKey(fromWorldPosition(sample))));
     if (!samples.every((sample) => this.isPositionBuildable(sample))) {
       return false;
@@ -1099,26 +1131,35 @@ export class Phase1VerticalSliceWorldAdapter
     position: WorldPosition,
     profile: StructurePlacementProfile,
     orientationQuarterTurns: QuarterTurn,
+    terrainCells=false,
   ): readonly WorldPosition[] {
     const swapped = orientationQuarterTurns % 2 === 1;
     const width = swapped ? profile.footprint.depth : profile.footprint.width;
     const depth = swapped ? profile.footprint.width : profile.footprint.depth;
     const halfWidth = width / 2;
     const halfDepth = depth / 2;
-    return Object.freeze([
-      position,
-      createWorldPosition(position.x - halfWidth, position.y - halfDepth),
-      createWorldPosition(position.x + halfWidth, position.y - halfDepth),
-      createWorldPosition(position.x - halfWidth, position.y + halfDepth),
-      createWorldPosition(position.x + halfWidth, position.y + halfDepth),
-    ]);
+    if(!terrainCells)return Object.freeze([position,
+      createWorldPosition(position.x-halfWidth,position.y-halfDepth),createWorldPosition(position.x+halfWidth,position.y-halfDepth),
+      createWorldPosition(position.x-halfWidth,position.y+halfDepth),createWorldPosition(position.x+halfWidth,position.y+halfDepth)]);
+    // Sample every terrain cell touched by the rectangle, including edge cells.
+    // A center plus four corners misses narrow water/fog strips under larger foundations.
+    const coordinates=(center:number,half:number)=>{
+      const low=center-half,high=center+half,values=[low,center,high];
+      const cellSize=2;
+      for(let cell=Math.floor(low/cellSize);cell<=Math.floor(high/cellSize);cell++){
+        values.push(Math.max(low,Math.min(high,(cell+.5)*cellSize)));
+      }
+      return [...new Set(values)];
+    };
+    const xs=coordinates(position.x,halfWidth),ys=coordinates(position.y,halfDepth);
+    return Object.freeze(xs.flatMap(x=>ys.map(y=>createWorldPosition(x,y))));
   }
 
   public getMovementSpeedMultiplier(position: WorldPosition): number {
     if (!this.options.colonyTerrainRulesEnabled) return 1;
     // Existing generated water stays shallow and traversable. Buildings keep their foundations.
     for (const structure of this.options.structures()) {
-      const profile=PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId];
+      const profile=this.placementProfile(structure);
       if(positionInsideFootprint(position,structure.position,profile,structure.orientationQuarterTurns))return 1;
     }
     const view=this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
@@ -1144,7 +1185,7 @@ export class Phase1VerticalSliceWorldAdapter
   }
 
   private isPositionBuildable(position: WorldPosition): boolean {
-    if(this.options.colonyTerrainRulesEnabled)for(const structure of this.options.structures())if(positionInsideFootprint(position,structure.position,PHASE1_STRUCTURE_PLACEMENT_PROFILES[structure.definitionId],structure.orientationQuarterTurns))return true;
+    if(this.options.colonyTerrainRulesEnabled)for(const structure of this.options.structures())if(positionInsideFootprint(position,structure.position,this.placementProfile(structure),structure.orientationQuarterTurns))return true;
     const view = this.activeChunks.get(toChunkKey(fromWorldPosition(position)));
     if (view === undefined) return false;
     const local = toChunkLocalPosition(position, view.base.coord);

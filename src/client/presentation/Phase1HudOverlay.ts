@@ -1,3 +1,8 @@
+import { uiText } from '../localization/UiMessages';
+import { onLocaleChange } from '../localization/Locale';
+import { bindUiText } from '../localization/UiMessages';
+import { uiPhrase } from '../localization/UiMessages';
+import { WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
 import {
   validatePhase1PresentationState,
   type Phase1InventoryItemPresentation,
@@ -24,7 +29,7 @@ import {
 } from './Phase1ProductionAssets';
 import type { CharacterInspection } from './CharacterInspection';
 import { RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
-import { heldSpearSprite } from './EquipmentArt';
+import { heldSpearSprite, wearableSprite } from './EquipmentArt';
 import { selectedPlayerSkin, playerSkinFilter } from '../runtime/PlayerProfile';
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
@@ -36,7 +41,7 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
   const element = document.createElement(tag);
   element.className = className;
   if (text !== undefined) {
-    element.textContent = text;
+    bindUiText(element,"textContent",text);
   }
   return element;
 }
@@ -130,7 +135,7 @@ function meter(
   row.dataset.stateLabel = presentation.stateLabel;
   row.dataset.value = String(presentation.value);
   row.dataset.max = String(presentation.max);
-  row.title = presentation.label + ' · ' + presentation.stateLabel;
+  bindUiText(row,"title",presentation.label + ' · ' + presentation.stateLabel);
 
   const label = createElement(document, 'div', 'p1-meter-label');
   const icon = assetSprite(
@@ -183,18 +188,18 @@ function itemRow(
 ): HTMLElement {
   const row = createElement(document, 'button', 'p1-item-row');
   row.type = 'button';
-  row.setAttribute('aria-label', item.name);
+  bindUiText(row,"aria-label",uiPhrase(item.name));
   row.dataset.reviewItem = item.id;
   row.dataset.itemId = item.id;
   row.dataset.selected = String(selected);
   row.dataset.available = String(item.available ?? item.condition !== 0);
   row.draggable = item.inspection?.canEquip === true;
-  if (item.inspection?.canEquip) { row.dataset.rarity = item.rarity ?? 'common'; row.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; row.title = RARITY_STYLE[item.rarity ?? 'common'].label + ' · ' + item.name; }
+  if (item.inspection?.canEquip) { row.dataset.rarity = item.rarity ?? 'common'; row.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; bindUiText(row,"title",uiPhrase(RARITY_STYLE[item.rarity ?? 'common'].label) + ' · ' + uiPhrase(item.name)); }
 
   const icon = assetSprite(
     document,
     'p1-asset-icon p1-item-icon',
-    itemIconSprite(item.name),
+    itemIconSprite(uiPhrase(item.name)),
   );
   const identity = createElement(
     document,
@@ -202,21 +207,21 @@ function itemRow(
     'p1-item-name',
     compact
       ? '×' + String(item.quantity)
-      : item.name + ' ×' + String(item.quantity),
+      : uiPhrase(item.name) + ' ×' + String(item.quantity),
   );
   const state = createElement(
     document,
     'span',
     'p1-item-state',
     item.condition === null
-      ? (item.stateLabel ?? '')
-      : 'COND ' + String(item.condition) + (item.stateLabel === null ? '' : ' · ' + item.stateLabel),
+      ? uiPhrase(item.stateLabel)
+      : uiText("ui.44a26ee7") + String(item.condition) + (item.stateLabel === null ? '' : ' · ' + uiPhrase(item.stateLabel)),
   );
 
   if (icon !== null) {
     row.append(icon);
   }
-  if (item.inspection?.canEquip) { identity.style.color = RARITY_STYLE[item.rarity ?? 'common'].colour; identity.append(createElement(document, 'small', 'p1-rarity-label', RARITY_STYLE[item.rarity ?? 'common'].label)); }
+  if (item.inspection?.canEquip) { identity.style.color = RARITY_STYLE[item.rarity ?? 'common'].colour; identity.append(createElement(document, 'small', 'p1-rarity-label', uiPhrase(RARITY_STYLE[item.rarity ?? 'common'].label))); }
   row.append(identity, state);
   if (
     item.condition !== null
@@ -246,18 +251,18 @@ function itemRow(
       document,
       'span',
       'p1-visually-hidden',
-      item.name,
+      uiPhrase(item.name),
     ));
   }
   return row;
 }
 
-function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlotsPresentation, 'weapon' | 'protection'> | undefined): HTMLElement {
+function equipmentPreview(document: Document, equipment: Omit<Phase1EquipmentSlotsPresentation, 'quickUse'> | undefined): HTMLElement {
   const wardrobe = createElement(document, 'section', 'p1-wardrobe');
   if (!equipment) return wardrobe;
-  wardrobe.setAttribute('aria-label', 'Equipment and character preview');
+  bindUiText(wardrobe,"aria-label",uiText("ui.6f92739"));
   const avatar = createElement(document, 'div', 'p1-avatar');
-  avatar.setAttribute('role', 'img'); avatar.setAttribute('aria-label', 'Current character appearance');
+  avatar.setAttribute('role', 'img'); bindUiText(avatar,"aria-label",uiText("ui.d51b54d9"));
   avatar.dataset.skin = selectedPlayerSkin();
   const body = createElement(document, 'span', 'p1-avatar-layer');
   applyProductionSprite(body, playerActorSprite('S', 'IDLE', 0).sprite, 2);
@@ -265,43 +270,61 @@ function equipmentPreview(document: Document, equipment: Pick<Phase1EquipmentSlo
   avatar.append(body);
   if (equipment.protection) { const protection = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(protection, thermalWrapActorSprite('S', 'IDLE', 0).sprite, 2); protection.dataset.avatarEquipment = 'protection'; avatar.append(protection); }
   if (equipment.weapon) { const weapon = createElement(document, 'span', 'p1-avatar-layer'); applyProductionSprite(weapon, heldSpearSprite('S', equipment.weapon.rarity).sprite, 2); weapon.dataset.avatarEquipment = 'weapon'; weapon.dataset.rarity = equipment.weapon.rarity ?? 'common'; avatar.append(weapon); }
-  const slot = (kind: 'weapon' | 'protection') => {
-    const equipped = equipment[kind], label = kind === 'weapon' ? 'Weapon' : 'Protection';
+  for (const kind of WEARABLE_SLOTS) if (equipment[kind]) {
+    const layer = createElement(document, 'span', 'p1-avatar-layer');
+    applyProductionSprite(layer, wearableSprite(kind, 'S').sprite, 2);
+    layer.dataset.avatarEquipment = kind; avatar.append(layer);
+  }
+  const slot = (kind: 'weapon' | 'protection' | WearableSlot) => {
+    const equipped = equipment[kind], label = {weapon:uiText("ui.b7c10361"),protection:uiText("ui.37914e64"),head:uiText("ui.b2972ae3"),legs:uiText("ui.9979822c"),feet:uiText("ui.3b61cb75"),accessory:uiText("ui.f7f5c579")}[kind];
     const cell = createElement(document, 'div', 'p1-wardrobe-slot'); cell.dataset.equipmentDropSlot = kind;
     cell.append(createElement(document, 'strong', '', label));
     if (equipped) {
       cell.dataset.rarity = equipped.rarity ?? 'common'; cell.style.borderColor = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
       const badge = createElement(document, 'small', 'p1-rarity-label', RARITY_STYLE[equipped.rarity ?? 'common'].label); badge.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour; cell.append(badge);
-      const icon = assetSprite(document, 'p1-asset-icon', itemIconSprite(equipped.name)); if (icon) cell.append(icon);
-      cell.append(createElement(document, 'span', '', equipped.name), createElement(document, 'small', '', equipped.condition === null ? 'Equipped' : 'Durability ' + equipped.condition + '/' + equipped.conditionMax), actionButton(document, 'Unequip ' + label.toLowerCase(), 'unequip-slot:' + kind));
+      const icon = assetSprite(document, 'p1-asset-icon', itemIconSprite(uiPhrase(equipped.name))); if (icon) cell.append(icon);
+      cell.append(createElement(document, 'span', '', uiPhrase(equipped.name)), createElement(document, 'small', '', equipped.condition === null ? uiText("ui.7e98c350") : uiText("ui.345bed12") + equipped.condition + '/' + equipped.conditionMax), actionButton(document, uiText("ui.566c1a0e") + label.toLowerCase(), 'unequip-slot:' + kind));
       cell.dataset.equippedStack = equipped.stackId ?? '';
       const name = cell.querySelector('span:not(.p1-asset-icon)'); if (name instanceof HTMLElement) name.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
-    } else cell.append(createElement(document, 'span', '', 'Empty'), actionButton(document, 'Equip selected ' + label.toLowerCase(), 'equip-slot:' + kind));
-    cell.title = 'Drag a matching item from your bag here, or select it and use Equip.';
+    } else cell.append(createElement(document, 'span', '', uiText("ui.d1571f8e")), actionButton(document, uiText("ui.caead158") + label.toLowerCase(), 'equip-slot:' + kind));
+    bindUiText(cell,"title",uiText("ui.49f03461"));
     return cell;
   };
-  wardrobe.append(slot('weapon'), avatar, slot('protection'), createElement(document, 'small', 'p1-wardrobe-help', 'Select gear and equip it, or drag it into a slot. Equipped gear stays in your bag.'));
+  const left = createElement(document, 'div', 'p1-wardrobe-column'); left.append(slot('head'), slot('protection'), slot('legs'));
+  const right = createElement(document, 'div', 'p1-wardrobe-column'); right.append(slot('weapon'), slot('feet'), slot('accessory'));
+  wardrobe.append(left, avatar, right);
+  if (equipment.effects) wardrobe.append(createElement(document, 'small', 'p1-wardrobe-help', uiText("ui.c6110440") + equipment.effects.join(' · ')));
+  const help = createElement(document, 'details', 'p1-wardrobe-help'); help.append(createElement(document, 'summary', '', uiText("ui.be1025ea")), createElement(document, 'small', '', uiText("ui.ef4da8ed"))); wardrobe.append(help);
   return wardrobe;
+}
+
+function arrangeWardrobe(document: Document, root: HTMLElement): void {
+  const wardrobe = root.querySelector<HTMLElement>('.p1-wardrobe');
+  if (!wardrobe) return;
+  const layout = createElement(document, 'div', 'p1-inventory-layout');
+  const bag = createElement(document, 'div', 'p1-inventory-bag');
+  for (const child of Array.from(root.children)) if (child !== wardrobe && !child.matches('.p1-panel-title,.p1-panel-skin-corner')) bag.append(child);
+  layout.append(wardrobe, bag); root.append(layout);
 }
 
 function itemInspectionCard(document: Document, item: Phase1InventoryItemPresentation | undefined): HTMLElement {
   const card = createElement(document, 'section', 'p1-item-inspection');
   if (!item?.inspection) return card;
-  card.setAttribute('aria-label', 'Selected item details');
+  bindUiText(card,"aria-label",uiText("ui.9538e211"));
   card.dataset.inspectedStack = item.id;
   if (item.inspection.canEquip) { card.dataset.rarity = item.rarity ?? 'common'; card.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; card.style.setProperty('--rarity-colour', RARITY_STYLE[item.rarity ?? 'common'].colour); }
-  card.append(createElement(document, 'h3', '', item.name), createElement(document, 'p', '', item.inspection.purpose), createElement(document, 'p', '', 'Selected stack: ' + item.quantity + ' items · ' + (item.stackWeightKg ?? 0).toFixed(2) + ' kg · ' + (item.stackBulk ?? 0).toFixed(2) + ' bulk units'));
+  card.append(createElement(document, 'h3', '', uiPhrase(item.name)), createElement(document, 'p', '', uiPhrase(item.inspection.purpose)), createElement(document, 'p', '', uiText("ui.345f446e") + item.quantity + uiText("ui.5dbd0754") + (item.stackWeightKg ?? 0).toFixed(2) + ' kg · ' + (item.stackBulk ?? 0).toFixed(2) + uiText("ui.c273f254")));
   const details = createElement(document, 'details', 'p1-inspection-more');
   details.dataset.inspectionKey = 'item:' + item.id;
-  details.append(createElement(document, 'summary', '', 'Properties, sources and crafting uses'));
+  details.append(createElement(document, 'summary', '', uiText("ui.aebde165")));
   for (const fact of item.inspection.facts) details.append(createElement(document, 'p', '', fact));
-  if (item.condition !== null) details.append(createElement(document, 'p', '', 'Durability now: ' + item.condition + '/' + (item.conditionMax ?? 100) + (item.condition === 0 ? ' · Broken; repair before using.' : '')));
-  if (item.inspection.sources.length) details.append(createElement(document, 'p', '', 'Sources: ' + item.inspection.sources.join(' · ')));
-  if (item.inspection.recipes.length) details.append(createElement(document, 'p', '', 'Ingredient for: ' + item.inspection.recipes.join(' · ')));
+  if (item.condition !== null) details.append(createElement(document, 'p', '', uiText("ui.9c20d098") + item.condition + '/' + (item.conditionMax ?? 100) + (item.condition === 0 ? ' · Broken; repair before using.' : '')));
+  if (item.inspection.sources.length) details.append(createElement(document, 'p', '', uiText("ui.7ae25703") + item.inspection.sources.join(' · ')));
+  if (item.inspection.recipes.length) details.append(createElement(document, 'p', '', uiText("ui.ae7b111b") + item.inspection.recipes.join(' · ')));
   card.append(details);
-  if (item.inspection.canConsume) card.append(actionButton(document, 'Use selected item [V]', 'inventory-use'));
-  if (item.inspection.canEquip) { const equip = actionButton(document, 'Equip selected item [X]', 'equip'); equip.disabled = item.condition === 0; if (equip.disabled) equip.title = 'Repair this broken item before equipping it.'; card.append(equip); }
-  card.append(actionButton(document, 'Drop selected quantity [G]', 'inventory-drop'));
+  if (item.inspection.canConsume) card.append(actionButton(document, uiText("ui.2495d920"), 'inventory-use'));
+  if (item.inspection.canEquip) { const equip = actionButton(document, uiText("ui.6007b81"), 'equip'); equip.disabled = item.condition === 0; if (equip.disabled) bindUiText(equip,"title",uiText("ui.6a653b3e")); card.append(equip); }
+  card.append(actionButton(document, uiText("ui.a023707b"), 'inventory-drop'));
   return card;
 }
 
@@ -309,14 +332,14 @@ function characterInspectionCard(document: Document, character: CharacterInspect
   const details = createElement(document, 'details', 'p1-character-inspection');
   if (!character) return details;
   details.dataset.inspectionKey = 'character';
-  details.append(createElement(document, 'summary', '', 'Character status · ' + (character.effects.length ? character.effects.length + ' conditions' : 'No adverse conditions')));
+  details.append(createElement(document, 'summary', '', uiText("ui.6668c5e9") + (character.effects.length ? character.effects.length + uiText("ui.f328f6c1") : uiText("ui.86300d7a"))));
   const values = createElement(document, 'div', 'p1-character-values');
-  for (const stat of character.values) values.append(createElement(document, 'span', '', stat.name + ': ' + stat.value + '/100'));
-  details.append(values, createElement(document, 'p', '', 'Current stamina recovery penalty: ' + character.staminaRegenPenaltyPercent + '% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.'));
+  for (const stat of character.values) values.append(createElement(document, 'span', '', uiPhrase(stat.name) + ': ' + stat.value + '/100'));
+  details.append(values, createElement(document, 'p', '', uiText("ui.49818d5") + character.staminaRegenPenaltyPercent + '% (combined authority result, capped at 100%). Conditions change when the underlying stat recovers; no expiry timer is invented.'));
   for (const effect of character.effects) {
     const entry = createElement(document, 'article', 'p1-character-effect');
     entry.dataset.effect = effect.id; entry.dataset.severity = effect.severity;
-    entry.append(createElement(document, 'strong', '', effect.name + ' · ' + effect.severity), createElement(document, 'p', '', effect.consequence), createElement(document, 'p', '', 'Treatment: ' + effect.remedy));
+    entry.append(createElement(document, 'strong', '', uiPhrase(effect.name) + ' · ' + uiPhrase(effect.severity)), createElement(document, 'p', '', effect.consequence), createElement(document, 'p', '', uiText("ui.3c4004d9") + effect.remedy));
     details.append(entry);
   }
   return details;
@@ -334,12 +357,8 @@ function teammate(
   const marker = createElement(document, 'span', 'p1-teammate-marker');
   marker.dataset.shape = entry.markerShape;
   applyProductionSprite(marker, teammateIdentitySprite(entry.markerShape));
-  const label = createElement(
-    document,
-    'span',
-    'p1-teammate-label',
-    entry.label + ' · ' + entry.stateLabel,
-  );
+  const label = createElement(document,'span','p1-teammate-label');
+  label.append(document.createTextNode(entry.label + ' · '),createElement(document,'span','',entry.stateLabel));
 
   row.append(marker, label);
   return row;
@@ -391,7 +410,7 @@ function renderPanel(
       root.dataset.inventoryActivePane = 'player';
       root.dataset.inventoryQuantity = String(panel.quantity);
       const list = createElement(document, 'div', 'p1-item-list');
-      for (const item of [...panel.items].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
+      for (const item of [...panel.items].sort((a,b)=>uiPhrase(a.name).localeCompare(uiPhrase(b.name))||a.id.localeCompare(b.id))) {
         list.append(itemRow(
           document,
           item,
@@ -438,6 +457,7 @@ function renderPanel(
         );
       }
       root.append(itemInspectionCard(document, panel.items.find(i => i.id === panel.selectedItemId)));
+      arrangeWardrobe(document, root);
       return root;
     }
 
@@ -457,7 +477,7 @@ function renderPanel(
       left.dataset.inventoryPane = 'player';
       left.dataset.active = String(panel.activePane === 'player');
       left.append(createElement(document, 'div', 'p1-subtitle', 'PLAYER'));
-      for (const item of [...panel.playerItems].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
+      for (const item of [...panel.playerItems].sort((a,b)=>uiPhrase(a.name).localeCompare(uiPhrase(b.name))||a.id.localeCompare(b.id))) {
         const selected = item.id === panel.selectedPlayerItemId;
         const row = itemRow(document, item, selected);
         left.append(row);
@@ -478,7 +498,7 @@ function renderPanel(
       right.dataset.inventoryPane = 'storage';
       right.dataset.active = String(panel.activePane === 'storage');
       right.append(createElement(document, 'div', 'p1-subtitle', panel.containerLabel));
-      for (const item of [...panel.containerItems].sort((a,b)=>a.name.localeCompare(b.name)||a.id.localeCompare(b.id))) {
+      for (const item of [...panel.containerItems].sort((a,b)=>uiPhrase(a.name).localeCompare(uiPhrase(b.name))||a.id.localeCompare(b.id))) {
         const selected = item.id === panel.selectedContainerItemId;
         const row = itemRow(document, item, selected);
         right.append(row);
@@ -574,25 +594,25 @@ function renderPanel(
             'span',
             'p1-craft-output-token',
           );
-          outputToken.dataset.outputName = outputState.name;
+          outputToken.dataset.outputName = uiPhrase(outputState.name);
           outputToken.dataset.outputQuantity = String(outputState.quantity);
           const outputIcon = assetSprite(
             document,
             'p1-asset-icon p1-craft-output-icon',
-            itemIconSprite(outputState.name),
+            itemIconSprite(uiPhrase(outputState.name)),
             0.5,
           );
           if (outputIcon !== null) outputToken.append(outputIcon);
-          outputToken.title = outputState.name;
+          bindUiText(outputToken,"title",uiPhrase(outputState.name));
           outputToken.append(String(outputState.quantity) + '× ',
-            createElement(document, 'span', 'p1-visually-hidden', outputState.name));
+            createElement(document, 'span', 'p1-visually-hidden', uiPhrase(outputState.name)));
           output.append(outputToken);
         }
         if ((rowState.outputs?.length ?? 0) === 0) {
           output.append('→ ' + rowState.outputLabel);
         }
         heading.append(
-          createElement(document, 'span', 'p1-craft-name', rowState.name),
+          createElement(document, 'span', 'p1-craft-name', uiPhrase(rowState.name)),
           output,
         );
         row.append(heading);
@@ -609,7 +629,7 @@ function renderPanel(
               'span',
               'p1-craft-ingredient',
             );
-            const iconDefinition = itemIconSprite(ingredient.name);
+            const iconDefinition = itemIconSprite(uiPhrase(ingredient.name));
             if (iconDefinition !== null) {
               const icon = createElement(
                 document,
@@ -620,8 +640,8 @@ function renderPanel(
               icon.setAttribute('aria-hidden', 'true');
               token.append(icon);
             }
-            token.title = ingredient.name;
-            token.append(createElement(document, 'span', 'p1-visually-hidden', ingredient.name + ' '));
+            bindUiText(token,"title",uiPhrase(ingredient.name));
+            token.append(createElement(document, 'span', 'p1-visually-hidden', uiPhrase(ingredient.name) + ' '));
             token.append(
               ' '
               + String(ingredient.have)
@@ -655,7 +675,7 @@ function renderPanel(
           rowState.reason ?? rowState.state,
         ));
         const craft = actionButton(document, 'Craft', 'craft-recipe:' + rowState.id);
-        craft.setAttribute('aria-label', 'Craft ' + rowState.outputLabel);
+        bindUiText(craft,"aria-label",'Craft ' + rowState.outputLabel);
         craft.disabled = rowState.state !== 'AVAILABLE';
         footer.append(craft);
         row.append(footer);
@@ -679,7 +699,7 @@ function renderPanel(
           'p1-build-catalog-entry',
         );
         row.setAttribute('type', 'button');
-        row.setAttribute('aria-label', 'Select ' + entry.name);
+        bindUiText(row,"aria-label",'Select ' + uiPhrase(entry.name));
         row.dataset.reviewAction = 'build-select:' + entry.structureId;
         row.dataset.structureId = entry.structureId;
         row.dataset.selected = String(entry.selected);
@@ -722,7 +742,7 @@ function renderPanel(
             document,
             'div',
             'p1-build-catalog-name',
-            entry.name,
+            uiPhrase(entry.name),
           ),
           createElement(
             document,
@@ -1241,8 +1261,10 @@ function styles(document: Document): HTMLStyleElement {
     '.p1-panel-skin-corner{position:absolute;left:0;top:0;width:16px!important;height:16px!important;}',
     '.p1-panel-title{font-size:11px;font-weight:700;border-bottom:1px solid #778094;padding:2px 0 4px 14px;margin-bottom:5px;}',
     '.p1-item-inspection,.p1-character-inspection{border:1px solid #51636d;padding:6px;margin:6px 0;line-height:1.5}.p1-item-inspection h3{font-size:11px;margin:0 0 4px}.p1-item-inspection p,.p1-character-inspection p{margin:4px 0}.p1-inspection-more summary,.p1-character-inspection summary{cursor:pointer;font-weight:bold}.p1-character-values{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0}.p1-character-effect{border-left:2px solid #d6c78d;padding:4px 8px;margin:6px 0}.p1-character-effect[data-severity="critical"]{border-color:#e8a088}.p1-item-inspection button{margin:4px 4px 0 0;}',
-    '.p1-wardrobe{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:center;padding:8px;border:1px solid #65747b;margin-bottom:6px}.p1-wardrobe-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:70px;border:1px dashed #708a92;padding:8px}.p1-wardrobe-slot[data-equipped-stack]{border-style:solid}.p1-avatar{position:relative;width:80px;height:104px;background:radial-gradient(ellipse at 50% 80%,#6b8b8b44,transparent 70%)}.p1-avatar-layer{position:absolute!important;left:8px;bottom:4px;image-rendering:pixelated}.p1-wardrobe-help{grid-column:1/4;line-height:1.5}.p1-item-row[draggable=true]{cursor:grab;}',
+    '.p1-wardrobe{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:center;padding:8px;border:1px solid #65747b;margin-bottom:6px}.p1-wardrobe-column{display:flex;flex-direction:column;gap:6px;min-width:0}.p1-wardrobe-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:70px;border:1px dashed #708a92;padding:8px}.p1-wardrobe-slot[data-equipped-stack]{border-style:solid}.p1-avatar{position:relative;width:80px;height:104px;background:radial-gradient(ellipse at 50% 80%,#6b8b8b44,transparent 70%)}.p1-avatar-layer{position:absolute!important;left:8px;bottom:4px;image-rendering:pixelated}.p1-wardrobe-help{grid-column:1/4;line-height:1.5}.p1-item-row[draggable=true]{cursor:grab;}',
     '[data-product-review-panel-open=true] .sp-blueprint,[data-product-review-panel-open=true] .lw-menu,[data-product-review-panel-open=true] .lw-season,[data-product-review-panel-open=true] .p2-colony-controls,[data-product-review-help-open=true] .sp-blueprint{visibility:hidden;pointer-events:none;}',
+    '.p1-panel[data-panel-kind="inventory"]{width:600px;max-height:310px}.p1-inventory-layout{display:grid;grid-template-columns:264px 1fr;gap:8px}.p1-inventory-bag{max-height:268px;overflow:auto;min-width:0}.p1-inventory-layout .p1-wardrobe{align-self:start;margin:0;grid-template-columns:1fr 64px 1fr;gap:4px;padding:4px}.p1-inventory-layout .p1-wardrobe-slot{padding:4px;gap:2px;font-size:8px;min-height:65px}.p1-inventory-layout .p1-wardrobe-slot .p1-action{font-size:8px;padding:2px;line-height:1.2}.p1-inventory-layout .p1-avatar{width:64px}.p1-inventory-layout .p1-avatar-layer{left:0}.p1-inventory-layout .p1-wardrobe-help{font-size:8px}.p1-panel[data-panel-kind="inventory"] .p1-inventory-bag .p1-item-list{grid-template-columns:repeat(2,1fr);}',
+    '.p1-inventory-layout .p1-wardrobe-slot{display:grid;grid-template-columns:24px minmax(0,1fr);align-content:center;text-align:center}.p1-inventory-layout .p1-wardrobe-slot>strong,.p1-inventory-layout .p1-wardrobe-slot>.p1-action,.p1-inventory-layout .p1-wardrobe-slot>small:not(.p1-rarity-label){grid-column:1/-1}.p1-inventory-layout .p1-wardrobe-slot>.p1-rarity-label{grid-column:2;font-size:8px}.p1-inventory-layout .p1-wardrobe-slot>.p1-asset-icon{grid-column:1;grid-row:2/4}.p1-inventory-layout .p1-wardrobe-slot>span:not(.p1-asset-icon){grid-column:2;min-width:0;overflow-wrap:anywhere}.p1-inventory-layout .p1-wardrobe-slot:not([data-equipped-stack])>span{grid-column:1/-1}',
     '.p1-subtitle{margin-top:4px;color:#c5ccbd;}',
     '.p1-item-list,.p1-craft-list{display:grid;gap:2px;}',
     '.p1-rarity-label{display:block;font-size:9px;line-height:1.4}.p1-item-inspection[data-rarity] h3{color:var(--rarity-colour)}',
@@ -1345,7 +1367,12 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private readonly canvas: HTMLCanvasElement;
   private currentState: Phase1PresentationState;
   private panelSignature = '';
+  private readonly stopLocale: () => void;
   private displaySignature = '';
+  private actionDock: HTMLElement | null = null;
+  private equipmentDragActive = false;
+  private readonly startEquipmentDrag = (event: Event) => { if (event.target instanceof Element && event.target.closest('[data-review-item][draggable=true]')) this.equipmentDragActive = true; };
+  private readonly endEquipmentDrag = () => { this.equipmentDragActive = false; queueMicrotask(() => { if (this.layer.isConnected) this.render(); }); };
 
   public constructor(
     private readonly root: HTMLElement,
@@ -1356,12 +1383,17 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     this.document = root.ownerDocument;
     this.canvas = canvas;
     this.currentState = initialState;
+    this.stopLocale = onLocaleChange(() => { this.displaySignature = ''; this.panelSignature = ''; this.render(); });
     this.layer = createElement(this.document, 'div', 'p1-ui');
     this.layer.id = 'proz0-phase1-ui';
     this.layer.dataset.presentationAuthority = 'derived-read-only';
     this.layer.dataset.productionAssetFoundation = 'p1-75-78';
     this.layer.append(styles(this.document));
     this.root.append(this.layer);
+    this.root.addEventListener('dragstart', this.startEquipmentDrag, true);
+    this.root.addEventListener('dragend', this.endEquipmentDrag);
+    this.root.addEventListener('drop', this.endEquipmentDrag);
+    this.document.defaultView?.addEventListener('blur', this.endEquipmentDrag);
     this.root.ownerDocument.defaultView?.addEventListener('resize', this.applyScale);
     this.applyScale();
     this.render();
@@ -1374,7 +1406,12 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   }
 
   public destroy(): void {
+    this.stopLocale();
     this.root.ownerDocument.defaultView?.removeEventListener('resize', this.applyScale);
+    this.root.removeEventListener('dragstart', this.startEquipmentDrag, true);
+    this.root.removeEventListener('dragend', this.endEquipmentDrag);
+    this.root.removeEventListener('drop', this.endEquipmentDrag);
+    this.document.defaultView?.removeEventListener('blur', this.endEquipmentDrag);
     delete this.root.dataset.productReviewPanelOpen;
     this.layer.remove();
   }
@@ -1388,6 +1425,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
 
   private render(): void {
     const state = this.currentState;
+    if (this.equipmentDragActive && state.panel?.kind === 'inventory') return;
+    this.equipmentDragActive = false;
     // Meter text and bars are whole-unit pixels. Keep the exact diagnostic
     // values current without rebuilding the HUD for subpixel survival changes.
     const meters = [state.health, state.water, state.food, state.stamina, state.temperature];
@@ -1421,11 +1460,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     if (state.panel?.kind === 'colony') {
       const lines = state.panel.lines;
       this.layer.querySelectorAll('.p1-colony-status').forEach((element, index) => {
-        element.textContent = lines[index] ?? '';
+        bindUiText(element,"textContent",lines[index] ?? '');
       });
     }
     for (const child of Array.from(this.layer.children)) {
-      if (child !== style && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
+      if (child !== style && child !== this.actionDock && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
         child.remove();
       }
     }
@@ -1466,7 +1505,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     weatherIdentity.append(state.world.weatherLabel);
     weatherLine.append(
       weatherIdentity,
-      createElement(this.document, 'span', '', String(state.world.teammateCount) + ' TEAM'),
+      createElement(this.document, 'span', '', String(state.world.teammateCount) + uiText("ui.7876b81e")),
     );
     world.append(worldLine, weatherLine);
 
@@ -1477,18 +1516,18 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     equipment.dataset.empty = String(equipmentSlots!==undefined ? equipmentSlots.weapon===null && equipmentSlots.protection===null && equipmentSlots.quickUse.target===null : state.equipment===null);
     if (equipmentSlots === undefined) {
       if (state.equipment === null) {
-        equipment.textContent = 'NO ACTIVE EQUIPMENT';
+        bindUiText(equipment,"textContent",uiText("ui.fc9c7250"));
       } else {
         const equipmentIcon = assetSprite(
           this.document,
           'p1-asset-icon p1-equipment-icon',
-          itemIconSprite(state.equipment.name),
+          itemIconSprite(uiPhrase(state.equipment.name)),
         );
         if (equipmentIcon !== null) {
           equipment.append(equipmentIcon);
         }
         equipment.append(
-          state.equipment.name
+          uiPhrase(state.equipment.name)
           + (state.equipment.condition === null
             ? ' · ' + state.equipment.stateLabel
             : ' · ' + String(state.equipment.condition) + '/' + String(state.equipment.conditionMax)
@@ -1515,16 +1554,16 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
           '[' + inputLabel + ']',
         ));
         if (slot === null) {
-          row.title = emptyLabel + ' · none';
+          bindUiText(row,"title",emptyLabel + uiText("ui.b60ccd0a"));
           const emptyIcon = assetSprite(this.document, 'p1-asset-icon p1-equipment-icon',
-            itemIconSprite(key === 'weapon' ? 'Basic Spear' : 'Thermal Wrap'));
+            itemIconSprite(key === 'weapon' ? uiText("ui.898df54c") : uiText("ui.cd44c054")));
           if (emptyIcon !== null) { emptyIcon.style.opacity = '.35'; row.append(emptyIcon); }
           row.append(createElement(this.document, 'span', 'p1-visually-hidden', emptyLabel), '—');
         } else {
           const icon = assetSprite(
             this.document,
             'p1-asset-icon p1-equipment-icon',
-            itemIconSprite(slot.name),
+            itemIconSprite(uiPhrase(slot.name)),
           );
           if (icon !== null) row.append(icon);
           const conditionLabel =
@@ -1533,15 +1572,15 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
             || slot.conditionMax <= 0
               ? ''
               : ' C' + String(slot.condition);
-          row.title = slot.name
+          bindUiText(row,"title",uiPhrase(slot.name)
             + (slot.condition === null || slot.conditionMax === null
               ? ''
-              : ' · condition '
+              : uiText("ui.903fa637")
                 + String(slot.condition)
                 + '/'
-                + String(slot.conditionMax));
+                + String(slot.conditionMax)));
           row.dataset.equipmentState = slot.stateLabel;
-          row.append(createElement(this.document, 'span', 'p1-visually-hidden', slot.name), conditionLabel);
+          row.append(createElement(this.document, 'span', 'p1-visually-hidden', uiPhrase(slot.name)), conditionLabel);
           if (
             slot.condition !== null
             && slot.conditionMax !== null
@@ -1587,7 +1626,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       );
       quickUse.dataset.quickUseState = equipmentSlots.quickUse.state;
       quickUse.append(
-        '[V] CONSUME · '
+        uiText("ui.d9199510")
         + (equipmentSlots.quickUse.target ?? '—'),
       );
       equipment.append(quickUse);
@@ -1596,8 +1635,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const carry = createElement(this.document, 'section', 'p1-carry p1-box p1-context-hud');
     carry.dataset.region = 'carry';
     carry.dataset.carryState = state.carry.stateLabel;
-    carry.title='Weight: '+state.carry.weightCurrent.toFixed(1)+'/'+state.carry.weightMax+' kg. Volume: '+state.carry.volumeCurrent.toFixed(1)+'/'+state.carry.volumeMax+' bulk units, not slots.';
-    carry.setAttribute('aria-label',carry.title);
+    bindUiText(carry,"title",uiText("ui.ba72f17b")+state.carry.weightCurrent.toFixed(1)+'/'+state.carry.weightMax+uiText("ui.c164b263")+state.carry.volumeCurrent.toFixed(1)+'/'+state.carry.volumeMax+uiText("ui.15a006f6"));
+    bindUiText(carry,"aria-label",carry.title);
     const weightIcon = assetSprite(
       this.document,
       'p1-asset-icon',
@@ -1656,22 +1695,25 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     this.layer.append(survival, world, equipment, carry, toasts, team);
-    const dock = createElement(this.document, 'nav', 'p1-action-dock');
-    dock.setAttribute('aria-label', 'Game actions');
-    for (const [label, key, action, sprite, scale] of [
-      ['Inventory', 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
-      ['Craft', 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
-      ['Build base', 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
-      ['Map', 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
-      ['Colony', 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
-    ] as const) {
-      const button = actionButton(this.document, '', action);
-      button.setAttribute('aria-label', label + ' [' + key + ']'); button.title = label + ' [' + key + ']';
-      const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
-      if (icon !== null) button.append(icon);
-      button.append(createElement(this.document, 'span', '', key)); dock.append(button);
+    if (this.actionDock === null) {
+      const dock = createElement(this.document, 'nav', 'p1-action-dock');
+      this.actionDock = dock;
+      bindUiText(dock,"aria-label",uiText("ui.57bffba4"));
+      for (const [label, key, action, sprite, scale] of [
+        [uiText("ui.c8d2dcdf"), 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
+        [uiText("ui.c8f02361"), 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
+        [uiText("ui.8d432504"), 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
+        [uiText("ui.44a7f051"), 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
+        [uiText("ui.23d960bf"), 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
+      ] as const) {
+        const button = actionButton(this.document, '', action);
+        bindUiText(button,"aria-label",label + ' [' + key + ']'); bindUiText(button,"title",label + ' [' + key + ']');
+        const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
+        if (icon !== null) button.append(icon);
+        button.append(createElement(this.document, 'span', '', key)); dock.append(button);
+      }
+      this.layer.append(dock);
     }
-    this.layer.append(dock);
 
     if (state.firstActionCue !== undefined && state.firstActionCue !== null) {
       const firstAction = createElement(
@@ -1679,12 +1721,12 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         'div',
         'p1-first-action p1-context-hud',
       );
-      firstAction.title = state.firstActionCue;
+      bindUiText(firstAction,"title",state.firstActionCue);
       firstAction.append(createElement(this.document, 'span', 'p1-visually-hidden', state.firstActionCue));
-      const cueIcon = assetSprite(this.document, 'p1-asset-icon', interactionSprite('GATHER'));
+      const cueIcon = assetSprite(this.document, 'p1-asset-icon', interactionSprite(uiText("ui.94c2b2ca")));
       if (cueIcon !== null) firstAction.append(cueIcon);
-      firstAction.append(state.interaction?.verb === 'GATHER' && state.interaction.state === 'AVAILABLE'
-        ? ' E · Gather' : ' WASD · Move');
+      firstAction.append(state.interaction?.verb === uiText("ui.94c2b2ca") && state.interaction.state === uiText("ui.ef7a53b8")
+        ? uiText("ui.ce4334ea") : uiText("ui.9db710ea"));
       firstAction.dataset.firstActionCue = 'visible';
       this.layer.append(firstAction);
     }
@@ -1709,7 +1751,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       }
       interactionMain.append(
         '[' + state.interaction.inputLabel + '] '
-        + state.interaction.verb + ' · ' + state.interaction.target,
+        + uiPhrase(state.interaction.verb) + ' · ' + uiPhrase(state.interaction.target),
       );
       interaction.append(interactionMain);
 

@@ -1,3 +1,5 @@
+import { uiText } from '../localization/UiMessages';
+import { uiPhrase } from '../localization/UiMessages';
 import type {
   PlayerMotionViewV1,
   PresentationIdentitySlotV1,
@@ -456,6 +458,19 @@ export function projectPhase1ProductReviewMapPanel(
   selectionOrdinal: number,
 ): Readonly<Phase1MapPanelPresentation> {
   const playerPosition = bundle.getPlayerPosition(playerId);
+  const cave = bundle.caves?.activeLayout();
+  if (cave) {
+    const state = bundle.caves!.read().spaces.find(s=>s.progress.spaceId===cave.spaceId)!;
+    const known = new Set(state.progress.exploredCellIndices);
+    const exploredCells:Phase1MapExploredCellPresentation[] = [];
+    const unknownBoundaryCells:Phase1MapUnknownBoundaryCellPresentation[] = [];
+    for(let i=0;i<cave.cells.length;i++){
+      const cellX=i%cave.width,cellY=Math.floor(i/cave.width);
+      if(known.has(i)&&cave.cells[i]!=='wall')exploredCells.push({cellX,cellY,terrain:cave.cells[i]==='water'?'water':'ground',motif:'none'});
+      else unknownBoundaryCells.push({cellX,cellY});
+    }
+    return {kind:'map',title:uiText("ui.8ce393b5")+cave.templateId.replaceAll('-',' '),fogLabel:uiText("ui.c285bbb7"),ruinLabel:uiText("ui.4836f36"),deathCacheLabel:state.deathCaches.length?String(state.deathCaches.length)+uiText("ui.1034a3ef"):null,sharedDiscoveryLabel:null,spatial:{cellSizeWorldUnits:1,minCellX:0,maxCellX:cave.width-1,minCellY:0,maxCellY:cave.height-1,exploredCells,unknownBoundaryCells,markers:[{id:playerId,kind:'player',label:uiText("ui.b5bdd13c"),atlasIndex:0,worldX:playerPosition.x,worldY:playerPosition.y,facing:null,distanceBand:null,selected:false,identitySlot:'LOCAL'},{id:cave.portalId,kind:'base',label:uiText("ui.39d49ed8"),atlasIndex:1,worldX:cave.exit.x,worldY:cave.exit.y,facing:null,distanceBand:null,selected:false,identitySlot:null}],selectedDetailLabel:cave.templateId.replaceAll('-',' '),selectedDistanceBand:null,selectableTargetCount:0,knowledgePolicy:'EXPLORED_ONLY'}};
+  }
   const localMotion = motions.find(
     (motion) => motion.playerId === playerId,
   );
@@ -475,7 +490,7 @@ export function projectPhase1ProductReviewMapPanel(
   const detailTargets: EligibleDetailTarget[] = [
     Object.freeze({
       id: 'map:base',
-      label: 'LANDING MODULE · BASE',
+      label: uiText("ui.be1ea1c6"),
       worldX: landmarks.landingPosition.x,
       worldY: landmarks.landingPosition.y,
       markerIndex: 4,
@@ -486,8 +501,8 @@ export function projectPhase1ProductReviewMapPanel(
     detailTargets.push(Object.freeze({
       id: 'map:ruin',
       label: ruinState.discoveryState === 'located'
-        ? 'UNINVESTIGATED RUIN'
-        : 'INVESTIGATED RUIN',
+        ? uiText("ui.37918d07")
+        : uiText("ui.2659bbea"),
       worldX: landmarks.ruinPosition.x,
       worldY: landmarks.ruinPosition.y,
       markerIndex:
@@ -510,7 +525,7 @@ export function projectPhase1ProductReviewMapPanel(
     for (const site of bundle.colonyDepth.sites()) {
       if (!bundle.colonyDepth.read().inspectedSites.includes(site.id)) continue;
       detailTargets.push(Object.freeze({
-        id: 'map:' + site.id, label: site.name.toUpperCase() + ' · SURVEYED',
+        id: 'map:' + site.id, label: uiPhrase(site.name).toUpperCase() + uiText("ui.4717072f"),
         worldX: site.position.x, worldY: site.position.y,
         markerIndex: 6, kind: 'ruin' as const,
       }));
@@ -519,7 +534,7 @@ export function projectPhase1ProductReviewMapPanel(
 
   for(const facility of bundle.expedition?.read().facilities ?? []) {
     if(facility.definitionId!=='trail-beacon'&&facility.definitionId!=='camp-bed'&&facility.definitionId!=='field-lab')continue;
-    detailTargets.push(Object.freeze({id:'map:outpost:'+facility.id,label:facility.definitionId.toUpperCase()+' · OUTPOST',worldX:facility.x,worldY:facility.y,markerIndex:4,kind:'base' as const}));
+    detailTargets.push(Object.freeze({id:'map:outpost:'+facility.id,label:facility.definitionId.toUpperCase()+uiText("ui.8ceeca66"),worldX:facility.x,worldY:facility.y,markerIndex:4,kind:'base' as const}));
   }
   const selectedIndex = normalizedSelection(
     selectionOrdinal,
@@ -595,23 +610,23 @@ export function projectPhase1ProductReviewMapPanel(
 
   return Object.freeze({
     kind: 'map',
-    title: 'MAP · DISCOVERY',
+    title: uiText("ui.8b1ce5ce"),
     fogLabel:
-      'EXPLORED · '
+      uiText("ui.b81a93c7")
       + String(explored.length)
-      + ' cells · UNKNOWN remains opaque',
+      + uiText("ui.2fc7bf6d"),
     ruinLabel: ruinState === null
       || ruinState.discoveryState === 'unknown'
-      ? 'Ruin · UNKNOWN'
+      ? uiText("ui.1801c548")
       : ruinState.discoveryState === 'located'
-        ? 'Uninvestigated Ruin · LOCATED'
-        : 'Investigated Ruin · INVESTIGATED',
+        ? uiText("ui.11832bd8")
+        : uiText("ui.b1cf2dac"),
     deathCacheLabel: activeCaches.length === 0
       ? null
       : String(activeCaches.length)
         + (activeCaches.length === 1
-          ? ' active Death Cache'
-          : ' active Death Caches'),
+          ? uiText("ui.77051cc5")
+          : uiText("ui.130c3282")),
     sharedDiscoveryLabel: motions.some(
       (motion) =>
         motion.playerId !== playerId
@@ -619,7 +634,7 @@ export function projectPhase1ProductReviewMapPanel(
           motion.presentationIdentitySlot,
         ) !== null,
     )
-      ? 'TEAM POSITIONS · authoritative current state'
+      ? uiText("ui.8fbb170e")
       : null,
     spatial: Object.freeze({
       cellSizeWorldUnits:

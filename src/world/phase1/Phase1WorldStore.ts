@@ -5,6 +5,8 @@ import type {
   ResourceNodeDefinitionV1,
 } from '../../content';
 import { resourceSizeAt, type ResourceSize } from '../../content/livingworld/ResourceSizeProfiles';
+import { initialResourceLifecycle, resourceGrowthCheckpoint, validateResourceLifecycle } from './ResourceLifecycle';
+import { advancePlantWork, canonicalPlantRate } from './DynamicResourceGrowth';
 import {
   SIMULATION_HZ,
   createWorldPosition,
@@ -65,6 +67,7 @@ export const PHASE1_RUIN_LOCATE_RADIUS_WORLD_UNITS = 3.75;
 
 export interface Phase1WorldStoreConfig {
   readonly resourceProfileVersion?: 1;
+  readonly resourceLifecycleVersion?: 1;
   readonly calendarVersion?: 1;
   readonly generationVersion?: number;
   readonly worldSeed: string;
@@ -159,24 +162,29 @@ function ruinEntities(
 function createInitialResourceState(
   entity: Phase1GeneratedResourceEntity,
   definition: ResourceNodeDefinitionV1,
+  lifecycleVersion?: 1,
 ): Phase1ResourceRuntimeState {
+  const lifecycle = lifecycleVersion === 1 ? initialResourceLifecycle(entity.definitionId) : undefined;
   return Object.freeze({
     resourceEntityId: entity.entityId,
     revision: 0,
     remainingGatherActions: definition.maxGatherActions,
     depleted: false,
     regenerationReadyTick: null,
+    ...(lifecycle ? {lifecycle} : {}),
   });
 }
 
 function createInitialDelta(
   base: Phase1GeneratedChunkBase,
   catalog: ContentCatalogV1,
+  lifecycleVersion?: 1,
 ): Phase1WorldSliceChunkDelta {
   const resourceStates = resourceEntities(base).map((entity) =>
     createInitialResourceState(
       entity,
       catalog.getAs(entity.definitionId, 'resource'),
+      lifecycleVersion,
     ),
   );
   const ruinStates = ruinEntities(base).map((entity) =>
@@ -225,6 +233,8 @@ function validateResourceState(
     throw new Error('Resource runtime state identity does not match generated base.');
   }
   requireNonNegativeRevision(state.revision, 'Resource revision');
+  const lifecycle = state.lifecycle === undefined ? undefined : validateResourceLifecycle(state.lifecycle, entity.definitionId);
+  if (state.uprootedVersion !== undefined && (state.uprootedVersion !== 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId) || !state.depleted || state.regenerationReadyTick !== null)) throw Error('Invalid uprooted resource tombstone');
 
   if (definition.maxGatherActions === null) {
     if (
@@ -248,7 +258,11 @@ function validateResourceState(
       throw new Error('Resource depleted flag disagrees with remaining actions.');
     }
 
-    if (state.depleted) {
+    if (state.depleted && lifecycle?.kind === 'mineral') {
+      if (state.regenerationReadyTick !== null) throw Error('Finite mineral must not retain a renewal clock');
+    } else if (state.uprootedVersion === 1) {
+      if (state.regenerationReadyTick !== null) throw Error('Uprooted plant must not renew');
+    } else if (state.depleted) {
       if (
         definition.regenerationActiveSeconds === null
         || !Number.isSafeInteger(state.regenerationReadyTick)
@@ -262,7 +276,11 @@ function validateResourceState(
     }
   }
 
-  return Object.freeze({ ...state });
+  if (lifecycle?.kind === 'plant') {
+    if (state.depleted !== (lifecycle.stage === 'early')) throw Error('Plant stage disagrees with resource availability');
+    if (state.depleted && state.uprootedVersion !== 1 && state.regenerationReadyTick !== resourceGrowthCheckpoint(lifecycle)) throw Error('Plant renewal clock disagrees with growth checkpoint');
+  }
+  return Object.freeze({ ...state, ...(lifecycle ? {lifecycle} : {}) });
 }
 
 function validateRuinState(
@@ -313,6 +331,7 @@ function validatePersistedDelta(
   record: PersistedPhase1WorldSliceChunkRecord,
   base: Phase1GeneratedChunkBase,
   catalog: ContentCatalogV1,
+  lifecycleVersion?: 1,
 ): Phase1WorldSliceChunkDelta {
   if (!sameChunkCoord(record.coord, base.coord)) {
     throw new Error('Persisted Phase 1 delta coordinate does not match generated base.');
@@ -343,6 +362,7 @@ function validatePersistedDelta(
   }
   const resourceIds = new Set<string>();
   const resources = record.resourceStates.map((state) => {
+    if (state.lifecycle !== undefined && lifecycleVersion !== 1) throw Error('Resource lifecycle is not enabled for this world');
     if (resourceIds.has(state.resourceEntityId)) {
       throw new Error('Duplicate persisted resource runtime identity.');
     }
@@ -450,7 +470,7 @@ export class Phase1WorldStore {
     this.resourceSizes.set(key, size);
     return size;
   }
-  private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
+  private renewalPolicy: { readonly multiplier: (position: WorldPosition, resourceDefinitionId: string) => number; readonly growthMultiplier?: (position: WorldPosition, resourceDefinitionId: string) => number; readonly harvested: (position: WorldPosition,tick: number) => void } | null = null;
   public setRenewalPolicy(policy: NonNullable<Phase1WorldStore['renewalPolicy']>): void { this.renewalPolicy = policy; }
   private readonly entries = new Map<string, Phase1WorldChunkEntry>();
   private readonly entityChunk = new Map<string, string>();
@@ -480,6 +500,7 @@ export class Phase1WorldStore {
         this.config.catalog,
         this.config.calendarVersion,
         this.config.resourceProfileVersion,
+        this.config.resourceLifecycleVersion,
       );
       this.environmentDirty = true;
       return;
@@ -831,9 +852,22 @@ export class Phase1WorldStore {
 
     const remaining = current.remainingGatherActions - 1;
     const depleted = remaining === 0;
+    let lifecycle = current.lifecycle;
+    if (depleted && lifecycle?.kind === 'plant') {
+      const duration = Math.max(2, Math.ceil(this.requireRegenerationTicks(definition) * (this.renewalPolicy?.multiplier(entity.position,entity.definitionId) ?? 1)));
+      const matureTick = authorityTick + duration;
+      if (!Number.isSafeInteger(matureTick)) throw Error('Resource lifecycle clock overflow');
+      lifecycle = Object.freeze({version:1,kind:'plant',stage:'early',cutTick:authorityTick,matureTick});
+      if(this.renewalPolicy?.growthMultiplier){
+        const durationTicks=Math.max(2,Math.ceil(this.requireRegenerationTicks(definition)*this.renewalPolicy.growthMultiplier(entity.position,entity.definitionId)));
+        const rateMilli=canonicalPlantRate(this.config.worldSeed,entity.position,authorityTick,null);
+        lifecycle=Object.freeze({version:2,kind:'plant',stage:'early',cutTick:authorityTick,matureTick:authorityTick+Math.ceil(durationTicks*1000/Math.max(1,rateMilli)),work:Object.freeze({completedWork:0,progressMilli:0,lastGrowthTick:authorityTick,durationTicks,wateredTick:null,rateMilli})});
+      }
+    }
     const regenerationReadyTick = depleted
-      ? authorityTick
-        + Math.ceil(this.requireRegenerationTicks(definition) * (this.renewalPolicy?.multiplier(entity.position, entity.definitionId) ?? 1))
+      ? lifecycle?.kind === 'mineral' ? null
+        : lifecycle?.kind === 'plant' ? resourceGrowthCheckpoint(lifecycle)
+          : authorityTick + Math.ceil(this.requireRegenerationTicks(definition) * (this.renewalPolicy?.multiplier(entity.position, entity.definitionId) ?? 1))
       : null;
     const next = Object.freeze({
       ...current,
@@ -841,6 +875,7 @@ export class Phase1WorldStore {
       remainingGatherActions: remaining,
       depleted,
       regenerationReadyTick,
+      ...(lifecycle ? {lifecycle} : {}),
     });
     const states = [...delta.resourceStates];
     states[index] = next;
@@ -855,6 +890,39 @@ export class Phase1WorldStore {
 
     this.renewalPolicy?.harvested(entity.position,authorityTick);
     return Object.freeze({ changed: true, state: next });
+  }
+
+  /** Called inside a prepared item exchange, after capacity and tool validation. */
+  public commitResourceUproot(resourceEntityId: string, expectedRevision: number): string | null {
+    const entry = this.activeEntryForEntity(resourceEntityId);
+    const state = entry?.delta?.resourceStates.find(value => value.resourceEntityId === resourceEntityId);
+    if (!entry?.delta || !state) return 'SOURCE_MISSING';
+    if (state.revision !== expectedRevision) return 'STALE_RESOURCE_REVISION';
+    const entity = entry.base?.entities.find(value => value.entityId === resourceEntityId);
+    if (!entity || entity.type !== 'resource' || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId)) return 'SOURCE_MISSING';
+    if (!state.depleted || state.uprootedVersion === 1) return 'HARVEST_MATURE_PLANT_FIRST';
+    const next = Object.freeze({...state,revision:incrementRevision(state.revision,'Resource revision'),regenerationReadyTick:null,uprootedVersion:1 as const});
+    this.publishDeltaMutation(entry,Object.freeze({...entry.delta,resourceStates:Object.freeze(entry.delta.resourceStates.map(value=>value.resourceEntityId === resourceEntityId ? next : value))}));
+    return null;
+  }
+
+  /** Prepared item exchange owns payment; this callback publishes only after guards. */
+  public commitResourceWater(resourceEntityId:string,expectedRevision:number,tick:number):string|null {
+    if (!Number.isSafeInteger(tick) || tick !== this.requireEnvironment().activeTick) return 'INVALID_GROWTH_CLOCK';
+    const entry=this.activeEntryForEntity(resourceEntityId),state=entry?.delta?.resourceStates.find(v=>v.resourceEntityId===resourceEntityId),entity=entry?.base?.entities.find(v=>v.entityId===resourceEntityId);
+    if(!entry?.delta||!state||entity?.type!=='resource'||state.uprootedVersion===1||state.lifecycle?.kind!=='plant')return 'SOURCE_MISSING';
+    if(state.revision!==expectedRevision)return 'STALE_RESOURCE_REVISION';
+    const lifecycle=state.lifecycle;
+    if(lifecycle.stage==='mature')return 'MAXIMUM_GROWTH';
+    const durationTicks=lifecycle.work?.durationTicks??Math.max(2,lifecycle.matureTick-lifecycle.cutTick);
+    const legacyUnits=Math.min(durationTicks*1000000,Math.max(0,(tick-lifecycle.cutTick)*1000000));
+    const current=lifecycle.work?advancePlantWork(lifecycle.work,this.config.worldSeed,entity.position,tick):{completedWork:legacyUnits,progressMilli:legacyUnits/durationTicks,lastGrowthTick:tick,durationTicks,wateredTick:null,rateMilli:1000};
+    const work=Object.freeze({...current,wateredTick:tick,rateMilli:canonicalPlantRate(this.config.worldSeed,entity.position,tick,tick)});
+    const stage=work.progressMilli>=1000000?'mature':work.progressMilli>=500000?'growing':'early';
+    const updated=Object.freeze({...lifecycle,version:2 as const,stage,work,matureTick:tick+Math.max(1,Math.ceil((1000000-work.progressMilli)*durationTicks/Math.max(1,work.rateMilli)/1000))});
+    const next=Object.freeze({...state,revision:incrementRevision(state.revision,'Resource revision'),lifecycle:updated,depleted:stage==='early',remainingGatherActions:state.depleted&&stage!=='early'?this.config.catalog.getAs(entity.definitionId,'resource').maxGatherActions:state.remainingGatherActions,regenerationReadyTick:stage==='early'?resourceGrowthCheckpoint(updated):null});
+    this.publishDeltaMutation(entry,{...entry.delta,resourceStates:entry.delta.resourceStates.map(v=>v.resourceEntityId===resourceEntityId?next:v)});
+    return null;
   }
 
   public getRuinState(
@@ -1039,8 +1107,8 @@ export class Phase1WorldStore {
         generationVersion: this.config.generationVersion ?? PHASE1_WORLD_GENERATION_VERSION,
       });
       const delta = record === null
-        ? createInitialDelta(base, this.config.catalog)
-        : validatePersistedDelta(record, base, this.config.catalog);
+        ? createInitialDelta(base, this.config.catalog, this.requireEnvironment().resourceLifecycleVersion)
+        : validatePersistedDelta(record, base, this.config.catalog, this.requireEnvironment().resourceLifecycleVersion);
 
       entry.base = base;
       entry.delta = delta;
@@ -1084,6 +1152,30 @@ export class Phase1WorldStore {
 
     let changed = false;
     const states = entry.delta.resourceStates.map((state) => {
+      if (state.uprootedVersion === 1) return state;
+      const lifecycle = state.lifecycle;
+      if (lifecycle?.kind === 'mineral') return state;
+      if (lifecycle?.kind === 'plant') {
+        const entity = entry.base?.entities.find(candidate => candidate.entityId === state.resourceEntityId);
+        if (!entity || entity.type !== 'resource') throw Error('Growing resource lost its generated identity');
+        let updated=lifecycle;
+        if(lifecycle.work&&lifecycle.stage!=='mature'&&Math.floor(authorityTick/60)!==Math.floor(lifecycle.work.lastGrowthTick/60)){
+          const work=advancePlantWork(lifecycle.work,this.config.worldSeed,entity.position,authorityTick);
+          const stage=work.progressMilli>=1000000?'mature':work.progressMilli>=500000?'growing':'early';
+          updated=Object.freeze({...lifecycle,stage,work:Object.freeze(work),matureTick:authorityTick+Math.max(1,Math.ceil((1000000-work.progressMilli)*work.durationTicks/Math.max(1,work.rateMilli)/1000))});
+        }
+        const stage = updated.work ? updated.stage : authorityTick >= lifecycle.matureTick ? 'mature' : authorityTick >= resourceGrowthCheckpoint(lifecycle) ? 'growing' : 'early';
+        if (stage === lifecycle.stage && updated===lifecycle) return state;
+        changed = true;
+        return Object.freeze({
+          ...state,
+          revision: stage===lifecycle.stage ? state.revision : incrementRevision(state.revision, 'Resource revision'),
+          remainingGatherActions: state.depleted && stage!=='early' ? this.config.catalog.getAs(entity.definitionId,'resource').maxGatherActions : state.remainingGatherActions,
+          depleted: stage==='early',
+          regenerationReadyTick: stage==='early' ? resourceGrowthCheckpoint(updated) : null,
+          lifecycle: Object.freeze({...updated,stage}),
+        });
+      }
       if (
         !state.depleted
         || state.regenerationReadyTick === null

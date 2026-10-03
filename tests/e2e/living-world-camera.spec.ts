@@ -50,13 +50,14 @@ test('living plants share the terrain raster anchor through continuous camera mo
   await expect(retained).toBeVisible();
   expect(await retained.evaluate(element => ({ left: (element as HTMLElement).style.left, top: (element as HTMLElement).style.top }))).toEqual({ left: before.left, top: before.top });
   await retained.click();
-  await expect(page.locator('.lw-panel')).toBeVisible();
+  await expect(page.locator('.lw-panel')).toBeHidden();
   await page.keyboard.press('Escape');
   const prevented = await retained.evaluate(element => {
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     element.dispatchEvent(event); return event.defaultPrevented;
   });
   expect(prevented).toBe(true);
+  await expect(page.getByRole('region',{name:'Entity statistics',exact:true})).toBeVisible();
   await page.screenshot({ path: 'test-results/living-camera-world.png' });
   expect(errors).toEqual([]);
 });

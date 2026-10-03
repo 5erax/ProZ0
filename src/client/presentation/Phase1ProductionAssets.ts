@@ -1,3 +1,5 @@
+import { canonicalUiPhrase } from '../localization/UiMessages';
+import { WEARABLE_PROFILES } from '../../content/livingworld/WearableContent';
 import {LIVING_ITEMS} from '../../content/livingworld/LivingWorldContent';
 import { LIVING_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import { GEAR_ITEMS, RARITY_STYLE } from '../../content/livingworld/EquipmentContent';
@@ -5,6 +7,7 @@ import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import {PHASE1_ITEM_IDS} from '../../content/Phase1Ids';
 const LIVING_ITEM_URL = new URL('../../../assets/livingworld/items.svg', import.meta.url).href;
 export interface Phase1ProductionSprite {
+  readonly footOffsetY?: number;
   readonly assetPath: string;
   readonly url: string;
   readonly cellWidth: number;
@@ -262,6 +265,17 @@ function atlasSprite(
 export function itemIconSprite(
   name: string,
 ): Phase1ProductionSprite | null {
+  name = canonicalUiPhrase(name);
+  const wearable = WEARABLE_PROFILES.find(p => p.id === name || p.name === name);
+  if (wearable) {
+    const shapes = {
+      head:'<path fill="#354c48" d="M5 5h14v8H5Z"/><path fill="#d2dcbb" d="M2 11h20v3H2Z"/><path fill="#92d879" d="M6 6h12v2H6Z"/>',
+      legs:'<path fill="#aaa185" d="M5 3h14v8H5Zm0 8h6v12H5Zm8 0h6v12h-6Z"/><path fill="#615749" d="M5 8h14v2H5Zm4 3h2v10H9Zm4 0h2v10h-2Z"/>',
+      feet:'<path fill="#365563" d="M3 3h6v13h3v6H2V11h1Zm12 2h6v12h2v5H13V12h2Z"/><path fill="#7fbbff" d="M3 8h6v2H3Zm12 0h6v2h-6Z"/><path fill="#9aa99b" d="M2 20h10v2H2Zm11 0h10v2H13Z"/>',
+      accessory:'<path fill="#263e48" d="M5 3h14v20H5Z"/><path fill="#7fbbff" d="M8 6h8v12H8Z"/><path fill="#a3b6a3" d="M7 4h10v2H7Zm-2 15h14v2H5Z"/><path fill="none" stroke="#bcccb5" stroke-width="2" d="M16 5h5v7"/>',
+    };
+    return {assetPath:'procedural:wearable-icon:' + wearable.slot,url:'data:image/svg+xml;charset=utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" shape-rendering="crispEdges">' + shapes[wearable.slot] + '</svg>'),cellWidth:24,cellHeight:24,sourceWidth:24,sourceHeight:24,columns:1,index:0};
+  }
   const gear = GEAR_ITEMS.find(i => i.id === name || i.displayName === name);
   if (gear?.rarity) {
     const colour = RARITY_STYLE[gear.rarity].colour;

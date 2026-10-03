@@ -256,3 +256,22 @@ describe('P1-POLISH-005 stale selection guard', () => {
     }
   });
 });
+
+
+it('keeps explicit crate identity and never silently transfers into another crate when selection becomes inaccessible', async () => {
+  const {bundle,playerId}=await createInventorySelectionBundle();
+  try {
+    const source=new Phase1ProductReviewPresentationSource(bundle,playerId,()=>[]);
+    const crate=bundle.buildings.exportSnapshot().foothold.structures.find(s=>s.definitionId==='structure:storage-crate')!;
+    source.openStorage(crate.structureId);
+    expect(source.getInventoryActionSelection().storage?.containerId).toBe(crate.containerId);
+    source.openStorage('structure:missing-explicit-crate');
+    expect(source.getInventoryActionSelection().storage).toBeNull();
+    expect(source.getInventoryActionSelection().target).toBeNull();
+    source.togglePanel('inventory');source.togglePanel('inventory');
+    expect(source.getInventoryActionSelection().storage?.containerId).toBe(crate.containerId);
+    source.openStorage(crate.structureId);
+    bundle.getRuntime(playerId).relocatePlayer({x:100,y:100});await bundle.stepSolo();source.refresh();
+    expect(source.getInventoryActionSelection().storage).toBeNull();
+  } finally {await bundle.destroy();}
+});

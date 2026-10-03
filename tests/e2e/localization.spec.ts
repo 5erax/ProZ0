@@ -1,0 +1,30 @@
+import {test,expect} from '@playwright/test';
+test('EN/VI preference changes labels immediately, preserves unsubmitted seed, and persists on reload',async({page})=>{
+  await page.route('**/api/pilot/auth/me',r=>r.fulfill({json:{account:null}}));
+  await page.goto('/');await expect(page.locator('[data-start-phase2-review]')).toHaveText('Start a new world');
+  await page.locator('[data-single-player-seed]').fill('locale-expedition');
+  await page.locator('[data-locale-choice]').selectOption('vi');
+  await expect(page.locator('[data-start-phase2-review]')).toHaveText('Bắt đầu thế giới mới');
+  await expect(page.locator('[data-single-player-seed]')).toHaveValue('locale-expedition');
+  await page.reload();await expect(page.locator('[data-locale-choice]')).toHaveValue('vi');
+  await page.locator('[data-locale-choice]').selectOption('en');await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible();
+});
+test('game language preserves selected canonical item and save/reopen while translating inventory, craft and ARIA at narrow width',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.setViewportSize({width:850,height:720});
+  await page.goto('/?'+new URLSearchParams({proz0Mode:'phase2-colony-review',proz0WorldId:'world:locale',proz0WorldSeed:'p1-world-golden',proz0Players:'solo',proz0Player:'solo',proz0SaveDb:'locale'}));
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
+  await page.keyboard.press('i');await page.locator('[data-review-item="starter:stone-field-tool:solo"]').click();
+  const before=await page.locator('[data-review-item][data-selected="true"]').getAttribute('data-review-item');
+  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.locator('[data-locale-choice]').selectOption('vi');
+  await expect(page.getByRole('button',{name:'Cài đặt',exact:true})).toBeVisible();await page.keyboard.press('Escape');
+  await page.keyboard.press('i');await expect(page.locator('[data-review-item="starter:stone-field-tool:solo"]')).toContainText('Công cụ đá dã ngoại');
+  expect(await page.locator('[data-review-item][data-selected="true"]').getAttribute('data-review-item')).toBe(before);
+  await page.keyboard.press('Escape');await page.keyboard.press('c');await expect(page.locator('.p1-panel-title')).toContainText('CHẾ TẠO');await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Cài đặt',exact:true}).click();await page.getByRole('button',{name:'Lưu thế giới [L]',exact:true}).click();
+  await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state','success');
+  await page.reload();await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened','true');
+  await page.keyboard.press('i');await expect(page.locator('[data-review-item="starter:stone-field-tool:solo"]')).toContainText('Công cụ đá dã ngoại');
+  await page.screenshot({path:'test-results/locale-vi-inventory-850.png'});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(errors).toEqual([]);
+});

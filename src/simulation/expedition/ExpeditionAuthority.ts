@@ -1,3 +1,4 @@
+import {expeditionFieldFootprint} from '../../content/singleplayer/ExpeditionFootprints';
 import {
   expeditionEventKind,
   expeditionRegion,
@@ -7,6 +8,7 @@ import type { Phase1ItemAuthority } from '../items';
 import type {
   PlacementIntent,
   Phase1StructureDefinitionId,
+  StructurePlacementProfile,
 } from '../../world/building/BuildingTypes';
 import {
   PHASE1_STRUCTURE_PLACEMENT_PROFILES,
@@ -26,6 +28,7 @@ export interface ExpeditionActor {
   readonly x: number;
   readonly y: number;
   readonly alive: boolean;
+  readonly spaceId?: string;
 }
 export interface ExpeditionCommand {
   readonly id: string;
@@ -88,6 +91,7 @@ export class ExpeditionAuthority {
   }
   public hasRemoteLab(playerId: string): boolean {
     const actor = this.actor(playerId);
+    if(actor.spaceId && actor.spaceId!=='surface')return false;
     return this.state.facilities.some(
       (f) =>
         f.definitionId === 'field-lab' &&
@@ -218,6 +222,7 @@ export class ExpeditionAuthority {
       return reject('STALE_REVISION');
     const actor = this.actor(command.playerId);
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     const facility = this.state.facilities.find((f) => f.id === command.target),
       lab = command.target === 'landing-lab',
       siteShelter = command.action === 'rest' ? this.services.siteShelter?.(command.target) : null;
@@ -352,7 +357,8 @@ export class ExpeditionAuthority {
     x: number,
     y: number,
     orientation: 0 | 1 | 2 | 3,
-    ignoreId = '',
+    ignoreId: string,
+    footprintVersion: 1 | undefined,
   ): string | null {
     const def = expeditionFacility(definition);
     if (
@@ -364,25 +370,46 @@ export class ExpeditionAuthority {
       ![0, 1, 2, 3].includes(orientation)
     )
       return 'INVALID_POSITION';
-    const assessment = this.buildings.assessPlacement(
-      def.shape,
-      this.planIntent(definition, x, y, orientation),
-      def.canonical === null,
-    );
+    const fieldSize = def.canonical === null && footprintVersion === 1 ? expeditionFieldFootprint(definition) : null;
+    const assessment = fieldSize && def.canonical === null
+      ? this.buildings.assessFieldPlacement(def.shape, {x,y}, orientation, fieldSize, ignoreId)
+      : this.buildings.assessPlacement(def.shape, this.planIntent(definition,x,y,orientation), def.canonical === null, ignoreId);
     if (typeof assessment === 'string') return assessment;
-    if (
-      [
-        ...this.state.plans,
-        ...this.state.facilities.filter((f) => f.canonicalStructureId === null),
-      ].some(
-        (p) =>
-          p.id !== ignoreId &&
-          Math.abs(p.x - x) < 1.5 &&
-          Math.abs(p.y - y) < 1.5,
-      )
-    )
-      return 'PLAN_OVERLAP';
+    if (this.overlapsField(definition, {x,y}, orientation, ignoreId, footprintVersion)) return 'PLAN_OVERLAP';
     return null;
+  }
+  private overlapsField(definition:string, position:{x:number;y:number}, orientation:0|1|2|3, ignoreId:string, version:1|undefined):boolean {
+    const size = this.footprint(definition,orientation,version)!;
+    return [...this.state.plans, ...this.state.facilities.filter(f=>f.canonicalStructureId===null)].some(other=>{
+      if(other.id===ignoreId)return false;
+      // Keep the old spacing rule for two unversioned sites.
+      if(version===undefined && other.footprintVersion===undefined)
+        return Math.abs(other.x-position.x)<1.5 && Math.abs(other.y-position.y)<1.5;
+      const otherSize=this.footprint(other.definitionId,other.orientation,other.footprintVersion)!;
+      return Math.abs(other.x-position.x)<(size.width+otherSize.width)/2+.1
+        && Math.abs(other.y-position.y)<(size.depth+otherSize.depth)/2+.1;
+    });
+  }
+  /** Unrotated dimensions consumed by world collision and soil/farming clearance. */
+  public facilityFootprint(target:string):{readonly width:number;readonly depth:number}|null {
+    const facility=this.state.facilities.find(f=>f.id===target);
+    return facility ? this.footprint(facility.definitionId,0,facility.footprintVersion) : null;
+  }
+  public overlapsBuiltField(position:{x:number;y:number},profile:StructurePlacementProfile,orientation:0|1|2|3,ignoreId?:string):boolean {
+    const size=orientation%2 ? {width:profile.footprint.depth,depth:profile.footprint.width} : profile.footprint;
+    return this.state.facilities.some(f=>{
+      if(f.id===ignoreId || f.canonicalStructureId!==null)return false;
+      const other=this.footprint(f.definitionId,f.orientation,f.footprintVersion)!;
+      return Math.abs(f.x-position.x)<(size.width+other.width)/2 && Math.abs(f.y-position.y)<(size.depth+other.depth)/2;
+    });
+  }
+  public blocksFieldGround(x:number,y:number,ignoreId?:string):boolean {
+    return this.state.facilities.some(f=>{
+      if(f.id===ignoreId || f.canonicalStructureId!==null)return false;
+      if(f.footprintVersion===undefined)return Math.abs(f.x-x)<1.1 && Math.abs(f.y-y)<1.1;
+      const size=this.footprint(f.definitionId,f.orientation,1)!;
+      return Math.abs(f.x-x)<size.width/2+.375 && Math.abs(f.y-y)<size.depth/2+.375;
+    });
   }
   public planPosition(definition: string, x: number, y: number, orientation: 0 | 1 | 2 | 3) {
     if (![0, 1, 2, 3].includes(orientation)) return { x: NaN, y: NaN };
@@ -410,6 +437,8 @@ export class ExpeditionAuthority {
         shape: def.shape,
         canonicalId: facility.canonicalStructureId,
         facilityId: facility.id,
+        definitionId: facility.definitionId,
+        footprintVersion: facility.footprintVersion,
       };
     }
     const structure = this.buildings.getStructure(target);
@@ -423,6 +452,8 @@ export class ExpeditionAuthority {
       shape: structure.definitionId,
       canonicalId: structure.structureId,
       facilityId: null,
+      definitionId: structure.definitionId,
+      footprintVersion: undefined,
     };
   }
   public relocationPosition(
@@ -499,18 +530,7 @@ export class ExpeditionAuthority {
       Math.hypot(actor.x - position.x, actor.y - position.y) > 4
     )
       return 'OUT_OF_RANGE';
-    if (
-      [
-        ...this.state.plans,
-        ...this.state.facilities.filter((f) => f.canonicalStructureId === null),
-      ].some(
-        (f) =>
-          f.id !== info.facilityId &&
-          Math.abs(f.x - position.x) < 1.5 &&
-          Math.abs(f.y - position.y) < 1.5,
-      )
-    )
-      return 'PLAN_OVERLAP';
+    if(this.overlapsField(info.definitionId,position,orientation,info.facilityId ?? '',info.footprintVersion)) return 'PLAN_OVERLAP';
     if (info.canonicalId) {
       const assessment = this.buildings.assessRelocation(
         info.canonicalId,
@@ -524,12 +544,14 @@ export class ExpeditionAuthority {
       position.y,
       orientation,
       target,
+      info.footprintVersion,
     );
   }
 
-  public previewFootprint(
+  private footprint(
     definition: string,
     orientation: 0 | 1 | 2 | 3,
+    version: 1 | undefined,
   ): { width: number; depth: number } | null {
     const def = expeditionFacility(definition);
     const shape =
@@ -538,10 +560,15 @@ export class ExpeditionAuthority {
         ? (definition as Phase1StructureDefinitionId)
         : null);
     if (!shape) return null;
-    const size = PHASE1_STRUCTURE_PLACEMENT_PROFILES[shape].footprint;
+    const size = def?.canonical === null && version===1
+      ? expeditionFieldFootprint(definition)! : PHASE1_STRUCTURE_PLACEMENT_PROFILES[shape].footprint;
     return orientation % 2
       ? { width: size.depth, depth: size.width }
       : { width: size.width, depth: size.depth };
+  }
+  public previewFootprint(definition:string, orientation:0|1|2|3, existingId?:string) {
+    const existing = [...this.state.plans,...this.state.facilities].find(p=>p.id===existingId);
+    return this.footprint(definition,orientation,existing ? existing.footprintVersion : 1);
   }
   public assessPreview(
     playerId: string,
@@ -565,7 +592,8 @@ export class ExpeditionAuthority {
       !this.state.plans.some((p) => p.id === planId && p.owner === playerId)
     )
       return 'PLAN_MISSING';
-    return this.spatial(definition, position.x, position.y, orientation, planId);
+    const existing=this.state.plans.find(p=>p.id===planId);
+    return this.spatial(definition, position.x, position.y, orientation, planId ?? '', existing ? existing.footprintVersion : 1);
   }
   public craft(command: {
     id: string;
@@ -597,6 +625,7 @@ export class ExpeditionAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     this.cancelRest(command.playerId);
     const recipe = EXPEDITION_RECIPES.find((r) => r.id === command.recipeId);
     if (!recipe) return reject('UNKNOWN_RECIPE');
@@ -674,6 +703,7 @@ export class ExpeditionAuthority {
       return reject('UNKNOWN_PLAYER');
     }
     if (!actor.alive) return reject('PLAYER_DEAD');
+    if (actor.spaceId && actor.spaceId !== 'surface') return reject('WRONG_WORLDSPACE');
     this.cancelRest(command.playerId);
     let next = this.state;
     let message: string;
@@ -734,11 +764,10 @@ export class ExpeditionAuthority {
         return reject('OUT_OF_RANGE');
       if (facility.water > 0) return reject('COLLECT_WATER_FIRST');
       const def = expeditionFacility(facility.definitionId)!;
-      const result = this.items.commitColonyExchange({
+      const result = this.items.commitColonyRefund({
         operationId: command.id,
         playerId: command.playerId,
         expectedInventoryRevision: command.expectedInventoryRevision,
-        inputs: [],
         outputs: def.costs.map(([itemDefinitionId, quantity]) => ({
           itemDefinitionId,
           quantity,
@@ -749,7 +778,7 @@ export class ExpeditionAuthority {
         ...next,
         facilities: next.facilities.filter((f) => f.id !== facility.id),
       };
-      message = 'FACILITY_DISMANTLED';
+      message = result.destinationContainerId.startsWith('inventory:') ? 'FACILITY_DISMANTLED' : 'FACILITY_DISMANTLED_TO_STORAGE';
     } else if (command.action === 'plan') {
       if (
         this.state.facilities.some(
@@ -766,7 +795,7 @@ export class ExpeditionAuthority {
       const { x, y } = this.planPosition(def.id, command.x ?? NaN, command.y ?? NaN, orientation);
       if (Math.hypot(actor.x - x, actor.y - y) > 4)
         return reject('OUT_OF_RANGE');
-      const reason = this.spatial(def.id, x, y, orientation);
+      const reason = this.spatial(def.id, x, y, orientation, '', 1);
       if (reason) return reject(reason);
       const plan: ExpeditionPlan = {
         id: 'plan:' + command.id,
@@ -776,6 +805,7 @@ export class ExpeditionAuthority {
         y,
         orientation,
         paid: {},
+        footprintVersion: 1,
       };
       next = { ...next, plans: [...next.plans, plan] };
       message = plan.id;
@@ -792,7 +822,7 @@ export class ExpeditionAuthority {
         const { x, y } = this.planPosition(def.id, command.x ?? plan.x, command.y ?? plan.y, orientation);
         if (Math.hypot(actor.x - x, actor.y - y) > 4)
           return reject('OUT_OF_RANGE');
-        const reason = this.spatial(def.id, x, y, orientation, plan.id);
+        const reason = this.spatial(def.id, x, y, orientation, plan.id, plan.footprintVersion);
         if (reason) return reject(reason);
         next = {
           ...next,
@@ -807,7 +837,7 @@ export class ExpeditionAuthority {
         if (replacement.id === def.id) return reject('SAME_BLUEPRINT_TYPE');
         const { x, y } = this.planPosition(replacement.id, plan.x, plan.y, plan.orientation);
         if (Math.hypot(actor.x - x, actor.y - y) > 4) return reject('OUT_OF_RANGE');
-        const reason = this.spatial(replacement.id, x, y, plan.orientation, plan.id);
+        const reason = this.spatial(replacement.id, x, y, plan.orientation, plan.id, plan.footprintVersion);
         if (reason) return reject(reason);
         const paid: Record<string, number> = {}, outputs: { itemDefinitionId: string; quantity: number }[] = [];
         for (const [itemDefinitionId, quantity] of Object.entries(plan.paid)) {
@@ -816,10 +846,10 @@ export class ExpeditionAuthority {
           if (quantity > kept) outputs.push({ itemDefinitionId, quantity: quantity - kept });
         }
         const candidate = validateExpeditionState({ ...next, plans: next.plans.map(p => p.id === plan.id ? { ...p, definitionId: replacement.id, x, y, paid } : p) });
-        const result = this.items.commitColonyExchange({ operationId: command.id, playerId: command.playerId, expectedInventoryRevision: command.expectedInventoryRevision, inputs: [], outputs });
+        const result = this.items.commitColonyRefund({ operationId: command.id, playerId: command.playerId, expectedInventoryRevision: command.expectedInventoryRevision, outputs });
         if (result.status === 'rejected') return reject(result.reason);
         next = candidate;
-        message = 'PLAN_REPLACED';
+        message = result.destinationContainerId.startsWith('inventory:') ? 'PLAN_REPLACED' : 'PLAN_REPLACED_TO_STORAGE';
       } else if (command.action === 'deposit') {
         const inventory = this.items.getContainerView(
           'inventory:' + command.playerId,
@@ -854,11 +884,10 @@ export class ExpeditionAuthority {
         };
         message = 'MATERIALS_DEPOSITED';
       } else if (command.action === 'cancel') {
-        const result = this.items.commitColonyExchange({
+        const result = this.items.commitColonyRefund({
           operationId: command.id,
           playerId: command.playerId,
           expectedInventoryRevision: command.expectedInventoryRevision,
-          inputs: [],
           outputs: Object.entries(plan.paid)
             .filter(([, quantity]) => quantity > 0)
             .map(([itemDefinitionId, quantity]) => ({
@@ -868,7 +897,7 @@ export class ExpeditionAuthority {
         });
         if (result.status === 'rejected') return reject(result.reason);
         next = { ...next, plans: next.plans.filter((p) => p.id !== plan.id) };
-        message = 'PLAN_REFUNDED';
+        message = result.destinationContainerId.startsWith('inventory:') ? 'PLAN_REFUNDED' : 'PLAN_REFUNDED_TO_STORAGE';
       } else if (command.action === 'complete') {
         if (this.state.facilities.length >= 64) return reject('FACILITY_LIMIT');
         if (def.costs.some(([id, q]) => (plan.paid[id] ?? 0) < q))
@@ -879,6 +908,7 @@ export class ExpeditionAuthority {
           plan.y,
           plan.orientation,
           plan.id,
+          plan.footprintVersion,
         );
         if (reason) return reject(reason);
         let canonicalStructureId: string | null = null;
@@ -919,6 +949,7 @@ export class ExpeditionAuthority {
               x: plan.x,
               y: plan.y,
               orientation: plan.orientation,
+              ...(plan.footprintVersion===1 ? {footprintVersion:1 as const} : {}),
               canonicalStructureId,
               water: 0,
               progress: 0,

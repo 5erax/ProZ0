@@ -65,6 +65,8 @@ export interface Phase1ResourceRuntimeState {
   readonly remainingGatherActions: number | null;
   readonly depleted: boolean;
   readonly regenerationReadyTick: number | null;
+  readonly uprootedVersion?: 1;
+  readonly lifecycle?: import('./ResourceLifecycle').ResourceLifecycleV1;
 }
 
 export type Phase1RuinDiscoveryState =
@@ -114,6 +116,7 @@ export interface Phase1WeatherEventState {
 export interface Phase1EnvironmentState {
   /** Absent preserves legacy resource yield/work/art on existing saves. */
   readonly resourceProfileVersion?: 1;
+  readonly resourceLifecycleVersion?: 1;
   /** Absent keeps the historical 48-minute day when reopening old saves. */
   readonly calendarVersion?: 1;
   readonly activeTick: number;

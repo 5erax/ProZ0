@@ -15,6 +15,7 @@ export interface WeatherEventSaveV2 {
 }
 
 export interface WorldManifestV2 {
+  readonly soloCaves?: import('../../../simulation/worldspaces/SoloCaveState').SoloCaveStateV1;
   readonly livingWorld?: import('../../../simulation/livingworld/LivingWorldState').LivingWorldState;
   readonly singlePlayerExpedition?: import('../../../simulation/expedition/ExpeditionState').ExpeditionState;
   readonly formatId: typeof SAVE_FORMAT_ID;
@@ -32,6 +33,7 @@ export interface WorldManifestV2 {
   readonly contentCompatibility: SaveContentCompatibilityV2;
   readonly environment: {
     readonly resourceProfileVersion?: 1;
+  readonly resourceLifecycleVersion?: 1;
     readonly calendarVersion?: 1;
     readonly activeTick: number;
     readonly cycleStartLocalMinute: number;

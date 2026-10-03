@@ -1,4 +1,15 @@
+import { uiText } from '../localization/UiMessages';
+import { contentDisplayName } from '../localization/ContentText';
+import { bindUiText } from '../localization/UiMessages';
+import { uiPhrase } from '../localization/UiMessages';
+import { WEARABLE_SLOTS } from '../../content/livingworld/WearableContent';
+import {naturalSoilMoisture, soilCellKey} from '../../simulation/livingworld/SoilMoisture';
 import {soilAt} from '../../content/livingworld/LivingWorldContent';
+import { localizedResourceFacts as resourceLifecycleFacts } from '../localization/ResourceFacts';
+import { createSoloCaveScene } from '../presentation/SoloCaveScene';
+import { mountainAt } from '../../world/phase2/SoloMountain';
+import { fieldFacilitySprite } from '../presentation/FieldFacilityArt';
+import { expeditionFacility } from '../../content/singleplayer/ExpeditionContent';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { sizedResourceSprite, sizedResourceHitShape } from '../presentation/ResourceSizeArt';
 import { moistureState } from '../../simulation/livingworld/PlantGrowth';
@@ -8,14 +19,15 @@ import { colonyWaterAt } from '../../world/phase2/ColonyHydrology';
 import { createAtmosphericParticles } from '../presentation/AtmosphericParticles';
 import {playerSkinFilter,selectedPlayerSkin} from './PlayerProfile';
 import { explorationSiteSprite } from '../presentation/ExplorationArt';
-import { heldSpearSprite } from '../presentation/EquipmentArt';
+import { heldSpearSprite, wearableSprite } from '../presentation/EquipmentArt';
 import { worldDepthOrder } from '../presentation/WorldDepth';
+import { bindEntityInspection } from '../presentation/EntityInspection';
 import {
   WORLD_PIXELS_PER_UNIT,
   type WorldPosition,
 } from '../../foundation';
 import type { Phase1AuthorityBundle } from '../../integration';
-import { colonyBiomeAt, colonyWeatherAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
+import { colonyBiomeAt, colonyWeatherAt, colonyWeatherVisualAt, colonyLandscapeTerrainAt } from '../../world/phase2/ColonyRegions';
 import { colonyTerrainSprite, colonyLandmarkSprite, colonyResourceSprite } from '../presentation/ColonyRegionSprites';
 import { projectPhase1Isometric, phase1IsometricFacing } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION } from '../../simulation/sustenance/ColonySustenanceAuthority';
@@ -270,7 +282,7 @@ function entitySprite(
     case 'resource': {
       const state = bundle.worldStore.getResourceState(entity.entityId);
       const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
-      if (size) return sizedResourceSprite(entity.definitionId, size, state?.depleted === true);
+      if (size) return sizedResourceSprite(entity.definitionId, size, state?.depleted === true, state?.lifecycle?.kind === 'plant' ? state.lifecycle.stage : undefined);
       if(bundle.config.colonyDepthEnabled===true)return colonyResourceSprite(colonyBiomeAt(bundle.config.worldSeed,entity.position),entity.definitionId,state?.depleted===true);
       return phase1ResourcePresentationSprite(
         entity.definitionId,
@@ -576,15 +588,29 @@ export function createPhase1ProductReviewWorldRenderer(
   const rasterOrigin = bundle.getPlayerPosition(playerId);
   worldStage.dataset.rasterOriginX = String(rasterOrigin.x);
   worldStage.dataset.rasterOriginY = String(rasterOrigin.y);
+  const caveScene = createSoloCaveScene(root, worldStage, bundle, rasterOrigin);
   let cameraDepth = Number.NaN;
   const particles = createAtmosphericParticles(document);
   // Encapsulate the effect's internal raster; #proz0-canvas remains the public game surface.
   const particleHost = document.createElement('div');
   particleHost.style.cssText = 'position:absolute;inset:0;pointer-events:none';
   particleHost.attachShadow({ mode: 'closed' }).append(particles.canvas);
+  const groundParticleHost = document.createElement('div');
+  groundParticleHost.style.cssText = 'position:absolute;width:640px;height:360px;z-index:-80000;pointer-events:none';
+  groundParticleHost.attachShadow({mode:'closed'}).append(particles.groundCanvas);
   const motionPreference = targetWindow.matchMedia('(prefers-reduced-motion: reduce)');
   const soilMoistures = new Map<string, number>();
   let soilRevision = -1;
+  let soilFieldSecond = -1;
+  const naturalMoistures = new Map<string,number>();
+  const terrainMoisture = (key:string,point:WorldPosition,tick:number):number => {
+    const watered=soilMoistures.get(soilCellKey(point));if(watered!==undefined)return watered;
+    const second=Math.floor(tick/60);
+    if(second!==soilFieldSecond){soilFieldSecond=second;naturalMoistures.clear();}
+    let value=naturalMoistures.get(key);
+    if(value===undefined){value=naturalSoilMoisture(bundle.config.worldSeed,point,second*60);if(naturalMoistures.size>=4096)naturalMoistures.clear();naturalMoistures.set(key,value);}
+    return value;
+  };
 
   root.replaceChildren(canvas, layer);
 
@@ -669,6 +695,32 @@ export function createPhase1ProductReviewWorldRenderer(
     if (!focused && element.dataset.focusedTarget !== undefined) delete element.dataset.focusedTarget;
     if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
     if (element.dataset.worldId !== id) element.dataset.worldId = id;
+    if (['hostile','structure','facility','survey-site','world-drop','death-cache','ruin'].includes(role)) {
+      if(element.style.pointerEvents!=='auto' && (role!=='survey-site'||!options.data?.poiTemplate))element.style.pointerEvents='auto';
+      if(role!=='survey-site'){element.setAttribute('role','button');element.tabIndex=0;}
+      bindEntityInspection(element, () => {
+        if(role==='facility'){const f=bundle.expedition?.read().facilities.find(f=>f.id===id);return f?{id,name:uiPhrase(expeditionFacility(f.definitionId)!.name),kind:uiText("ui.8a87bf95"),facts:[uiText("ui.e4948090")+f.orientation*90+'°',uiText("ui.7f1940ab")]}:null;}
+        if (role === 'hostile') {
+          const target = bundle.world.getPredator(id);
+          if (!target || !worldPositionKnown(bundle,target.position)) return null;
+          return {id,name:uiText("ui.38671cb3"),kind:uiText("ui.8f8735af"),facts:[uiText("ui.fde1b4ec")+target.state.replaceAll('_',' ').toLowerCase(),uiText("ui.a438be7d")+target.health,uiText("ui.f321724a")]};
+        }
+        if (!worldPositionKnown(bundle,position)) return null;
+        if (role === 'structure') {
+          const structure = bundle.buildings.exportSnapshot().foothold.structures.find(v => v.structureId === id);
+          if (!structure) return null;
+          const facts = [uiText("ui.f321724a")];
+          if (structure.containerId) { const inventory = bundle.items.getContainerView(structure.containerId); facts.unshift(uiText("ui.6db47018")+inventory.totalWeightKg.toFixed(1)+' kg',uiText("ui.16c9f886")+inventory.totalVolume.toFixed(1)); }
+          return {id,name:contentDisplayName(bundle.catalog.get(structure.definitionId)),kind:uiText("ui.8a87bf95"),facts};
+        }
+        if (role === 'survey-site') {
+          const site = bundle.colonyDepth.sites().find(value => value.id === id);
+          if (!site) return null;
+          return {id,name:uiPhrase(site.name),kind:uiText("ui.7655028d"),facts:[uiText("ui.fde1b4ec")+bundle.colonyDepth.siteStage(id),uiText("ui.6c6837e1")+site.biomeId,uiText("ui.c072a99b")]};
+        }
+        return {id,name:element.getAttribute('aria-label') ?? role.replaceAll('-',' '),kind:role.replaceAll('-',' '),facts:[uiText("ui.ae805cdc")]};
+      });
+    }
     const data = options.data ?? {};
     for (const key of spriteDataKeys.get(element) ?? []) {
       if (!(key in data)) delete element.dataset[key];
@@ -697,6 +749,8 @@ export function createPhase1ProductReviewWorldRenderer(
       return null;
     }
     appendScene(element);
+    if(spriteDefinition.footOffsetY)element.style.top=Number.parseFloat(element.style.top)+spriteDefinition.footOffsetY+'px';
+    if(bundle.caves?.isSurface())element.style.top=Number.parseFloat(element.style.top)-mountainAt(position,bundle.caves.portals).height*4+'px';
     return element;
   };
 
@@ -755,7 +809,7 @@ export function createPhase1ProductReviewWorldRenderer(
         if (known) {
         const tile = sceneElement('terrain:' + String(gx) + ':' + String(gy));
         if (tile.dataset.worldRole !== 'terrain') {
-          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED';
+          tile.className = 'p1-product-terrain'; tile.dataset.worldRole = 'terrain'; tile.dataset.explorationState = 'EXPLORED'; tile.dataset.soilCell=soilCellKey(position);
         }
         if (tile.dataset.terrainState !== terrain) tile.dataset.terrainState = terrain;
         if(bundle.livingWorld && terrain!=='water' && !tile.dataset.soil)tile.dataset.soil=soilAt(bundle.config.worldSeed,position).id;
@@ -780,13 +834,13 @@ export function createPhase1ProductReviewWorldRenderer(
         applySprite(
           tile,
           bundle.config.colonyDepthEnabled===true
-            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', stableDecorHash(gx, gy) % 8, moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
+            ? terrain === 'ground' ? colonyGroundSprite(colonyBiomeAt(bundle.config.worldSeed, position), tile.dataset.soil ?? 'loam', (stableDecorHash(Math.floor(gx/3),Math.floor(gy/3))+stableDecorHash(gx,gy)%3)%8, moistureState(terrainMoisture(gx+':'+gy,position,authorityTick)), groundShore) : waterArt ?? colonyTerrainSprite(colonyBiomeAt(bundle.config.worldSeed,position),terrain,variant)
             : terrainCellSprite(terrain, variant),
           EXPLORATION_CELL_RASTER_SCALE,
         );
         const filter = night ? 'brightness(.78) saturate(.72)' : '';
         if (tile.style.filter !== filter) tile.style.filter = filter;
-        const moisture = moistureState(soilMoistures.get(gx + ':' + gy) ?? (raining ? 8500 : tile.dataset.soil === 'sand' ? 2000 : 5000));
+        const moisture = moistureState(terrainMoisture(gx+':'+gy,position,authorityTick));
         if (tile.dataset.moisture !== moisture) tile.dataset.moisture = moisture;
         const raisedShore = groundShore !== 0;
         if (raisedShore && tile.dataset.terrainDepth !== 'raised-shore') {
@@ -805,6 +859,11 @@ export function createPhase1ProductReviewWorldRenderer(
             rasterOrigin,
           )
         ) {
+          const elevation=bundle.caves?mountainAt(position,bundle.caves.portals):null;
+          if(elevation?.height){tile.style.top=Number.parseFloat(tile.style.top)-elevation.height*4+'px';tile.dataset.elevation=String(elevation.height);tile.dataset.mountainProfile=elevation.profile;tile.dataset.ramp=String(elevation.ramp);
+            const lift=Math.round(elevation.height*4);let face=tile.querySelector<SVGSVGElement>('[data-cliff-face]');if(!face){face=document.createElementNS('http://www.w3.org/2000/svg','svg');face.dataset.cliffFace='true';face.style.cssText='position:absolute;left:0;top:0;width:100%;pointer-events:none;z-index:-1';tile.append(face);}
+            if(face.dataset.lift!==String(lift)){face.dataset.lift=String(lift);face.setAttribute('viewBox','0 0 64 '+(32+lift));face.style.height=32+lift+'px';face.innerHTML='<path fill="#31444a" d="M0 16 32 32 64 16V'+(16+lift)+'L32 '+(32+lift)+' 0 '+(16+lift)+'Z"/><path fill="#51605b" d="M32 32 64 16V'+(16+lift)+'L32 '+(32+lift)+'Z"/>';}
+          }
           appendScene(tile);
         }
         }
@@ -1008,6 +1067,11 @@ export function createPhase1ProductReviewWorldRenderer(
       );
     }
 
+    if (state !== 'DEATH') for (const slot of WEARABLE_SLOTS) {
+      if (equipment.wearables[slot] === null) continue;
+      const overlay = wearableSprite(slot, phase1IsometricFacing(movement.facing), state === 'MOVE', playerFrameOrdinal(state, bundle.authorityTick, startedTick));
+      renderSprite(overlay.sprite, movement.position, camera, 'wearable-' + slot, id, {flipX: overlay.flipX, zIndex: worldDepthOrder(movement.position, 3 + WEARABLE_SLOTS.indexOf(slot)), className: local ? 'p1-product-player' : 'p1-product-teammate', data: {actorState: state, equipmentSlot: slot}});
+    }
     if (!local) {
       const shape = presentationIdentitySlot === 'TEAM_A'||presentationIdentitySlot==='TEAM_D'||presentationIdentitySlot==='TEAM_G'
         ? 'circle'
@@ -1195,11 +1259,35 @@ export function createPhase1ProductReviewWorldRenderer(
     const living = bundle.livingWorld?.presentationSnapshot();
     if (living && living.revision !== soilRevision) {
       soilRevision = living.revision; soilMoistures.clear();
-      for (const f of living.forage) if (!f.cleared && f.growth) soilMoistures.set(Math.floor(f.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(f.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), f.growth.moisture);
-      for (const p of living.plots) soilMoistures.set(Math.floor(p.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS) + ':' + Math.floor(p.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS), p.moisture);
+      for (const p of living.soil?.patches ?? []) soilMoistures.set(p.key,p.moisture);
+      for (const p of living.plots) soilMoistures.set(soilCellKey(p), p.moisture);
     }
     const offset = projectPhase1Isometric(camera, rasterOrigin);
-    worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y) + 'px)';
+    const cameraElevation=bundle.caves?.isSurface()?mountainAt(camera,bundle.caves.portals).height*4:0;
+    worldStage.style.transform = 'translate(' + String(-offset.x) + 'px,' + String(-offset.y+cameraElevation) + 'px)';
+    if (caveScene.render(camera)) {
+      layer.style.backgroundImage = 'none';
+      layer.style.backgroundColor = '#14252e';
+      particleHost.hidden = true;
+      const context = getPresentationContext();
+      renderPlayer(playerId, camera, context, true, 'LOCAL');
+      for (const [key, element] of retained) if (!visibleKeys.has(key)) {element.remove();retained.delete(key);}
+      groundParticleHost.remove();
+      canvas.dataset.playerX = camera.x.toFixed(6);canvas.dataset.playerY = camera.y.toFixed(6);
+      canvas.dataset.authorityTick = String(bundle.authorityTick);canvas.dataset.weatherState = 'clear';
+      canvas.dataset.worldspace = bundle.playerWorldspace();canvas.dataset.fogProjection = 'canonical-cave-fog';
+      return;
+    }
+    canvas.dataset.worldspace = 'surface';
+    layer.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
+    layer.style.backgroundColor = '';
+    particleHost.hidden = false;
+    for(const f of bundle.expedition?.read().facilities??[]){
+      if(f.canonicalStructureId!==null||!worldPositionKnown(bundle,{x:f.x,y:f.y}))continue;
+      const footprint=bundle.expedition!.facilityFootprint(f.id)!;
+      const rendered=renderSprite(fieldFacilitySprite(f.definitionId,footprint.width,footprint.depth,f.orientation),{x:f.x,y:f.y},camera,'facility',f.id);
+      if(rendered){rendered.dataset.facilityDefinition=f.definitionId;rendered.dataset.facilityOrientation=String(f.orientation);bindUiText(rendered,"aria-label",uiPhrase(expeditionFacility(f.definitionId)!.name));}
+    }
     // Atmospheric cloud drift is screen-space; camera motion must not repaint
     // the full viewport backdrop on each simulation tick.
     layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
@@ -1231,9 +1319,14 @@ export function createPhase1ProductReviewWorldRenderer(
         if(!worldPositionKnown(bundle,site.position))continue;
         const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
         if(rendered && site.template){
-          rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';
-          rendered.setAttribute('aria-label','Explore '+site.name);rendered.title='Explore '+site.name+' · approach to inspect';
-          rendered.style.clipPath='polygon(0 25%,100% 25%,100% 100%,0 100%)';
+          // The diorama floor is scenery: only its console receives pointer input.
+          rendered.removeAttribute('role');rendered.removeAttribute('tabindex');rendered.style.pointerEvents='none';rendered.style.clipPath='none';rendered.removeAttribute('title');
+          let console = rendered.querySelector<HTMLButtonElement>('[data-site-interaction]');
+          if (!console) { console=document.createElement('button');console.type='button';console.dataset.siteInteraction='true';console.style.cssText='position:absolute;left:15px;top:44px;width:20px;height:20px;padding:0;border:1px solid #aedace55;background:transparent;cursor:pointer;pointer-events:auto';rendered.append(console); }
+          const lockerHandle=site.template==='garden'||site.template==='shelter';
+          console.style.left=lockerHandle?'58px':'15px';console.style.top=lockerHandle?'49px':'44px';
+          bindUiText(console,"aria-label",uiText("ui.2cd3c2b4")+uiPhrase(site.name));
+
         }
       }
     }
@@ -1254,6 +1347,9 @@ export function createPhase1ProductReviewWorldRenderer(
     }
 
     for (const entity of bundle.world.getActiveGeneratedEntities()) {
+      if (entity.type === 'resource') {
+        if (bundle.worldStore.getResourceState(entity.entityId)?.uprootedVersion === 1) continue;
+      }
       if (entity.type === 'passive-wildlife' && (bundle.livingWorld || entity.entityId === bundle.sustenance.read().animalEntityId)) continue;
       if (
         entity.type !== 'hostile'
@@ -1280,15 +1376,22 @@ export function createPhase1ProductReviewWorldRenderer(
         // The authored 32×48 resource cell has transparent sky above a rock.
         // Do not let that empty rectangle steal clicks from a crop behind it.
         const size = bundle.worldStore.getResourceSize(entity.entityId, entity.definitionId);
-        if (size) rendered.style.clipPath = sizedResourceHitShape(entity.definitionId, size, bundle.worldStore.getResourceState(entity.entityId)?.depleted === true);
-        else if (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node') rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
-        else if (entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
-        const name='Gather '+bundle.catalog.getAs(entity.definitionId,'resource').displayName;
+        const resourceState = bundle.worldStore.getResourceState(entity.entityId);
+        if (size) rendered.style.clipPath = sizedResourceHitShape(entity.definitionId, size, resourceState?.depleted === true, resourceState?.lifecycle?.kind === 'plant' ? resourceState.lifecycle.stage : undefined);
+        if (resourceState?.lifecycle?.kind === 'plant') rendered.dataset.growthStage = resourceState.lifecycle.stage;
+        else if (!size && (entity.definitionId === 'resource:stone-outcrop' || entity.definitionId === 'resource:metal-ore-node')) rendered.style.clipPath = 'polygon(8% 40%,65% 40%,94% 64%,94% 94%,8% 94%)';
+        else if (!size && entity.definitionId === 'resource:potable-water-source') rendered.style.clipPath = 'polygon(0 59%,50% 57%,100% 75%,50% 96%,0 80%)';
+        const name=uiText("ui.7cc2b63e")+contentDisplayName(bundle.catalog.getAs(entity.definitionId,'resource'));
         if(rendered.getAttribute('role')!=='button'){rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';}
-        if(rendered.getAttribute('aria-label')!==name)rendered.setAttribute('aria-label',name);const resource=bundle.worldStore.getResourceState(entity.entityId);
+        if(rendered.getAttribute('aria-label')!==name)bindUiText(rendered,"aria-label",name);
         if (size) rendered.dataset.resourceSize = size;
-        const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId, 'resource'), size);
-        rendered.title=resource?.depleted?'Renewing · '+String(Math.max(0,Math.ceil(((resource.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60)))+'s active time':(size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' : '') + name + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's · approach to interact';
+        rendered.removeAttribute('title');
+        bindEntityInspection(rendered, () => {
+          if (!worldPositionKnown(bundle, entity.position)) return null;
+          const current = bundle.worldStore.getResourceState(entity.entityId);
+          const harvest = resourceHarvestDefinition(bundle.catalog.getAs(entity.definitionId,'resource'),size,current?.lifecycle?.kind === 'plant' ? current.lifecycle.stage : undefined);
+          return {id:entity.entityId,name:contentDisplayName(bundle.catalog.getAs(entity.definitionId,'resource')),kind:uiText("ui.23b0d815"),facts:[...(size ? [uiText("ui.adb28456")+RESOURCE_SIZE_PROFILES[size].label] : []),uiText("ui.6ac9b7f4")+harvest.output.quantity+' '+contentDisplayName(bundle.catalog.getAs(harvest.output.itemId,'item')),uiText("ui.53d0e7d5")+harvest.gatherChannelSeconds+'s',...resourceLifecycleFacts(current?.lifecycle,bundle.authorityTick,current?.remainingGatherActions??null),...(current?.lifecycle ? [] : [current?.depleted ? uiText("ui.1e97f9d8")+Math.max(0,Math.ceil(((current.regenerationReadyTick??bundle.authorityTick)-bundle.authorityTick)/60))+uiText("ui.3b16e069") : uiText("ui.72402638")]),uiText("ui.f321724a")]};
+        });
       }
 
       if (entity.type === 'ruin') {
@@ -1302,7 +1405,7 @@ export function createPhase1ProductReviewWorldRenderer(
             ruinInspectMarkerSprite(
               ruin.discoveryState === 'investigated'
                 ? 'INVESTIGATED'
-                : 'AVAILABLE',
+                : "AVAILABLE",
             ),
             markerPosition,
             camera,
@@ -1336,7 +1439,7 @@ export function createPhase1ProductReviewWorldRenderer(
         const container=bundle.items.getContainerView(structure.containerId),capacity=bundle.catalog.getAs(structure.definitionId,'structure').container!;
         const multiplier=container.storageCapacityMultiplier??1,fill=Math.min(1,Math.max(container.totalWeightKg/(capacity.maxWeightKg*multiplier),container.totalVolume/(capacity.maxVolume*multiplier))),percent=Math.round(fill*100);
         let indicator=structureElement.querySelector<HTMLElement>('[data-storage-fill]');if(!indicator){indicator=document.createElement('div');indicator.dataset.storageFill='';indicator.style.cssText='position:absolute;bottom:2px;left:8px;width:24px;height:3px;border:1px solid #a7b8ae;pointer-events:none';structureElement.append(indicator);}
-        if(indicator.dataset.storageFill!==String(percent)){indicator.dataset.storageFill=String(percent);indicator.style.background='linear-gradient(to right,'+(percent>=90?'#dda36b':'#8ac7a0')+' '+percent+'%,#21343a '+percent+'%)';structureElement.title='Storage '+percent+'% · open Inventory nearby';}
+        if(indicator.dataset.storageFill!==String(percent)){indicator.dataset.storageFill=String(percent);indicator.style.background='linear-gradient(to right,'+(percent>=90?'#dda36b':'#8ac7a0')+' '+percent+'%,#21343a '+percent+'%)';structureElement.removeAttribute('title');}
       }
     }
 
@@ -1374,7 +1477,7 @@ export function createPhase1ProductReviewWorldRenderer(
       pad.style.opacity = site.built ? '1' : '.45';
       const label = pad.querySelector('span')!;
       const labelText = (site.id === 'cultivation-bed' ? 'BED' : 'PEN') + (site.built ? '' : ' · N');
-      if (label.textContent !== labelText) label.textContent = labelText;
+      if (label.textContent !== labelText) bindUiText(label,"textContent",labelText);
       appendScene(pad);
       if (site.id === 'cultivation-bed' && colony.cropProgressTicks !== null) {
         for (const offset of [-1, 0, 1]) renderSprite(PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor,
@@ -1451,7 +1554,7 @@ export function createPhase1ProductReviewWorldRenderer(
       const stack = container.stacks[0];
       if (stack !== undefined) {
         const displayName =
-          bundle.catalog.get(stack.itemDefinitionId).displayName;
+          contentDisplayName(bundle.catalog.get(stack.itemDefinitionId));
         const icon = itemIconSprite(displayName);
         if (icon !== null) {
           const iconPosition = Object.freeze({
@@ -1529,13 +1632,33 @@ export function createPhase1ProductReviewWorldRenderer(
     }
     renderPlayer(playerId, camera, context, true, 'LOCAL');
 
-    if (raining || regionalWeather?.weather === 'dry-wind') {
+    const windVisual = regionalWeather ? colonyWeatherVisualAt(bundle.config.worldSeed,camera,bundle.authorityTick) : undefined;
+    const windVisible = regionalWeather?.biomeId === 'ochre-badlands' && windVisual?.phase !== 'calm';
+    if (raining || windVisible) {
       const kind = raining ? 'rain' : 'dry-wind';
       const weather = sceneElement('weather:particles');
       weather.style.cssText = 'position:absolute;inset:0;z-index:790000;pointer-events:none';
       weather.dataset.weatherEffect = raining ? 'cold-rain' : 'dry-wind';
       if (particleHost.parentElement !== weather) weather.append(particleHost);
-      particles.render(kind, targetWindow.performance.now() / 1000, projectPhase1Isometric(camera, rasterOrigin), motionPreference.matches);
+      const dustAnchors: {x:number;y:number;salt:number}[] = [];
+      if (kind === 'dry-wind') {
+        // Anchor sparse dust to known dry ground. Water and fog never emit it.
+        const cx=Math.floor(camera.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),cy=Math.floor(camera.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS);
+        for(let y=cy-8;y<=cy+8 && dustAnchors.length<12;y++)for(let x=cx-10;x<=cx+10 && dustAnchors.length<12;x++) {
+          if(!explorationCellKnown(bundle,x,y))continue;
+          const point=worldCell(x,y),base=terrainForCell(bundle,x,y);
+          if(colonyLandscapeTerrainAt(bundle.config.worldSeed,point,base,bundle.config.worldGenerationVersion??1)!=='ground')continue;
+          if(moistureState(terrainMoisture(x+':'+y,point,bundle.authorityTick))!=='dry')continue;
+          const raster=distancePx(point,camera);
+          if(raster.x<0||raster.x>640||raster.y<0||raster.y>360)continue;
+          dustAnchors.push({...raster,salt:stableDecorHash(x,y)});
+        }
+        groundParticleHost.style.left=offset.x+'px';groundParticleHost.style.top=offset.y+'px';
+        worldStage.append(groundParticleHost);
+        weather.dataset.weatherPhase=windVisual!.phase;weather.dataset.weatherIntensity=windVisual!.intensity.toFixed(2);weather.dataset.windDirection=String(windVisual!.direction);
+      } else groundParticleHost.remove();
+      particles.render(kind, targetWindow.performance.now() / 1000, offset, motionPreference.matches, kind==='dry-wind'?windVisual:undefined, dustAnchors);
+      weather.dataset.groundDustCount=particles.groundCanvas.dataset.groundDustCount;
       weather.dataset.rainMotionPhase = particles.canvas.dataset.particlePhase;
       appendScene(weather, true);
       if (raining) {
@@ -1545,6 +1668,8 @@ export function createPhase1ProductReviewWorldRenderer(
         appendScene(haze, true);
       }
     }
+
+    if (!windVisible) groundParticleHost.remove();
 
     // Remove only entities that actually leave the visible canonical scene.
     // Repeated rendering preserves node/texture identity and does not churn DOM.
@@ -1576,6 +1701,7 @@ export function createPhase1ProductReviewWorldRenderer(
       targetWindow.removeEventListener('resize', applyScale);
       layer.remove();
       retained.clear();
+      caveScene.destroy();
       canvas.remove();
     },
   });

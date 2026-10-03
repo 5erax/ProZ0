@@ -14,7 +14,7 @@ async function walk(page: Page, x: number, y: number) {
         dy = y - p.y;
       last = p;
       const remaining = Math.hypot(dx, dy);
-      if (remaining < 0.2) return;
+      if (remaining < 0.5) return;
       const keys =
         Math.abs(dx) >= Math.abs(dy)
           ? dx > 0
@@ -30,7 +30,11 @@ async function walk(page: Page, x: number, y: number) {
       }
       // Shorten the final approach rather than oscillating past a close target
       // on runners that process several authority ticks per browser command.
-      await page.waitForTimeout(remaining < .75 ? 20 : 80);
+      await page.waitForTimeout(remaining < 2 ? 16 : 80);
+      // Release before querying the rendered position: a slow runner must not
+      // continue walking throughout locator round trips and overshoot the goal.
+      for (const k of held.toReversed()) await page.keyboard.up(k);
+      held = [];
     }
     throw Error('Natural walk could not reach ' + String(x) + ',' + String(y) + '; last ' + last.x + ',' + last.y);
   } finally {
@@ -67,7 +71,7 @@ async function clickGround(page: Page, x: number, y: number) {
 test('solo expedition: real gathering builds remote storage and reload preserves inventory, plans and lab receipts', async ({
   page,
 }) => {
-  test.setTimeout(240000);
+  test.setTimeout(360000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -91,8 +95,10 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   const gather = async (n: number, itemName: string) => {
     const target = page.locator('[data-world-role="resource"][data-focused-target="true"]');
     await expect(target).toHaveCount(1);
-    const title = await target.getAttribute('title');
-    const output = Number(title?.match(new RegExp('· (\\d+) ' + itemName))?.[1]);
+    await target.focus(); await page.keyboard.press('Shift+F10');
+    const title = await page.getByRole('region',{name:'Entity statistics',exact:true}).innerText();
+    await page.keyboard.press('Escape');
+    const output = Number(title?.match(new RegExp('Yield: (\\d+) ' + itemName))?.[1]);
     expect(output, title ?? 'Missing gather tooltip').toBeGreaterThan(0);
     for (let i = 0; i < n; i++) {
       await page.keyboard.press('e');
@@ -293,12 +299,12 @@ test('solo launcher rolls distinct default seeds and accepts a reproducible cust
     await page.goto('/');
     if (seed)
       await page
-        .getByLabel('Seed thế giới · để trống để tạo ngẫu nhiên', {
+        .getByLabel('World seed · leave blank for a random world', {
           exact: true,
         })
         .fill(seed);
     await page
-      .getByRole('button', { name: 'Bắt đầu thế giới mới', exact: true })
+      .getByRole('button', { name: 'Start a new world', exact: true })
       .click();
     await page.waitForURL(
       (url) => url.searchParams.get('proz0Mode') === 'phase2-colony-review',

@@ -48,11 +48,27 @@ const animals: Record<string, { width: number; height: number; body: string }> =
     <path fill="${shade}" d="M48 21h3v3h-3zM58 22h4v4h-4zM13 49h6v4h-6zM35 49h7v4h-7zM22 47h5v4h-5zM43 47h5v4h-5z"/>` },
 };
 
-function plant(kind: string, stage: number): string {
+/** Six bounded silhouettes, selected from stable entity identity, never camera or tick. */
+export function livingArtVariant(id:string):number {
+  let hash=2166136261;for(const c of id)hash=Math.imul(hash^c.charCodeAt(0),16777619);return (hash>>>0)%6;
+}
+function grass(stage:number,variant:number):string {
+  const profiles=[[0,7,2,10,4],[5,0,12,3,8],[9,4,1,7,11],[2,11,6,0,9],[10,5,8,1,3],[4,9,0,12,6]];
+  const heights=profiles[variant]!,count=stage===0?2:stage===1?3:5;
+  let paths='';
+  for(let i=0;i<count;i++){
+    const x=14+i*8,h=(stage===0?5:stage===1?10:15)+heights[i]!,y=50-h,bend=(i+variant)%2?3:-3;
+    paths+='<path fill="#496a50" d="M'+x+' 50V'+(y+5)+'l'+bend+'-5h2v'+h+'Z"/>';
+    paths+='<path fill="#8aa877" d="M'+x+' '+(y+7)+'h1v'+(h-7)+'h-1Z"/>';
+    if(stage===2&&(i+variant)%3===0)paths+='<path fill="#a9b17a" d="M'+(x+bend-1)+' '+(y-2)+'h3v3h-3Z"/>';
+  }
+  return paths;
+}
+function plant(kind: string, stage: number, variant=0): string {
   if (kind === 'empty') return '';
   if (kind === 'dead') return '<path fill="#a78e61" d="M21 34h3v13h-3zM33 31h3v16h-3zM41 37h3v10h-3zM19 33h8v3h-8zM31 29h8v3h-8z"/>';
+  if (kind === 'wild-grass') return grass(stage,variant);
   if (stage === 0) return '<path fill="#486747" d="M22 41h3v7h-3zM34 38h3v10h-3zM42 42h3v6h-3z"/><path fill="#8faa68" d="M17 39h7v4h-7zM35 35h7v5h-7zM43 39h5v4h-5z"/>';
-  if (kind === 'wild-grass') return '<path fill="#496a50" d="M13 45v-8h3v-9h3v20h-6zM24 48V24h3v11h4v13zM36 47V30h3v-9h3v26zM45 48V34h3v-6h3v20z"/><path fill="#87a875" d="M16 37h3v10h-3zM26 29h2v12h-2zM40 26h2v15h-2zM47 37h2v8h-2z"/>';
   if (kind === 'root') return `<path fill="#688954" d="M17 32h10v5H17zM23 24h5v18h-5zM29 28h7v15h-7zM36 23h6v18h-6zM42 31h9v6h-9z"/><path fill="#98ad69" d="M18 29h6v3h-6zM29 24h5v8h-5zM39 21h4v9h-4z"/>${stage === 2 ? '<path fill="#bf9580" d="M21 42h9v6h-9zM36 41h9v8h-9z"/><path fill="#e0ba94" d="M22 42h4v3h-4zM37 41h4v3h-4z"/>' : ''}`;
   if (kind === 'herb' || kind === 'wild-herbs') return `<path fill="#426855" d="M14 33h12v7H14zM20 22h9v12h-9zM31 27h15v9H31zM39 19h7v14h-7zM22 39h23v6H22z"/><path fill="#89a77a" d="M16 30h9v4h-9zM22 24h5v5h-5zM33 28h9v5h-9zM41 20h4v5h-4zM26 37h12v4H26z"/>${stage === 2 ? '<path fill="#b49abb" d="M23 19h4v4h-4zM41 16h5v4h-5zM33 24h4v4h-4z"/>' : ''}`;
   if (kind === 'flax' || kind === 'wild-flax') return `<path fill="#608561" d="M20 24h2v24h-2zM30 15h2v33h-2zM42 20h2v28h-2zM16 30h6v3h-6zM31 22h7v3h-7zM38 32h6v3h-6zM25 36h7v3h-7z"/>${stage === 2 ? '<path fill="#78adbf" d="M17 21h8v4h-8zM28 12h7v5h-7zM39 17h8v4h-8z"/><path fill="#d4d9a0" d="M20 22h2v2h-2zM30 13h2v2h-2zM42 18h2v2h-2z"/>' : '<path fill="#90aa73" d="M18 22h5v4h-5zM29 14h5v4h-5z"/>'}`;
@@ -61,9 +77,10 @@ function plant(kind: string, stage: number): string {
 }
 
 const cache = new Map<string, LivingArt>();
-export function livingArt(role: string, kind: string, progress: number, young = false, dead = false): LivingArt {
+export function livingArt(role: string, kind: string, progress: number, young = false, dead = false, variant = 0): LivingArt {
   const stageKey = progress >= 1 ? 2 : progress >= .5 ? 1 : 0;
-  const key = [role, kind, stageKey, young, dead].join(':');
+  variant = kind === 'wild-grass' ? ((variant%6)+6)%6 : 0;
+  const key = [role, kind, stageKey, young, dead, variant].join(':');
   const cached = cache.get(key);
   if (cached) return cached;
   const shadow = '<path fill="#172c30" opacity=".45" d="m6 50 25-6 27 7-25 7z"/>';
@@ -74,6 +91,14 @@ export function livingArt(role: string, kind: string, progress: number, young = 
     width = a.width; height = a.height;
     if (young) { width = Math.round(width * .65); height = Math.round(height * .65); }
     body = dead ? `<g transform="translate(0 70) scale(1 -.45)">${a.body}</g>` : a.body;
+  } else if (kind === 'timber-tree') {
+    width = 40; height = 50;
+    body = stageKey === 0 ? '<path fill="#765a3d" d="M27 44h9v9h-9Z"/><path fill="#b29663" d="M27 44 31 42 36 44 32 46Z"/><path fill="#729365" d="M34 41h5v4h-5Z"/>' : '<path fill="#51432f" d="M28 22h8v31h-8Z"/><path fill="#9c8053" d="M29 25h3v26h-3Z"/><path fill="#344f3e" d="M8 18h6v-7h10V5h16v6h10v8h6v18h-8v6H17v-7H8Z"/><path fill="#6c8a5b" d="M15 13h17v5h10v7H12v-6h3Z"/><path fill="#4d714c" d="M16 29h12v8h10v6H19v-5h-3Z"/><path fill="#8ea36b" d="M16 14h9v3h-9Zm18 6h9v3h-9Z"/><path fill="#79613d" d="M35 35h5V25h4v-5h3v9h-4v11h-8Z"/>';
+    if (stageKey === 1) body = '<g transform="translate(6.4 10.6) scale(.8)">'+body+'</g>';
+  } else if (kind === 'fiber-plant' || kind === 'food-plant') {
+    width = 32; height = 32;
+    body = plant(kind === 'fiber-plant' ? 'flax' : 'herb',stageKey);
+    if (kind === 'food-plant' && stageKey === 2) body += '<path fill="#d1a56b" d="M18 34h5v5h-5Zm18-7h5v5h-5Z"/>';
   } else if (kind === 'berry-bush') {
     width = 42; height = 38;
     body = '<path fill="#82674d" d="M29 29h5v22h-5zM23 39h12v4H23zM33 36h10v4H33z"/><path fill="#3e604b" d="M9 27h6v-9h14v-6h13v7h10v19H17v-4H9z"/><path fill="#628452" d="M16 19h12v7H16zM30 15h10v7H30zM36 24h13v8H36zM19 30h12v6H19z"/><path fill="#87a469" d="M18 19h7v3h-7zM31 15h6v3h-6zM39 24h6v3h-6z"/>' + (dead || stageKey < 2 ? '' : '<path fill="#b7797b" d="M18 26h4v4h-4zM22 29h4v4h-4zM37 22h4v4h-4zM41 25h4v4h-4zM30 34h4v4h-4z"/><path fill="#e0ada0" d="M18 26h2v2h-2zM37 22h2v2h-2z"/>');
@@ -87,7 +112,7 @@ export function livingArt(role: string, kind: string, progress: number, young = 
     body = '<path fill="#688b89" d="m9 46 5-11h32l8 11-21 8z"/><path fill="#bdd1c3" d="M15 24h9v23h-9zM28 12h12v35H28zM43 27h7v18h-7z"/><path fill="#e3e6ce" d="M15 24h4v17h-4zM28 12h5v26h-5zM43 27h3v12h-3z"/><path fill="#92b4ae" d="M35 17h5v30h-5zM21 29h3v17h-3z"/>';
   } else {
     const stage = dead ? 0 : stageKey;
-    body = (role === 'plot' ? '<path fill="var(--plot-soil-color,#62563f)" d="m5 46 27-13 27 13-27 14z"/><path fill="#8d7751" opacity=".6" d="m13 45 20 10 17-9m-29-6 21 10"/>' : '') + plant(kind, stage);
+    body = (role === 'plot' ? '<path fill="var(--plot-soil-color,#62563f)" d="m5 46 27-13 27 13-27 14z"/><path fill="#8d7751" opacity=".6" d="m13 45 20 10 17-9m-29-6 21 10"/>' : '') + plant(kind, stage, variant);
     if (kind === 'empty') { width = 40; height = 22; }
   }
   const result = Object.freeze({ width, height, markup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges" aria-hidden="true">${shadow}${body}</svg>` });

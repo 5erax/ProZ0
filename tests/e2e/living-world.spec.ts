@@ -173,6 +173,8 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   await expect(
     page.locator('.lw-object[data-living-id="' + id + '"]'),
   ).toBeVisible();
+  await page.screenshot({path: resolve('test-results', 'living-reopened-before-input.png')});
+  await test.info().attach('world-hit-regions', {body: JSON.stringify(await page.locator('.lw-object[data-living-id="'+id+'"],.p1-product-sprite[data-world-role="resource"]').evaluateAll(elements => elements.map(e => ({id:(e as HTMLElement).dataset.livingId??(e as HTMLElement).dataset.worldId,rect:e.getBoundingClientRect().toJSON(),depth:getComputedStyle(e).zIndex,clip:getComputedStyle(e).clipPath})))),contentType:'application/json'});
   await page.locator('.lw-object[data-living-id="' + id + '"]').click();
   await expect(panel.locator('[data-living-row="' + id + '"]')).toContainText(
     'Root Vegetables',

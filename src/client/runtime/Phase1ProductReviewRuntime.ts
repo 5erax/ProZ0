@@ -1,7 +1,13 @@
+import { uiText } from '../localization/UiMessages';
+import { contentDisplayName } from '../localization/ContentText';
+import { onLocaleChange } from '../localization/Locale';
+import { uiPhrase } from '../localization/UiMessages';
+import { wearableSlotFor, WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
 import { isKnownMeleeEquipment } from '../../content/livingworld/EquipmentContent';
 import {createLivingWorldOverlay} from '../presentation/LivingWorldOverlay';
 import { RESOURCE_SIZE_PROFILES, resourceHarvestDefinition } from '../../content/livingworld/ResourceSizeProfiles';
 import { installGameContextMenu } from '../input/GameContextMenu';
+import { createEntityInspection } from '../presentation/EntityInspection';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
@@ -217,7 +223,8 @@ export async function createPhase1ProductReviewRuntime(
   root.dataset.visualQaMode = 'none';
   root.dataset.runtimeStatus = 'booting';
 
-  const bundle = await Phase1AuthorityBundle.create({...config,...(config.colonyDepthEnabled===true && config.playerIds.length===1 ? {resourceProfileVersion:1 as const} : {}),singlePlayerExpeditionEnabled:config.colonyDepthEnabled===true && config.playerIds.length===1});
+  const solo = config.colonyDepthEnabled===true && config.playerIds.length===1;
+  const bundle = await Phase1AuthorityBundle.create({...config,...(solo ? {resourceProfileVersion:1 as const,resourceLifecycleVersion:1 as const} : {}),singlePlayerExpeditionEnabled:solo,soloCavesEnabled:solo && (!config.reopen || !!config.reopen.bundle.world.soloCaves)});
   const checkpointCoordinator =
     new Phase1SaveV2CheckpointCoordinator(bundle);
   const input = new KeyboardInputAdapter(
@@ -318,25 +325,28 @@ export async function createPhase1ProductReviewRuntime(
   let gatheredActions=0;
   const playtestTools=config.colonyDepthEnabled===true?createColonyPlaytestTools(root,()=>{const p=bundle.getPlayerPosition(config.localPlayerId),c=bundle.items.getContainerView('inventory:'+config.localPlayerId),d=bundle.colonyDepth.read();return {tick:bundle.authorityTick,x:p.x,y:p.y,carrying:c.playerWeightState??'NORMAL',stacks:c.stacks.length,sites:d.inspectedSites.length,biomes:d.discoveredBiomes.length,facilities:bundle.buildings.exportSnapshot().foothold.structures.length,gatherActions:gatheredActions,toolCondition:c.stacks.find(stack=>stack.itemDefinitionId==='item:stone-field-tool')?.condition??null};}):null;
 
+  // Intent identity belongs to the client session; it is not world RNG.
+  const operationSession = crypto.randomUUID();
   const nextOperationId = (kind: string): string =>
-    'product-review:' + kind + ':' + String(++operationOrdinal);
+    'product-review:' + operationSession + ':' + kind + ':' + String(++operationOrdinal);
   const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
     livingOverlay?.close();expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
   }):null;
 
   const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const entityInspection = createEntityInspection(root, () => ['colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'));
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
-    source.setPresentationPanel(Object.freeze({ kind: 'colony', title: 'COLONY · CULTIVATION / HUSBANDRY · N TO CLOSE',
+    source.setPresentationPanel(Object.freeze({ kind: 'colony', title: uiText("ui.72df119f"),
       lines: Object.freeze([
-        'BED · ' + (!state.bedBuilt ? 'BUILD NEAR THE BED SITE WEST OF LANDING' : state.cropProgressTicks === null ? 'EMPTY · PLANT AN EDIBLE CUTTING + WATER'
-          : state.cropProgressTicks >= state.cropCycleTicks ? 'READY TO HARVEST' : 'GROWING · ' + String(Math.ceil((state.cropCycleTicks - state.cropProgressTicks) / 60)) + 's'),
-        'PEN · ' + (!state.penBuilt ? 'BUILD NEAR THE PEN SITE EAST OF LANDING' : state.animalEntityId === null ? 'EMPTY · FIND A PASSIVE GRAZER AND PRESS E TO CAPTURE (1 CORDAGE)'
-          : state.careProgressTicks === null ? 'GRAZER · FEED + WATER FOR FERTILIZER' : 'CARED FOR · ' + String(Math.ceil((GRAZER_CARE_TICKS - state.careProgressTicks) / 60)) + 's'),
-        'FERTILIZER · ' + String(state.fertilizer) + '/4 · reduces current crop time by 25%',
-        'Growth runs only while this world is active. Build and care within reach of the site.',
+        uiText("ui.d95c84cb") + (!state.bedBuilt ? uiText("ui.a4b08895") : state.cropProgressTicks === null ? uiText("ui.db3227fc")
+          : state.cropProgressTicks >= state.cropCycleTicks ? uiText("ui.7216f2bc") : uiText("ui.ae8998d") + String(Math.ceil((state.cropCycleTicks - state.cropProgressTicks) / 60)) + 's'),
+        uiText("ui.303d5d9f") + (!state.penBuilt ? uiText("ui.ed2faa53") : state.animalEntityId === null ? uiText("ui.1bed2f0c")
+          : state.careProgressTicks === null ? uiText("ui.e999e198") : uiText("ui.6361e952") + String(Math.ceil((GRAZER_CARE_TICKS - state.careProgressTicks) / 60)) + 's'),
+        uiText("ui.1e56d5d2") + String(state.fertilizer) + uiText("ui.73ccb0cf"),
+        uiText("ui.b5636e66"),
         colonyFeedback,
       ]) }));
   };
@@ -346,7 +356,7 @@ export async function createPhase1ProductReviewRuntime(
     const result = bundle.sustenance.execute({ operationId: nextOperationId('colony'), playerId: config.localPlayerId,
       expectedRevision: bundle.sustenance.read().revision, expectedInventoryRevision: inventory.revision,
       action, ...(animalEntityId === undefined ? {} : { animalEntityId }) });
-    colonyFeedback = result.status === 'committed' ? action.toUpperCase() + ' · DONE' : result.reason.replaceAll('_', ' ');
+    colonyFeedback = result.status === 'committed' ? action.toUpperCase() + uiText("ui.1d09c118") : result.reason.replaceAll('_', ' ');
     source.setLocalCommandFeedback({ inputLabel: 'N', operationId: result.operationId,
       status: result.status, ...(result.status === 'rejected' ? { reason: result.reason } : {}),
       verb: 'COLONY', target: action.toUpperCase() });
@@ -368,8 +378,9 @@ export async function createPhase1ProductReviewRuntime(
     return squaredDistance(player.x, player.y, x, y);
   };
 
+  const resourceEntities = () => bundle.caves?.activeLayout()?.nodes.map(n=>({type:'resource' as const,entityId:n.id,definitionId:n.resourceDefinitionId,position:n.position})) ?? bundle.world.getActiveGeneratedEntities();
   const resourceTarget = () => {
-    return bundle.world.getActiveGeneratedEntities()
+    return resourceEntities()
       .filter((entity) => entity.type === 'resource')
       .map((entity) => ({
         entity,
@@ -381,14 +392,17 @@ export async function createPhase1ProductReviewRuntime(
       .filter((candidate) =>
         candidate.distance <= interactionRangeSquared,
       )
+      .filter(({entity}) => bundle.interactionWorld.getResource(entity.entityId) !== null && bundle.interactionWorld.isResourceInInteractionRange(config.localPlayerId,entity.entityId))
       .sort((left, right) =>
         left.distance - right.distance
         || left.entity.entityId.localeCompare(right.entity.entityId),
       )[0]?.entity ?? null;
   };
 
-  const deathCacheTarget = () => {
-    return bundle.world.exportSnapshot().deathCaches.caches
+  const deathCacheTarget = (entityId?: string) => {
+    return (bundle.caves?.activeLayout() ? bundle.caves.read().spaces.find(s=>s.progress.spaceId===bundle.playerWorldspace())!.deathCaches : bundle.world.exportSnapshot().deathCaches.caches)
+      .filter(cache=>entityId===undefined||cache.entityId===entityId)
+      .filter(cache=>bundle.interactionWorld.isContainerAccessible(config.localPlayerId,cache.containerId))
       .map((cache) => ({
         cache,
         distance: distanceFromPlayerSquared(
@@ -410,22 +424,23 @@ export async function createPhase1ProductReviewRuntime(
       )?.cache ?? null;
   };
 
-  const colonySiteTarget = (): 'Cultivation bed' | 'Grazer pen' | null => {
-    if (distanceFromPlayerSquared(CULTIVATION_POSITION.x, CULTIVATION_POSITION.y) <= 1.25 ** 2) return 'Cultivation bed';
-    if (distanceFromPlayerSquared(PEN_POSITION.x, PEN_POSITION.y) <= 1.25 ** 2) return 'Grazer pen';
+  const colonySiteTarget = (): string | null => {
+    if (bundle.playerWorldspace() !== 'surface') return null;
+    if (distanceFromPlayerSquared(CULTIVATION_POSITION.x, CULTIVATION_POSITION.y) <= 1.25 ** 2) return uiText("ui.d0d61e4");
+    if (distanceFromPlayerSquared(PEN_POSITION.x, PEN_POSITION.y) <= 1.25 ** 2) return uiText("ui.bb1bcdf");
     return null;
   };
 
-  const worldDropTarget = () => bundle.world.exportSnapshot().drops
-    .filter((drop) => drop.available
+  const worldDropTarget = (entityId?: string) => (bundle.caves?.activeLayout() ? bundle.caves.read().spaces.find(s=>s.progress.spaceId===bundle.playerWorldspace())!.drops : bundle.world.exportSnapshot().drops)
+    .filter((drop) => (entityId===undefined||drop.worldDropId===entityId) && (!('available' in drop)||drop.available)
       && bundle.items.getContainerView(drop.containerId).stacks.length > 0
-      && bundle.world.isWorldDropInInteractionRange(config.localPlayerId, drop.worldDropId))
+      && bundle.interactionWorld.isWorldDropInInteractionRange(config.localPlayerId, drop.worldDropId))
     .sort((a, b) => distanceFromPlayerSquared(a.position.x, a.position.y)
       - distanceFromPlayerSquared(b.position.x, b.position.y)
       || a.worldDropId.localeCompare(b.worldDropId))[0] ?? null;
 
-  const pickupWorldDrop = (): boolean => {
-    const drop = worldDropTarget();
+  const pickupWorldDrop = (entityId?: string): boolean => {
+    const drop = worldDropTarget(entityId);
     if (drop === null) return false;
     const inventory = bundle.items.getContainerView('inventory:' + config.localPlayerId);
     const container = bundle.items.getContainerView(drop.containerId);
@@ -441,17 +456,18 @@ export async function createPhase1ProductReviewRuntime(
     source.setLocalCommandFeedback({
       inputLabel: 'E', operationId: result.operationId, status: result.status,
       ...(result.status === 'rejected' ? { reason: result.reason } : {}),
-      verb: 'PICK UP', target: 'Dropped items',
+      verb: uiText("ui.27956395"), target: uiText("ui.1eab2711"),
     });
     return true;
   };
 
-  const ruinTarget = () => {
+  const ruinTarget = (entityId?: string) => {
     const entity = bundle.world.findGeneratedEntityByDefinition(
       'ruin:previous-civilization-ruin',
     );
     if (
       entity === null
+      || (entityId!==undefined && entity.entityId!==entityId)
       || entity.type !== 'ruin'
       || !bundle.world.isGeneratedEntityInInteractionRange(
         config.localPlayerId,
@@ -474,13 +490,14 @@ export async function createPhase1ProductReviewRuntime(
     return Object.freeze({ entity, state });
   };
 
-  const machineTarget = () => {
+  const machineTarget = (structureId?: string) => {
     return bundle.buildings
       .exportSnapshot()
       .foothold.structures
       .filter(
         (structure) =>
-          structure.definitionId
+          (structureId === undefined || structure.structureId === structureId)
+          && structure.definitionId
             === 'structure:atmospheric-water-condenser'
           && bundle.world.isPlayerInInteractionRange(
             config.localPlayerId,
@@ -503,20 +520,20 @@ export async function createPhase1ProductReviewRuntime(
     );
     return Object.freeze({
       kind: 'machine',
-      title: 'Atmospheric Water Condenser · [E] INTERACT',
+      title: uiText("ui.1a5f93ce"),
       stateLabel: view.derivedState === 'OUTPUT_FULL'
         ? 'OUTPUT FULL'
         : view.derivedState,
       powerLabel:
         String(machine.powerDemandPu)
-        + ' PU demand · '
+        + uiText("ui.46f25466")
         + String(power.capacityPu)
-        + ' PU capacity',
+        + uiText("ui.bf68680c"),
       outputLabel:
         String(view.outputCount)
         + '/'
         + String(machine.outputBufferCapacity)
-        + ' Clean Water',
+        + uiText("ui.38644c6b"),
       reason: null,
     });
   };
@@ -533,13 +550,14 @@ export async function createPhase1ProductReviewRuntime(
       ),
     );
 
-  const accessibleWorkbench = () => {
+  const accessibleWorkbench = (structureId?: string) => {
     const workbench = bundle.buildings
       .exportSnapshot()
       .foothold.structures
       .find(
         (structure) =>
-          structure.definitionId === 'structure:workbench'
+          (structureId === undefined || structure.structureId === structureId)
+          && structure.definitionId === 'structure:workbench'
           && bundle.world.isWorkbenchAccessible(
             config.localPlayerId,
             structure.structureId,
@@ -571,11 +589,11 @@ export async function createPhase1ProductReviewRuntime(
     return Object.freeze({
       kind: 'craft',
       title:
-        'CRAFT · PAGE '
+        uiText("ui.c2d411cd")
         + String(craftPage + 1)
         + '/'
         + String(pageCount)
-        + ' · [1-6] CRAFT · [ / ] PAGE',
+        + uiText("ui.48cc7bed"),
       rows: Object.freeze(page.map((recipe, index) => {
         const missing = recipe.inputs.find(
           (input) => itemQuantity(input.itemId) < input.quantity,
@@ -584,27 +602,27 @@ export async function createPhase1ProductReviewRuntime(
           recipe.requiredStationStructureId !== null
           && workbench === null;
         const reason = missing !== undefined
-          ? 'NEED '
+          ? uiText("ui.77e6ebb7")
             + String(missing.quantity)
             + ' '
-            + bundle.catalog.get(missing.itemId).displayName
+            + contentDisplayName(bundle.catalog.get(missing.itemId))
           : stationBlocked
-            ? 'WORKBENCH REQUIRED'
+            ? uiText("ui.225d6b63")
             : null;
 
         return Object.freeze({
           id: recipe.id,
-          name: '[' + String(index + 1) + '] ' + recipe.displayName,
+          name: '[' + String(index + 1) + '] ' + contentDisplayName(recipe),
           outputLabel: recipe.outputs
             .map((output) =>
               String(output.quantity)
               + '× '
-              + bundle.catalog.get(output.itemId).displayName,
+              + contentDisplayName(bundle.catalog.get(output.itemId)),
             )
             .join(' + '),
           outputs: Object.freeze(recipe.outputs.map((output) =>
             Object.freeze({
-              name: bundle.catalog.get(output.itemId).displayName,
+              name: contentDisplayName(bundle.catalog.get(output.itemId)),
               quantity: output.quantity,
             }),
           )),
@@ -612,12 +630,12 @@ export async function createPhase1ProductReviewRuntime(
             .map((input) =>
               String(input.quantity)
               + '× '
-              + bundle.catalog.get(input.itemId).displayName,
+              + contentDisplayName(bundle.catalog.get(input.itemId)),
             )
             .join(' + '),
           ingredients: Object.freeze(recipe.inputs.map((input) =>
             Object.freeze({
-              name: bundle.catalog.get(input.itemId).displayName,
+              name: contentDisplayName(bundle.catalog.get(input.itemId)),
               have: itemQuantity(input.itemId),
               need: input.quantity,
             }),
@@ -625,9 +643,9 @@ export async function createPhase1ProductReviewRuntime(
           stationLabel: recipe.requiredStationStructureId === null
             ? null
             : workbench === null
-              ? 'WORKBENCH · REQUIRED'
-              : 'WORKBENCH · READY',
-          state: reason === null ? 'AVAILABLE' : 'BLOCKED',
+              ? uiText("ui.981e9e70")
+              : uiText("ui.168b3704"),
+          state: reason === null ? "AVAILABLE" : "BLOCKED",
           reason,
         });
       })),
@@ -701,7 +719,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: 'CRAFT',
-      target: recipe.displayName,
+      target: contentDisplayName(recipe),
       panelTargetId: recipe.id,
     });
   };
@@ -786,9 +804,9 @@ export async function createPhase1ProductReviewRuntime(
       definition.id === 'structure:habitat-room';
     const spatial = bundle.buildings.assessPlacement(placeableStructureDefinitionId(definition.id), placementIntent());
     const reason = kit === undefined
-      ? 'KIT UNAVAILABLE'
+      ? uiText("ui.363e5599")
       : connectorRequired && connector === undefined
-        ? 'NO LANDING CONNECTOR'
+        ? uiText("ui.e67b1066")
         : typeof spatial === 'string' ? spatial : null;
 
     const structures =
@@ -797,16 +815,16 @@ export async function createPhase1ProductReviewRuntime(
       kind: 'build',
       expeditionEnabled:bundle.expedition!==null,
       title:
-        'BUILD BASE',
-      selectedStructure: definition.displayName,
+        uiText("ui.b6847044"),
+      selectedStructure: contentDisplayName(definition),
       sourceKitLabel:
-        bundle.catalog.get(kitId).displayName
+        contentDisplayName(bundle.catalog.get(kitId))
         + ' ×'
         + String(kit?.quantity ?? 0)
         + (connectorRequired
           ? ' · '
-            + (connector?.localConnectorKey.toUpperCase() ?? 'NO CONNECTOR')
-          : ' · PLACE IN WORLD · '
+            + (connector?.localConnectorKey.toUpperCase() ?? uiText("ui.849e34a1"))
+          : uiText("ui.58a12351")
             + String(buildOrientation * 90)
             + '°'),
       placementState: reason !== null
@@ -830,14 +848,14 @@ export async function createPhase1ProductReviewRuntime(
         ).length;
         return Object.freeze({
           structureId: entry.id,
-          name: entry.displayName,
-          sourceKitName: bundle.catalog.get(entryKitId).displayName,
+          name: contentDisplayName(entry),
+          sourceKitName: contentDisplayName(bundle.catalog.get(entryKitId)),
           availableKitCount,
           builtCount,
           buildCap: bundle.buildings.structureCap(placeableStructureDefinitionId(entry.id)),
           buildCapState: builtCount >= bundle.buildings.structureCap(placeableStructureDefinitionId(entry.id))
             ? 'CAP REACHED' as const
-            : 'AVAILABLE' as const,
+            : "AVAILABLE" as const,
           selected: entry.id === definition.id,
         });
       })),
@@ -920,14 +938,14 @@ export async function createPhase1ProductReviewRuntime(
 
     source.setPresentationPanel(buildPanel());
     source.setLocalCommandFeedback({
-      inputLabel: 'ENTER',
+      inputLabel: uiText("ui.b57994ad"),
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
         ? { reason: result.reason }
         : {}),
       verb: 'BUILD',
-      target: definition.displayName,
+      target: contentDisplayName(definition),
     });
   };
 
@@ -962,9 +980,9 @@ export async function createPhase1ProductReviewRuntime(
       });
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: 'GATHER',
+        verb: "GATHER",
         target: targetName,
-        state: 'CHANNELING',
+        state: "CHANNELING",
         reason: null,
         progress: 0,
       }));
@@ -978,7 +996,7 @@ export async function createPhase1ProductReviewRuntime(
         ...(start.result.status === 'rejected'
           ? { reason: start.result.reason }
           : {}),
-        verb: 'GATHER',
+        verb: "GATHER",
         target: targetName,
       });
       return;
@@ -988,7 +1006,7 @@ export async function createPhase1ProductReviewRuntime(
       operationId: start.operationId,
       status: 'rejected',
       reason: start.reason,
-      verb: 'GATHER',
+      verb: "GATHER",
       target: targetName,
     });
   };
@@ -1002,29 +1020,27 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
-    const entity = clickedId===undefined ? resourceTarget() : bundle.world.getActiveGeneratedEntities().find(candidate=>candidate.entityId===clickedId) ?? null;
+    const entity = clickedId===undefined ? resourceTarget() : resourceEntities().find(candidate=>candidate.entityId===clickedId) ?? null;
     if (entity === null || entity.type !== 'resource') {
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
         verb: 'INTERACT',
         target: 'WORLD',
         state: 'UNAVAILABLE',
-        reason: 'NO TARGET IN RANGE',
+        reason: uiText("ui.35c6a49f"),
         progress: null,
       }));
       return;
     }
 
-    const resource = bundle.worldStore.getResourceState(
-      entity.entityId,
-    );
-    if (resource === undefined) {
+    const resource = bundle.interactionWorld.getResource(entity.entityId);
+    if (resource == null) {
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: 'GATHER',
+        verb: "GATHER",
         target: entity.definitionId,
-        state: 'BLOCKED',
-        reason: 'SOURCE MISSING',
+        state: "BLOCKED",
+        reason: uiText("ui.7114c138"),
         progress: null,
       }));
       return;
@@ -1050,11 +1066,11 @@ export async function createPhase1ProductReviewRuntime(
       expectedResourceRevision: resource.revision,
       ...(toolStackId === undefined ? {} : { toolStackId }),
     });
-    presentGatherStart(start, definition.displayName);
+    presentGatherStart(start, contentDisplayName(definition));
   };
 
-  const recoverDeathCache = (): boolean => {
-    const cache = deathCacheTarget();
+  const recoverDeathCache = (entityId?: string): boolean => {
+    const cache = deathCacheTarget(entityId);
     if (cache === null) return false;
 
     const sourceContainer =
@@ -1077,7 +1093,7 @@ export async function createPhase1ProductReviewRuntime(
     });
     if (
       result.status === 'committed'
-      && bundle.world.getDeathCacheByContainer(cache.containerId) === null
+      && bundle.interactionWorld.getDeathCacheByContainer(cache.containerId) === null
     ) {
       recoveredDeathCache = Object.freeze({
         entityId: cache.entityId,
@@ -1091,14 +1107,14 @@ export async function createPhase1ProductReviewRuntime(
       ...(result.status === 'rejected'
         ? { reason: result.reason }
         : {}),
-      verb: 'RECOVER',
-      target: 'Death Cache',
+      verb: uiText("ui.664322fb"),
+      target: uiText("ui.77f67d4b"),
     });
     return true;
   };
 
-  const interactWithMachine = (): boolean => {
-    const structure = machineTarget();
+  const interactWithMachine = (structureId?: string): boolean => {
+    const structure = machineTarget(structureId);
     if (structure === null) return false;
 
     const view = bundle.machines.getView(structure.structureId);
@@ -1131,7 +1147,7 @@ export async function createPhase1ProductReviewRuntime(
           ? { reason: result.reason }
           : {}),
         verb: 'COLLECT',
-        target: 'Clean Water',
+        target: uiText("ui.c24d3555"),
       });
       return true;
     }
@@ -1156,7 +1172,7 @@ export async function createPhase1ProductReviewRuntime(
       verb: result.status === 'committed' && result.enabled
         ? 'ENABLE'
         : 'DISABLE',
-      target: 'Atmospheric Water Condenser',
+      target: uiText("ui.b1048dd6"),
     });
     return true;
   };
@@ -1209,7 +1225,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: 'REPAIR',
-      target: definition.displayName,
+      target: contentDisplayName(definition),
     });
     return true;
   };
@@ -1229,9 +1245,9 @@ export async function createPhase1ProductReviewRuntime(
       });
       source.setInteraction(Object.freeze({
         inputLabel,
-        verb: 'CONSUME',
+        verb: "CONSUME",
         target: targetName,
-        state: 'CHANNELING',
+        state: "CHANNELING",
         reason: null,
         progress: 0,
       }));
@@ -1243,7 +1259,7 @@ export async function createPhase1ProductReviewRuntime(
       operationId: start.operationId,
       status: 'rejected',
       reason: start.reason,
-      verb: 'CONSUME',
+      verb: "CONSUME",
       target: targetName,
     });
     queueMicrotask(() => {
@@ -1272,7 +1288,7 @@ export async function createPhase1ProductReviewRuntime(
     const operationId = nextOperationId('consume');
     const targetName = stack === undefined
       ? missingTargetLabel
-      : bundle.catalog.get(stack.itemDefinitionId).displayName;
+      : contentDisplayName(bundle.catalog.get(stack.itemDefinitionId));
     const start = bundle.survival.beginConsume({
       operationId,
       playerId: config.localPlayerId,
@@ -1288,7 +1304,7 @@ export async function createPhase1ProductReviewRuntime(
     beginConsumeStack(
       source.resolveQuickUseStackId(),
       'V',
-      'Consumable',
+      uiText("ui.93d79fb2"),
     );
   };
 
@@ -1343,8 +1359,8 @@ export async function createPhase1ProductReviewRuntime(
     }
   };
 
-  const interactWithRuin = (): boolean => {
-    const target = ruinTarget();
+  const interactWithRuin = (entityId?: string): boolean => {
+    const target = ruinTarget(entityId);
     if (target === null) return false;
 
     if (
@@ -1369,7 +1385,7 @@ export async function createPhase1ProductReviewRuntime(
           ? { reason: result.reason }
           : {}),
         verb: 'CLAIM',
-        target: 'Ancient Alloy Shard',
+        target: uiText("ui.61d11f88"),
       });
       return true;
     }
@@ -1387,43 +1403,57 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: 'INSPECT',
-      target: 'Previous-Civilization Ruin',
+      target: uiText("ui.4be1499c"),
     });
     return true;
   };
 
   const explorationSiteTarget = () => bundle.colonyDepth.sites().find(site=>site.template && bundle.world.isExploredPosition(site.position) && distanceFromPlayerSquared(site.position.x,site.position.y)<=1.25**2);
+  const cavePortalTarget = () => {
+    const cave=bundle.caves;if(!cave)return null;
+    if(!cave.isSurface()){const l=cave.activeLayout()!;return distanceFromPlayerSquared(l.exit.x,l.exit.y)<=1.25**2?'exit:'+l.portalId:null;}
+    return cave.portals.find(p=>bundle.world.isExploredPosition(p.position)&&distanceFromPlayerSquared(p.position.x,p.position.y)<=1.25**2)?.id??null;
+  };
+  const transitionCave = (id:string) => {
+    const cave=bundle.caves;if(!cave)return;
+    const result=cave.transition({id:nextOperationId('cave-transition'),action:id.startsWith('exit:')?'exit':'enter',portalId:id.replace(/^exit:/,''),expectedRevision:cave.read().revision});
+    root.dataset.caveTransitionResult=result.message;
+    source.setLocalCommandFeedback({operationId:nextOperationId('cave-feedback'),verb:uiText("ui.b63710f9"),target:uiText("ui.175e4a78"),status:result.status,...(result.status==='rejected'?{reason:result.message}:{})});
+    if(result.status==='committed'){activeGather=null;activeConsume=null;actionPanel=null;source.setPanel(null);source.setPresentationPanel(null);livingOverlay?.close();expeditionOverlay?.close();colonyDepthOverlay?.close();entityInspection.close();controls.close();}
+  };
   const refreshContextInteraction = (): void => {
     if(root.dataset.colonyDepthPanelOpen==='true'){source.setInteraction(null);return;}
     if (activeGather !== null || activeConsume !== null) return;
+    const portal=cavePortalTarget();
+    if(portal){source.setInteraction({inputLabel:'E',verb:portal.startsWith('exit:')?uiText("ui.79836105"):uiText("ui.b57994ad"),target:uiText("ui.d82f1717"),state:"AVAILABLE",reason:null,progress:null});return;}
 
     const drop = worldDropTarget();
     if (drop !== null) {
       const stack = bundle.items.getContainerView(drop.containerId).stacks[0];
       source.setInteraction(Object.freeze({
-        inputLabel: 'E', verb: 'PICK UP',
-        target: stack === undefined ? 'Dropped items'
-          : bundle.catalog.get(stack.itemDefinitionId).displayName + ' ×' + String(stack.quantity),
-        state: 'AVAILABLE', reason: null, progress: null,
+        inputLabel: 'E', verb: uiText("ui.27956395"),
+        target: stack === undefined ? uiText("ui.1eab2711")
+          : contentDisplayName(bundle.catalog.get(stack.itemDefinitionId)) + ' ×' + String(stack.quantity),
+        state: "AVAILABLE", reason: null, progress: null,
       }));
       return;
     }
 
-    const nearbyAnimal = bundle.sustenance.read().penBuilt && bundle.sustenance.read().animalEntityId === null
+    const nearbyAnimal = bundle.playerWorldspace()==='surface' && bundle.sustenance.read().penBuilt && bundle.sustenance.read().animalEntityId === null
       ? bundle.world.getActiveGeneratedEntities().find((entity) => entity.type === 'passive-wildlife'
         && distanceFromPlayerSquared(entity.position.x, entity.position.y) <= 1.25 ** 2) : undefined;
     if (nearbyAnimal !== undefined) {
-      source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'CAPTURE', target: 'Grazer · 1 Cordage',
-        state: 'AVAILABLE', reason: null, progress: null }));
+      source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'CAPTURE', target: uiText("ui.2c4a0a5"),
+        state: "AVAILABLE", reason: null, progress: null }));
       return;
     }
     const cache = deathCacheTarget();
     if (cache !== null) {
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: 'RECOVER',
-        target: 'Death Cache',
-        state: 'AVAILABLE',
+        verb: uiText("ui.664322fb"),
+        target: uiText("ui.77f67d4b"),
+        state: "AVAILABLE",
         reason: null,
         progress: null,
       }));
@@ -1439,9 +1469,9 @@ export async function createPhase1ProductReviewRuntime(
         inputLabel: 'E',
         verb: claiming ? 'CLAIM' : 'INSPECT',
         target: claiming
-          ? 'Ancient Alloy Shard'
-          : 'Previous-Civilization Ruin',
-        state: 'AVAILABLE',
+          ? uiText("ui.61d11f88")
+          : uiText("ui.4be1499c"),
+        state: "AVAILABLE",
         reason: null,
         progress: null,
       }));
@@ -1458,8 +1488,8 @@ export async function createPhase1ProductReviewRuntime(
           : view.enabled
             ? 'DISABLE'
             : 'ENABLE',
-        target: 'Atmospheric Water Condenser',
-        state: 'AVAILABLE',
+        target: uiText("ui.b1048dd6"),
+        state: "AVAILABLE",
         reason: view.derivedState,
         progress: null,
       }));
@@ -1484,11 +1514,11 @@ export async function createPhase1ProductReviewRuntime(
         inputLabel: 'E',
         verb: repairTarget === undefined ? 'CRAFT' : 'REPAIR',
         target: repairTarget === undefined
-          ? 'Workbench'
-          : bundle.catalog.get(
+          ? uiText("ui.f4823b5e")
+          : contentDisplayName(bundle.catalog.get(
               repairTarget.itemDefinitionId,
-            ).displayName,
-        state: 'AVAILABLE',
+            )),
+        state: "AVAILABLE",
         reason: null,
         progress: null,
       }));
@@ -1505,28 +1535,43 @@ export async function createPhase1ProductReviewRuntime(
       const renewing = resourceState?.depleted === true;
       const readyTick = resourceState?.regenerationReadyTick;
       const size = bundle.worldStore.getResourceSize(resource.entityId, resource.definitionId);
-      const harvest = resourceHarvestDefinition(definition, size);
+      const harvest = resourceHarvestDefinition(definition, size, resourceState?.lifecycle?.kind === 'plant' ? resourceState.lifecycle.stage : undefined);
       source.setInteraction(Object.freeze({
         inputLabel: 'E',
-        verb: renewing ? 'RENEWING' : 'GATHER',
-        target: definition.displayName,
-        state: renewing ? 'BLOCKED' : 'AVAILABLE',
-        reason: !renewing ? size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' + harvest.output.quantity + ' ' + bundle.catalog.getAs(harvest.output.itemId, 'item').displayName + ' · ' + harvest.gatherChannelSeconds + 's' : null : readyTick == null ? 'Resource depleted' :
-          'Regrows in ' + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + 's of world time',
+        verb: renewing ? uiText("ui.e53c4b62") : "GATHER",
+        target: contentDisplayName(definition),
+        state: renewing ? "BLOCKED" : "AVAILABLE",
+        reason: !renewing ? size ? RESOURCE_SIZE_PROFILES[size].label + ' · ' + harvest.output.quantity + ' ' + contentDisplayName(bundle.catalog.getAs(harvest.output.itemId, 'item')) + ' · ' + harvest.gatherChannelSeconds + 's' : null : readyTick == null ? resourceState?.lifecycle?.kind === 'mineral' ? uiText("ui.a05a3297") : uiText("ui.53113f40") :
+          uiText("ui.a2c2c475") + String(Math.max(0, Math.ceil((readyTick - bundle.authorityTick) / 60))) + uiText("ui.3ed94090"),
         progress: null,
       }));
       return;
     }
 
     const exploration=explorationSiteTarget();
-    if(exploration){source.setInteraction(Object.freeze({inputLabel:'E',verb:'EXPLORE',target:exploration.name,state:'AVAILABLE',reason:null,progress:null}));return;}
+    if(exploration){source.setInteraction(Object.freeze({inputLabel:'E',verb:'EXPLORE',target:uiPhrase(exploration.name),state:"AVAILABLE",reason:null,progress:null}));return;}
     const site = colonySiteTarget();
     if (site !== null) {
       source.setInteraction(Object.freeze({ inputLabel: 'E', verb: 'COLONY', target: site,
-        state: 'AVAILABLE', reason: null, progress: null }));
+        state: "AVAILABLE", reason: null, progress: null }));
       return;
     }
     source.setInteraction(null);
+  };
+
+  /** Route an explicit building identity; never act on a different nearby building. */
+  const interactWithStructure = (structureId: string): boolean => {
+    const structure = bundle.buildings.exportSnapshot().foothold.structures.find(value => value.structureId === structureId);
+    if (!structure) return false;
+    if (!bundle.buildings.isStructureAccessible(config.localPlayerId, structureId)) {
+      source.setLocalCommandFeedback({operationId:'view:'+structureId,verb:'INTERACT',target:contentDisplayName(bundle.catalog.get(structure.definitionId)),status:'rejected',reason:'OUT_OF_RANGE'});
+      return true;
+    }
+    if (structureId === 'structure-instance:landing-module') { expeditionOverlay?.open('landing-lab'); return true; }
+    if (structure.definitionId === 'structure:storage-crate') { source.openStorage(structureId); return true; }
+    if (structure.definitionId === 'structure:workbench') { actionPanel='craft';craftPage=0;source.clearCommandFeedback();source.setPresentationPanel(craftPanel());return true; }
+    if (structure.definitionId === 'structure:atmospheric-water-condenser') return interactWithMachine(structureId);
+    expeditionOverlay?.open(structureId);return true;
   };
 
   const beginContextInteraction = (): void => {
@@ -1536,6 +1581,13 @@ export async function createPhase1ProductReviewRuntime(
       refreshContextInteraction();
       return;
     }
+
+    if(bundle.playerWorldspace()!=='surface'){
+      const resource=resourceTarget(),view=resource?bundle.interactionWorld.getResource(resource.entityId):null;
+      source.setInteraction(resource&&view?{inputLabel:'E',verb:'GATHER',target:contentDisplayName(bundle.catalog.get(resource.definitionId)),state:view.depleted?'BLOCKED':'AVAILABLE',reason:view.depleted?uiText("ui.fd4adefb"):null,progress:null}:null);return;
+    }
+    const portal=cavePortalTarget();if(portal){transitionCave(portal);return;}
+    if(bundle.playerWorldspace()!=='surface'){if(pickupWorldDrop()||recoverDeathCache())return;beginGather();return;}
     if (pickupWorldDrop()) return;
     if (bundle.sustenance.read().penBuilt && bundle.sustenance.read().animalEntityId === null) {
       const animal = bundle.world.getActiveGeneratedEntities().find((entity) =>
@@ -1547,8 +1599,14 @@ export async function createPhase1ProductReviewRuntime(
     if (interactWithRuin()) return;
     if (interactWithMachine()) return;
     if (interactWithWorkbench()) return;
+    if (config.colonyDepthEnabled === true && resourceTarget() === null) {
+      const structure=bundle.buildings.exportSnapshot().foothold.structures.filter(value => bundle.buildings.isStructureAccessible(config.localPlayerId,value.structureId)).sort((a,b)=>distanceFromPlayerSquared(a.position.x,a.position.y)-distanceFromPlayerSquared(b.position.x,b.position.y)||a.structureId.localeCompare(b.structureId))[0];
+      if (structure && interactWithStructure(structure.structureId)) return;
+    }
     if(resourceTarget()===null){const site=explorationSiteTarget();if(site){colonyDepthOverlay?.openSite(site.id);return;}}
     if (colonySiteTarget() !== null) { actionPanel = 'colony'; refreshColonyPanel(); return; }
+    const resource=resourceTarget();
+    if(resource && bundle.worldStore.getResourceState(resource.entityId)?.depleted && ['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(resource.definitionId)){livingOverlay?.open(resource.entityId);return;}
     beginGather();
   };
 
@@ -1614,7 +1672,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
-      target: targetWeapon ? bundle.catalog.get(targetWeapon.itemDefinitionId).displayName : 'Weapon',
+      target: targetWeapon ? contentDisplayName(bundle.catalog.get(targetWeapon.itemDefinitionId)) : uiText("ui.b7c10361"),
     });
     queueMicrotask(() => {
       if (!destroyed) refreshContextInteraction();
@@ -1642,7 +1700,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb: next === null ? 'UNEQUIP' : 'EQUIP',
-      target: 'Thermal Wrap',
+      target: uiText("ui.cd44c054"),
     });
     queueMicrotask(() => {
       if (!destroyed) refreshContextInteraction();
@@ -1660,7 +1718,7 @@ export async function createPhase1ProductReviewRuntime(
       status: 'rejected',
       reason,
       verb,
-      target: 'Selected item',
+      target: uiText("ui.a3cfc913"),
     });
   };
 
@@ -1681,16 +1739,16 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const beginSelectedConsume = (): void => {
-    const selection = selectedInventoryAction('V', 'CONSUME');
+    const selection = selectedInventoryAction('V', "CONSUME");
     if (selection === null) return;
     if (selection.pane !== 'player') {
-      presentInventoryGuard('V', 'CONSUME', 'TARGET_UNAVAILABLE');
+      presentInventoryGuard('V', "CONSUME", 'TARGET_UNAVAILABLE');
       return;
     }
     beginConsumeStack(
       selection.stack?.stackId ?? null,
       'V',
-      'Selected item',
+      uiText("ui.a3cfc913"),
     );
   };
 
@@ -1712,7 +1770,12 @@ export async function createPhase1ProductReviewRuntime(
       | ReturnType<typeof bundle.equipWeapon>
       | ReturnType<typeof bundle.equipThermalWrap>;
 
-    if ((stack.itemDefinitionId === 'item:thermal-wrap'||stack.itemDefinitionId === 'item:warm-cloak')) {
+    const wearableSlot = wearableSlotFor(stack.itemDefinitionId);
+    if (wearableSlot !== null) {
+      const next = current.wearables[wearableSlot] === stack.stackId ? null : stack.stackId;
+      verb = next === null ? 'UNEQUIP' : 'EQUIP';
+      result = bundle.equipment.equipWearable(config.localPlayerId, wearableSlot, next);
+    } else if ((stack.itemDefinitionId === 'item:thermal-wrap'||stack.itemDefinitionId === 'item:warm-cloak')) {
       const next = current.equippedThermalWrapStackId === stack.stackId
         ? null
         : stack.stackId;
@@ -1734,7 +1797,7 @@ export async function createPhase1ProductReviewRuntime(
         ? { reason: result.reason }
         : {}),
       verb,
-      target: definition.displayName,
+      target: contentDisplayName(definition),
     });
   };
 
@@ -1782,19 +1845,19 @@ export async function createPhase1ProductReviewRuntime(
         : {}),
       verb: 'DROP',
       target:
-        definition.displayName + ' ×' + String(selection.quantity),
+        contentDisplayName(definition) + ' ×' + String(selection.quantity),
     });
   };
 
   const transferSelectedInventoryQuantity = (): void => {
-    const selection = selectedInventoryAction('ENTER', 'TRANSFER');
+    const selection = selectedInventoryAction(uiText("ui.b57994ad"), 'TRANSFER');
     if (selection === null) return;
     if (
       selection.storage === null
       || selection.target === null
       || selection.stack === null
     ) {
-      presentInventoryGuard('ENTER', 'TRANSFER', 'TARGET_UNAVAILABLE');
+      presentInventoryGuard(uiText("ui.b57994ad"), 'TRANSFER', 'TARGET_UNAVAILABLE');
       return;
     }
     const definition = bundle.catalog.getAs(
@@ -1816,7 +1879,7 @@ export async function createPhase1ProductReviewRuntime(
       reconcileEquipmentAfterItemMove();
     }
     source.setLocalCommandFeedback({
-      inputLabel: 'ENTER',
+      inputLabel: uiText("ui.b57994ad"),
       operationId: result.operationId,
       status: result.status,
       ...(result.status === 'rejected'
@@ -1824,27 +1887,25 @@ export async function createPhase1ProductReviewRuntime(
         : {}),
       verb: 'TRANSFER',
       target:
-        definition.displayName
+        contentDisplayName(definition)
         + ' ×'
         + String(selection.quantity)
         + (selection.pane === 'player'
-          ? ' · PLAYER → STORAGE'
-          : ' · STORAGE → PLAYER'),
+          ? uiText("ui.b52b3c3e")
+          : uiText("ui.a048a7ec")),
     });
   };
 
-  const attackPredator = (): void => {
+  const attackPredator = (entityId?: string): void => {
     bundle.expedition?.cancelRest(config.localPlayerId);
-    const predator = bundle.world.findGeneratedEntityByDefinition(
-      'hostile:territorial-predator',
-    );
+    const predator = entityId===undefined ? bundle.world.findGeneratedEntityByDefinition('hostile:territorial-predator') : bundle.world.getActiveGeneratedEntities().find(e=>e.entityId===entityId)??null;
     if (predator === null || predator.type !== 'hostile') {
       source.setInteraction(Object.freeze({
         inputLabel: 'SPACE',
         verb: 'ATTACK',
-        target: 'Territorial Predator',
+        target: uiText("ui.38671cb3"),
         state: 'UNAVAILABLE',
-        reason: 'NO HOSTILE TARGET',
+        reason: uiText("ui.dbd6bd81"),
         progress: null,
       }));
       return;
@@ -1856,9 +1917,9 @@ export async function createPhase1ProductReviewRuntime(
       source.setInteraction(Object.freeze({
         inputLabel: 'SPACE',
         verb: 'ATTACK',
-        target: 'Territorial Predator',
-        state: 'BLOCKED',
-        reason: 'MOVE TO SET FACING',
+        target: uiText("ui.38671cb3"),
+        state: "BLOCKED",
+        reason: uiText("ui.92c09cf1"),
         progress: null,
       }));
       return;
@@ -1895,16 +1956,33 @@ export async function createPhase1ProductReviewRuntime(
         : {}),
       verb: 'ATTACK',
       target:
-        'Territorial Predator · '
+        uiText("ui.2463e7ae")
         + result.status.toUpperCase(),
     });
+  };
+
+  const interactWorldEntity = (element: HTMLElement): void => {
+    const id=element.dataset.worldId,role=element.dataset.worldRole;if(!id)return;
+    if(role==='cave-portal'){transitionCave(id);return;}
+    if(role==='facility'){expeditionOverlay?.open(id);return;}
+    if(role==='structure'){interactWithStructure(id);return;}
+    if(role==='survey-site'){colonyDepthOverlay?.openSite(element.dataset.siteId??id);return;}
+    if(role==='hostile'){attackPredator(id);return;}
+    if(role==='resource'){
+      const state=bundle.worldStore.getResourceState(id),entity=bundle.world.getActiveGeneratedEntities().find(e=>e.entityId===id);
+      if(state?.depleted&&entity&&['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId))livingOverlay?.open(id);
+      else beginGather(id);
+      return;
+    }
+    const handled=role==='world-drop'?pickupWorldDrop(id):role==='death-cache'?recoverDeathCache(id):role==='ruin'?interactWithRuin(id):false;
+    if(!handled)source.setLocalCommandFeedback({operationId:'view:'+id,status:'rejected',verb:'INTERACT',target:role??uiText("ui.f963b26"),reason:'OUT_OF_RANGE_OR_UNAVAILABLE'});
   };
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
     if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true')return;
     if((event.code==='Enter'||event.code==='Space') && event.target instanceof Element && actionPanel===null){const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){event.preventDefault();colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}}
-    if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){event.preventDefault();beginGather(resource.dataset.worldId);return;}}
+    if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const entity=event.target.closest<HTMLElement>('[data-world-role][data-world-id][data-entity-inspectable]');if(entity){event.preventDefault();interactWorldEntity(entity);return;}}
 
     if (source.isInventoryOpen()) {
       if ((event.code === 'Enter' || event.code === 'Space') && event.target instanceof HTMLButtonElement) return;
@@ -2112,6 +2190,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const focusedWorldTargetId = (): string | null => {
+    if(bundle.playerWorldspace()!=='surface')return cavePortalTarget()??worldDropTarget()?.worldDropId??deathCacheTarget()?.entityId??resourceTarget()?.entityId??null;
     const cache = deathCacheTarget();
     if (cache !== null) return cache.entityId;
 
@@ -2143,9 +2222,9 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     const localAction = activeGather !== null
-      ? 'GATHER' as const
+      ? "GATHER" as const
       : activeConsume !== null
-        ? 'CONSUME' as const
+        ? "CONSUME" as const
         : attackPresentation?.action ?? null;
     const localActionStartedTick = activeGather?.startedTick
       ?? activeConsume?.startedTick
@@ -2167,11 +2246,19 @@ export async function createPhase1ProductReviewRuntime(
     return view.nightOrdinal ?? Math.floor((view.state.cycleStartLocalMinute + bundle.authorityTick / 120 - 360) / 1440);
   };
   const autosaveCrossings = new ColonyAutosaveCrossings(dawnOrdinal(), bundle.expedition?.read().restCooldown[config.localPlayerId] ?? 0);
+  let pendingSoloSteps = 0;
+  root.dataset.soloPendingSteps = '0';
   const host = new FixedStepHost({
     onStep: () => {
-      const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+      // Async chunk work must not build an unbounded backlog of stale movement.
+      // Excess wall-clock catch-up is dropped; authority time still advances one tick per committed step.
+      if (pendingSoloSteps >= 4) return;
+      pendingSoloSteps++;
+      root.dataset.soloPendingSteps = String(pendingSoloSteps);
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
+        // Sample at execution, so queued steps cannot replay movement after release or a menu opens.
+        const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
         bundle.submitInput(config.localPlayerId, phase1IsometricInput(sampled));
         await bundle.stepSolo();
         if (config.colonyDepthEnabled === true) {
@@ -2197,11 +2284,11 @@ export async function createPhase1ProductReviewRuntime(
       }).catch((error: unknown) => {
         root.dataset.runtimeStatus = 'failed';
         console.error('Phase 1 Product Review authority step failed.', error);
-      });
+      }).finally(() => {pendingSoloSteps--;if(!destroyed)root.dataset.soloPendingSteps=String(pendingSoloSteps);});
     },
     onRender: () => {
       // Present only the most recent completed authority state once per frame.
-      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();}
+      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();entityInspection.render();}
     },
   });
 
@@ -2228,7 +2315,7 @@ export async function createPhase1ProductReviewRuntime(
     if (!(event.target instanceof Element)) return;
     if(config.colonyDepthEnabled===true && actionPanel===null && root.dataset.colonySettingsOpen!=='true' && root.dataset.livingPanelOpen!=='true' && root.dataset.expeditionPanelOpen!=='true' && root.dataset.colonyDepthPanelOpen!=='true' && root.dataset.productReviewPanelOpen!=='true' && root.dataset.productReviewHelpOpen!=='true'){
       const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}
-      const resource=event.target.closest<HTMLElement>('[data-world-role="resource"]');if(resource!==null){beginGather(resource.dataset.worldId);return;}
+      const entity=event.target.closest<HTMLElement>('[data-world-role][data-world-id][data-entity-inspectable]');if(entity){interactWorldEntity(entity);return;}
     }
     const item = event.target.closest<HTMLElement>('[data-review-item]');
     if (item !== null) {
@@ -2244,7 +2331,7 @@ export async function createPhase1ProductReviewRuntime(
       for(const target of view.stacks)for(const from of view.stacks)if(from.stackId!==target.stackId&&from.itemDefinitionId===target.itemDefinitionId&&from.condition===target.condition&&from.quantity+target.quantity<=bundle.catalog.getAs(target.itemDefinitionId,'item').maxStack)pair??=[from,target];
       if(!pair){presentInventoryGuard('STACK','STACK','NO_MATCHING_STACKS');return;}
       const operationId=nextOperationId('stack');const result=bundle.executeItemCommand({type:'merge',operationId,playerId:config.localPlayerId,containerId,expectedRevision:view.revision,sourceStackId:pair[0].stackId,targetStackId:pair[1].stackId});
-      source.setLocalCommandFeedback({inputLabel:'STACK',operationId,status:result.status,reason:result.status==='rejected'?result.reason:'STACKS_COMBINED',verb:'STACK',target:'Matching items'});return;
+      source.setLocalCommandFeedback({inputLabel:'STACK',operationId,status:result.status,reason:result.status==='rejected'?result.reason:'STACKS_COMBINED',verb:'STACK',target:uiText("ui.baeaa87a")});return;
     }
     if(action==='inventory-transfer-one'||action==='inventory-transfer-stack'){
       const selection=source.getInventoryActionSelection();
@@ -2293,7 +2380,7 @@ export async function createPhase1ProductReviewRuntime(
     if (action?.startsWith('equip-slot:') && source.isInventoryOpen()) equipInventorySlot(action.slice('equip-slot:'.length));
     if (action?.startsWith('unequip-slot:') && source.isInventoryOpen()) {
       const slot = action.slice('unequip-slot:'.length), equipped = bundle.equipment.getView(config.localPlayerId);
-      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : null;
+      const stackId = slot === 'weapon' ? equipped.equippedWeaponStackId : slot === 'protection' ? equipped.equippedThermalWrapStackId : equipped.wearables[slot as WearableSlot] ?? null;
       if (stackId) { source.selectInventoryItem(stackId); toggleSelectedEquipment('X'); }
     }
     if (action === 'equip' && source.isInventoryOpen()) toggleSelectedEquipment('X');
@@ -2308,16 +2395,16 @@ export async function createPhase1ProductReviewRuntime(
 
   input.start();
   const equipInventorySlot = (slot: string, stackId?: string) => {
-    if (!source.isInventoryOpen() || !['weapon', 'protection'].includes(slot)) return;
+    if (!source.isInventoryOpen() || !['weapon', 'protection', ...WEARABLE_SLOTS].includes(slot)) return;
     if (stackId) {
       if (!bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks.some(s => s.stackId === stackId)) { presentInventoryGuard('DRAG', 'EQUIP', 'SOURCE_MISSING'); return; }
       source.selectInventoryItem(stackId);
     }
     const selection = source.getInventoryActionSelection();
     const id = selection.stack?.itemDefinitionId;
-    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : id !== 'item:thermal-wrap' && id !== 'item:warm-cloak')) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
+    if (selection.pane !== 'player' || (slot === 'weapon' ? !isKnownMeleeEquipment(id ?? '') : slot === 'protection' ? id !== 'item:thermal-wrap' && id !== 'item:warm-cloak' : wearableSlotFor(id ?? '') !== slot)) { presentInventoryGuard('EQUIP', 'EQUIP', 'INVALID_EQUIPMENT'); return; }
     const current = bundle.equipment.reconcile(config.localPlayerId);
-    if ((slot === 'weapon' ? current.equippedWeaponStackId : current.equippedThermalWrapStackId) === selection.stack?.stackId) return;
+    if ((slot === 'weapon' ? current.equippedWeaponStackId : slot === 'protection' ? current.equippedThermalWrapStackId : current.wearables[slot as WearableSlot]) === selection.stack?.stackId) return;
     toggleSelectedEquipment('X');
   };
   const onGearDragStart = (event: DragEvent) => {
@@ -2335,16 +2422,20 @@ export async function createPhase1ProductReviewRuntime(
     const id = event.dataTransfer?.getData('application/x-proz0-inventory-stack');
     if (id && id.length < 512) equipInventorySlot(slot, id);
   };
-  const removeContextMenu = installGameContextMenu(root, () => {
-    livingOverlay?.cancelPlacement();
-    expeditionOverlay?.cancelPlacement();
+  const removeContextMenu = installGameContextMenu(root, (event) => {
+    const livingCancelled = livingOverlay?.cancelPlacement() ?? false;
+    const expeditionCancelled = expeditionOverlay?.cancelPlacement() ?? false;
+    if (livingCancelled || expeditionCancelled) { entityInspection.close(); return; }
     if (actionPanel === 'build') {
       actionPanel = null;
       buildAnchor = null;
       source.setPresentationPanel(null);
       refreshWorldPresentationContext();
       worldRenderer.render();
+      entityInspection.close();
+      return;
     }
+    entityInspection.inspect(event);
   });
   root.addEventListener('click', onPanelClick);
   root.addEventListener('dragstart', onGearDragStart);
@@ -2352,6 +2443,13 @@ export async function createPhase1ProductReviewRuntime(
   root.addEventListener('drop', onGearDrop);
   root.addEventListener('pointermove', updateBuildPointer);
   root.ownerDocument.addEventListener('keydown', onKeyDown);
+  const stopLocale = onLocaleChange(() => {
+    if (actionPanel === 'craft') source.setPresentationPanel(craftPanel());
+    else if (actionPanel === 'build') source.setPresentationPanel(buildPanel());
+    else if (actionPanel === 'colony') refreshColonyPanel();
+    else if (machineStructureId) source.setPresentationPanel(machinePanel(machineStructureId));
+    refreshContextInteraction(); refreshWorldPresentationContext();
+  });
   host.start();
   root.dataset.runtimeStatus = 'ready';
   root.dataset.productReviewAuthority = 'canonical';
@@ -2379,11 +2477,13 @@ export async function createPhase1ProductReviewRuntime(
     getAuthorityTick(): number {
       return bundle.authorityTick;
     },
-    destroy(): void {
+      destroy(): void {
+        stopLocale();
       destroyed = true;
       host.stop();
       input.stop();
       removeContextMenu();
+      entityInspection.destroy();
       root.removeEventListener('click', onPanelClick);
       root.removeEventListener('dragstart', onGearDragStart);
       root.removeEventListener('dragover', onGearDragOver);

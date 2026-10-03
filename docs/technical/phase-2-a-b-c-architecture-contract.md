@@ -1,5 +1,7 @@
 # Phase 2 — as-built authority, save, network and content
 
+Current solo extension: [2026-10-03 release handoff](../phase2-solo-release-handoff-2026-10-03.vi.md). Fresh solo expedition worlds enable `soloCaves` version 1; legacy saves retain their existing mode. The scoped adapter routes movement/resources/drops/death caches through canonical worldspace authority. Mountain collision, rendering and foundation checks share an elevation query. Resource lifecycle version 2 persists integer growth work, active clock and watering state; version 1 remains readable. No offline growth is added. Locale preference/dictionaries do not alter catalog fingerprints, save IDs or protocol fields. Hosted multiplayer retains its contract; new cave replication is deferred by the Owner.
+
 Direct Owner-authorized reconciliation, 2026-10-01; not an A-TL approval. Base public release is PR #203/main `05491d17a088f0bd74fbb43e7260924b3e92801f`, extended by the linked #204–#206 PR. See [co-op corrections traceability](phase-2-coop-corrections-traceability.md) and [gameplay contract](../design/phase-2-a-b-c-master-gameplay.md). The broader baseline traceability remains PR #207 / #165.
 
 ## State ownership and commands

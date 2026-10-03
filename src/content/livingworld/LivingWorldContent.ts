@@ -246,7 +246,13 @@ export const FORAGE = [
   },
 ] as const;
 export type ForageId = (typeof FORAGE)[number]['id'];
-export const forageDefinition = (id: string) => FORAGE.find((f) => f.id === id);
+/** Transplants are not inserted into the original seeded spawn table. */
+export const TRANSPLANT_FORAGE = [
+  {id:'timber-tree',name:'Timber Tree',output:'item:timber',quantity:3,renewalTicks:108000},
+  {id:'fiber-plant',name:'Fiber Plant',output:'item:plant-fiber',quantity:4,renewalTicks:36000},
+  {id:'food-plant',name:'Food Plant',output:'item:edible-plant',quantity:2,renewalTicks:54000},
+] as const;
+export const forageDefinition = (id: string) => FORAGE.find((f) => f.id === id) ?? TRANSPLANT_FORAGE.find(f => f.id === id);
 type Cost = readonly [string, number];
 export const LIVING_FACILITIES = [
   {

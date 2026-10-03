@@ -1,3 +1,9 @@
+import { contentDisplayName } from '../localization/ContentText';
+import { locale } from '../localization/Locale';
+import { uiText } from '../localization/UiMessages';
+import { bindUiText } from '../localization/UiMessages';
+import { uiPhrase } from '../localization/UiMessages';
+import { WEARABLE_RECIPES } from '../../content/livingworld/WearableContent';
 import type { Phase1AuthorityBundle } from '../../integration';
 import {
   CROPS,
@@ -7,9 +13,11 @@ import {
   forageDefinition,
   soilAt,
 } from '../../content/livingworld/LivingWorldContent';
-import { livingArt } from './LivingWorldArt';
+import { livingArt, livingArtVariant } from './LivingWorldArt';
 import { LivingMotion } from './LivingMotion';
 import { worldDepthOrder } from './WorldDepth';
+import { mountainAt } from '../../world/phase2/SoloMountain';
+import { bindEntityInspection } from './EntityInspection';
 import { forageGrowthView, renewablePlant, moistureState } from '../../simulation/livingworld/PlantGrowth';
 import { LIVING_ROOT_ITEMS, LIVING_ROOT_RECIPES } from '../../content/livingworld/LivingRootContent';
 import { GEAR_RECIPES, RARITY_STYLE }  from '../../content/livingworld/EquipmentContent';
@@ -43,12 +51,12 @@ export function createLivingWorldOverlay(
     ghost = document.createElement('div'),
     hint = document.createElement('div');
   layer.className = 'lw-world';
-  menu.textContent = '☘ Homestead [F]';
+  bindUiText(menu,"textContent",uiText("ui.3e926c65"));
   menu.className = 'lw-menu';
-  menu.setAttribute('aria-label', 'Homestead farming and wildlife');
+  bindUiText(menu,"aria-label",uiText("ui.d74d21d2"));
   season.className = 'lw-season';
   panel.className = 'lw-panel';
-  panel.setAttribute('aria-label', 'Homestead');
+  bindUiText(panel,"aria-label",uiText("ui.e0b523e1"));
   panel.hidden = true;
   markers.className = 'lw-markers';
   ghost.className = 'lw-ghost';
@@ -57,6 +65,7 @@ export function createLivingWorldOverlay(
   hint.hidden = true;
   style.textContent =
     '.lw-world{position:absolute;inset:0;pointer-events:none;z-index:15;font:12px monospace;color:#e2e8d6}.lw-menu,.lw-season,.lw-hint{position:absolute;background:#10252ee8;border:1px solid #718b8e;padding:8px}.lw-menu{font:12px monospace;z-index:950001;right:12px;top:110px;pointer-events:auto;color:#e2e8d6}.lw-season{left:50%;top:115px;transform:translateX(-50%);font-size:11px}.lw-panel{z-index:20;position:absolute;inset:6% 12%;overflow:auto;background:#102029f7;border:1px solid #92ada9;padding:20px;pointer-events:auto}.lw-panel[hidden],.lw-ghost[hidden],.lw-hint[hidden]{display:none}.lw-panel article{border-bottom:1px solid #496167;padding:8px 0}.lw-panel button{background:#223a43;border:1px solid #8da5a2;color:#e2e8d6;padding:7px;margin:4px;cursor:pointer}.lw-panel p{line-height:1.5}.lw-object{position:absolute;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;width:36px;height:36px;color:#dfe7ce;font:10px monospace;image-rendering:pixelated}[data-product-review-panel-open=true] .lw-object,[data-product-review-help-open=true] .lw-object,[data-colony-settings-open=true] .lw-object,[data-expedition-panel-open=true] .lw-object{pointer-events:none}.lw-object svg{width:100%;height:100%;display:block}.lw-object:focus-visible{outline:1px solid #dae8bf;outline-offset:2px}.lw-object:hover svg{filter:brightness(1.12)}.lw-object[data-dead=true]{filter:grayscale(1);opacity:.65}.lw-ghost{position:absolute;transform:translate(-50%,-50%);height:24px;width:42px;border:2px dashed #a8e1b3;background:#a8e1b330;pointer-events:none}.lw-hint{bottom:105px;left:50%;transform:translateX(-50%)}.lw-season[data-season=winter]{color:#bce2ef}.lw-season[data-season=autumn]{color:#e4ba76}.lw-season[data-season=summer]{color:#e7d39a}@media(max-width:700px){.lw-panel{inset:8% 3%}.lw-menu{font-size:10px;top:110px}.lw-season{top:95px}}';
+  style.textContent += '.lw-panel[data-targeted=true]{inset:auto 12px auto auto;top:112px;width:min(320px,calc(100% - 24px));max-height:45vh;padding:12px;box-sizing:border-box}.lw-panel[data-targeted=true] h2{font-size:14px}.lw-panel[data-targeted=true] article{padding:4px 0;border:0}.lw-panel[data-targeted=true] h3{margin:4px 0;font-size:13px}@media(max-height:450px){.lw-panel[data-targeted=true]{top:84px;width:min(280px,44%)}}';
   const worldStage = root.querySelector<HTMLElement>('.p1-product-world-stage');
   if (!worldStage) throw new Error('Living presentation requires the canonical world stage.');
   const rasterOrigin = { x: Number(worldStage.dataset.rasterOriginX), y: Number(worldStage.dataset.rasterOriginY) };
@@ -67,7 +76,7 @@ export function createLivingWorldOverlay(
   fishingStatus.className = 'lw-fishing-status'; fishingStatus.hidden = true;
   fishingStatus.style.cssText = 'position:absolute;bottom:150px;left:50%;transform:translateX(-50%);background:#102029ef;border:1px solid #90c1c5;padding:8px;pointer-events:auto;z-index:950000;max-width:85%;display:flex;gap:8px;align-items:center';
   // Keep the DOM stable during the reaction window, including keyboard focus.
-  reelButton.textContent = 'Reel [Space]'; reelButton.type = 'button'; cancelFishButton.textContent = 'Cancel [Esc]'; cancelFishButton.type = 'button';
+  bindUiText(reelButton,"textContent",uiText("ui.7e19a591")); reelButton.type = 'button'; bindUiText(cancelFishButton,"textContent",uiText("ui.a4eae766")); cancelFishButton.type = 'button';
   reelButton.onclick = () => fishingAction('reel'); cancelFishButton.onclick = () => fishingAction('cancel');
   fishingStatus.append(fishingLabel, reelButton, cancelFishButton); layer.append(fishingStatus);
   bobber.dataset.fishingBobber = 'true'; bobber.style.cssText = 'position:absolute;width:24px;height:16px;pointer-events:none';
@@ -86,6 +95,7 @@ export function createLivingWorldOverlay(
     fishFlashUntil = 0,
     lastFishMessage = '',
     fishingError = '',
+    interactionFlashUntil = 0,
     cursor: { x: number; y: number } | null = null;
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
@@ -108,13 +118,13 @@ export function createLivingWorldOverlay(
   };
   const text = (tag: string, value: string) => {
     const n = document.createElement(tag);
-    n.textContent = value;
+    bindUiText(n,"textContent",value);
     return n;
   };
   const button = (label: string, callback: () => void) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = label;
+    bindUiText(b,"textContent",label);
     b.onclick = (e) => {
       e.stopPropagation();
       callback();
@@ -123,44 +133,47 @@ export function createLivingWorldOverlay(
   };
   const statusText = (v: string) =>
     ({
-      OUT_OF_RANGE: 'Walk closer (4 m).',
-      BUILD_NEARBY_PEN: 'Build a pen within 6 m of this animal.',
-      EQUIP_WEAPON_FIRST: 'Equip a spear in inventory before hunting.',
-      FIELD_HOE_REQUIRED: 'Craft a Field Hoe first.',
-      WATERING_CAN_REQUIRED: 'Craft a Watering Can first.',
+      OUT_OF_RANGE: uiText("ui.e546246a"),
+      BUILD_NEARBY_PEN: uiText("ui.97eddf1a"),
+      EQUIP_WEAPON_FIRST: uiText("ui.810c2cfe"),
+      FIELD_HOE_REQUIRED: uiText("ui.9955227e"),
+      WATERING_CAN_REQUIRED: uiText("ui.24234a53"),
       CAPACITY_EXCEEDED:
         'Bag full. Store some items; harvest and loot are preserved.',
-      NEARBY_STATION_REQUIRED: 'Build and stand near the required station.',
-      RENEWING: 'This patch is regenerating.',
-      NOT_READY: 'Still growing or producing.',
-      SOIL_TILLED: 'Plot ready: choose a seed.',
-      PLANTED: 'Seeds planted.',
-      WATERED: 'Soil watered.',
-      FORAGED: 'Materials gathered.',
-      HUNTED: 'Animal down: collect the meat.',
-      TAMED: 'Animal moved into your pen.',
-      FED: 'Animal fed. Adults with a fed partner can breed.',
-      FIRE_LIT: 'Fire burning: stay within 4 m for warmth.',
-      TANK_FILLED: 'Irrigation reservoir filled.',
-      MISSING_INPUT: 'Bring the required materials.',
-      FISHING_ROD_REQUIRED: 'Craft a Field Fishing Rod first.',
-      FISHING_BAIT_REQUIRED: 'Craft or carry Plant Fishing Bait before casting.',
-      FISHING_WATER_REQUIRED: 'Choose explored water within 4 m.',
-      FISHING_LINE_BLOCKED: 'The line is blocked. Try a clear bank.',
-      FISHING_STAND_ON_BANK: 'Stand on dry bank ground before casting.',
-      FISHING_CAST: 'Bait cast. Stay still and watch for the bite.',
-      FISHING_WAIT_FOR_BITE: 'Wait for the bite before reeling.',
+      NEARBY_STATION_REQUIRED: uiText("ui.c7b54aa"),
+      RENEWING: uiText("ui.171329ec"),
+      NOT_READY: uiText("ui.c04bf2c"),
+      SOIL_TILLED: uiText("ui.274a8454"),
+      PLANTED: uiText("ui.c207a849"),
+      WATERED: uiText("ui.e0bf78c2"),
+      OUT_OF_WEAPON_RANGE: uiText("ui.a73556ae"),
+      EXHAUSTED: uiText("ui.5a20d503"),
+      BROKEN_WEAPON: uiText("ui.78fc6005"),
+      FORAGED: uiText("ui.7d573115"),
+      HUNTED: uiText("ui.a14f5745"),
+      TAMED: uiText("ui.5cefbaaa"),
+      FED: uiText("ui.85f1e8f5"),
+      FIRE_LIT: uiText("ui.acc0dd85"),
+      TANK_FILLED: uiText("ui.a25b5da"),
+      MISSING_INPUT: uiText("ui.3ae4397"),
+      FISHING_ROD_REQUIRED: uiText("ui.afdb44bb"),
+      FISHING_BAIT_REQUIRED: uiText("ui.70aa376e"),
+      FISHING_WATER_REQUIRED: uiText("ui.725b104"),
+      FISHING_LINE_BLOCKED: uiText("ui.2490b2f"),
+      FISHING_STAND_ON_BANK: uiText("ui.9b67aaf8"),
+      FISHING_CAST: uiText("ui.bba12d3f"),
+      FISHING_WAIT_FOR_BITE: uiText("ui.e1c478ad"),
       FISHING_STOCK_RECOVERING: 'Fish population depleted or reserved; let this area recover.',
-      FISHING_INTERRUPTED_MOVE: 'Fishing cancelled because you moved. The cast bait is spent.',
-      FISHING_INTERRUPTED_DAMAGE: 'Fishing cancelled because you took damage.',
-      FISHING_MISSED_BITE: 'The fish escaped. Reel within four seconds of the bite.',
-      FISHING_CANCELLED: 'Fishing cancelled. The cast bait is spent.',
-      TARGET_CAPACITY_WEIGHT: 'Too heavy to land the fish. Free bag space before the bite window closes.',
-      TARGET_CAPACITY_VOLUME: 'No room to land the fish. Free bag space before the bite window closes.',
+      FISHING_INTERRUPTED_MOVE: uiText("ui.72ce500c"),
+      FISHING_INTERRUPTED_DAMAGE: uiText("ui.4baa12a1"),
+      FISHING_MISSED_BITE: uiText("ui.b16a4ce5"),
+      FISHING_CANCELLED: uiText("ui.90da89a4"),
+      TARGET_CAPACITY_WEIGHT: uiText("ui.37ea48da"),
+      TARGET_CAPACITY_VOLUME: uiText("ui.8fb5d85"),
     })[v] ?? v.replaceAll('_', ' ').toLowerCase();
   const fishingAction = (action: FishingCommand['action'], extra: Partial<FishingCommand> = {}) => {
     const result = authority.fishing.execute({ id: 'fish:' + crypto.randomUUID(), playerId: player, expectedRevision: authority.fishing.revision(), expectedInventoryRevision: bundle.items.getContainerView('inventory:' + player).revision, action, ...extra });
-    feedback = result.message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(result.message.slice('FISHING_CAUGHT:'.length)).displayName : result.message.startsWith('NEED item:fishing-bait') ? 'Craft or carry Plant Fishing Bait before casting.' : statusText(result.message);
+    feedback = result.message.startsWith('FISHING_CAUGHT:') ? uiText("ui.f8dbcaff") + contentDisplayName(bundle.catalog.get(result.message.slice('FISHING_CAUGHT:'.length))) : result.message.startsWith(uiText("ui.b9d440a7")) ? uiText("ui.70aa376e") : statusText(result.message);
     fishingError = result.status === 'rejected' ? feedback : '';
     signature = ''; render(); return result.status === 'committed';
   };
@@ -210,14 +223,26 @@ export function createLivingWorldOverlay(
     placementRoot = null;
     placing = true;
     hint.hidden = false;
-    hint.textContent = 'Click explored dry ground within 4 m · Escape cancel';
+    bindUiText(hint,"textContent",uiText("ui.2b0f2d8a"));
   };
-  const startFishing = () => { close(); placing = true; placingFishing = true; hint.hidden = false; hint.textContent = 'Click explored water within 4 m · 1 bait per cast · Escape / right-click cancel'; };
+  const startFishing = () => { close(); placing = true; placingFishing = true; hint.hidden = false; bindUiText(hint,"textContent",uiText("ui.32280935")); };
   const growthText = (v: ReturnType<typeof forageGrowthView>) => v.stage === 'mature'
-    ? 'Maximum growth reached · best yield ' + v.maximumYield + ' · ' + (v.condition === 'normal' ? 'Normal' : 'Needs water')
-    : (v.stage === 'early' ? 'Early growth' : 'Growing') + ' · ' + (v.nextStageSeconds === null ? 'Growth paused: water needed' : 'Next stage ≈ ' + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? 'Needs water' : 'Normal') + ' · yield ' + v.harvestYield + '/' + v.maximumYield;
+    ? uiText("ui.9e549982") + v.maximumYield + ' · ' + (v.condition === 'normal' ? uiText("ui.58de2772") : uiText("ui.34473019"))
+    : (v.stage === 'early' ? uiText("ui.94d612b3") : uiText("ui.5eb1c946")) + ' · ' + (v.nextStageSeconds === null ? uiText("ui.e685acf2") : uiText("ui.2794b86a") + v.nextStageSeconds + 's') + ' · ' + (v.condition === 'needs-water' ? uiText("ui.34473019") : uiText("ui.58de2772")) + uiText("ui.6ddf03ab") + v.harvestYield + '/' + v.maximumYield;
+  const interact = (id: string) => {
+    if (placing || opened || root.dataset.colonySettingsOpen === 'true' || root.dataset.productReviewPanelOpen === 'true') return;
+    const f = authority.presentationSnapshot().forage.find(f => f.id === id && !f.cleared);
+    if (f) {
+      execute('forage', id); bindUiText(hint,"textContent",feedback); hint.hidden = false; interactionFlashUntil = performance.now() + 3500;
+    } else open(id);
+  };
   const render = () => {
+    const interior = bundle.playerWorldspace() !== 'surface';
+    layer.hidden = interior; menu.hidden = interior;markers.style.display = interior ? 'none' : 'contents';
+    if (interior) { close();for(const b of objectNodes.values())b.hidden=true;motion.clear();return; }
+    for(const b of objectNodes.values())b.hidden=false;
     const now = performance.now();
+    if (!placing && !opened && interactionFlashUntil && now >= interactionFlashUntil) { hint.hidden = true; interactionFlashUntil = 0; }
     if (root.dataset.colonySettingsOpen === 'true') {
       close();
       placing = false;
@@ -236,12 +261,12 @@ export function createLivingWorldOverlay(
     if (fish) {
       const biting = bundle.authorityTick >= fish.biteTick;
       fishingStatus.dataset.phase = biting ? 'bite' : 'waiting';
-      const label = (biting ? 'BITE! Reel within ' + Math.max(0, Math.ceil((fish.endTick - bundle.authorityTick) / 60)) + 's' : 'Waiting for a bite · stay still') + (fishingError ? ' · ' + fishingError : '');
-      if (fishingLabel.textContent !== label) fishingLabel.textContent = label;
+      const label = (biting ? uiText("ui.41ff433f") + Math.max(0, Math.ceil((fish.endTick - bundle.authorityTick) / 60)) + 's' : uiText("ui.41ab452a")) + (fishingError ? ' · ' + fishingError : '');
+      if (fishingLabel.textContent !== label) bindUiText(fishingLabel,"textContent",label);
       reelButton.disabled = !biting;
       const at = projectPhase1Isometric(fish, rasterOrigin);
       bobber.style.left = 320 + at.x - 12 + 'px'; bobber.style.top = 180 + at.y - 8 + (biting ? Math.floor(bundle.authorityTick / 8) % 2 * 2 : 0) + 'px'; bobber.style.zIndex = worldDepthOrder(fish, 2);
-    } else if (message) fishingLabel.textContent = message.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(message.slice('FISHING_CAUGHT:'.length)).displayName : statusText(message);
+    } else if (message) bindUiText(fishingLabel,"textContent",message.startsWith('FISHING_CAUGHT:') ? uiText("ui.f8dbcaff") + contentDisplayName(bundle.catalog.get(message.slice('FISHING_CAUGHT:'.length))) : statusText(message) ?? "");
     season.dataset.season = s.id;
     if (root.dataset.livingSeason !== s.id) root.dataset.livingSeason = s.id;
     for (let i = 0; i < particles.length; i++) {
@@ -260,13 +285,13 @@ export function createLivingWorldOverlay(
     }
 
     const seasonText =
-      s.name +
-      ' · Year ' +
+      uiPhrase(s.name) +
+      uiText("ui.2f794433") +
       s.year +
       ' · ' +
       Math.ceil(s.remainingTicks / 3600) +
-      ' min';
-    if (season.textContent !== seasonText) season.textContent = seasonText;
+      uiText("ui.34aaa379");
+    if (season.textContent !== seasonText) bindUiText(season,"textContent",seasonText);
     const visible = new Set<string>();
     const objects = [
       ...state.plots.map((e) => ({
@@ -318,13 +343,31 @@ export function createLivingWorldOverlay(
         b.dataset.livingId = e.id;
         b.onclick = (event) => {
           event.stopPropagation();
-          open(e.id);
+          interact(e.id);
         };
         objectNodes.set(e.id, b);
         markers.append(b);
+        bindEntityInspection(b, () => {
+          const snapshot = authority.presentationSnapshot();
+          const current = role === 'plot' ? snapshot.plots.find(v => v.id === e.id) : role === 'animal' ? snapshot.animals.find(v => v.id === e.id) : snapshot.forage.find(v => v.id === e.id && !v.cleared);
+          if (!current || !worldPositionKnown(bundle, current)) return null;
+          const label = role === 'plot' ? uiText("ui.ebf4e624") : role === 'animal' ? uiPhrase(speciesDefinition(kind)!.name) : uiPhrase(forageDefinition(kind)!.name);
+          const facts: string[] = [];
+          if (role === 'animal') {
+            const animal = snapshot.animals.find(v => v.id === e.id)!, def = speciesDefinition(animal.species)!;
+            facts.push(uiText("ui.a438be7d")+animal.health+'/'+def.health, uiText("ui.792089b7")+Math.round(animal.energy/100)+uiText("ui.4b316084")+Math.round(animal.thirst/100)+'%', animal.health === 0 ? uiText("ui.715a6a83") : animal.age >= def.matureSeconds*60 ? uiText("ui.5c0e81af") : uiText("ui.2a407de3"), animal.pen ? uiText("ui.8431affd") : uiText("ui.883cad15"));
+          } else {
+            const growth = role === 'plot' ? authority.plotStatus(e.id) : authority.forageStatus(e.id);
+            if (growth) facts.push(growthText(growth));
+            if (role === 'plot') { const plot = snapshot.plots.find(v => v.id === e.id)!; facts.push(uiText("ui.df5b90dd")+Math.round(plot.moisture/100)+'%', plot.dead ? uiText("ui.93ac2193") : plot.crop ? uiPhrase(cropDefinition(plot.crop)!.name) : uiText("ui.b421ceb9")); }
+          }
+          facts.push(uiText("ui.524f0b38")+uiPhrase(soilAt(bundle.config.worldSeed,current).name), uiText("ui.d18a0a8"));
+          return {id:e.id,name:label,kind:role,facts};
+        });
       }
-      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead].join(':');
-      const definition = livingArt(role, kind, progress, young, dead);
+      const variant = kind === 'wild-grass' ? livingArtVariant(e.id) : 0;
+      const key = [role, kind, progress >= 1 ? 2 : progress >= .5 ? 1 : 0, young, dead, variant].join(':');
+      const definition = livingArt(role, kind, progress, young, dead, variant);
       if (b.dataset.art !== key) {
         b.innerHTML = definition.markup;
         b.dataset.art = key;
@@ -334,21 +377,15 @@ export function createLivingWorldOverlay(
       b.dataset.dead = String(dead);
       b.dataset.livingRole = role;
       b.dataset.livingKind = kind;
+      b.dataset.livingArtVariant = String(variant);
       b.dataset.livingYoung = String(young);
       b.style.zIndex = worldDepthOrder(displayed);
-      b.setAttribute(
-        'aria-label',
-        role === 'plot'
-          ? 'Farm plot · ' + kind
+      bindUiText(b,"aria-label",role === 'plot'
+          ? uiText("ui.d8ddaa93") + kind
           : role === 'animal'
-            ? speciesDefinition(kind)!.name
-            : forageDefinition(kind)!.name,
-      );
-      if (Math.hypot(e.x - p.x, e.y - p.y) <= 4 && role === 'forage' && renewablePlant(kind)) {
-        const growth = authority.forageStatus(e.id)!;
-        const label = (b.getAttribute('aria-label') ?? '') + ' · ' + growthText(growth);
-        if (b.title !== label) b.title = label;
-      } else b.title = b.getAttribute('aria-label') ?? '';
+            ? uiPhrase(speciesDefinition(kind)!.name)
+            : uiPhrase(forageDefinition(kind)!.name) ?? "");
+      b.removeAttribute('title');
       if (role === 'plot') {
         const plot = state.plots.find(plot => plot.id === e.id)!;
         b.dataset.moisture = moistureState(plot.moisture);
@@ -359,7 +396,7 @@ export function createLivingWorldOverlay(
       // Foot pivot at 50/64 of the authored canvas, shared with terrain's raster origin.
       const hitWidth = Math.max(24, definition.width), hitHeight = Math.max(24, definition.height);
       b.style.left = raster.x + 320 - hitWidth / 2 + 'px';
-      b.style.top = raster.y + 180 - definition.height * 50 / 64 - (hitHeight - definition.height) + 'px';
+      b.style.top = raster.y + 180 - definition.height * 50 / 64 - (hitHeight - definition.height) - (bundle.caves?mountainAt(displayed,bundle.caves.portals).height*4:0) + 'px';
       b.style.width = hitWidth + 'px';
       b.style.height = hitHeight + 'px';
     }
@@ -389,11 +426,14 @@ export function createLivingWorldOverlay(
         const reason = authority.fishing.assessCast(player,x,y), valid = reason === null;
         ghost.dataset.valid = String(valid); ghost.style.borderColor = valid ? '#a8e1b3' : '#e89c83';
         const population = authority.fishing.water(x,y) ? authority.fishing.population(x,y) : null;
-        hint.textContent = (reason ? statusText(reason) : 'Cast here · 1 bait') + (population ? ' · Fish ' + population.stock + '/' + population.capacity + (population.recoverySeconds === null ? '' : ' · next fish ≈ ' + population.recoverySeconds + 's') : '') + ' · Escape cancel';
+        bindUiText(hint,"textContent",(reason ? statusText(reason) : uiText("ui.ffc553f6")) + (population ? uiText("ui.17c03126") + population.stock + '/' + population.capacity + (population.recoverySeconds === null ? '' : uiText("ui.e211f15b") + population.recoverySeconds + 's') : '') + uiText("ui.71353c8f"));
       }
     }
     if (!opened) return;
-    const next = JSON.stringify([
+    if (focus && focus !== 'craft' && !objects.some(v => v.e.id === focus) && !bundle.world.getActiveGeneratedEntities().some(e => e.entityId === focus && e.type === 'resource' && bundle.worldStore.getResourceState(e.entityId)?.depleted && bundle.worldStore.getResourceState(e.entityId)?.uprootedVersion !== 1)) { close(); return; }
+    const targeted = focus !== '' && focus !== 'craft';
+    panel.dataset.targeted = String(targeted);
+    const next = JSON.stringify([locale(),
       Math.floor(state.lastTick / 60),
       inventory.revision,
       Math.floor(p.x),
@@ -410,36 +450,36 @@ export function createLivingWorldOverlay(
         panel.querySelector<HTMLDetailsElement>('details')?.open ??
         focus === 'craft';
     panel.replaceChildren(
-      text('h2', 'HOMESTEAD · ' + s.name),
-      button('Close', close),
-      button('Till a new plot', startPlot),
+      text('h2', targeted ? uiText("ui.1e2eb9ef") : uiText("ui.d9324124") + uiPhrase(s.name)),
+      button(uiText("ui.cd86acc3"), close),
+      ...(!targeted ? [button(uiText("ui.e048e22e"), startPlot)] : []),
     );
     const status = text('p', feedback);
     status.setAttribute('role', 'status');
-    panel.append(
-      status,
+    panel.append(status);
+    if (!targeted) panel.append(
       text(
         'p',
-        'Spring +35% growth · Summer: water regularly · Autumn +25% harvest · Winter: fire and shelter. Each season lasts 12 active minutes.',
+        uiText("ui.2e675ac5"),
       ),
     );
     const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
-    panel.append(button('Fish nearby water', startFishing));
+    if (!targeted) panel.append(button(uiText("ui.5f9c6795"), startFishing));
     const fishFeedback = authority.fishing.message(player);
-    if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? 'Caught ' + bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length)).displayName : statusText(fishFeedback)));
-    for (const rootItem of roots) panel.append(button('Replant ' + rootItem.displayName, () => {
+    if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? uiText("ui.f8dbcaff") + contentDisplayName(bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length))) : statusText(fishFeedback)));
+    for (const rootItem of targeted ? [] : roots) panel.append(button(uiText("ui.73de41ef") + contentDisplayName(rootItem), () => {
       close(); placing = true; placementRoot = rootItem.id; hint.hidden = false;
-      hint.textContent = 'Replant on explored ground within 4 m · Escape / right-click cancel';
+      bindUiText(hint,"textContent",uiText("ui.cacbd0a2"));
     }));
     const soil = soilAt(bundle.config.worldSeed, p);
-    panel.append(
+    if (!targeted) panel.append(
       text(
         'p',
-        'Local soil: ' +
-          soil.name +
-          ' · growth ' +
+        uiText("ui.b8d548cd") +
+          uiPhrase(soil.name) +
+          uiText("ui.df8490d5") +
           Math.round(soil.growthMilli / 10) +
-          '% · water retention ' +
+          uiText("ui.6bd825e0") +
           Math.round(soil.retentionMilli / 10) +
           '%',
       ),
@@ -452,133 +492,141 @@ export function createLivingWorldOverlay(
       return a;
     };
     for (const plot of state.plots.filter(
-      (e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus,
+      (e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8,
     )) {
       const crop = cropDefinition(plot.crop ?? ''),
         a = row(
           plot.id,
-          'Plot · ' + soilAt(bundle.config.worldSeed, plot).name,
+          (crop ? uiPhrase(crop.name) : uiText("ui.2cd74f4d")) + ' · ' + uiPhrase(soilAt(bundle.config.worldSeed, plot).name),
         );
-      a.append(
+      if (!targeted) a.append(
         text(
           'p',
           plot.dead
-            ? 'Withered: clear and replant.'
+            ? uiText("ui.aeb1104d")
             : (crop
-                ? crop.name +
+                ? uiPhrase(crop.name) +
                   ' ' +
                   Math.floor((plot.progress / crop.cycleTicks) * 100) +
                   '%'
-                : 'Empty soil') +
-                ' · Moisture ' +
+                : uiText("ui.b421ceb9")) +
+                uiText("ui.75b42b56") +
                 Math.round(plot.moisture / 100) +
                 '%',
         ),
       );
       const growth = authority.plotStatus(plot.id);
-      if (growth && !plot.dead) a.append(text('p', growthText(growth)));
+      if (growth && !plot.dead && !targeted) a.append(text('p', growthText(growth)));
       if (!plot.crop)
         for (const c of CROPS)
           a.append(
-            button('Plant ' + c.name, () =>
+            button(uiText("ui.3fc2d456") + uiPhrase(c.name), () =>
               execute('plant', plot.id, { crop: c.id }),
             ),
           );
       a.append(
-        button('Water · 1 clean water', () => execute('water', plot.id)),
-        button('Fertilize · 1 compost', () => execute('fertilize', plot.id)),
-        button('Harvest', () => execute('harvest', plot.id)),
-        button('Clear crop', () => execute('clear', plot.id)),
+        button(uiText("ui.71d2725c"), () => execute('water', plot.id)),
+        button(uiText("ui.ebb18eea"), () => execute('fertilize', plot.id)),
+        button(uiText("ui.f4d07cb2"), () => execute('harvest', plot.id)),
+        button(uiText("ui.1a323be8"), () => execute('clear', plot.id)),
       );
     }
     for (const animal of state.animals.filter(
-      (e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus,
+      (e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8,
     )) {
       const d = speciesDefinition(animal.species)!,
         a = row(
           animal.id,
-          d.name +
+          uiPhrase(d.name) +
             ' · ' +
             (animal.health === 0
-              ? 'Carcass'
+              ? uiText("ui.715a6a83")
               : animal.age >= d.matureSeconds * 60
-                ? 'Adult'
-                : 'Young'),
+                ? uiText("ui.5c0e81af")
+                : uiText("ui.2a407de3")),
         );
-      a.append(
+      if (!targeted) a.append(
         text(
           'p',
-          'Health ' +
+          uiText("ui.7020801d") +
             animal.health +
             '/' +
             d.health +
-            ' · Feed ' +
+            uiText("ui.d0a0b68c") +
             Math.round(animal.energy / 100) +
-            '% · Water ' +
+            uiText("ui.e2f8a8ba") +
             Math.round(animal.thirst / 100) +
             '% · ' +
-            (animal.pen ? 'Domestic' : 'Wild') +
+            (animal.pen ? uiText("ui.8431affd") : uiText("ui.883cad15")) +
             ' · ' +
-            (animal.sex ? 'Male' : 'Female'),
+            (animal.sex ? uiText("ui.487d36f0") : uiText("ui.d8a26cb9")),
         ),
       );
       if (!animal.health)
         a.append(
-          button('Collect meat, hide & bone', () => execute('loot', animal.id)),
+          button(uiText("ui.c6fa5794"), () => execute('loot', animal.id)),
         );
       else {
-        a.append(button('Hunt', () => execute('hunt', animal.id)));
+        a.append(button(uiText("ui.e2cc34c4"), () => execute('hunt', animal.id)));
         if (!animal.pen && d.tame)
-          a.append(button('Tame · 1 feed', () => execute('tame', animal.id)));
+          a.append(button(uiText("ui.e78748a2"), () => execute('tame', animal.id)));
         if (animal.owner === player) {
           a.append(
-            button('Feed & water · 1 each', () => execute('feed', animal.id)),
-            button('Release', () => execute('release', animal.id)),
+            button(uiText("ui.fa3fc007"), () => execute('feed', animal.id)),
+            button(uiText("ui.6d1e9b1e"), () => execute('release', animal.id)),
           );
           if (d.product)
             a.append(
               button(
-                'Collect ' +
-                  bundle.catalog.get(d.product).displayName +
+                uiText("ui.33547463") +
+                  contentDisplayName(bundle.catalog.get(d.product)) +
                   ' · ' +
                   animal.product,
                 () => execute('produce', animal.id),
               ),
             );
           if (animal.species === 'goat')
-            a.append(button('Shear wool', () => execute('shear', animal.id)));
+            a.append(button(uiText("ui.de7e5f43"), () => execute('shear', animal.id)));
         }
       }
     }
+    for (const entity of bundle.world.getActiveGeneratedEntities().filter(e => !targeted || e.entityId === focus)) {
+      if (entity.type !== 'resource' || !worldPositionKnown(bundle,entity.position) || Math.hypot(entity.position.x-p.x,entity.position.y-p.y)>4) continue;
+      const resource = bundle.worldStore.getResourceState(entity.entityId);
+      if (!resource || resource.uprootedVersion === 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId) || (!resource.depleted&&resource.lifecycle?.kind==='plant'&&resource.lifecycle.stage==='mature')) continue;
+      const a = row(entity.entityId,contentDisplayName(bundle.catalog.getAs(entity.definitionId,'resource'))+(resource.depleted?uiText("ui.75290c99"):uiText("ui.736391b0")));
+      if(resource.depleted)a.append(button(uiText("ui.6a845a05"),()=>execute('uproot-canonical',entity.entityId,{resourceRevision:resource.revision})));
+      a.append(button(uiText("ui.2c919f1d"),()=>execute('water-canonical',entity.entityId,{resourceRevision:resource.revision})));
+    }
     for (const f of state.forage
       .filter((f) => !f.cleared)
-      .filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8 || e.id === focus)) {
-      const a = row(f.id, forageDefinition(f.kind)!.name);
+      .filter((e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
+      const a = row(f.id, uiPhrase(forageDefinition(f.kind)!.name));
       const growth = authority.forageStatus(f.id)!;
-      if (renewablePlant(f.kind)) a.append(text('p', growthText(growth)));
+      if (renewablePlant(f.kind) && !targeted) a.append(text('p', growthText(growth)));
       a.append(
         button(
           (f.growth ? growth.harvestYield === 0 : f.readyTick > bundle.authorityTick)
-            ? f.growth ? growth.nextStageSeconds === null ? 'Water needed · growth paused' : 'Early growth · ≈ ' + growth.nextStageSeconds + 's' : 'Regrowing · ' +
+            ? f.growth ? growth.nextStageSeconds === null ? uiText("ui.842f31fb") : uiText("ui.fbb0ffb6") + growth.nextStageSeconds + 's' : uiText("ui.2a04ed00") +
                 Math.ceil((f.readyTick - bundle.authorityTick) / 60) +
                 's'
-            : 'Gather',
+            : uiText("ui.2614cfaa"),
           () => execute('forage', f.id),
         ),
       );
       if (f.growth) {
-        a.append(button('Water roots · 1 clean water', () => execute('water-forage', f.id)));
-        if (f.growth.cut) a.append(text('p', 'Uprooting removes this patch permanently; replant the root elsewhere.'), button('Uproot · Field Hoe', () => execute('uproot', f.id)));
+        a.append(button(uiText("ui.cee5b11d"), () => execute('water-forage', f.id)));
+        if (f.growth.cut) a.append(text('p', 'Uprooting removes this patch permanently; replant the root elsewhere.'), button(uiText("ui.6a845a05"), () => execute('uproot', f.id)));
       }
     }
     for (const f of bundle
       .expedition!.read()
-      .facilities.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
+      .facilities.filter((e) => !targeted && Math.hypot(e.x - p.x, e.y - p.y) <= 8)) {
       if (f.definitionId !== 'campfire' && f.definitionId !== 'irrigation-tank')
         continue;
       const a = row(
           f.id,
-          f.definitionId === 'campfire' ? 'Campfire' : 'Irrigation Tank',
+          f.definitionId === 'campfire' ? uiText("ui.acb06d38") : uiText("ui.d3b0ecf7"),
         ),
         sprite = document.createElement('span');
       applyProductionSprite(sprite, expeditionSprite(f.definitionId), 0.5);
@@ -588,18 +636,18 @@ export function createLivingWorldOverlay(
         text(
           'p',
           f.definitionId === 'campfire'
-            ? 'Burning: ' +
+            ? uiText("ui.e5a8d75a") +
                 Math.max(
                   0,
                   Math.ceil(((st?.fireUntil ?? 0) - bundle.authorityTick) / 60),
                 ) +
                 's'
-            : 'Reservoir ' + (st?.water ?? 0) + '/24',
+            : uiText("ui.29cf0cb2") + (st?.water ?? 0) + '/24',
         ),
         button(
           f.definitionId === 'campfire'
-            ? 'Add timber · 5 min'
-            : 'Fill · 1 water → 4 irrigation',
+            ? uiText("ui.89cd97c1")
+            : uiText("ui.430e88c1"),
           () => execute(f.definitionId === 'campfire' ? 'fuel' : 'fill', f.id),
         ),
       );
@@ -609,12 +657,12 @@ export function createLivingWorldOverlay(
     craft.append(
       text(
         'summary',
-        'Farm & survival crafting · ' + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length) + ' recipes',
+        uiText("ui.e9eb9b92") + (LIVING_RECIPES.length + LIVING_ROOT_RECIPES.length + FISHING_RECIPES.length + GEAR_RECIPES.length + WEARABLE_RECIPES.length) + uiText("ui.c8c1b8be"),
       ),
     );
-    panel.append(craft);
-    for (const r of [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES]) {
-      const a = row('recipe:' + r.id, r.name);
+    if (!targeted) panel.append(craft);
+    for (const r of targeted ? [] : [...LIVING_RECIPES, ...LIVING_ROOT_RECIPES, ...FISHING_RECIPES, ...GEAR_RECIPES, ...WEARABLE_RECIPES]) {
+      const a = row('recipe:' + r.id, uiPhrase(r.name));
       const definition = bundle.catalog.getAs(r.output, 'item');
       if (definition.rarity) { a.dataset.rarity = definition.rarity; a.style.borderColor = RARITY_STYLE[definition.rarity].colour; const badge = text('small', RARITY_STYLE[definition.rarity].label); badge.style.color = RARITY_STYLE[definition.rarity].colour; a.append(badge); a.querySelector('h3')?.setAttribute('style', 'color:' + RARITY_STYLE[definition.rarity].colour); }
       craft.append(a);
@@ -630,7 +678,7 @@ export function createLivingWorldOverlay(
           r.costs
             .map(
               ([id, q]) =>
-                bundle.catalog.get(id).displayName +
+                contentDisplayName(bundle.catalog.get(id)) +
                 ' ' +
                 inventory.stacks
                   .filter((s) => s.itemDefinitionId === id)
@@ -639,9 +687,9 @@ export function createLivingWorldOverlay(
                 q,
             )
             .join(' · ') +
-            (r.station ? ' · Station: ' + r.station.replaceAll('-', ' ') : ''),
+            (r.station ? uiText("ui.73fe98fe") + r.station.replaceAll('-', ' ') : ''),
         ),
-        button('Craft ' + r.name, () => execute('craft', r.id)),
+        button(uiText("ui.93077f53") + uiPhrase(r.name), () => execute('craft', r.id)),
       );
     }
     panel.scrollTop = scrollTop;
@@ -677,7 +725,7 @@ export function createLivingWorldOverlay(
     render();
     if (placingFishing) {
       if (fishingAction('cast', { x: Number(ghost.dataset.x), y: Number(ghost.dataset.y) })) close();
-      else hint.textContent = feedback + ' · choose another position';
+      else bindUiText(hint,"textContent",feedback + uiText("ui.bd3d8869"));
       return;
     }
     if (
@@ -688,9 +736,10 @@ export function createLivingWorldOverlay(
     ) {
       placing = false;
       open();
-    } else hint.textContent = feedback + ' · choose another position';
+    } else bindUiText(hint,"textContent",feedback + uiText("ui.bd3d8869"));
   };
   const key = (e: KeyboardEvent) => {
+    if (bundle.playerWorldspace() !== 'surface') return;
     if (
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement || (e.target instanceof HTMLElement && e.target.isContentEditable)
@@ -745,7 +794,7 @@ export function createLivingWorldOverlay(
         if (!canonical) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          open(near.id);
+          interact(near.id);
         }
       }
     } else if (e.code === 'Escape' && (opened || placing)) {
@@ -776,7 +825,7 @@ export function createLivingWorldOverlay(
   return {
     open,
     close,
-    cancelPlacement: () => { if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); },
+    cancelPlacement: () => { const active = placing || Boolean(authority.fishing.session(player)); if (placing) close(); if (authority.fishing.session(player)) fishingAction('cancel'); return active; },
     render,
     destroy: () => {
       root.removeEventListener('pointermove', pointer);
