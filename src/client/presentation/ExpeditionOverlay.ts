@@ -32,7 +32,7 @@ export function createExpeditionOverlay(
   const bounds = createCanvasBounds(root, canvas);
   const style = document.createElement('style');
   style.textContent =
-    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-ghost{position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;z-index:1}.sp-ghost svg{position:absolute;inset:0}.sp-ghost .sp-facility-art{position:absolute;left:16px;bottom:20px;opacity:.65}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
+    '.sp-expedition{position:absolute;inset:0;pointer-events:none;z-index:1000010;font:12px monospace;color:#e8efdf}.sp-expedition-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(700px,92%);max-height:80%;overflow:auto;box-sizing:border-box;background:#0b1721f5;border:2px solid #8faaa2;padding:16px;pointer-events:auto}.sp-expedition-panel[data-target-entity]:not([data-target-entity=""]){left:auto;right:12px;top:110px;transform:none;width:min(360px,48%);max-height:60%}.sp-expedition-header{position:sticky;top:-16px;z-index:1;background:#0b1721;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}.sp-expedition-header h2{margin:0}.sp-ghost{position:absolute;pointer-events:none;transform:translate(-50%,-50%);width:64px;height:64px;z-index:1}.sp-ghost svg{position:absolute;inset:0}.sp-ghost .sp-facility-art{position:absolute;left:16px;bottom:20px;opacity:.65}.sp-expedition button{font:inherit;background:#20343c;border:1px solid #839b94;color:inherit;padding:8px;cursor:pointer}.sp-expedition button:disabled{opacity:.4}.sp-expedition h2{margin:0 0 12px;font-size:17px}.sp-expedition article{border-bottom:1px solid #405655;padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.sp-expedition small{color:#adc0af}.sp-expedition [role=status]{margin:8px;color:#efcb91}.sp-blueprint{position:absolute;pointer-events:auto;transform:translate(-50%,-100%);border:1px dashed #9ee4e4;background:#173b4590;color:#c9ffff;padding:4px;white-space:nowrap;font:11px monospace}.sp-outpost{border-style:solid;background:#182c2de0}.sp-placement-hint{position:absolute;left:50%;bottom:20%;transform:translateX(-50%);background:#11252ded;border:1px solid #a6d8cc;padding:10px}.sp-cost{display:inline-flex;align-items:center;gap:4px}.sp-expedition-panel p{line-height:1.5}';
   const layer = document.createElement('section');
   layer.className = 'sp-expedition';
   layer.setAttribute('aria-label', 'Expedition construction');
@@ -62,6 +62,7 @@ export function createExpeditionOverlay(
   layer.append(style, markers, ghost, panel, hint);
   root.append(layer);
   let opened = false,
+    focusedEntity: string | null = null,
     feedback = '',
     signature = '',
     placement: {
@@ -94,6 +95,7 @@ export function createExpeditionOverlay(
     placement = null;
     hint.hidden = true;
     opened = false;
+    focusedEntity = null;
     panel.hidden = true;
     ghost.hidden = true;
     root.dataset.expeditionPanelOpen = 'false';
@@ -195,6 +197,8 @@ export function createExpeditionOverlay(
       ...extra,
     });
     feedback = result.message;
+    if (result.status === 'committed' && action === 'complete' && focusedEntity === target)
+      focusedEntity = 'facility:' + target;
     signature = '';
     render();
     return result.status === 'committed';
@@ -261,6 +265,8 @@ export function createExpeditionOverlay(
   const open = (focus?: string) => {
     onOpen();
     opened = true;
+    if (focus && focus !== focusedEntity) feedback = '';
+    focusedEntity = focus ?? null;
     placement = null;
     hint.hidden = true;
     root.dataset.expeditionPanelOpen = 'true';
@@ -290,6 +296,7 @@ export function createExpeditionOverlay(
     const rest = authority.restStatus(playerId);
     const next = JSON.stringify([
       opened,
+      focusedEntity,
       state.plans,
       state.facilities.map((f) => ({ ...f, progress: 0 })),
       state.supplyClaimed,
@@ -307,67 +314,70 @@ export function createExpeditionOverlay(
         const header = document.createElement('header');
         header.className = 'sp-expedition-header';
         header.append(
-          text('h2', 'EXPEDITION · BLUEPRINTS & FIELD CRAFT'),
+          text('h2', focusedEntity ? 'BUILDING · INTERACT' : 'EXPEDITION · BLUEPRINTS & FIELD CRAFT'),
           button('Close', close),
         );
-        panel.append(
-          header,
-          text('small', 'World seed: ' + bundle.config.worldSeed),
-          button('Copy seed', () => {
-            if (!navigator.clipboard) {
-              feedback = 'Select the displayed seed to copy it.';
-              signature = '';
-              render();
-              return;
-            }
-            void navigator.clipboard
-              .writeText(bundle.config.worldSeed)
-              .then(() => {
-                feedback = 'SEED_COPIED';
-                signature = '';
-                render();
-              })
-              .catch(() => {
+        panel.append(header);
+        if (!focusedEntity) {
+          panel.append(
+            text('small', 'World seed: ' + bundle.config.worldSeed),
+            button('Copy seed', () => {
+              if (!navigator.clipboard) {
                 feedback = 'Select the displayed seed to copy it.';
                 signature = '';
                 render();
-              });
-          }),
-          text(
-            'p',
-            'Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.',
-          ),
-        );
-        const event = authority.currentEvent(
-          bundle.getPlayerPosition(playerId),
-        );
-        if (event)
-          panel.append(
-            text('small', 'Local ecology: ' + event.replaceAll('-', ' ')),
+                return;
+              }
+              void navigator.clipboard
+                .writeText(bundle.config.worldSeed)
+                .then(() => {
+                  feedback = 'SEED_COPIED';
+                  signature = '';
+                  render();
+                })
+                .catch(() => {
+                  feedback = 'Select the displayed seed to copy it.';
+                  signature = '';
+                  render();
+                });
+            }),
+            text(
+              'p',
+              'Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.',
+            ),
           );
-        if (state.events.length) {
-          const history = document.createElement('details'),
-            summary = document.createElement('summary');
-          summary.textContent = 'Observed ecology history';
-          history.append(summary);
-          for (const e of state.events.slice(-8).toReversed())
-            history.append(
-              text(
-                'p',
-                e.kind.replaceAll('-', ' ') +
-                  ' · region ' +
-                  e.region +
-                  ' · active minute ' +
-                  String(Math.floor(e.tick / 3600)),
-              ),
+          const event = authority.currentEvent(
+            bundle.getPlayerPosition(playerId),
+          );
+          if (event)
+            panel.append(
+              text('small', 'Local ecology: ' + event.replaceAll('-', ' ')),
             );
-          panel.append(history);
+          if (state.events.length) {
+            const history = document.createElement('details'),
+              summary = document.createElement('summary');
+            summary.textContent = 'Observed ecology history';
+            history.append(summary);
+            for (const e of state.events.slice(-8).toReversed())
+              history.append(
+                text(
+                  'p',
+                  e.kind.replaceAll('-', ' ') +
+                    ' · region ' +
+                    e.region +
+                    ' · active minute ' +
+                    String(Math.floor(e.tick / 3600)),
+                ),
+              );
+            panel.append(history);
+          }
         }
+        panel.dataset.targetEntity = focusedEntity ?? '';
         const status = text('p', describeFeedback(feedback));
         status.dataset.result = feedback;
         status.setAttribute('role', 'status');
         panel.append(status);
-        for (const def of EXPEDITION_FACILITIES) {
+        for (const def of focusedEntity ? [] : EXPEDITION_FACILITIES) {
           const row = document.createElement('article');
           row.append(art(def.id), text('p', def.name));
           costs(row, def.costs);
@@ -377,7 +387,7 @@ export function createExpeditionOverlay(
           );
           panel.append(row);
         }
-        for (const plan of state.plans) {
+        for (const plan of state.plans.filter(plan => !focusedEntity || plan.id === focusedEntity)) {
           const def = expeditionFacility(plan.definitionId)!;
           const row = document.createElement('article');
           row.dataset.expeditionPlan = plan.id;
@@ -407,7 +417,7 @@ export function createExpeditionOverlay(
           row.append(change);
           panel.append(row);
         }
-        panel.append(text('h2', 'FACILITIES & LANDING LAB'));
+        if (!focusedEntity) panel.append(text('h2', 'FACILITIES & LANDING LAB'));
         const interact = (
           target: string,
           action: 'rest' | 'supplies' | 'cook' | 'water',
@@ -445,7 +455,7 @@ export function createExpeditionOverlay(
             'Recover +15 health / +40 stamina for 5 food + 5 water. Moving, damage or danger cancels rest.',
           ),
         );
-        panel.append(lab);
+        if (!focusedEntity || focusedEntity === 'landing-lab') panel.append(lab);
         if (rest)
           panel.append(
             text(
@@ -460,7 +470,7 @@ export function createExpeditionOverlay(
               render();
             }),
           );
-        for (const facility of state.facilities) {
+        for (const facility of state.facilities.filter(facility => !focusedEntity || facility.id === focusedEntity || facility.canonicalStructureId === focusedEntity)) {
           const row = document.createElement('article');
           row.dataset.expeditionFacility = facility.id;
           row.append(
@@ -519,6 +529,7 @@ export function createExpeditionOverlay(
         for (const structure of bundle.buildings.exportSnapshot().foothold
           .structures) {
           if (
+            (focusedEntity !== null && structure.structureId !== focusedEntity) ||
             structure.placedByPlayerId !== playerId ||
             state.facilities.some(
               (f) => f.canonicalStructureId === structure.structureId,
@@ -543,8 +554,8 @@ export function createExpeditionOverlay(
             );
           panel.append(row);
         }
-        panel.append(text('h2', 'FIELD CRAFT'));
-        for (const recipe of EXPEDITION_RECIPES) {
+        if (!focusedEntity) panel.append(text('h2', 'FIELD CRAFT'));
+        for (const recipe of focusedEntity ? [] : EXPEDITION_RECIPES) {
           const row = document.createElement('article');
           row.append(text('p', recipe.name));
           costs(row, recipe.costs);
@@ -572,10 +583,7 @@ export function createExpeditionOverlay(
       markers.replaceChildren();
       delete markers.dataset.buildRevision;
       const labMarker = button('Landing Lab · interact', () => {
-        open();
-        panel
-          .querySelector('[data-expedition-lab]')
-          ?.scrollIntoView({ block: 'center' });
+        open('landing-lab');
       });
       labMarker.className = 'sp-blueprint sp-outpost';
       labMarker.dataset.x = '0';

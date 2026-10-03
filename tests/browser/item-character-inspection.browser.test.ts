@@ -26,3 +26,15 @@ it('inspection sections retain expansion, scroll and keyboard focus when authori
     expect(root.querySelector('.p1-character-values')!.textContent).toContain('Water: 39/100');
   } finally { hud.destroy(); root.remove(); }
 });
+
+
+it('keeps action dock identity and keyboard focus while survival meters and the clock change',()=>{
+ const fixture=resolvePhase1PresentationQaFixture('?qaPhase1=inventory')!.state;
+ const root=document.createElement('section'),canvas=document.createElement('canvas');root.dataset.phase1QaMode='none';root.append(canvas);document.body.append(root);
+ const hud=createPhase1HudOverlay(root,canvas,{...fixture,panel:null});
+ try{
+  const button=root.querySelector<HTMLButtonElement>('[data-review-action="open-build"]')!;button.focus();
+  for(let i=0;i<30;i++)hud.update({...fixture,panel:null,health:{...fixture.health,value:99-i},world:{...fixture.world,timeLabel:'09:'+String(i).padStart(2,'0')}});
+  expect(root.querySelector('[data-review-action="open-build"]')).toBe(button);expect(document.activeElement).toBe(button);expect(root.querySelectorAll('.p1-action-dock')).toHaveLength(1);
+ }finally{hud.destroy();root.remove();}
+});

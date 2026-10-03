@@ -34,3 +34,13 @@ it('secondary placement cancellation consumes the gesture before inspection',()=
  entity.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));expect(reads).toBe(1);expect(cancels).toBe(1);
  remove();card.destroy();root.remove();
 });
+
+
+it('keeps inspection on the same authoritative identity after a presentation marker is replaced',()=>{
+ const root=document.createElement('section'),first=document.createElement('button');root.append(first);document.body.append(root);
+ const view={id:'plan:same',name:'Camp Bed',kind:'Blueprint',facts:['Timber: 1/2']};
+ bindEntityInspection(first,()=>view);const inspection=createEntityInspection(root,()=>false);
+ inspection.inspect({target:first} as unknown as MouseEvent);const card=root.querySelector<HTMLElement>('[data-entity-inspection]')!;expect(card.hidden).toBe(false);
+ const replacement=document.createElement('button');bindEntityInspection(replacement,()=>view);first.replaceWith(replacement);inspection.render();expect(card.hidden).toBe(false);expect(card.dataset.entityId).toBe('plan:same');
+ replacement.remove();inspection.render();expect(card.hidden).toBe(true);inspection.destroy();root.remove();
+});

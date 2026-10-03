@@ -18,11 +18,13 @@ test('canonical stump fixture: inspect, uproot with hoe, replant timber root and
   await installSaveFixture(page,'canonical-root-ui',save);
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:canonical-root-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=canonical-root-ui');
   const tree=page.locator('[data-world-id="'+id+'"][data-world-role="resource"]');
-  // The starter stump lies behind the grove diorama; inspect its focused target by keyboard.
-  await tree.focus();await page.keyboard.press('Shift+F10');await expect(page.getByRole('region',{name:'Entity statistics',exact:true})).toContainText('Early growth');
-  await page.keyboard.press('f');const panel=page.locator('.lw-panel');
+  // Click the visible stump, not the transparent sky of the resource cell.
+  const stumpBox=await tree.boundingBox();expect(stumpBox).not.toBeNull();
+  await tree.click({button:'right',position:{x:stumpBox!.width*.5,y:stumpBox!.height*.86}});await expect(page.getByRole('region',{name:'Entity statistics',exact:true})).toContainText('Early growth');
+  await tree.click({position:{x:stumpBox!.width*.5,y:stumpBox!.height*.86}});const panel=page.locator('.lw-panel');
+  await expect(panel).toHaveAttribute('data-targeted','true');await expect(panel.locator('[data-living-row]')).toHaveCount(1);
   await panel.locator('[data-living-row="'+id+'"]').getByRole('button',{name:'Uproot · Field Hoe',exact:true}).click();
-  await expect(tree).toHaveCount(0);await panel.getByRole('button',{name:'Replant Timber Tree Root',exact:true}).click();
+  await expect(tree).toHaveCount(0);await page.keyboard.press('f');await panel.getByRole('button',{name:'Replant Timber Tree Root',exact:true}).click();
   // Root placement shares the isometric ground projection; no state injection after boot.
   const point=await page.locator('canvas').evaluate((e,target)=>{const r=e.getBoundingClientRect(),c=(e as HTMLElement).dataset;return{x:r.left+(320+(target.x-Number(c.playerX)-target.y+Number(c.playerY))*16)*r.width/640,y:r.top+(180+(target.x-Number(c.playerX)+target.y-Number(c.playerY))*8)*r.height/360};},destination);
   await page.mouse.move(point.x,point.y);await expect(page.locator('.lw-ghost')).toBeVisible();await page.mouse.click(point.x,point.y);

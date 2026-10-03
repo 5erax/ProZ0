@@ -417,7 +417,7 @@ export function createLivingWorldOverlay(
       }
     }
     if (!opened) return;
-    if (focus && focus !== 'craft' && !objects.some(v => v.e.id === focus)) { close(); return; }
+    if (focus && focus !== 'craft' && !objects.some(v => v.e.id === focus) && !bundle.world.getActiveGeneratedEntities().some(e => e.entityId === focus && e.type === 'resource' && bundle.worldStore.getResourceState(e.entityId)?.depleted && bundle.worldStore.getResourceState(e.entityId)?.uprootedVersion !== 1)) { close(); return; }
     const targeted = focus !== '' && focus !== 'craft';
     panel.dataset.targeted = String(targeted);
     const next = JSON.stringify([
@@ -577,7 +577,7 @@ export function createLivingWorldOverlay(
         }
       }
     }
-    if (!targeted) for (const entity of bundle.world.getActiveGeneratedEntities()) {
+    for (const entity of bundle.world.getActiveGeneratedEntities().filter(e => !targeted || e.entityId === focus)) {
       if (entity.type !== 'resource' || !worldPositionKnown(bundle,entity.position) || Math.hypot(entity.position.x-p.x,entity.position.y-p.y)>4) continue;
       const resource = bundle.worldStore.getResourceState(entity.entityId);
       if (!resource?.depleted || resource.uprootedVersion === 1 || !['resource:timber-source','resource:fiber-plant','resource:food-plant'].includes(entity.definitionId)) continue;

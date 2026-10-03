@@ -32,7 +32,7 @@ for(const template of EXPLORATION_TEMPLATES)test('exploration UI: '+template.id+
   await expect(sprite).toHaveAttribute('data-poi-template',template.id);await expect(sprite).toHaveAttribute('data-poi-stage','unrestored');
   const other=template.id==='laboratory'?'site:abandoned-shelter':'site:abandoned-lab';await expect(page.locator('[data-world-role="survey-site"][data-site-id="'+other+'"]')).toHaveCount(0);
   // Keyboard and mouse entry points both open the discovered site and focus its action.
-  if(template.id==='shelter'){await expect(page.locator('[data-region="interaction"]')).toContainText('EXPLORE');await page.keyboard.press('e');}else if(template.id==='relay'){await sprite.focus();await page.keyboard.press('Enter');}else await sprite.click();
+  if(template.id==='shelter'){await expect(page.locator('[data-region="interaction"]')).toContainText('EXPLORE');await page.keyboard.press('e');}else if(template.id==='relay'){await sprite.locator('[data-site-interaction]').focus();await page.keyboard.press('Enter');}else await sprite.locator('[data-site-interaction]').click();
   const panel=page.locator('.p2-colony-panel'),row=panel.locator('[data-discovered-landmark="'+template.siteId+'"]');
   await expect(row.getByRole('button',{name:'Inspect',exact:true})).toBeFocused();
   await page.keyboard.press('Enter');await expect(row.locator('[data-colony-action="restore-site:'+template.siteId+'"]')).toBeVisible();

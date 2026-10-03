@@ -672,7 +672,8 @@ export function createPhase1ProductReviewWorldRenderer(
     if (element.dataset.worldRole !== role) element.dataset.worldRole = role;
     if (element.dataset.worldId !== id) element.dataset.worldId = id;
     if (['hostile','structure','survey-site','world-drop','death-cache','ruin'].includes(role)) {
-      element.style.pointerEvents = 'auto';
+      if(element.style.pointerEvents!=='auto' && (role!=='survey-site'||!options.data?.poiTemplate))element.style.pointerEvents='auto';
+      if(role!=='survey-site'){element.setAttribute('role','button');element.tabIndex=0;}
       bindEntityInspection(element, () => {
         if (role === 'hostile') {
           const target = bundle.world.getPredator(id);
@@ -1257,9 +1258,14 @@ export function createPhase1ProductReviewWorldRenderer(
         if(!worldPositionKnown(bundle,site.position))continue;
         const rendered = renderSprite(site.template ? explorationSiteSprite(site.template,bundle.colonyDepth.siteStage(site.id)) : colonyLandmarkSprite(site),site.position,camera,'survey-site',site.id,{zIndex:worldDepthOrder(site.position,-1),data:Object.freeze({siteId:site.id,biome:site.biomeId,inspected:String(bundle.colonyDepth.read().inspectedSites.includes(site.id)),explorationState:'EXPLORED',poiTemplate:site.template??'',poiStage:bundle.colonyDepth.siteStage(site.id)})});
         if(rendered && site.template){
-          rendered.setAttribute('role','button');rendered.tabIndex=0;rendered.style.pointerEvents='auto';rendered.style.cursor='pointer';
-          rendered.setAttribute('aria-label','Explore '+site.name);rendered.removeAttribute('title');
-          rendered.style.clipPath='polygon(0 25%,100% 25%,100% 100%,0 100%)';
+          // The diorama floor is scenery: only its console receives pointer input.
+          rendered.removeAttribute('role');rendered.removeAttribute('tabindex');rendered.style.pointerEvents='none';rendered.style.clipPath='none';rendered.removeAttribute('title');
+          let console = rendered.querySelector<HTMLButtonElement>('[data-site-interaction]');
+          if (!console) { console=document.createElement('button');console.type='button';console.dataset.siteInteraction='true';console.style.cssText='position:absolute;left:15px;top:44px;width:20px;height:20px;padding:0;border:1px solid #aedace55;background:transparent;cursor:pointer;pointer-events:auto';rendered.append(console); }
+          const lockerHandle=site.template==='garden'||site.template==='shelter';
+          console.style.left=lockerHandle?'58px':'15px';console.style.top=lockerHandle?'49px':'44px';
+          console.setAttribute('aria-label','Explore '+site.name);
+
         }
       }
     }

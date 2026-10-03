@@ -1346,6 +1346,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
   private currentState: Phase1PresentationState;
   private panelSignature = '';
   private displaySignature = '';
+  private actionDock: HTMLElement | null = null;
 
   public constructor(
     private readonly root: HTMLElement,
@@ -1425,7 +1426,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       });
     }
     for (const child of Array.from(this.layer.children)) {
-      if (child !== style && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
+      if (child !== style && child !== this.actionDock && !(child.matches('.p1-panel') && signature === this.panelSignature)) {
         child.remove();
       }
     }
@@ -1656,22 +1657,25 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     }
 
     this.layer.append(survival, world, equipment, carry, toasts, team);
-    const dock = createElement(this.document, 'nav', 'p1-action-dock');
-    dock.setAttribute('aria-label', 'Game actions');
-    for (const [label, key, action, sprite, scale] of [
-      ['Inventory', 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
-      ['Craft', 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
-      ['Build base', 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
-      ['Map', 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
-      ['Colony', 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
-    ] as const) {
-      const button = actionButton(this.document, '', action);
-      button.setAttribute('aria-label', label + ' [' + key + ']'); button.title = label + ' [' + key + ']';
-      const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
-      if (icon !== null) button.append(icon);
-      button.append(createElement(this.document, 'span', '', key)); dock.append(button);
+    if (this.actionDock === null) {
+      const dock = createElement(this.document, 'nav', 'p1-action-dock');
+      this.actionDock = dock;
+      dock.setAttribute('aria-label', 'Game actions');
+      for (const [label, key, action, sprite, scale] of [
+        ['Inventory', 'I', 'open-inventory', PHASE1_PRODUCTION_WORLD_SPRITES.storageCrate, 0.5],
+        ['Craft', 'C', 'open-craft', PHASE1_PRODUCTION_WORLD_SPRITES.workbench, 0.35],
+        ['Build base', 'B', 'open-build', PHASE1_PRODUCTION_WORLD_SPRITES.habitat, 0.15],
+        ['Map', 'M', 'open-map', hudStatusSprite('DISCOVERY'), 1],
+        ['Colony', 'N', 'open-colony', PHASE1_PRODUCTION_WORLD_SPRITES.floraDecor, 0.5],
+      ] as const) {
+        const button = actionButton(this.document, '', action);
+        button.setAttribute('aria-label', label + ' [' + key + ']'); button.title = label + ' [' + key + ']';
+        const icon = assetSprite(this.document, 'p1-asset-icon', sprite, scale);
+        if (icon !== null) button.append(icon);
+        button.append(createElement(this.document, 'span', '', key)); dock.append(button);
+      }
+      this.layer.append(dock);
     }
-    this.layer.append(dock);
 
     if (state.firstActionCue !== undefined && state.firstActionCue !== null) {
       const firstAction = createElement(

@@ -12,6 +12,7 @@ export function bindEntityInspection(element: HTMLElement, read: Reader): void {
   if (readers.has(element)) return;
   readers.set(element, read);
   element.dataset.entityInspectable = 'true';
+  if(element.tabIndex<0)element.tabIndex=0;
   element.removeAttribute('title');
 }
 
@@ -30,7 +31,11 @@ export function createEntityInspection(root: HTMLElement, blocked: () => boolean
   closeButton.onclick = close;
   const render = () => {
     if (!selected) return;
-    if (!selected.isConnected || selected.hidden || !root.contains(selected) || blocked()) { close(); return; }
+    if (!selected.isConnected && card.dataset.entityId) {
+      const id=card.dataset.entityId;
+      selected=Array.from(root.querySelectorAll<HTMLElement>('[data-entity-inspectable]')).slice(0,512).find(e=>readers.get(e)?.()?.id===id)??null;
+    }
+    if (!selected || selected.hidden || !root.contains(selected) || blocked()) { close(); return; }
     const now = performance.now(); if (now - lastRefresh < 250) return; lastRefresh = now;
     const view = readers.get(selected)?.(); if (!view) { close(); return; }
     const next = JSON.stringify(view); if (next === signature) return; signature = next;

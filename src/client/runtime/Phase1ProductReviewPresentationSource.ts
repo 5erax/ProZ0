@@ -66,6 +66,7 @@ export class Phase1ProductReviewPresentationSource
   private mapDetailOrdinal = 0;
   private inventorySelectedStackId: string | null = null;
   private storageSelectedStackId: string | null = null;
+  private preferredStorageId: string | null = null;
   private inventoryActivePane: 'player' | 'storage' = 'player';
   private inventoryQuantity = 1;
   private current: Readonly<Phase1PresentationState>;
@@ -129,10 +130,22 @@ export class Phase1ProductReviewPresentationSource
       this.mapDetailOrdinal = 0;
     }
     if (opening && panel === 'inventory') {
+      this.preferredStorageId = null;
       this.inventoryActivePane = 'player';
       this.inventoryQuantity = 1;
     }
     this.refresh();
+  }
+
+  /** Explicit crate selection never falls back to another nearby container. */
+  public openStorage(structureId: string): void {
+    this.preferredStorageId = structureId;
+    this.inventoryActivePane = 'player';
+    this.inventoryQuantity = 1;
+    this.inventorySelectedStackId = null;
+    this.storageSelectedStackId = null;
+    this.clearCommandFeedback();
+    this.setPanel('inventory');
   }
 
   public isInventoryOpen(): boolean {
@@ -353,7 +366,8 @@ export class Phase1ProductReviewPresentationSource
       .exportSnapshot()
       .foothold.structures
       .filter((candidate) =>
-        candidate.definitionId === 'structure:storage-crate'
+        (this.preferredStorageId === null || candidate.structureId === this.preferredStorageId)
+        && candidate.definitionId === 'structure:storage-crate'
         && candidate.containerId !== null
         && this.bundle.buildings.isStructureAccessible(
           this.playerId,
