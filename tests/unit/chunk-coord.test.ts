@@ -42,6 +42,22 @@ describe('canonical chunk coordinates', () => {
     expect(fromChunkKey(toChunkKey(coord))).toEqual(coord);
   });
 
+  it.each([-Number.MIN_VALUE, -Number.EPSILON / 2, -Number.EPSILON, -1e-16])('keeps a tiny negative coordinate %s in the final cell of its owning chunk', value => {
+    const position=createWorldPosition(value,value),coord=fromWorldPosition(position),local=toChunkLocalPosition(position,coord);
+    expect(coord).toEqual({x:-1,y:-1});
+    expect(local.x).toBeGreaterThanOrEqual(0);expect(local.x).toBeLessThan(CHUNK_SPAN_WORLD_UNITS);
+    expect(local.y).toBeGreaterThanOrEqual(0);expect(local.y).toBeLessThan(CHUNK_SPAN_WORLD_UNITS);
+    expect(Math.floor(local.x/2)).toBe(15);expect(Math.floor(local.y/2)).toBe(15);
+  });
+
+  it('still rejects adjacent chunks and non-finite world positions instead of clamping invalid ownership',()=>{
+    expect(()=>toChunkLocalPosition(createWorldPosition(-1e-16,0),createChunkCoord(0,0))).toThrow(/does not belong/);
+    expect(()=>toChunkLocalPosition(createWorldPosition(0,0),createChunkCoord(-1,0))).toThrow(/does not belong/);
+    expect(()=>toChunkLocalPosition(createWorldPosition(32,0),createChunkCoord(0,0))).toThrow(/does not belong/);
+    expect(()=>toChunkLocalPosition({x:NaN,y:0},createChunkCoord(0,0))).toThrow(/finite/);
+    expect(()=>toChunkLocalPosition({x:Infinity,y:0},createChunkCoord(0,0))).toThrow(/finite/);
+  });
+
   it('rejects non-int32 coordinates', () => {
     expect(() => createChunkCoord(2147483648, 0)).toThrow(/signed int32/);
     expect(() => createChunkCoord(0.5, 0)).toThrow(/signed int32/);

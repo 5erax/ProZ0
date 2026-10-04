@@ -13,6 +13,7 @@ Owner request: implement the supplied HUD/panel redesign in code and provide a r
 - Farm groups plots, livestock and nearby resources. Authored crop/animal art and real growth, moisture, feed/water meters expose care state. Existing crop choices, costs and authority actions are retained.
 - Research and professions expose unlock state and named prerequisites; journal discoveries remain individual cards. Panels share subdued surfaces, thin borders and consistent physical sizing, independent of the world raster.
 - Inspected journal sites remain visible from canonical saved progress even while chunks are unavailable. The journal cache also follows discovered-site availability as exploration chunks finish loading.
+- Fixed the numerical chunk boundary failure exposed by natural CI journeys: a tiny negative world coordinate could round its local offset to 32 and crash authority stepping. Chunk ownership is validated in world space and valid local offsets retain the exclusive upper edge. Invalid coordinates still reject; normal chunk IDs, seeds and saved world positions remain unchanged.
 
 ## Verification
 
