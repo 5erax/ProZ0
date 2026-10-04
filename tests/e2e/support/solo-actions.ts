@@ -10,6 +10,7 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
         y: Number(e.getAttribute('data-player-y')),
       }));
       const current = p.x.toFixed(2) + ',' + p.y.toFixed(2);
+      if(n>0&&n%300===0)console.info('Walking approach', {step:n,target:{x,y},position:p,tolerance});
       stuck = current === previous ? stuck + 1 : 0;
       previous = current;
       if (stuck > 25)
@@ -19,8 +20,12 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
       const dx = x - p.x,
         dy = y - p.y;
       if (Math.hypot(dx, dy) < tolerance) return;
+      // Align the other axis when a footprint clips a nearby corner. A greedy
+      // walker must not repeatedly push into a real crate or cave wall.
+      const preferX = Math.abs(dx) >= Math.abs(dy);
+      const useX = stuck >= 2 && Math.min(Math.abs(dx),Math.abs(dy)) > .03 ? !preferX : preferX;
       const keys =
-        Math.abs(dx) >= Math.abs(dy)
+        useX
           ? dx > 0
             ? ['s', 'd']
             : ['w', 'a']
@@ -28,11 +33,15 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
             ? ['s', 'a']
             : ['w', 'd'];
       if (keys.join() !== held.join()) {
-        for (const k of held) await page.keyboard.up(k);
-        for (const k of keys) await page.keyboard.down(k);
+        await Promise.all(held.map(k=>page.keyboard.up(k)));
+        await Promise.all(keys.map(k=>page.keyboard.down(k)));
         held = keys;
       }
-      await page.waitForTimeout(80);
+      await page.waitForTimeout(Math.hypot(dx, dy) < 2 ? 16 : 200);
+      // Do not keep moving while a slow locator round trip reads the pose.
+      await Promise.all(held.map(k=>page.keyboard.up(k)));
+      held = [];
+      if(Math.hypot(dx,dy)<2)await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
     }
     throw Error('Natural walk could not reach ' + String(x) + ',' + String(y));
   } finally {

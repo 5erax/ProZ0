@@ -462,7 +462,7 @@ export function createLivingWorldOverlay(
     const restoreUi=capturePanelUi(panel);
     const scrollTop = panel.scrollTop,
       craftOpen =
-        panel.querySelector<HTMLDetailsElement>('details')?.open ??
+        panel.querySelector<HTMLDetailsElement>('[data-living-craft]')?.open ??
         focus === 'craft';
     panel.replaceChildren(
       text('h2', targeted ? uiText("ui.1e2eb9ef") : uiText("ui.d9324124") + uiPhrase(s.name)),
@@ -536,7 +536,7 @@ export function createLivingWorldOverlay(
       if (!plot.crop) {
         const choices=document.createElement('div');choices.className='lw-seed-choices';
         for(const c of CROPS) {const count=inventory.stacks.filter(v=>v.itemDefinitionId===c.seed).reduce((n,v)=>n+v.quantity,0);
-          const choice=button(gameUiText('seed',{name:uiPhrase(c.name),count}),()=>execute('plant',plot.id,{crop:c.id}));choice.disabled=count===0;choice.dataset.crop=c.id;
+          const choice=button(gameUiText('seed',{name:uiPhrase(c.name),count}),()=>execute('plant',plot.id,{crop:c.id}));choice.disabled=count===0;choice.dataset.crop=c.id;bindUiText(choice,'aria-label',uiText('ui.3fc2d456')+uiPhrase(c.name));
           const icon=document.createElement('span'),sprite=itemIconSprite(c.seed);if(sprite){applyProductionSprite(icon,sprite,1);choice.prepend(icon);}choices.append(choice);
         } a.append(choices);
       }
@@ -672,6 +672,7 @@ export function createLivingWorldOverlay(
       );
     }
     const craft = document.createElement('details');
+    craft.dataset.livingCraft='true';
     craft.open = craftOpen;
     craft.append(
       text(

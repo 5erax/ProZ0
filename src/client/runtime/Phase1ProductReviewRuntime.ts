@@ -1526,10 +1526,6 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
 
-    if(bundle.playerWorldspace()!=='surface'){
-      const resource=resourceTarget(),view=resource?bundle.interactionWorld.getResource(resource.entityId):null;
-      source.setInteraction(resource&&view?{inputLabel:'E',verb:'GATHER',target:contentDisplayName(bundle.catalog.get(resource.definitionId)),state:view.depleted?'BLOCKED':'AVAILABLE',reason:view.depleted?uiText("ui.fd4adefb"):null,progress:null}:null);return;
-    }
     const portal=cavePortalTarget();if(portal){transitionCave(portal);return;}
     if(bundle.playerWorldspace()!=='surface'){if(pickupWorldDrop()||recoverDeathCache())return;beginGather();return;}
     if (pickupWorldDrop()) return;
@@ -1958,12 +1954,12 @@ export async function createPhase1ProductReviewRuntime(
         case 'ArrowUp':
           event.preventDefault();
           event.stopPropagation();
-          source.cycleInventorySelection(-1);
+          source.cycleInventorySelection(-1);root.querySelector<HTMLElement>('.p1-panel [data-active=true] .p1-item-row[data-selected=true],.p1-panel[data-panel-kind=inventory] .p1-item-row[data-selected=true]')?.scrollIntoView({block:'nearest'});
           return;
         case 'ArrowDown':
           event.preventDefault();
           event.stopPropagation();
-          source.cycleInventorySelection(1);
+          source.cycleInventorySelection(1);root.querySelector<HTMLElement>('.p1-panel [data-active=true] .p1-item-row[data-selected=true],.p1-panel[data-panel-kind=inventory] .p1-item-row[data-selected=true]')?.scrollIntoView({block:'nearest'});
           return;
         case 'Tab':
           event.preventDefault();
@@ -2030,8 +2026,14 @@ export async function createPhase1ProductReviewRuntime(
         break;
       case 'Space':
         if(event.target instanceof Element && event.target.closest('button,summary,input,textarea,select,[contenteditable=true]')) return;
+        if(root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true')return;
         event.preventDefault();
-        if(!event.repeat)combatAssist.hold();
+        if(!event.repeat){
+          combatAssist.hold();
+          // A quick tap can be released before the next fixed step. Resolve the
+          // first eligible attack now, with the same range/cooldown/manual guards.
+          combatAssist.sample(phase1IsometricInput(input.sample()));
+        }
         break;
       case 'KeyC':
         event.preventDefault();

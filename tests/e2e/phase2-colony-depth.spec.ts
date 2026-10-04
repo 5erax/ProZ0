@@ -1,62 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { colonySurveySites } from "../../src/world/phase2/ColonyRegions";
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 
-async function walkTo(page: Page, x: number, y: number): Promise<void> {
-  let previous = "";
-  let stuck = 0;
-  let held: string[] = [];
-  try {
-    // The longest leg crosses both regions. Allow slower CI frame scheduling
-    // without granting items, relocating the player, or accepting blocked motion.
-    for (let step = 0; step < 1800; step += 1) {
-      const position = await page.locator("canvas").evaluate((element) => ({
-        x: Number(element.getAttribute("data-player-x")),
-        y: Number(element.getAttribute("data-player-y")),
-      }));
-      const dx = x - position.x;
-      const dy = y - position.y;
-      if (Math.hypot(dx, dy) <= 0.65) return;
-      const current = position.x.toFixed(2) + "," + position.y.toFixed(2);
-      stuck = current === previous ? stuck + 1 : 0;
-      previous = current;
-      if (stuck > 15)
-        throw new Error(
-          "Movement blocked at " +
-            current +
-            " toward " +
-            String(x) +
-            "," +
-            String(y),
-        );
-      const keys =
-        Math.abs(dx) >= Math.abs(dy)
-          ? dx > 0
-            ? ["s", "d"]
-            : ["w", "a"]
-          : dy > 0
-            ? ["s", "a"]
-            : ["w", "d"];
-      if (keys.join(",") !== held.join(",")) {
-        for (const key of held.toReversed()) await page.keyboard.up(key);
-        for (const key of keys) await page.keyboard.down(key);
-        held = keys;
-      }
-      await page.waitForTimeout(100);
-    }
-    throw new Error(
-      "Normal movement failed toward " +
-        String(x) +
-        "," +
-        String(y) +
-        "; last position " +
-        previous,
-    );
-  } finally {
-    for (const key of held.toReversed()) await page.keyboard.up(key);
-  }
-}
+import { walkSurface as walkTo } from './support/surface-route';
 
 test("colony exploration: real gathering funds research; walking reveals and inspects both regional sites; save restores journal", async ({
   page,

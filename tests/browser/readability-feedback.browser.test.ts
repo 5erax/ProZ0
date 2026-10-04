@@ -29,3 +29,16 @@ it('keeps animals visible amid more forage than the render budget and communicat
  const overlay=createLivingWorldOverlay(root,canvas,bundle,'solo',()=>{});
  try{overlay.render();expect(root.querySelectorAll('[data-living-role]')).toHaveLength(64);const goat=root.querySelector<HTMLElement>('[data-living-id="fixture:goat"]')!;expect(goat).not.toBeNull();expect(goat.getAttribute('aria-label')).toContain('Needs water');expect(goat.querySelector<HTMLElement>('.lw-state-cue')!.hidden).toBe(false);}finally{overlay.destroy();spy.mockRestore();root.remove();}
 });
+import {createPhase1HudOverlay} from '../../src/client/presentation/Phase1HudOverlay';
+import {resolvePhase1PresentationQaFixture} from '../../src/client/qa/Phase1PresentationFixture';
+it('keeps compact crafting arrows named in both languages and exposes material sufficiency',()=>{
+ const root=document.createElement('section'),canvas=document.createElement('canvas');root.append(canvas);document.body.append(root);const fixture=resolvePhase1PresentationQaFixture('?qaPhase1=craft')!;
+ const panel={kind:'craft' as const,title:'Craft',page:0,pageCount:2,rows:[{id:'brick',name:'Brick',outputLabel:'×1',requirementLabel:'Clay',state:'BLOCKED' as const,reason:null,ingredients:[{itemId:'item:clay',name:'Clay',source:'Gather Clay',have:0,need:2}]}]};
+ const overlay=createPhase1HudOverlay(root,canvas,{...fixture.state,panel});
+ try{const next=root.querySelector('[data-review-action=craft-next]')!;expect(next.textContent).toBe('›');expect(next.getAttribute('aria-label')).toBe('Next page [PgDn]');expect(root.querySelector('.p1-craft-ingredient')!.getAttribute('data-sufficient')).toBe('false');setLocale('vi');expect(next.getAttribute('aria-label')).toBe('Trang sau [PgDn]');expect(next.textContent).toBe('›');}finally{overlay.destroy();root.remove();setLocale('en');}
+});
+it('preserves the weather icon while its separate caption changes language',()=>{
+ const root=document.createElement('section'),canvas=document.createElement('canvas');root.append(canvas);document.body.append(root);const fixture=resolvePhase1PresentationQaFixture('?qaPhase1=overview')!;
+ const overlay=createPhase1HudOverlay(root,canvas,{...fixture.state,world:{...fixture.state.world,weatherLabel:'CLEAR'}});
+ try{const weather=root.querySelector('.p1-world-weather')!;expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();setLocale('vi');expect(weather.querySelector('.p1-weather-label')!.textContent).toBe('Trời quang');expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();}finally{overlay.destroy();root.remove();setLocale('en');}
+});

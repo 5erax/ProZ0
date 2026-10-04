@@ -35,7 +35,7 @@ test('rarity UI: real workbench upgrade, six readable grades, owned equip and sa
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:rarity-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=rarity-ui');
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
-  await page.keyboard.press('f'); const farm=page.locator('.lw-panel'); await farm.locator('details summary').click();
+  await page.keyboard.press('f'); const farm=page.locator('.lw-panel'); await farm.locator('[data-living-craft] > summary').click();
   const recipe=farm.locator('[data-living-row="recipe:reinforced-spear"]'); await expect(recipe).toHaveAttribute('data-rarity','uncommon'); await expect(recipe).toContainText('Uncommon');
   await recipe.getByRole('button',{name:'Craft Reinforced Spear',exact:true}).click(); await expect(farm.getByRole('status')).toContainText('crafted'); await page.keyboard.press('Escape');
   await page.keyboard.press('i'); const inventory=page.locator('[data-panel-kind="inventory"]'),weapon=inventory.locator('[data-equipment-drop-slot="weapon"]');

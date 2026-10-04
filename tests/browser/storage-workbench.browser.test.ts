@@ -35,7 +35,10 @@ it('focused item Enter transfers both ways and persists; a new workbench opens c
     root.querySelector<HTMLElement>('[data-world-id="'+crate.structureId+'"]')!.click();
     const quantity=(pane:string)=>{const row=Array.from(root.querySelectorAll<HTMLElement>('[data-inventory-pane="'+pane+'"] [data-review-item]')).find(e=>e.getAttribute('aria-label')==='Timber');return Number(row?.textContent?.match(/×(\d+)/)?.[1]??0);};
     const selectTimber=(pane:string)=>{const row=Array.from(root.querySelectorAll<HTMLElement>('[data-inventory-pane="'+pane+'"] [data-review-item]')).find(e=>e.getAttribute('aria-label')==='Timber')!;row.click();root.querySelector<HTMLElement>('[data-review-item="'+row.dataset.reviewItem+'"]')!.focus();};
-    expect(quantity('player')).toBe(3);selectTimber('player');await userEvent.keyboard('{Enter}');
+    expect(quantity('player')).toBe(3);selectTimber('player');
+    await userEvent.keyboard('[BracketRight]');expect(root.querySelector('[data-panel-kind=container]')!.getAttribute('data-inventory-quantity')).toBe('2');
+    await userEvent.keyboard('[BracketLeft]');expect(root.querySelector('[data-panel-kind=container]')!.getAttribute('data-inventory-quantity')).toBe('1');
+    await userEvent.keyboard('{Enter}');
     expect(quantity('player')).toBe(2);expect(quantity('storage')).toBe(1);
     selectTimber('storage');await userEvent.keyboard('{Enter}');expect(quantity('player')).toBe(3);expect(quantity('storage')).toBe(0);
     selectTimber('player');await userEvent.keyboard('{Enter}');

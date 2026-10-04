@@ -60,7 +60,8 @@ jobs:
       - name: E2E smoke
         env:
           P0_TEST_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: npm run test:e2e -- --max-failures=1
+        # Collect all remaining failures; any failed test still fails this step.
+        run: npm run test:e2e -- --max-failures=0
 
       - name: Upload Phase 2 colony journeys and frame evidence
         if: always()

@@ -486,13 +486,6 @@ function renderPanel(
         const selected = item.id === panel.selectedPlayerItemId;
         const row = itemRow(document, item, selected);
         left.append(row);
-        if (selected) {
-          queueMicrotask(() => {
-            if (row.isConnected) {
-              row.scrollIntoView({ block: 'nearest' });
-            }
-          });
-        }
       }
 
       const right = createElement(
@@ -507,13 +500,6 @@ function renderPanel(
         const selected = item.id === panel.selectedContainerItemId;
         const row = itemRow(document, item, selected);
         right.append(row);
-        if (selected) {
-          queueMicrotask(() => {
-            if (row.isConnected) {
-              row.scrollIntoView({ block: 'nearest' });
-            }
-          });
-        }
       }
 
       panes.append(left, right);
@@ -577,9 +563,13 @@ function renderPanel(
 
     case 'craft': {
       const navigation = createElement(document, 'div', 'p1-craft-navigation');
-      const previous=actionButton(document, 'Previous page [PgUp]', 'craft-previous');
-      const next=actionButton(document, 'Next page [PgDn]', 'craft-next');
+      const previous=actionButton(document, '‹', 'craft-previous');
+      const next=actionButton(document, '›', 'craft-next');
       previous.textContent='‹';next.textContent='›';
+      bindUiText(previous,'aria-label','Previous page [PgUp]');
+      bindUiText(previous,'title','Previous page [PgUp]');
+      bindUiText(next,'aria-label','Next page [PgDn]');
+      bindUiText(next,'title','Next page [PgDn]');
       previous.disabled=(panel.page??0)===0;next.disabled=(panel.page??0)>=(panel.pageCount??1)-1;
       navigation.append(previous);
       for(let index=0;index<(panel.pageCount??1);index++){const button=actionButton(document,String(index+1),'craft-page');button.dataset.page=String(index);button.setAttribute('aria-current',index===(panel.page??0)?'page':'false');navigation.append(button);}
@@ -632,7 +622,7 @@ function renderPanel(
         );
         if ((rowState.ingredients?.length ?? 0) > 0) {
           for (const ingredient of rowState.ingredients ?? []) {
-            if(ingredient.source){ingredients.append(materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId));continue;}
+            if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');hint.querySelector('summary > span')?.classList.add('p1-asset-icon','p1-craft-ingredient-icon');ingredients.append(hint);continue;}
             const token = createElement(
               document,
               'span',
@@ -695,7 +685,12 @@ function renderPanel(
     }
 
     case 'build': {
-      if(panel.expeditionEnabled)root.append(actionButton(document,'Expedition blueprints · materials later','open-expedition'));
+      if(panel.expeditionEnabled){
+        const blueprints=actionButton(document,'Blueprint','open-expedition');
+        bindUiText(blueprints,'aria-label','Expedition blueprints · materials later');
+        bindUiText(blueprints,'title','Expedition blueprints · materials later');
+        root.append(blueprints);
+      }
       const catalog = createElement(
         document,
         'div',
@@ -789,22 +784,28 @@ function renderPanel(
         'p1-build-preview-label',
         panel.placementState,
       ));
+      const kitLabel=createElement(document,'div','p1-build-kit',panel.sourceKitLabel.split(' · ')[0]);
+      bindUiText(kitLabel,'title',panel.sourceKitLabel);
       root.append(
         catalog,
         createElement(document, 'div', 'p1-build-name', panel.selectedStructure),
-        createElement(document, 'div', 'p1-build-kit', panel.sourceKitLabel),
+        kitLabel,
         preview,
       );
       if (panel.reason !== null) {
         root.append(createElement(document, 'div', 'p1-feedback', panel.reason));
       }
       const actions = createElement(document, 'div', 'p1-build-actions');
-      const place = actionButton(document, 'Place [Enter]', 'build-place');
+      const compactAction=(name:string,symbol:string,action:string)=>{
+        const button=actionButton(document,symbol,action);
+        bindUiText(button,'aria-label',name);bindUiText(button,'title',name);return button;
+      };
+      const place = compactAction('Place [Enter]', '✓', 'build-place');
       place.disabled = panel.placementState === 'INVALID';
-      actions.append(actionButton(document, 'Prepare kit', 'build-prepare'),
-        actionButton(document, 'Rotate [R]', 'build-rotate'),
-        actionButton(document, '← Connector', 'build-connector-previous'),
-        actionButton(document, 'Connector →', 'build-connector-next'), place);
+      actions.append(compactAction('Prepare kit','Kit','build-prepare'),
+        compactAction('Rotate [R]','↻','build-rotate'),
+        compactAction('← Connector','‹','build-connector-previous'),
+        compactAction('Connector →','›','build-connector-next'), place);
       root.append(actions);
       return root;
     }
@@ -887,14 +888,9 @@ function renderPanel(
               progressionSprite(rowState.iconIndex),
             );
             if (icon !== null) row.append(icon);
-            row.append(
-              (rowState.groupLabel === undefined
-                ? ''
-                : rowState.groupLabel + ' · ')
-              + rowState.label
-              + ' · '
-              + rowState.state,
-            );
+            const status=createElement(document,'span','p1-progression-status',rowState.state==='COMPLETE'||rowState.state==='UNLOCKED'?'✓':rowState.state==='LOCKED'?'◇':'○');
+            status.setAttribute('role','img');bindUiText(status,'aria-label',rowState.state);row.append(createElement(document,'span','p1-progression-label',rowState.label),status);
+            bindUiText(row,'title',(rowState.groupLabel?rowState.groupLabel+' · ':'')+rowState.label+' · '+rowState.state);
             rows.append(row);
           }
           root.append(rows);
@@ -1519,7 +1515,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     if (weatherIcon !== null) {
       weatherIdentity.append(weatherIcon);
     }
-    bindUiText(weatherIdentity,'textContent',state.world.weatherLabel);
+    const weatherLabel=createElement(this.document,'span','p1-weather-label',state.world.weatherLabel);weatherIdentity.append(weatherLabel);
     weatherLine.append(
       weatherIdentity,
       createElement(this.document, 'span', '', String(state.world.teammateCount) + uiText("ui.7876b81e")),
@@ -1796,7 +1792,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     for(const controls of fresh.querySelectorAll<HTMLElement>('.p1-inventory-controls')){if(controls.closest('details'))continue;const details=this.document.createElement('details'),summary=this.document.createElement('summary');details.className='p1-ui-controls';bindUiText(summary,'textContent',gameUiText('controls'));controls.replaceWith(details);details.append(summary,controls);}
       const sameKind = previousPanel?.dataset.panelKind === state.panel.kind;
       const panel = sameKind ? previousPanel! : fresh;
-      if (sameKind) panel.replaceChildren(...Array.from(fresh.childNodes));
+      if (sameKind) {
+        for(const attribute of Array.from(panel.attributes))if(!fresh.hasAttribute(attribute.name))panel.removeAttribute(attribute.name);
+        for(const attribute of Array.from(fresh.attributes))panel.setAttribute(attribute.name,attribute.value);
+        panel.replaceChildren(...Array.from(fresh.childNodes));
+      }
       this.layer.append(panel);
       const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
       if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
