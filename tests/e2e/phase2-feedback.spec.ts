@@ -48,7 +48,13 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await page.getByRole('button',{name:'Craft [C]',exact:true}).click();
  for(let n=0;n<2;n++)await page.locator('[data-review-action="craft-recipe:recipe:cordage"]').click();await page.keyboard.press('Escape');
  // Follow explicit legs between resource pockets instead of a greedy diagonal at terrain seams.
- await walk(page,18,-12);await walk(page,-36,-12);await gather(4);await walk(page,-4,0);
+ await walk(page,18,-12);
+ try {await walk(page,-36,-12);} catch(error) {
+  mkdirSync(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,'storage-walk-blocked.png')});
+  console.info('Storage walk blocked state',await page.evaluate(()=>({canvas:{...document.querySelector<HTMLCanvasElement>('canvas')?.dataset},root:{...document.querySelector<HTMLElement>('#app')?.dataset},visibility:document.visibilityState,focus:document.activeElement?.outerHTML,meters:Array.from(document.querySelectorAll('[role=meter]')).map(element=>({label:element.getAttribute('aria-label'),value:element.getAttribute('aria-valuenow')})),panels:Array.from(document.querySelectorAll('.p1-panel,.lw-panel,.sp-expedition-panel')).map(element=>({class:element.className,hidden:(element as HTMLElement).hidden,text:element.textContent?.slice(0,300)}))})));
+  throw error;
+ }
+ await gather(4);await walk(page,-4,0);
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
  await expect(page.locator('.lw-object').first()).toHaveCSS('pointer-events','none');
  await page.keyboard.press('e');
