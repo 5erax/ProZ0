@@ -36,6 +36,7 @@ test('settings consolidate display, sound and real save; quiet HUD keeps context
 });
 
 test('fresh ecosystem: natural gathering builds accessible storage and a real stack transfers into it',async({page})=>{
+ const runtimeErrors:string[]=[];page.on('pageerror',error=>runtimeErrors.push(error.stack??error.message));page.on('console',message=>{if(message.type()==='error')runtimeErrors.push(message.text());});
  test.setTimeout(300000);await page.setViewportSize({width:1280,height:720});
  await page.goto('/?'+new URLSearchParams({proz0Mode:'phase2-colony-review',proz0WorldId:'world:eco-storage',proz0WorldSeed:'p1-world-golden',proz0Players:'builder',proz0Player:'builder',proz0SaveDb:'eco-storage'}));
  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
@@ -52,6 +53,7 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  try {await walk(page,-36,-12);} catch(error) {
   mkdirSync(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,'storage-walk-blocked.png')});
   console.info('Storage walk blocked state',await page.evaluate(()=>({canvas:{...document.querySelector<HTMLCanvasElement>('canvas')?.dataset},root:{...document.querySelector<HTMLElement>('#app')?.dataset},visibility:document.visibilityState,focus:document.activeElement?.outerHTML,meters:Array.from(document.querySelectorAll('[role=meter]')).map(element=>({label:element.getAttribute('aria-label'),value:element.getAttribute('aria-valuenow')})),panels:Array.from(document.querySelectorAll('.p1-panel,.lw-panel,.sp-expedition-panel')).map(element=>({class:element.className,hidden:(element as HTMLElement).hidden,text:element.textContent?.slice(0,300)}))})));
+  console.info('Storage walk runtime errors',runtimeErrors);
   throw error;
  }
  await gather(4);await walk(page,-4,0);
