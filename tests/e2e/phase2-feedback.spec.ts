@@ -47,7 +47,8 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await expect(interaction).toHaveAttribute('data-state','AVAILABLE',{timeout:3000});await gather(2);
  await page.getByRole('button',{name:'Craft [C]',exact:true}).click();
  for(let n=0;n<2;n++)await page.locator('[data-review-action="craft-recipe:recipe:cordage"]').click();await page.keyboard.press('Escape');
- await walk(page,-36,-12);await gather(4);await walk(page,-4,0);
+ // Follow explicit legs between resource pockets instead of a greedy diagonal at terrain seams.
+ await walk(page,18,-12);await walk(page,-36,-12);await gather(4);await walk(page,-4,0);
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
  await expect(page.locator('.lw-object').first()).toHaveCSS('pointer-events','none');
  await page.keyboard.press('e');

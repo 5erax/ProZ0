@@ -20,7 +20,7 @@ test('game language preserves selected canonical item and save/reopen while tran
   await expect(page.getByRole('button',{name:'Cài đặt',exact:true})).toBeVisible();await page.keyboard.press('Escape');
   await page.keyboard.press('i');await expect(page.locator('[data-review-item="starter:stone-field-tool:solo"]')).toContainText('Công cụ đá dã ngoại');
   expect(await page.locator('[data-review-item][data-selected="true"]').getAttribute('data-review-item')).toBe(before);
-  await page.keyboard.press('Escape');await page.keyboard.press('c');await expect(page.locator('.p1-panel-title')).toContainText('CHẾ TẠO');await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');await page.keyboard.press('c');await expect(page.locator('.p1-panel-title')).toHaveText('Chế tạo');await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Cài đặt',exact:true}).click();await page.getByRole('button',{name:'Lưu thế giới [L]',exact:true}).click();
   await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state','success');
   await page.reload();await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened','true');
