@@ -12,8 +12,8 @@ export function mountMapViewport(field:HTMLElement,state:MapViewportState):HTMLE
   const apply=()=>{
     state.zoom=Math.max(1,Math.min(4,state.zoom));
     const width=viewport.clientWidth,height=viewport.clientHeight,contentWidth=parseFloat(field.style.width)*state.zoom,contentHeight=parseFloat(field.style.height)*state.zoom;
-    state.x=Math.max(Math.min(0,width-contentWidth),Math.min(Math.max(0,width-contentWidth),state.x));
-    state.y=Math.max(Math.min(0,height-contentHeight),Math.min(Math.max(0,height-contentHeight),state.y));
+    state.x=contentWidth<width?(width-contentWidth)/2:Math.max(width-contentWidth,Math.min(0,state.x));
+    state.y=contentHeight<height?(height-contentHeight)/2:Math.max(height-contentHeight,Math.min(0,state.y));
     field.style.transform=`translate(${state.x}px,${state.y}px) scale(${state.zoom})`;viewport.dataset.mapZoom=String(state.zoom);
   };
   const zoom=(factor:number)=>{const old=state.zoom;state.zoom=Math.max(1,Math.min(4,old*factor));const ratio=state.zoom/old;state.x=viewport.clientWidth/2-(viewport.clientWidth/2-state.x)*ratio;state.y=viewport.clientHeight/2-(viewport.clientHeight/2-state.y)*ratio;apply();};
@@ -28,7 +28,7 @@ export function mountMapViewport(field:HTMLElement,state:MapViewportState):HTMLE
   });
   viewport.addEventListener('wheel',event=>{event.preventDefault();event.stopPropagation();zoom(event.deltaY<0?1.25:1/1.25);},{passive:false});
   let drag:{id:number;x:number;y:number}|null=null;
-  viewport.onpointerdown=event=>{if(event.button!==0)return;drag={id:event.pointerId,x:event.clientX,y:event.clientY};viewport.setPointerCapture(event.pointerId);viewport.focus({preventScroll:true});};
+  viewport.onpointerdown=event=>{if(event.button!==0||event.target instanceof Element&&event.target.closest('[data-review-action]'))return;drag={id:event.pointerId,x:event.clientX,y:event.clientY};viewport.setPointerCapture(event.pointerId);viewport.focus({preventScroll:true});};
   viewport.onpointermove=event=>{if(!drag||drag.id!==event.pointerId)return;const rect=viewport.getBoundingClientRect(),scaleX=rect.width/Math.max(1,viewport.offsetWidth),scaleY=rect.height/Math.max(1,viewport.offsetHeight);state.x+=(event.clientX-drag.x)/scaleX;state.y+=(event.clientY-drag.y)/scaleY;drag.x=event.clientX;drag.y=event.clientY;apply();};
   viewport.onpointerup=viewport.onpointercancel=()=>{drag=null;};
   queueMicrotask(()=>{if(host.isConnected)apply();});

@@ -287,6 +287,14 @@ export class Phase1ProductReviewPresentationSource
     this.refresh();
     return true;
   }
+  public selectMapDetail(id:string):boolean {
+    if(this.panel!=='map')return false;
+    const view=projectPhase1ProductReviewMapPanel(this.bundle,this.playerId,this.getPlayerMotions(),this.mapDetailOrdinal);
+    const targets=view.spatial?.markers.filter(marker=>marker.distanceBand!==null)??[];
+    const index=targets.findIndex(marker=>marker.id===id);
+    if(index<0)return false;
+    this.mapDetailOrdinal=index;this.refresh();return true;
+  }
 
   public setInteraction(
     interaction: Phase1InteractionPresentation | null,

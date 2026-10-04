@@ -1,4 +1,5 @@
 import { actionGlyph } from './UiActionIcon';
+import './WorldFirstUi.css';
 import { materialHint } from './MaterialGuide';
 import { gameUiText } from '../localization/GameUiMessages';
 import { capturePanelUi } from './PanelUiState';
@@ -154,6 +155,7 @@ function meter(
     document,
     'p1-asset-icon p1-meter-icon',
     hudStatusSprite(presentation.label),
+    1.5,
   );
   if (icon !== null) {
     label.append(icon);
@@ -291,22 +293,23 @@ function equipmentPreview(document: Document, equipment: Omit<Phase1EquipmentSlo
   const slot = (kind: 'weapon' | 'protection' | WearableSlot) => {
     const equipped = equipment[kind], label = {weapon:uiText("ui.b7c10361"),protection:uiText("ui.37914e64"),head:uiText("ui.b2972ae3"),legs:uiText("ui.9979822c"),feet:uiText("ui.3b61cb75"),accessory:uiText("ui.f7f5c579")}[kind];
     const cell = createElement(document, 'div', 'p1-wardrobe-slot'); cell.dataset.equipmentDropSlot = kind;
+    const slotAction=(label:string,action:string,symbol:string)=>{const button=actionButton(document,symbol,action);bindUiText(button,'aria-label',label);bindUiText(button,'title',label);return button;};
     cell.append(createElement(document, 'strong', '', label));
     if (equipped) {
       cell.dataset.rarity = equipped.rarity ?? 'common'; cell.style.borderColor = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
       const badge = createElement(document, 'small', 'p1-rarity-label', RARITY_STYLE[equipped.rarity ?? 'common'].label); badge.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour; cell.append(badge);
       const icon = assetSprite(document, 'p1-asset-icon', itemIconSprite(uiPhrase(equipped.name))); if (icon) cell.append(icon);
-      cell.append(createElement(document, 'span', '', uiPhrase(equipped.name)), createElement(document, 'small', '', equipped.condition === null ? uiText("ui.7e98c350") : uiText("ui.345bed12") + equipped.condition + '/' + equipped.conditionMax), actionButton(document, uiText("ui.566c1a0e") + label.toLowerCase(), 'unequip-slot:' + kind));
+      cell.append(createElement(document, 'span', '', uiPhrase(equipped.name)), createElement(document, 'small', '', equipped.condition === null ? uiText("ui.7e98c350") : uiText("ui.345bed12") + equipped.condition + '/' + equipped.conditionMax), slotAction(uiText("ui.566c1a0e") + label.toLowerCase(), 'unequip-slot:' + kind,'−'));
       cell.dataset.equippedStack = equipped.stackId ?? '';
       const name = cell.querySelector('span:not(.p1-asset-icon)'); if (name instanceof HTMLElement) name.style.color = RARITY_STYLE[equipped.rarity ?? 'common'].colour;
-    } else cell.append(createElement(document, 'span', '', uiText("ui.d1571f8e")), actionButton(document, uiText("ui.caead158") + label.toLowerCase(), 'equip-slot:' + kind));
+    } else cell.append(createElement(document, 'span', '', uiText("ui.d1571f8e")), slotAction(uiText("ui.caead158") + label.toLowerCase(), 'equip-slot:' + kind,'+'));
     bindUiText(cell,"title",uiText("ui.49f03461"));
     return cell;
   };
   const left = createElement(document, 'div', 'p1-wardrobe-column'); left.append(slot('head'), slot('protection'), slot('legs'));
   const right = createElement(document, 'div', 'p1-wardrobe-column'); right.append(slot('weapon'), slot('feet'), slot('accessory'));
   wardrobe.append(left, avatar, right);
-  if (equipment.effects) wardrobe.append(createElement(document, 'small', 'p1-wardrobe-help', uiText("ui.c6110440") + equipment.effects.join(' · ')));
+  if (equipment.effects) {const effects=createElement(document,'details','p1-wardrobe-help');effects.dataset.inspectionKey='equipment-effects';effects.append(createElement(document,'summary','','Equipment effects'),createElement(document,'small','',uiText('ui.c6110440')+equipment.effects.join(' · ')));wardrobe.append(effects);}
   const help = createElement(document, 'details', 'p1-wardrobe-help'); help.append(createElement(document, 'summary', '', uiText("ui.be1025ea")), createElement(document, 'small', '', uiText("ui.ef4da8ed"))); wardrobe.append(help);
   return wardrobe;
 }
@@ -316,8 +319,19 @@ function arrangeWardrobe(document: Document, root: HTMLElement): void {
   if (!wardrobe) return;
   const layout = createElement(document, 'div', 'p1-inventory-layout');
   const bag = createElement(document, 'div', 'p1-inventory-bag');
-  for (const child of Array.from(root.children)) if (child !== wardrobe && !child.matches('.p1-panel-title,.p1-panel-skin-corner')) bag.append(child);
-  layout.append(wardrobe, bag); root.append(layout);
+  const character=createElement(document,'section','p1-inventory-character');
+  const inspection=root.querySelector<HTMLElement>('.p1-item-inspection');
+  const status=root.querySelector<HTMLElement>('.p1-character-inspection');
+  character.append(wardrobe);if(status)character.append(status);
+  for (const child of Array.from(root.children)) if (!child.matches('.p1-panel-title,.p1-panel-skin-corner,.p1-panel-close,.p1-item-inspection')) bag.append(child);
+  const description=bag.querySelector<HTMLElement>('.p1-panel-detail');
+  if(description)description.classList.add('p1-visually-hidden');
+  const storageTip=bag.querySelector<HTMLElement>('.p1-storage-tip');
+  if(storageTip){const more=createElement(document,'details','p1-storage-guide');more.dataset.inspectionKey='storage-guide';more.append(createElement(document,'summary','','Storage'));storageTip.replaceWith(more);more.append(storageTip);}
+  const utilities=createElement(document,'details','p1-inventory-utilities');utilities.dataset.inspectionKey='inventory-utilities';utilities.append(createElement(document,'summary','','Inventory actions'));
+  for(const button of Array.from(bag.children).filter(e=>e instanceof HTMLButtonElement))utilities.append(button);
+  bag.append(utilities);
+  layout.append(character,bag);if(inspection)layout.append(inspection);root.append(layout);
 }
 
 function itemInspectionCard(document: Document, item: Phase1InventoryItemPresentation | undefined): HTMLElement {
@@ -338,6 +352,7 @@ function itemInspectionCard(document: Document, item: Phase1InventoryItemPresent
   if(item.condition!==null&&item.condition<(item.conditionMax??100))card.append(actionButton(document,uiPhrase('Repair selected item [R]'),'inventory-repair'));
   if (item.inspection.canConsume) card.append(actionButton(document, uiText("ui.2495d920"), 'inventory-use'));
   if (item.inspection.canEquip) { const equip = actionButton(document, uiText("ui.6007b81"), 'equip'); equip.disabled = item.condition === 0; if (equip.disabled) bindUiText(equip,"title",uiText("ui.6a653b3e")); card.append(equip); }
+  if(item.quantity>1)card.append(actionButton(document,'Split selected quantity','inventory-split'));
   card.append(actionButton(document, uiText("ui.a023707b"), 'inventory-drop'));
   return card;
 }
@@ -396,7 +411,10 @@ function renderPanel(
   if (skinCorner !== null) {
     root.append(skinCorner);
   }
-  root.append(panelTitle(document, panel.title));
+  const title=panelTitle(document,panel.kind==='craft'?'Crafting':panel.title);
+  bindUiText(title,'title',panel.title);root.append(title);
+  const close=actionButton(document,'×','close-panel');close.classList.add('p1-panel-close');
+  bindUiText(close,'aria-label','Close');bindUiText(close,'title','Close [Esc]');root.append(close);
 
   switch (panel.kind) {
     case 'colony': {
@@ -667,12 +685,14 @@ function renderPanel(
             rowState.stationLabel,
           ));
         }
-        footer.append(createElement(
+        const availability=createElement(
           document,
           'span',
           'p1-craft-state',
           rowState.reason ?? rowState.state,
-        ));
+        );
+        const stateGlyph=createElement(document,'span','p1-craft-state-icon',rowState.state==='AVAILABLE'?'✓':'!');
+        stateGlyph.setAttribute('aria-hidden','true');availability.prepend(stateGlyph);footer.append(availability);
         const craft = actionButton(document, 'Craft', 'craft-recipe:' + rowState.id);
         bindUiText(craft,"aria-label",'Craft ' + rowState.outputLabel);
         craft.disabled = rowState.state !== 'AVAILABLE';
@@ -711,6 +731,8 @@ function renderPanel(
         row.dataset.availableKitCount = String(entry.availableKitCount);
         row.dataset.builtCount = String(entry.builtCount);
         row.dataset.buildCap = String(entry.buildCap);
+        const category=entry.structureId.includes('storage')?'Storage':entry.structureId.includes('workbench')?'Crafting':entry.structureId.includes('habitat')?'Shelter':'Utilities';
+        row.dataset.buildCategory=category;
         const iconSource = (() => {
           switch (entry.structureId) {
             case 'structure:storage-crate':
@@ -742,6 +764,7 @@ function renderPanel(
           'p1-build-catalog-copy',
         );
         copy.append(
+          createElement(document,'small','p1-build-category',category),
           createElement(
             document,
             'div',
@@ -1003,9 +1026,10 @@ function renderPanel(
         for (const markerState of spatial.markers) {
           const marker = createElement(
             document,
-            'div',
+            markerState.distanceBand!==null?'button':'div',
             'p1-map-marker-position',
           );
+          if(marker instanceof HTMLButtonElement){marker.type='button';marker.dataset.reviewAction='map-select-marker';marker.dataset.mapMarkerId=markerState.id;bindUiText(marker,'aria-label',markerState.label);bindUiText(marker,'title',markerState.label);}
           marker.dataset.mapMarkerKind = markerState.kind;
           marker.dataset.mapMarkerLabel = markerState.label;
           marker.dataset.mapMarkerIndex =
@@ -1518,9 +1542,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const weatherLabel=createElement(this.document,'span','p1-weather-label',state.world.weatherLabel);weatherIdentity.append(weatherLabel);
     weatherLine.append(
       weatherIdentity,
-      createElement(this.document, 'span', '', String(state.world.teammateCount) + uiText("ui.7876b81e")),
+      createElement(this.document, 'span', '', String(state.world.teammateCount)+' '+uiPhrase('players')),
     );
     world.append(worldLine, weatherLine);
+    const cycle=createElement(this.document,'div','p1-world-cycle',this.root.dataset.worldCycleLabel??'');
+    cycle.hidden=!this.root.dataset.worldCycleLabel;world.append(cycle);
 
     const equipment = createElement(this.document, 'section', 'p1-equipment p1-box p1-context-hud');
     equipment.dataset.region = 'equipment';
@@ -1638,10 +1664,12 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         'p1-quick-use',
       );
       quickUse.dataset.quickUseState = equipmentSlots.quickUse.state;
-      quickUse.append(
-        uiText("ui.d9199510")
-        + (equipmentSlots.quickUse.target ?? '—'),
-      );
+      const quickLabel=uiText('ui.d9199510')+(equipmentSlots.quickUse.target??'—');
+      bindUiText(quickUse,'title',quickLabel);bindUiText(quickUse,'aria-label',quickLabel);
+      const quickIcon=assetSprite(this.document,'p1-asset-icon p1-equipment-icon',itemIconSprite(equipmentSlots.quickUse.target??'Clean Water'));
+      quickUse.append(createElement(this.document,'span','p1-equipment-slot-label','[V]'));
+      if(quickIcon)quickUse.append(quickIcon);
+      quickUse.append(createElement(this.document,'span','p1-quick-use-label',equipmentSlots.quickUse.target??'—'));
       equipment.append(quickUse);
     }
 
@@ -1707,7 +1735,8 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       team.append(teammate(this.document, entry));
     }
 
-    this.layer.append(survival, world, equipment, carry, toasts, team);
+    world.append(team);
+    this.layer.append(survival, world, equipment, carry, toasts);
     if (this.actionDock === null) {
       const dock = createElement(this.document, 'nav', 'p1-action-dock');
       this.actionDock = dock;
@@ -1717,7 +1746,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         [uiText("ui.c8f02361"), 'C', 'open-craft'],
         [uiText("ui.8d432504"), 'B', 'open-build'],
         [uiText("ui.44a7f051"), 'M', 'open-map'],
-        [uiText("ui.23d960bf"), 'N', 'open-colony'],
+        [uiText("ui.d74d21d2"), 'F', 'open-farm'],
       ] as const) {
         const button = actionButton(this.document, '', action);
         bindUiText(button,"aria-label",label + ' [' + key + ']'); bindUiText(button,"title",label + ' [' + key + ']');
@@ -1725,6 +1754,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         button.append(createElement(this.document, 'span', '', key)); dock.append(button);
       }
       this.layer.append(dock);
+    }
+    for(const button of this.actionDock!.querySelectorAll<HTMLButtonElement>('button')){
+      const active=button.dataset.reviewAction==='open-'+state.panel?.kind;
+      button.setAttribute('aria-pressed',String(active));
     }
 
     if (state.firstActionCue !== undefined && state.firstActionCue !== null) {

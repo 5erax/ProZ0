@@ -188,5 +188,11 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   const folder = resolve('test-results', 'living-world');
   mkdirSync(folder, { recursive: true });
   await page.screenshot({ path: resolve(folder, 'remote-crop-reopened.png') });
+  await page.keyboard.press('Escape');await page.keyboard.press('f');
+  const management=panel.locator('[data-living-group="Plots"] [data-living-row="'+id+'"]');
+  await expect(management).toBeVisible();
+  await expect.poll(async()=>Number(await management.getByRole('meter',{name:'Growth',exact:true}).getAttribute('aria-valuenow'))).toBeGreaterThan(0);
+  await expect(management.getByRole('meter',{name:'Moisture',exact:true})).toBeVisible();
+  await page.screenshot({path:resolve(folder,'remote-crop-management.png')});
   expect(errors).toEqual([]);
 });

@@ -2315,7 +2315,7 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     );
   }
   await expect(page.locator('[data-region="world"]'))
-    .toContainText('4 TEAM');
+    .toContainText('4 players');
 
   await expect(
     page.locator('[data-first-action-cue="visible"]'),
@@ -2873,15 +2873,15 @@ test('owner-reported player controls: pages, mouse equipment, pickup and fullscr
 
   await page.keyboard.press('c');
   const craft = page.locator('[data-panel-kind="craft"]');
-  await expect(craft).toContainText('PAGE 1/2');
+  await expect(craft.locator('[data-review-action=craft-page][aria-current=page]')).toHaveText('1');
   await page.getByRole('button', { name: 'Next page [PgDn]', exact: true }).click();
-  await expect(craft).toContainText('PAGE 2/2');
+  await expect(craft.locator('[data-review-action=craft-page][aria-current=page]')).toHaveText('2');
   await page.keyboard.press('PageUp');
-  await expect(craft).toContainText('PAGE 1/2');
+  await expect(craft.locator('[data-review-action=craft-page][aria-current=page]')).toHaveText('1');
   await page.keyboard.press(']');
-  await expect(craft).toContainText('PAGE 2/2');
+  await expect(craft.locator('[data-review-action=craft-page][aria-current=page]')).toHaveText('2');
   await page.getByRole('button', { name: 'Previous page [PgUp]', exact: true }).click();
-  await expect(craft).toContainText('PAGE 1/2');
+  await expect(craft.locator('[data-review-action=craft-page][aria-current=page]')).toHaveText('1');
   await craft.locator('.p1-craft-row').last().scrollIntoViewIfNeeded();
   const lastVisible = await craft.locator('.p1-craft-row').last().evaluate((row) => {
     const box = row.getBoundingClientRect();
@@ -2892,6 +2892,7 @@ test('owner-reported player controls: pages, mouse equipment, pickup and fullscr
 
   await page.keyboard.press('i');
   await inventoryItemRow(page, 'player', 'Basic Spear').click();
+  if(await page.locator('.p1-inventory-utilities > summary').count())await page.locator('.p1-inventory-utilities > summary').click();
   await page.getByRole('button', { name: 'Equip / Unequip [X]', exact: true }).click();
   await expect(page.locator('.p1-feedback')).toContainText('EQUIP · Basic Spear');
   await page.keyboard.press('i');

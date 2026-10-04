@@ -160,10 +160,12 @@ export function createColonyDepthOverlay(
     );
     const lab=bundle.colonyDepth.restoredSite('laboratory');
     const labNearby=!!lab && Math.hypot(position.x-lab.position.x,position.y-lab.position.y)<=7.5 || (bundle.expedition?.hasRemoteLab(playerId) ?? false);
+    const discovered=panel==='journal'?sites.filter(site=>{if(state.inspectedSites.includes(site.id))return true;const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));}):[];
     const current = JSON.stringify([locale(),
       panel,
       state.revision,
       inventory.revision,
+      discovered.map(site=>site.id),
       nearSite?.id,
       labNearby,
       sites.map(s=>Math.hypot(position.x-s.position.x,position.y-s.position.y)<=4),
@@ -212,6 +214,9 @@ export function createColonyDepthOverlay(
         const eligible = def.prerequisites.every((id) =>
           state.researchIds.includes(id),
         );
+        row.dataset.unlockState=complete?'complete':eligible&&affordable?'ready':'locked';
+        const indicator=document.createElement('span');indicator.className='p2-unlock-state';indicator.textContent=complete?'✓':eligible&&affordable?'○':'◇';
+        bindUiText(indicator,'aria-label',complete?'Complete':eligible&&affordable?'Available':'Locked');row.prepend(indicator);
         addButton(
           row,
           complete
@@ -231,15 +236,17 @@ export function createColonyDepthOverlay(
     if (panel === "professions")
       for (const [id, def] of Object.entries(COLONY_PROFESSIONS)) {
         const row = document.createElement("article");
+        const name=document.createElement('strong');bindUiText(name,'textContent',def.name);
         const desc = document.createElement("p");
-        bindUiText(desc,"textContent",uiPhrase(def.name) + " · " + uiPhrase(def.description));
-        row.append(desc);
+        bindUiText(desc,"textContent",def.description);
+        row.append(name,desc);
         const eligible =
           state.researchIds.includes(def.requiredResearch) &&
           state.discoveredBiomes.length >= def.requiredRegions;
+        row.dataset.unlockState=state.professions[playerId]===id?'complete':eligible?'ready':'locked';
         const requirement = document.createElement("small");
         bindUiText(requirement,"textContent",uiText("ui.753d67cf") +
-          def.requiredResearch.replaceAll("-", " ") +
+          uiPhrase(COLONY_RESEARCH.find(research=>research.id===def.requiredResearch)?.name??def.requiredResearch.replaceAll("-", " ")) +
           " · " +
           String(def.requiredRegions) +
           uiText("ui.a49ab1ed"));
@@ -260,7 +267,6 @@ export function createColonyDepthOverlay(
       const guidance=document.createElement('p');guidance.dataset.explorationGuidance='true';bindUiText(guidance,'textContent',gameUiText('traceHint'));content.append(guidance);
       if(observedSites.length>=2){const network=document.createElement('p');network.dataset.observedNetwork='true';bindUiText(network,'textContent',gameUiText('networkHint',{names:observedSites.map(site=>uiPhrase(site.name)).join(' · ')}));content.append(network);}
 
-      const discovered=sites.filter(site=>{const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));});
       for(const site of discovered){
         const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
         row.dataset.discoveredLandmark=site.id;row.append(uiPhrase(site.name)+' · '+distance+' m');

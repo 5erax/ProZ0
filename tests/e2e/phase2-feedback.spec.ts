@@ -29,12 +29,14 @@ test('settings consolidate display, sound and real save; quiet HUD keeps context
  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await page.reload();
  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened','true');
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
+ await page.locator('.p1-inventory-utilities > summary').click();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toBeVisible();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-selected','true');
 });
 
 test('fresh ecosystem: natural gathering builds accessible storage and a real stack transfers into it',async({page})=>{
+ const runtimeErrors:string[]=[];page.on('pageerror',error=>runtimeErrors.push(error.stack??error.message));page.on('console',message=>{if(message.type()==='error')runtimeErrors.push(message.text());});
  test.setTimeout(300000);await page.setViewportSize({width:1280,height:720});
  await page.goto('/?'+new URLSearchParams({proz0Mode:'phase2-colony-review',proz0WorldId:'world:eco-storage',proz0WorldSeed:'p1-world-golden',proz0Players:'builder',proz0Player:'builder',proz0SaveDb:'eco-storage'}));
  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
@@ -46,11 +48,20 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await expect(interaction).toHaveAttribute('data-state','AVAILABLE',{timeout:3000});await gather(2);
  await page.getByRole('button',{name:'Craft [C]',exact:true}).click();
  for(let n=0;n<2;n++)await page.locator('[data-review-action="craft-recipe:recipe:cordage"]').click();await page.keyboard.press('Escape');
- await walk(page,-36,-12);await gather(4);await walk(page,-4,0);
+ // Follow explicit legs between resource pockets instead of a greedy diagonal at terrain seams.
+ await walk(page,18,-12);
+ try {await walk(page,-36,-12);} catch(error) {
+  mkdirSync(evidence,{recursive:true});await page.screenshot({path:resolve(evidence,'storage-walk-blocked.png')});
+  console.info('Storage walk blocked state',await page.evaluate(()=>({canvas:{...document.querySelector<HTMLCanvasElement>('canvas')?.dataset},root:{...document.querySelector<HTMLElement>('#app')?.dataset},visibility:document.visibilityState,focus:document.activeElement?.outerHTML,meters:Array.from(document.querySelectorAll('[role=meter]')).map(element=>({label:element.getAttribute('aria-label'),value:element.getAttribute('aria-valuenow')})),panels:Array.from(document.querySelectorAll('.p1-panel,.lw-panel,.sp-expedition-panel')).map(element=>({class:element.className,hidden:(element as HTMLElement).hidden,text:element.textContent?.slice(0,300)}))})));
+  console.info('Storage walk runtime errors',runtimeErrors);
+  throw error;
+ }
+ await gather(4);await walk(page,-4,0);
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
  await expect(page.locator('.lw-object').first()).toHaveCSS('pointer-events','none');
  await page.keyboard.press('e');
  await expect(page.locator('.lw-panel')).toBeHidden();
+ await page.locator('.p1-inventory-utilities > summary').click();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await page.getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
  await page.getByRole('button',{name:'Build base [B]',exact:true}).click();

@@ -8,7 +8,7 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
   const root=document.createElement('section');root.id='app';root.dataset.testid='layout-root';root.style.cssText='position:relative;width:100%;height:100%;';document.body.append(root);
   const runtime=await createPhase1ProductReviewRuntime(root,{worldId:'world:ui-layout',worldSeed:'p1-world-golden',playerIds:['solo'],localPlayerId:'solo',singlePlayerExpeditionEnabled:true,colonyDepthEnabled:true,interactionRangeWorldUnits:1.25,spawnClearanceRadiusWorldUnits:1.25,requiredAccessRadiusWorldUnits:1.25});
   try {
-    for(const [width,height] of [[1280,720],[1920,1080],[640,360]]){
+    for(const [width,height] of [[1280,720],[1600,900],[1920,1080],[640,360]]){
       await page.viewport(width!,height!);window.dispatchEvent(new Event('resize'));
       for(const language of ['en','vi'] as const){
         setLocale(language);

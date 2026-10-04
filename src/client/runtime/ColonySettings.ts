@@ -5,6 +5,7 @@ import { coreText } from '../localization/CoreMessages';
 export function createColonySettings(root: HTMLElement): {destroy(): void} {
   const document=root.ownerDocument, target=document.defaultView!;
   root.dataset.colonyUi='true';
+  root.dataset.hudDensity='compact';
   const host=document.createElement('section');host.className='p2-settings';
   const style=document.createElement('style');
   style.textContent=[
@@ -43,8 +44,11 @@ export function createColonySettings(root: HTMLElement): {destroy(): void} {
   for(const [value,text] of [['auto',uiText("ui.4d4a5778")],['1','640 × 360'],['2','1280 × 720'],['3','1920 × 1080']]){const option=document.createElement('option');option.value=value!;bindLocalized(option,'textContent',()=>value==='auto'?coreText('fit'):text!);resolution.append(option);}
   resolution.addEventListener('change',()=>{root.dataset.displayLimit=resolution.value;target.dispatchEvent(new Event('resize'));});label.append(resolution);panel.append(label);
   const help=document.createElement('button');bindLocalized(help,'textContent',()=>coreText('controls'));help.addEventListener('click',()=>{setOpen(false);document.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyH',bubbles:true}));});panel.append(help);
+  const density=document.createElement('button');density.type='button';density.dataset.hudCompact='true';
+  bindUiText(density,'textContent','Compact HUD');density.setAttribute('aria-pressed','true');
+  density.addEventListener('click',()=>{const compact=root.dataset.hudDensity!=='compact';root.dataset.hudDensity=compact?'compact':'expanded';density.setAttribute('aria-pressed',String(compact));});panel.append(density);
   const close=document.createElement('button');bindLocalized(close,'textContent',()=>coreText('close'));close.addEventListener('click',()=>setOpen(false));panel.append(close);
   const key=(event:KeyboardEvent):void=>{if(event.code==='Escape')setOpen(false);};document.addEventListener('keydown',key);
   host.append(style,gear,panel);root.append(host);
-  return {destroy(){document.removeEventListener('keydown',key);host.remove();delete root.dataset.colonyUi;delete root.dataset.displayLimit;delete root.dataset.colonySettingsOpen;}};
+  return {destroy(){document.removeEventListener('keydown',key);host.remove();delete root.dataset.colonyUi;delete root.dataset.hudDensity;delete root.dataset.worldCycleLabel;delete root.dataset.displayLimit;delete root.dataset.colonySettingsOpen;}};
 }

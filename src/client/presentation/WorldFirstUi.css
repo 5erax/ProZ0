@@ -1,0 +1,152 @@
+/* Physical UI sizing; the world raster and authoritative gameplay stay independent. */
+#app {
+  --hud-surface:#102129e8;
+  --hud-edge:#59716f;
+  --hud-active:#a9c5ad;
+  --hud-warning:#d5b077;
+  --hud-critical:#d78379;
+}
+#app #proz0-phase1-ui :is(.p1-box,.p1-panel),
+#app :is(.lw-panel,.p2-colony-panel,.p2-settings-panel,.sp-expedition-panel) {
+  background:var(--hud-surface);border:1px solid var(--hud-edge);box-shadow:0 6px 20px #07101540;
+  color:var(--ui-text);border-radius:3px;
+}
+#app #proz0-phase1-ui .p1-survival {top:16px;left:16px;width:230px!important;padding:10px;gap:5px;min-height:0;}
+#app #proz0-phase1-ui .p1-survival .p1-meter {grid-template-columns:88px minmax(0,1fr) 25px 10px;gap:6px;min-height:20px;border:0;outline:0;}
+#app #proz0-phase1-ui .p1-meter-icon {width:18px!important;height:18px!important;}
+#app #proz0-phase1-ui .p1-meter-track {height:8px;border:0;background:#314442;outline:0;border-radius:1px;overflow:hidden;}
+#app #proz0-phase1-ui .p1-meter[data-severity=warning] {color:var(--hud-warning);border-right:2px solid var(--hud-warning);}
+#app #proz0-phase1-ui .p1-meter[data-severity=critical] {color:var(--hud-critical);outline:1px solid #d7837966;outline-offset:2px;}
+#app[data-hud-density=compact] #proz0-phase1-ui .p1-survival {width:178px!important;}
+#app[data-hud-density=compact] #proz0-phase1-ui .p1-meter {grid-template-columns:20px minmax(0,1fr) 25px 8px;}
+#app[data-hud-density=compact] #proz0-phase1-ui .p1-meter-label-copy {display:none;}
+#app #proz0-phase1-ui .p1-world {top:16px;right:60px;width:230px;padding:10px;display:grid;gap:5px;font-size:12px;}
+#app #proz0-phase1-ui .p1-world-line:first-child {font-size:14px;font-weight:700;}
+#app #proz0-phase1-ui .p1-world-weather {display:flex;align-items:center;gap:6px;}
+#app #proz0-phase1-ui .p1-world-cycle {font-size:11px;color:var(--ui-muted);}
+#app #proz0-phase1-ui .p1-team {position:static;width:auto;gap:3px;}
+#app #proz0-phase1-ui .p1-team:empty {display:none;}
+#app #proz0-phase1-ui .p1-teammate {background:none;padding:0;font-size:11px;}
+#app .lw-season,#app .lw-menu {display:none;}
+#app #proz0-phase1-ui .p1-equipment {left:16px;bottom:16px;width:210px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:8px;min-height:56px;}
+#app #proz0-phase1-ui :is(.p1-equipment-slot,.p1-quick-use) {display:flex;flex-wrap:wrap;justify-content:center;align-content:center;gap:4px;font-size:10px;white-space:normal;}
+#app #proz0-phase1-ui .p1-equipment-icon {width:24px!important;height:24px!important;}
+#app #proz0-phase1-ui .p1-equipment-slot-label {width:auto;font-size:10px;}
+#app #proz0-phase1-ui .p1-quick-use-label {max-width:100%;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#app #proz0-phase1-ui .p1-carry {left:16px;right:auto;bottom:88px;width:240px;height:auto;min-height:28px;padding:5px 8px;font-size:10px;background:#102129a8;}
+#app #proz0-phase1-ui .p1-interaction {left:50%;bottom:18px;transform:translateX(-50%);width:min(380px,calc(100% - 580px));min-height:0;padding:9px 12px;font-size:12px;}
+#app #proz0-phase1-ui .p1-interaction-main {font-size:12px;line-height:1.4;}
+#app #proz0-phase1-ui .p1-interaction[data-state=BLOCKED],#app #proz0-phase1-ui .p1-interaction[data-state=UNAVAILABLE] {border-color:var(--hud-warning);}
+#app #proz0-phase1-ui .p1-interaction-reason {font-size:11px;color:var(--hud-warning);margin-top:4px;}
+#app #proz0-phase1-ui .p1-toasts {left:50%;top:16px;transform:translateX(-50%);width:min(320px,32%);max-width:320px;font-size:11px;}
+#app #proz0-phase1-ui .p1-toast {padding:7px 9px;border-left:2px solid var(--hud-active);}
+#app #proz0-phase1-ui .p1-action-dock {right:16px;bottom:16px;gap:4px;padding:6px;background:var(--hud-surface);border:1px solid var(--hud-edge);border-radius:3px;}
+#app #proz0-phase1-ui .p1-action-dock button {width:44px;height:46px;background:transparent;border:1px solid transparent;color:#adc0af;}
+#app #proz0-phase1-ui .p1-action-dock button:is(:hover,[aria-pressed=true]) {background:#28403f;border-color:var(--hud-active);color:#e2e8d6;}
+#app #proz0-phase1-ui .p1-panel {padding:16px;max-height:calc(100% - 144px);}
+#app #proz0-phase1-ui .p1-panel-title {border-color:var(--hud-edge);padding-right:40px;}
+#app #proz0-phase1-ui .p1-panel-close {position:absolute;right:12px;top:9px;width:32px;min-height:32px;padding:0;font-size:22px;background:transparent;border:0;}
+#app #proz0-phase1-ui :is(.p1-action,.p1-item-row,.p1-map-zoom-controls button) {border:1px solid var(--hud-edge);background:#1b3037;color:var(--ui-text);border-radius:2px;}
+#app #proz0-phase1-ui :is(.p1-action,.p1-item-row):hover {background:#29413f;}
+#app #proz0-phase1-ui button:disabled {opacity:.48;cursor:default;}
+#app #proz0-phase1-ui .p1-panel[data-panel-kind=inventory] {width:min(1120px,calc(100% - 32px));}
+#app #proz0-phase1-ui .p1-inventory-layout {display:grid;grid-template-columns:minmax(280px,.95fr) minmax(230px,1.05fr) minmax(230px,.85fr);gap:16px;align-items:start;}
+#app #proz0-phase1-ui .p1-inventory-character {min-width:0;}
+#app #proz0-phase1-ui .p1-inventory-bag {min-width:0;display:flex;flex-direction:column;gap:8px;}
+#app #proz0-phase1-ui .p1-item-list {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;max-height:310px;overflow:auto;}
+#app #proz0-phase1-ui .p1-item-row {display:grid;grid-template-columns:1fr;justify-items:center;min-height:64px;padding:6px;position:relative;}
+#app #proz0-phase1-ui .p1-item-row[data-selected=true] {border-color:var(--hud-active);background:#314a44;outline:1px solid #a9c5ad66;}
+#app #proz0-phase1-ui .p1-item-name {font-size:12px;}
+#app #proz0-phase1-ui .p1-item-state:empty {display:none;}
+#app #proz0-phase1-ui .p1-item-state {font-size:10px;}
+#app #proz0-phase1-ui .p1-wardrobe {border:0;background:#11232ba8;grid-template-columns:1fr 72px 1fr;gap:6px;padding:6px;}
+#app #proz0-phase1-ui .p1-avatar {width:72px;}
+#app #proz0-phase1-ui .p1-wardrobe-slot {min-height:80px;font-size:11px;padding:5px;border-color:#59716f;background:#1b30375e;}
+#app #proz0-phase1-ui .p1-wardrobe-slot .p1-action {font-size:10px;line-height:1.3;}
+#app #proz0-phase1-ui .p1-wardrobe-slot .p1-action {font-size:18px;min-height:28px;width:32px;padding:0;}
+#app #proz0-phase1-ui .p1-inventory-utilities .p1-action {display:block;width:100%;margin-top:6px;}
+#app #proz0-phase1-ui .p1-wardrobe-help {font-size:11px;line-height:1.4;}
+#app #proz0-phase1-ui .p1-item-inspection {margin:0;display:flex;flex-direction:column;gap:8px;background:#11232ba8;border:1px solid var(--hud-edge);}
+#app #proz0-phase1-ui .p1-item-inspection p {margin:0;font-size:12px;}
+#app #proz0-phase1-ui .p1-panel-capacity {font-size:11px;border:0;padding:6px;background:#152c32;}
+#app #proz0-phase1-ui .p1-craft-row {border:1px solid var(--hud-edge);background:#152a31;padding:8px;gap:8px;}
+#app #proz0-phase1-ui .p1-craft-row[data-state=AVAILABLE] {border-left:3px solid var(--hud-active);}
+#app #proz0-phase1-ui .p1-craft-row:not([data-state=AVAILABLE]) {border-left:3px solid var(--hud-warning);}
+#app #proz0-phase1-ui .p1-craft-name {font-size:14px;font-weight:700;}
+#app #proz0-phase1-ui .p1-craft-state {font-size:11px;display:flex;align-items:center;gap:5px;}
+#app #proz0-phase1-ui .p1-craft-state-icon {color:var(--hud-warning);font-size:14px;}
+#app #proz0-phase1-ui [data-state=AVAILABLE] .p1-craft-state-icon {color:var(--hud-active);}
+#app #proz0-phase1-ui .p1-craft-station {font-size:11px;color:var(--ui-muted);}
+#app #proz0-phase1-ui .p1-panel[data-panel-kind=build] {width:min(360px,42%);max-height:calc(100% - 96px);padding:12px;}
+#app #proz0-phase1-ui .p1-build-catalog-entry {border-color:var(--hud-edge);min-height:36px;font-size:12px;}
+#app #proz0-phase1-ui .p1-build-catalog-kit {font-size:10px;}
+#app #proz0-phase1-ui .p1-build-category {font-size:10px;color:var(--ui-muted);}
+#app #proz0-phase1-ui .p1-build-kit {font-size:11px;}
+#app #proz0-phase1-ui .p1-build-preview {height:24px;}
+#app #proz0-phase1-ui .p1-panel[data-panel-kind=map] {width:min(960px,calc(100% - 32px));}
+#app #proz0-phase1-ui .p1-map-viewport {height:clamp(190px,38vh,430px)!important;}
+#app #proz0-phase1-ui .p1-map-legend {display:flex;flex-wrap:wrap;gap:8px;font-size:11px;}
+#app #proz0-phase1-ui .p1-map-zoom-controls small {display:none;}
+#app #proz0-phase1-ui .p1-map-detail {padding:10px;border-left:2px solid var(--hud-active);background:#152c32;font-size:12px;}
+#app #proz0-phase1-ui button.p1-map-marker-position {border:0;background:transparent;color:inherit;padding:4px;cursor:pointer;pointer-events:auto;}
+#app .p2-settings {top:16px;right:16px;}
+#app .p2-settings>button {width:34px;height:34px;padding:4px;border-color:var(--hud-edge);}
+#app .p2-colony-controls {inset:0;transform:none;max-width:none;pointer-events:none;}
+#app .p2-colony-controls>nav {position:absolute;right:16px;bottom:86px;pointer-events:auto;padding:4px;border:1px solid var(--hud-edge);background:var(--hud-surface);border-radius:3px;}
+#app .p2-colony-controls>nav button {min-width:32px;height:32px;padding:4px 8px;}
+#app .p2-colony-panel {position:absolute;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:min(860px,calc(100% - 32px));max-width:calc(100% - 32px);max-height:calc(100% - 144px);margin:0;pointer-events:auto;padding:16px;}
+#app .p2-colony-panel article {border:1px solid var(--hud-edge);border-radius:3px;background:#152a31;margin:8px 0;padding:12px;}
+#app .p2-colony-panel article[data-unlock-state=complete] {border-left:3px solid var(--hud-active);}
+#app .p2-colony-panel article[data-unlock-state=locked] {border-left:3px solid var(--hud-warning);}
+#app .p2-colony-panel article p {font-size:12px;}
+#app .lw-panel:not([data-targeted=true]) {inset:72px max(16px,calc((100% - 960px)/2));padding:16px;}
+#app .lw-panel h2 {margin:0 0 12px;font-size:18px;}
+#app .lw-management-group {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0;}
+#app .lw-management-group>h3 {grid-column:1/-1;margin:0;font-size:14px;color:var(--ui-muted);}
+#app .lw-management-group article {display:flex;flex-wrap:wrap;align-content:start;align-items:center;gap:8px;border:1px solid var(--hud-edge);border-radius:3px;padding:12px;background:#152a31;min-width:0;}
+#app .lw-management-group article>h3 {flex:1 1 calc(100% - 60px);margin:0;font-size:14px;}
+#app .lw-card-icon {width:40px;height:40px;flex:0 0 40px;}
+#app .lw-card-icon svg {width:100%;height:100%;}
+#app .lw-condition {display:grid;grid-template-columns:74px minmax(0,1fr) 36px;gap:8px;align-items:center;flex-basis:100%;font-size:11px;}
+#app .lw-condition-track {height:7px;background:#314442;overflow:hidden;}
+#app .lw-condition-track>span {display:block;height:100%;background:var(--hud-active);}
+#app .lw-condition[data-severity=warning] {color:var(--hud-warning);}
+#app .lw-condition[data-severity=warning] .lw-condition-track>span {background:var(--hud-warning);}
+#app .lw-management-group article:is([data-care-state=needs-water],[data-care-state=needs-care]) {border-left:3px solid var(--hud-warning);}
+#app .lw-management-group article[data-care-state=ready] {border-left:3px solid var(--hud-active);}
+#app .lw-management-group article p {font-size:11px;color:var(--ui-muted);}
+#app .lw-panel [data-living-craft]>article {border:1px solid var(--hud-edge);margin:8px 0;padding:10px;background:#152a31;}
+#app .lw-panel>button:first-of-type {position:absolute;right:12px;top:12px;width:32px;height:32px;padding:0;font-size:0;}
+#app .lw-panel>button:first-of-type::before {content:'×';font-size:22px;}
+#app:has(.lw-panel:not([hidden]):not([data-targeted=true]),.p2-colony-panel:not([hidden])) #proz0-phase1-ui .p1-context-hud {display:none!important;}
+#app .lw-hint {bottom:18px;left:50%;width:min(380px,calc(100% - 580px));padding:9px 12px;border-color:var(--hud-edge);font:12px/1.4 var(--ui-font);}
+#app .sp-context-action {position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(380px,calc(100% - 580px));padding:9px 12px;border-color:var(--hud-edge);font:12px/1.4 var(--ui-font);pointer-events:auto;}
+#app:has(.lw-hint:not([hidden])) .sp-context-action {display:none;}
+#app:has(.lw-hint:not([hidden])) #proz0-phase1-ui .p1-interaction {display:none!important;}
+#app .sp-outpost {font-size:0;min-width:26px;min-height:26px;padding:4px;}
+#app:has(.p1-panel:not([hidden]),.lw-panel:not([hidden]),.p2-colony-panel:not([hidden]),.p2-settings-panel:not([hidden]),.sp-expedition-panel:not([hidden])) .sp-outpost {visibility:hidden;}
+#app .sp-outpost::before {content:'◇';font-size:16px;}
+#app .sp-outpost:is(:hover,:focus-visible) {font-size:11px;}
+#app .sp-outpost:is(:hover,:focus-visible)::before {display:none;}
+@media(max-width:1100px) {
+  #app #proz0-phase1-ui .p1-inventory-layout {grid-template-columns:minmax(260px,.9fr) minmax(0,1fr);}
+  #app #proz0-phase1-ui .p1-item-inspection {grid-column:2;}
+  #app #proz0-phase1-ui .p1-inventory-character {grid-row:1/3;}
+}
+@media(max-width:850px) {
+  #app #proz0-phase1-ui .p1-inventory-layout {grid-template-columns:minmax(0,1fr);}
+  #app #proz0-phase1-ui .p1-inventory-character,#app #proz0-phase1-ui .p1-item-inspection {grid-column:auto;grid-row:auto;}
+  #app #proz0-phase1-ui .p1-world {width:190px;right:54px;}
+  #app #proz0-phase1-ui .p1-interaction {bottom:90px;width:min(360px,calc(100% - 32px));}
+  #app .lw-hint {bottom:90px;width:min(360px,calc(100% - 32px));}
+  #app .sp-context-action {bottom:90px;width:min(360px,calc(100% - 32px));}
+  #app #proz0-phase1-ui .p1-carry {bottom:80px;width:178px;}
+  #app #proz0-phase1-ui .p1-toasts {top:158px;width:240px;max-width:40%;}
+  #app .lw-management-group {grid-template-columns:minmax(0,1fr);}
+}
+@media(max-height:500px) {
+  #app #proz0-phase1-ui .p1-panel,#app .p2-colony-panel {max-height:calc(100% - 84px);padding:10px;}
+  #app #proz0-phase1-ui .p1-panel[data-panel-kind=build] {padding:8px;max-height:calc(100% - 96px);}
+  #app #proz0-phase1-ui .p1-map-viewport {height:160px!important;}
+  #app .lw-panel:not([data-targeted=true]) {inset:42px 16px;}
+}

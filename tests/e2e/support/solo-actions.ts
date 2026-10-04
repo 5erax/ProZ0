@@ -1,5 +1,10 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type ConsoleMessage } from '@playwright/test';
+import {mkdirSync} from 'node:fs';
 export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
+  const errors:string[]=[];
+  const onError=(error:Error)=>{if(errors.length<20)errors.push(error.stack??error.message);};
+  const onConsole=(message:ConsoleMessage)=>{if(message.type()==='error'&&errors.length<20)errors.push(message.text());};
+  page.on('pageerror',onError);page.on('console',onConsole);
   let held: string[] = [];
   let previous = '',
     stuck = 0;
@@ -8,6 +13,7 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
       const p = await page.locator('canvas').evaluate((e) => ({
         x: Number(e.getAttribute('data-player-x')),
         y: Number(e.getAttribute('data-player-y')),
+        tick: e.hasAttribute('data-authority-tick') ? Number(e.getAttribute('data-authority-tick')) : null,
       }));
       const current = p.x.toFixed(2) + ',' + p.y.toFixed(2);
       if(n>0&&n%300===0)console.info('Walking approach', {step:n,target:{x,y},position:p,tolerance});
@@ -38,13 +44,21 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
         held = keys;
       }
       await page.waitForTimeout(Math.hypot(dx, dy) < 2 ? 16 : 200);
+      // Async chunk preparation can outlast a short key pulse on a busy runner.
+      // Hold real keys until a subsequent authority step has sampled the intent.
+      if(p.tick!==null)await expect.poll(async()=>Number(await page.locator('canvas').getAttribute('data-authority-tick')),{intervals:[16,32,50],timeout:5000}).toBeGreaterThan(p.tick+1);
       // Do not keep moving while a slow locator round trip reads the pose.
       await Promise.all(held.map(k=>page.keyboard.up(k)));
       held = [];
       if(Math.hypot(dx,dy)<2)await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
     }
     throw Error('Natural walk could not reach ' + String(x) + ',' + String(y));
+  } catch(error) {
+    console.info('Natural walk failure', {target:{x,y},errors,state:await page.evaluate(()=>({canvas:{...document.querySelector<HTMLCanvasElement>('canvas')?.dataset},root:{...document.querySelector<HTMLElement>('#app')?.dataset},runtime:{...document.querySelector<HTMLElement>('[data-proz0-autoboot]')?.dataset},visibility:document.visibilityState,hasFocus:document.hasFocus(),focus:document.activeElement?.outerHTML,meters:Array.from(document.querySelectorAll('.p1-meter')).map(element=>({label:element.getAttribute('aria-label'),value:element.getAttribute('aria-valuenow')})),panels:Array.from(document.querySelectorAll('.p1-panel,.lw-panel,.sp-expedition-panel,.p2-colony-panel')).map(element=>({class:element.className,hidden:(element as HTMLElement).hidden,text:element.textContent?.slice(0,100)}))}))});
+    mkdirSync('test-results/phase2-colony-depth',{recursive:true});await page.screenshot({path:'test-results/phase2-colony-depth/walk-blocked-'+x+'-'+y+'.png'});
+    throw error;
   } finally {
+    page.off('pageerror',onError);page.off('console',onConsole);
     for (const k of held) await page.keyboard.up(k);
   }
 }
