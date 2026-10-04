@@ -1,5 +1,10 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type ConsoleMessage } from '@playwright/test';
+import {mkdirSync} from 'node:fs';
 export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
+  const errors:string[]=[];
+  const onError=(error:Error)=>{if(errors.length<20)errors.push(error.stack??error.message);};
+  const onConsole=(message:ConsoleMessage)=>{if(message.type()==='error'&&errors.length<20)errors.push(message.text());};
+  page.on('pageerror',onError);page.on('console',onConsole);
   let held: string[] = [];
   let previous = '',
     stuck = 0;
@@ -48,7 +53,12 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
       if(Math.hypot(dx,dy)<2)await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));
     }
     throw Error('Natural walk could not reach ' + String(x) + ',' + String(y));
+  } catch(error) {
+    console.info('Natural walk failure', {target:{x,y},errors,state:await page.evaluate(()=>({canvas:{...document.querySelector<HTMLCanvasElement>('canvas')?.dataset},root:{...document.querySelector<HTMLElement>('#app')?.dataset},runtime:{...document.querySelector<HTMLElement>('[data-proz0-autoboot]')?.dataset},visibility:document.visibilityState,hasFocus:document.hasFocus(),focus:document.activeElement?.outerHTML,meters:Array.from(document.querySelectorAll('.p1-meter')).map(element=>({label:element.getAttribute('aria-label'),value:element.getAttribute('aria-valuenow')})),panels:Array.from(document.querySelectorAll('.p1-panel,.lw-panel,.sp-expedition-panel,.p2-colony-panel')).map(element=>({class:element.className,hidden:(element as HTMLElement).hidden,text:element.textContent?.slice(0,100)}))}))});
+    mkdirSync('test-results/phase2-colony-depth',{recursive:true});await page.screenshot({path:'test-results/phase2-colony-depth/walk-blocked-'+x+'-'+y+'.png'});
+    throw error;
   } finally {
+    page.off('pageerror',onError);page.off('console',onConsole);
     for (const k of held) await page.keyboard.up(k);
   }
 }
