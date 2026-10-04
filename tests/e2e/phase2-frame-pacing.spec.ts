@@ -122,6 +122,7 @@ test("full scene frame pacing: colony regions, recurring weather and moving auth
         authorityTick: sceneTick,
         environment: { ...request.world.environment, activeTick: sceneTick },
         singlePlayerExpedition: { ...request.world.singlePlayerExpedition!, nextEventTick: sceneTick + 7200 },
+        industry: { ...request.world.industry!, lastTick: sceneTick },
       },
     };
     // A labeled scene fixture accelerates weather setup; all measurements run the real game and authority.

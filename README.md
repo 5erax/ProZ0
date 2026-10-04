@@ -9,15 +9,17 @@
 
 ## Current milestone
 
-The active product milestone is **Phase 1 — Vertical Slice**: a 30–60 minute playable loop that proves landing, gathering, survival preparation, an expedition, death/recovery, first-base progression, shared discovery, and one prior-civilization ruin.
+**Phase 2 — Colony Depth** has been delivered on `main`; final Owner acceptance and genuine novice/co-op expedition evidence remain open. This branch incorporates the solo expedition upgrade from PR #210 and implements the **Phase 3 — Industry** candidate: processing, conveyors, independent power networks, greenhouses, cargo rovers and maintenance.
 
 Operational state changes frequently, so task truth lives in GitHub rather than this README:
 
 - [Project board — ProZ0 Project #4](https://github.com/users/5erax/projects/4/views/1)
 - [Cross-company coordination baseline — Issue #67](https://github.com/5erax/ProZ0/issues/67)
-- [Phase 1 integration — Issue #56](https://github.com/5erax/ProZ0/issues/56)
+- [Phase 2 Owner acceptance — Issue #187](https://github.com/5erax/ProZ0/issues/187)
+- [Phase 2 novice evidence — Issue #199](https://github.com/5erax/ProZ0/issues/199)
+- [Phase 3 industry plan and player flow](docs/phase-3-industry-plan.md)
 
-Phase 0 is accepted and closed. Phase 1 work is integrated through the repository's Issue/PR/QA gates.
+Phases 0 and 1 are accepted. Engineering tests, human acceptance and production release are reported separately; this branch does not invent an Owner decision.
 
 ## Game direction
 

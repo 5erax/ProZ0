@@ -84,6 +84,8 @@ jobs:
             test-results/exploration-sites/
             test-results/exploration-natural/
             test-results/exploration-narrow.png
+            test-results/phase3-industry/
+            test-results/phase2-coop-visible-latency/
           if-no-files-found: ignore
           retention-days: 30
 

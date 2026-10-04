@@ -1,5 +1,7 @@
 # Phase 2 A+B+C — AS-BUILT Traceability & Acceptance Map
 
+**Current checkpoint, 2026-10-04:** the historical baseline/dispatch below is superseded for current implementation by main `f3208d3` (PR #265) and the [Company B completion handoff](../company-b-phase2-phase3-handoff.vi.md). It records current solo world/growth/equipment/caves/UI, the storage-safe profession correction, hosted validation and the separate Phase 3 candidate. Historical specialist review/lock records remain historical; this direct Owner-authorized update does not impersonate B-TD, PM-B, QA or final acceptance.
+
 **Task / Source Issue:** #165 / P2-TD-001  
 **Authoring member:** B-TD-01 / TECHNICAL_DESIGNER / COMPANY_B  
 **Coordinating PM / lock:** B-PM-01 / PM-B / `PMB-P2-TD-001-R3`  

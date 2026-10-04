@@ -18,6 +18,7 @@ export interface WorldManifestV2 {
   readonly soloResourceMarkers?: import('../../../simulation/worldspaces/SoloResourceMarkers').SoloResourceMarkersState;
   readonly soloCaves?: import('../../../simulation/worldspaces/SoloCaveState').SoloCaveStateV1;
   readonly livingWorld?: import('../../../simulation/livingworld/LivingWorldState').LivingWorldState;
+  readonly industry?: import('../../../simulation/industry/IndustryAuthority').IndustryState;
   readonly singlePlayerExpedition?: import('../../../simulation/expedition/ExpeditionState').ExpeditionState;
   readonly formatId: typeof SAVE_FORMAT_ID;
   readonly schemaVersion: typeof SAVE_SCHEMA_VERSION_V2;

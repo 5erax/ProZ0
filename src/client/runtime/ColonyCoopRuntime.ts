@@ -4,6 +4,8 @@ import { materialSource } from '../presentation/MaterialGuide';
 import { uiPhrase } from '../localization/UiMessages';
 import { COLONY_ACTIONS } from "../../simulation/sustenance/ColonySustenanceAuthority";
 import { installGameContextMenu } from '../input/GameContextMenu';
+import { createIndustryPanel, type IndustryPanelResult } from './IndustryPanel';
+import type { IndustryState } from '../../simulation/industry/IndustryAuthority';
 import type { FacingDirection } from "../../simulation";
 import { phase1IsometricFacing } from "./Phase1IsometricProjection";
 import { createColonyAudio } from "../presentation/ColonyAudio";
@@ -225,6 +227,7 @@ export async function bootColonyCoop(
         SOURCE_MISSING: "Vật phẩm hoặc đối tượng đã thay đổi; mở lại bảng để chọn lại",
         RESEARCH_PREREQUISITE: "Hoàn thành nghiên cứu trước đó để mở khóa",
         ALREADY_RESEARCHED: "Nghiên cứu đã hoàn thành cho cả phòng",
+        REDUCE_STORAGE_BEFORE_SWITCH: "Giảm đồ trong hòm quá tải trước khi đổi khỏi nghề Engineer",
         WORKBENCH_REQUIRED: "Move near a Workbench to craft this recipe",
         NOT_READY: "Chờ kết nối lại",
       }) as Record<string, string>
@@ -254,7 +257,7 @@ export async function bootColonyCoop(
       commandType,
       expectedRevisions: refs.map((ref) => ({
         ...ref,
-        revision: aggregate(ref.aggregateType, ref.aggregateId)?.revision ?? ref.revision,
+        revision: ref.aggregateType === 'industry' ? ref.revision : aggregate(ref.aggregateType, ref.aggregateId)?.revision ?? ref.revision,
       })),
       payload: payload as JsonValue,
     });
@@ -267,6 +270,33 @@ export async function bootColonyCoop(
       revision: aggregate("container", key)?.revision ?? 0,
     };
   };
+  let industryPending: { id: string; resolve: (result: IndustryPanelResult) => void } | null = null;
+  const industryPanel = createIndustryPanel(root, {
+    read: () => aggregate('industry', 'colony')?.state as unknown as IndustryState ?? null,
+    inventory: () => inventory().stacks,
+    colonyResearchIds: () => (aggregate('colony-depth', 'colony')?.state as { researchIds?: string[] } | undefined)?.researchIds ?? [],
+    position: () => connection?.getPlayerMotions().find(p => p.playerId === connection?.getPlayerId())?.position ?? null,
+    ready: () => connection?.getState() === 'READY',
+    command: intent => {
+      if (connection?.getState() !== 'READY') return { status: 'rejected', reason: 'NOT_READY' };
+      if (lastOperation) return { status: 'rejected', reason: 'BUSY' };
+      command('industry.action', intent, [{ aggregateType: 'industry', aggregateId: 'colony', revision: (aggregate('industry', 'colony')?.state as unknown as IndustryState | undefined)?.revision ?? 0 }, containerRef()]);
+      const id = lastOperation as string | null;
+      if (id === null) return { status: 'rejected', reason: 'NOT_READY' };
+      return new Promise<IndustryPanelResult>(resolve => { industryPending = { id, resolve }; });
+    },
+    project: position => {
+      const local = connection?.getPlayerId(), camera = local ? visualPositions.get(local) : null;
+      if (!camera || !scene) return null;
+      const rect = stage.getBoundingClientRect(), parent = root.getBoundingClientRect();
+      const x = (position.x - camera.x - position.y + camera.y) * 16;
+      const y = (position.x - camera.x + position.y - camera.y) * 8;
+      return { x: rect.left - parent.left + (320 + x) * rect.width / 640,
+        y: rect.top - parent.top + (180 + y) * rect.height / 360,
+        visible: Math.abs(x) < 350 && Math.abs(y) < 200 };
+    },
+    onOpen: () => { closePanel(); pressed.clear(); sendMovement(); },
+  });
   stage.addEventListener("click", (event) => {
     if (!placing || !connection || root.dataset.colonySettingsOpen === "true")
       return;
@@ -674,7 +704,7 @@ export async function bootColonyCoop(
           ]),
         );
         b.disabled =
-          !!chosen ||
+          chosen === id ||
           !state?.researchIds?.includes(def.requiredResearch) ||
           (state?.discoveredBiomes?.length ?? 0) < def.requiredRegions;
         panel.append(row);
@@ -1255,6 +1285,10 @@ export async function bootColonyCoop(
             }
             const result = connection.getCommandResult(lastOperation);
             if (result) {
+              if (industryPending?.id === lastOperation) {
+                industryPending.resolve(result.status === 'committed' ? { status: 'committed' } : { status: 'rejected', reason: result.reason ?? 'REJECTED' });
+                industryPending = null;
+              }
               feedback =
                 result.status === "committed"
                   ? "✓ Action completed"
@@ -1269,6 +1303,8 @@ export async function bootColonyCoop(
               lastOperation = null;
               feedback =
                 "Check your inventory before repeating the last action.";
+              industryPending?.resolve({ status: 'rejected', reason: 'RESULT_UNKNOWN_CHECK_STOCK' });
+              industryPending = null;
               signature = "";
             }
           }
@@ -1333,6 +1369,7 @@ export async function bootColonyCoop(
       return;
     const active =
       panelKind === null &&
+      root.dataset.industryOpen !== 'true' &&
       root.dataset.colonySettingsOpen !== "true" &&
       !social.inputActive();
     const up = active && pressed.has("KeyW"),
@@ -1420,6 +1457,7 @@ export async function bootColonyCoop(
   function render() {
     if (destroyed) return;
     frame = requestAnimationFrame(render);
+    industryPanel.update();
     renderPanel();
     const scale = Math.max(
       1,
@@ -1467,6 +1505,8 @@ export async function bootColonyCoop(
       }
     }
     const camera = visualPositions.get(local.playerId)!;
+    canvas.dataset.visualPlayerX = String(camera.x);
+    canvas.dataset.visualPlayerY = String(camera.y);
     worldLayer.style.transform =
       "translate(" +
       String(-camera.x * 16 + camera.y * 16) +
@@ -1723,6 +1763,8 @@ export async function bootColonyCoop(
       audio.destroy();
       settings.destroy();
       social.destroy();
+      industryPending?.resolve({ status: 'rejected', reason: 'SESSION_CLOSED' });
+      industryPanel.destroy();
       root.replaceChildren();
     },
   };

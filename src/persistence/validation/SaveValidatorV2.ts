@@ -14,6 +14,8 @@ import { GEAR_ITEMS } from '../../content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import { LIVING_ROOT_ITEMS, CANONICAL_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
+import { validateIndustryState } from '../../simulation/industry/IndustryAuthority';
+import { INDUSTRY_RESEARCH } from '../../content/phase3/IndustryContent';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
@@ -211,6 +213,11 @@ export function validateWorldManifestV2(
   const record = input as unknown as WorldManifestV2;
   if(record.soloResourceMarkers!==undefined){try{validateSoloResourceMarkers(record.soloResourceMarkers);if(!record.singlePlayerExpedition)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid solo resource markers.');}}
   if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
+  if (record.industry !== undefined) {
+    try { validateIndustryState(record.industry); }
+    catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported industry state.'); }
+    if (record.industry.lastTick !== record.authorityTick) return saveFailure('CORRUPT_RECORD', 'Industry clock does not match the saved authority time.');
+  }
   if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.soloCaves !== undefined) {
     try {
@@ -976,6 +983,20 @@ function globalCrossReferences(
   policy: SaveV2CompatibilityPolicy,
 ): SaveFailure | null {
   const players = new Map(bundle.players.map((entry) => [entry.playerId, entry]));
+  const industry = bundle.world.industry;
+  if (industry) {
+    if (!bundle.world.colonyDepth || industry.facilities.some(f => !players.has(f.ownerPlayerId))
+      || industry.receipts.some(r => !players.has(r.playerId))) {
+      return saveFailure('CORRUPT_RECORD', 'Industry state references an absent colony or player.');
+    }
+    if (industry.researchIds.some(id => {
+      const prerequisite = INDUSTRY_RESEARCH.find(r => r.id === id)?.colonyPrerequisite;
+      return prerequisite != null && !bundle.world.colonyDepth!.researchIds.some(researched => researched === prerequisite);
+    })) return saveFailure('CORRUPT_RECORD', 'Industry research is missing its colony prerequisite.');
+    for (const facility of industry.facilities) {
+      if (facility.buffer.some(item => !policy.catalog.has(item.itemDefinitionId))) return saveFailure('CORRUPT_RECORD', 'Industry material is absent from the saved content catalog.');
+    }
+  }
   if (Object.keys(bundle.world.colonyDepth?.professions ?? {}).some(playerId => !players.has(playerId))) {
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }

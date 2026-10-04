@@ -339,6 +339,7 @@ function composePhase1SaveV2AtRevision(
     ...(bundle.caves?{soloCaves:bundle.caves.read()}:{}),
     ...(bundle.livingWorld?{livingWorld:bundle.livingWorld.read()}:{}),
     ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),
+    ...(bundle.industry ? { industry: bundle.industry.read() } : {}),
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
       ? { colonyDepth: bundle.colonyDepth.read() } : {}),
     worldSeed: bundle.config.worldSeed,
