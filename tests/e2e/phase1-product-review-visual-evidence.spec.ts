@@ -2450,8 +2450,8 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
     expect(icon.connected).toBe(true);
     expect(icon.display).not.toBe('none');
     expect(icon.visibility).not.toBe('hidden');
-    expect(icon.renderedWidth).toBe(48);
-    expect(icon.renderedHeight).toBe(48);
+    expect(icon.renderedWidth).toBe(24);
+    expect(icon.renderedHeight).toBe(24);
   }
   const craftLayout = await page.locator(
     '[data-panel-kind="craft"]',

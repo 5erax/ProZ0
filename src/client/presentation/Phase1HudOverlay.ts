@@ -622,7 +622,7 @@ function renderPanel(
         );
         if ((rowState.ingredients?.length ?? 0) > 0) {
           for (const ingredient of rowState.ingredients ?? []) {
-            if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');ingredients.append(hint);continue;}
+            if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');hint.querySelector('summary > span')?.classList.add('p1-asset-icon','p1-craft-ingredient-icon');ingredients.append(hint);continue;}
             const token = createElement(
               document,
               'span',
