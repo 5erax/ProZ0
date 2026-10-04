@@ -67,6 +67,9 @@ export function createExpeditionOverlay(
   footprint.append(outline);
   ghost.append(footprint);
   layer.append(style, markers, ghost, panel, hint);
+  const context=document.createElement('button');context.type='button';context.className='sp-context-action';context.hidden=true;
+  let contextTarget:HTMLButtonElement|null=null;
+  context.onclick=()=>contextTarget?.click();layer.append(context);
   root.append(layer);
   let opened = false,
     focusedEntity: string | null = null,
@@ -111,6 +114,7 @@ export function createExpeditionOverlay(
     const b = document.createElement('button');
     b.type = 'button';
     bindUiText(b,"textContent",label);
+    bindUiText(b,'aria-label',label);
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       run();
@@ -651,6 +655,11 @@ export function createExpeditionOverlay(
             ((point.y + 180) * canvasRect.height) / 360,
         ) + 'px';
     }
+    contextTarget=Array.from(markers.children).filter((element):element is HTMLButtonElement=>element instanceof HTMLButtonElement&&!element.hidden)
+      .filter(element=>Math.hypot(Number(element.dataset.x)-camera.x,Number(element.dataset.y)-camera.y)<=4)
+      .sort((a,b)=>Math.hypot(Number(a.dataset.x)-camera.x,Number(a.dataset.y)-camera.y)-Math.hypot(Number(b.dataset.x)-camera.x,Number(b.dataset.y)-camera.y))[0]??null;
+    context.hidden=!contextTarget||opened||placement!==null||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.colonySettingsOpen==='true'||bundle.playerWorldspace()!=='surface'||Boolean(root.querySelector('[data-region=interaction]'));
+    if(contextTarget){const caption=contextTarget.textContent?.split(' · ')[0]+' · '+uiPhrase('Click to interact');if(context.textContent!==caption)bindUiText(context,'textContent',caption);}
   };
   const renderPreview = () => {
     if (!placement || !cursor) {

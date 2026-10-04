@@ -2302,9 +2302,24 @@ export async function createPhase1ProductReviewRuntime(
       return;
     }
     const action = event.target.closest<HTMLElement>('[data-review-action]')?.dataset.reviewAction;
+    if(action==='map-select-marker'){const id=event.target.closest<HTMLElement>('[data-map-marker-id]')?.dataset.mapMarkerId;if(id)source.selectMapDetail(id);return;}
+    if(action==='close-panel'){
+      actionPanel=null;machineStructureId=null;source.setPresentationPanel(null);source.setPanel(null);return;
+    }
+    if(action==='open-farm'){
+      if(livingOverlay){livingOverlay.open();return;}
+      source.setPanel(null);actionPanel=actionPanel==='colony'?null:'colony';
+      if(actionPanel)refreshColonyPanel();else source.setPresentationPanel(null);return;
+    }
     if(action==='open-expedition'){expeditionOverlay?.open();return;}
     if(action?.startsWith('open-')){livingOverlay?.close();colonyDepthOverlay?.close();expeditionOverlay?.close();}
     if(action==='inventory-repair'){repairSelectedItem();return;}
+    if(action==='inventory-split'&&source.isInventoryOpen()){
+      const selection=selectedInventoryAction('SPLIT','SPLIT');if(!selection||!selection.stack)return;
+      const operationId=nextOperationId('split');
+      const result=bundle.executeItemCommand({type:'split',operationId,playerId:config.localPlayerId,containerId:selection.source.containerId,expectedRevision:selection.source.revision,sourceStackId:selection.stack.stackId,quantity:selection.quantity});
+      source.setLocalCommandFeedback({inputLabel:'SPLIT',operationId,status:result.status,...(result.status==='rejected'?{reason:result.reason}:{}),verb:'SPLIT',target:contentDisplayName(bundle.catalog.get(selection.stack.itemDefinitionId))});return;
+    }
     if(action==='remove-resource-marker'){
       const id=event.target.closest<HTMLElement>('[data-review-action]')?.dataset.resourceMarker,authority=bundle.resourceMarkers,spaceId=bundle.caves?.activeLayout()?.spaceId??'surface';
       if(id&&authority){authority.set(config.localPlayerId,authority.read().revision,id,spaceId,false);source.refresh();}return;

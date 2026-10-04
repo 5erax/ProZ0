@@ -212,6 +212,9 @@ export function createColonyDepthOverlay(
         const eligible = def.prerequisites.every((id) =>
           state.researchIds.includes(id),
         );
+        row.dataset.unlockState=complete?'complete':eligible&&affordable?'ready':'locked';
+        const indicator=document.createElement('span');indicator.className='p2-unlock-state';indicator.textContent=complete?'✓':eligible&&affordable?'○':'◇';
+        bindUiText(indicator,'aria-label',complete?'Complete':eligible&&affordable?'Available':'Locked');row.prepend(indicator);
         addButton(
           row,
           complete
@@ -231,15 +234,17 @@ export function createColonyDepthOverlay(
     if (panel === "professions")
       for (const [id, def] of Object.entries(COLONY_PROFESSIONS)) {
         const row = document.createElement("article");
+        const name=document.createElement('strong');bindUiText(name,'textContent',def.name);
         const desc = document.createElement("p");
-        bindUiText(desc,"textContent",uiPhrase(def.name) + " · " + uiPhrase(def.description));
-        row.append(desc);
+        bindUiText(desc,"textContent",def.description);
+        row.append(name,desc);
         const eligible =
           state.researchIds.includes(def.requiredResearch) &&
           state.discoveredBiomes.length >= def.requiredRegions;
+        row.dataset.unlockState=state.professions[playerId]===id?'complete':eligible?'ready':'locked';
         const requirement = document.createElement("small");
         bindUiText(requirement,"textContent",uiText("ui.753d67cf") +
-          def.requiredResearch.replaceAll("-", " ") +
+          uiPhrase(COLONY_RESEARCH.find(research=>research.id===def.requiredResearch)?.name??def.requiredResearch.replaceAll("-", " ")) +
           " · " +
           String(def.requiredRegions) +
           uiText("ui.a49ab1ed"));

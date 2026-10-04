@@ -132,6 +132,10 @@ Close|Đóng
 Inventory|Túi đồ
 Map|Bản đồ
 Craft|Chế tạo
+Crafting|Chế tạo
+Locked|Chưa mở khóa
+Click to interact|Nhấp để tương tác
+players|người chơi
 Build base|Xây căn cứ
 Journal|Nhật ký
 Research|Nghiên cứu
@@ -233,6 +237,23 @@ Entity statistics|Thông số vật thể
 Close entity statistics|Đóng thông số vật thể
 Building|Công trình
 Blueprint|Bản dựng
+Compact HUD|HUD thu gọn
+Growth|Sinh trưởng
+Moisture|Độ ẩm
+Storage|Lưu trữ
+Inventory actions|Thao tác túi đồ
+Shelter|Chỗ trú
+Utilities|Tiện ích
+Equipment effects|Hiệu ứng trang bị
+Split selected quantity|Tách số lượng đã chọn
+MORNING|Buổi sáng
+AFTERNOON|Buổi chiều
+EVENING|Buổi tối
+NIGHT|Ban đêm
+Plots|Ô trồng
+Livestock|Vật nuôi
+Nearby resources|Tài nguyên gần đây
+Close [Esc]|Đóng [Esc]
 Exploration site|Địa điểm khám phá
 Wildlife|Động vật hoang dã
 Consumable|Vật phẩm tiêu dùng

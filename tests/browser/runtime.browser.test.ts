@@ -861,7 +861,7 @@ describe('Phase 0 browser runtime', () => {
     const panel =
       root.querySelector<HTMLElement>('[data-panel-kind="craft"]');
     expect(panel).not.toBeNull();
-    expect(panel?.textContent).toContain('PAGE 1/');
+    expect(panel?.querySelector('[data-review-action=craft-page][aria-current=page]')?.textContent).toBe('1');
     expect(panel?.textContent).toContain('[1]');
 
     document.dispatchEvent(new KeyboardEvent('keydown', {

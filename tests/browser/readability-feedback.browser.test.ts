@@ -27,7 +27,14 @@ it('keeps animals visible amid more forage than the render budget and communicat
  const animal={id:'fixture:goat',species:'goat',x:p.x,y:p.y,age:0,health:40,sex:0 as const,energy:9000,thirst:1000,breedTick:0,product:0,productTicks:0,pen:'fixture:pen',owner:'solo',anchorX:p.x,anchorY:p.y,attackTick:0,shearTick:0};
  const spy=vi.spyOn(bundle.livingWorld!,'presentationSnapshot').mockReturnValue({...snapshot,animals:[animal],plots:[],forage:Array.from({length:80},(_,i)=>({id:'fixture:forage:'+i,kind:'wild-grass',x:p.x,y:p.y,readyTick:0,cleared:false}))});
  const overlay=createLivingWorldOverlay(root,canvas,bundle,'solo',()=>{});
- try{overlay.render();expect(root.querySelectorAll('[data-living-role]')).toHaveLength(64);const goat=root.querySelector<HTMLElement>('[data-living-id="fixture:goat"]')!;expect(goat).not.toBeNull();expect(goat.getAttribute('aria-label')).toContain('Needs water');expect(goat.querySelector<HTMLElement>('.lw-state-cue')!.hidden).toBe(false);}finally{overlay.destroy();spy.mockRestore();root.remove();}
+ try{overlay.render();expect(root.querySelectorAll('[data-living-role]')).toHaveLength(64);const goat=root.querySelector<HTMLElement>('[data-living-id="fixture:goat"]')!;expect(goat).not.toBeNull();expect(goat.getAttribute('aria-label')).toContain('Needs water');expect(goat.querySelector<HTMLElement>('.lw-state-cue')!.hidden).toBe(false);
+   spy.mockReturnValue({...snapshot,animals:[animal],plots:[],forage:[]});
+   overlay.open();const card=root.querySelector<HTMLElement>('[data-living-row="fixture:goat"]')!;
+   expect(card.closest('[data-living-group]')?.getAttribute('data-living-group')).toBe('Livestock');
+   expect(card.dataset.careState).toBe('needs-care');
+   expect(card.querySelector('[role=meter][aria-label=Food]')!.getAttribute('aria-valuenow')).toBe('90');
+   expect(card.querySelector('[role=meter][aria-label=Water]')!.getAttribute('aria-valuenow')).toBe('10');
+ }finally{overlay.destroy();spy.mockRestore();root.remove();}
 });
 import {createPhase1HudOverlay} from '../../src/client/presentation/Phase1HudOverlay';
 import {resolvePhase1PresentationQaFixture} from '../../src/client/qa/Phase1PresentationFixture';

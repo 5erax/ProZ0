@@ -128,6 +128,7 @@ export function createLivingWorldOverlay(
     const b = document.createElement('button');
     b.type = 'button';
     bindUiText(b,"textContent",label);
+    bindUiText(b,'aria-label',label);
     b.onclick = (e) => {
       e.stopPropagation();
       callback();
@@ -295,6 +296,11 @@ export function createLivingWorldOverlay(
       Math.ceil(s.remainingTicks / 3600) +
       uiText("ui.34aaa379");
     if (season.textContent !== seasonText) bindUiText(season,"textContent",seasonText);
+    root.dataset.worldCycleLabel=seasonText;
+    const worldCycle=root.querySelector<HTMLElement>('.p1-world-cycle');
+    if(worldCycle){worldCycle.hidden=false;if(worldCycle.textContent!==seasonText)bindUiText(worldCycle,'textContent',seasonText);}
+    const farmDock=root.querySelector<HTMLElement>('[data-review-action="open-farm"]');
+    farmDock?.setAttribute('aria-pressed',String(opened));
     const visible = new Set<string>();
     const objects = [
       ...state.plots.map((e) => ({
@@ -499,12 +505,25 @@ export function createLivingWorldOverlay(
           '%',
       ),
     );
-    const row = (id: string, title: string) => {
+    const groups=new Map<string,HTMLElement>();
+    const row = (id: string, title: string,kind='Nearby resources') => {
       const a = document.createElement('article');
       a.dataset.livingRow = id;
       a.append(text('h3', title));
-      panel.append(a);
+      if(targeted||id.startsWith('recipe:'))panel.append(a);
+      else {
+        let group=groups.get(kind);
+        if(!group){group=document.createElement('section');group.className='lw-management-group';group.dataset.livingGroup=kind;group.append(text('h3',kind));groups.set(kind,group);panel.append(group);}
+        group.append(a);
+      }
       return a;
+    };
+    const condition=(parent:HTMLElement,label:string,value:number,severity='normal')=>{
+      const indicator=document.createElement('div');indicator.className='lw-condition';indicator.dataset.severity=severity;
+      const caption=text('span',label),track=document.createElement('span'),fill=document.createElement('span'),number=text('span',Math.round(value)+'%');
+      track.className='lw-condition-track';fill.style.width=Math.max(0,Math.min(100,value))+'%';track.append(fill);
+      indicator.setAttribute('role','meter');bindUiText(indicator,'aria-label',label);indicator.setAttribute('aria-valuemin','0');indicator.setAttribute('aria-valuemax','100');indicator.setAttribute('aria-valuenow',String(Math.round(value)));
+      indicator.append(caption,track,number);parent.append(indicator);
     };
     for (const plot of state.plots.filter(
       (e) => targeted ? e.id === focus : Math.hypot(e.x - p.x, e.y - p.y) <= 8,
@@ -512,8 +531,12 @@ export function createLivingWorldOverlay(
       const crop = cropDefinition(plot.crop ?? ''),
         a = row(
           plot.id,
-          (crop ? uiPhrase(crop.name) : uiText("ui.2cd74f4d")) + ' · ' + uiPhrase(soilAt(bundle.config.worldSeed, plot).name),
+          (crop ? uiPhrase(crop.name) : uiText("ui.2cd74f4d")) + ' · ' + uiPhrase(soilAt(bundle.config.worldSeed, plot).name),'Plots',
         );
+      a.dataset.careState=plot.dead?'dead':crop&&plot.progress>=crop.cycleTicks?'ready':moistureState(plot.moisture)==='dry'?'needs-water':'growing';
+      const cropIcon=document.createElement('span');cropIcon.className='lw-card-icon';cropIcon.innerHTML=livingArt('plot',plot.crop??'',crop?plot.progress/crop.cycleTicks:0,false,plot.dead).markup;a.prepend(cropIcon);
+      condition(a,'Growth',crop?plot.progress/crop.cycleTicks*100:0,a.dataset.careState==='ready'?'ready':'normal');
+      condition(a,'Moisture',plot.moisture/100,moistureState(plot.moisture)==='dry'?'warning':'normal');
       if (!targeted) a.append(
         text(
           'p',
@@ -559,8 +582,12 @@ export function createLivingWorldOverlay(
               ? uiText("ui.715a6a83")
               : animal.age >= d.matureSeconds * 60
                 ? uiText("ui.5c0e81af")
-                : uiText("ui.2a407de3")),
+                : uiText("ui.2a407de3")),'Livestock',
         );
+      a.dataset.careState=animal.health===0?'dead':animal.energy<2500||animal.thirst<2500?'needs-care':'normal';
+      const animalIcon=document.createElement('span');animalIcon.className='lw-card-icon';animalIcon.innerHTML=livingArt('animal',animal.species,1,animal.age<d.matureSeconds*60,animal.health===0).markup;a.prepend(animalIcon);
+      condition(a,'Food',animal.energy/100,animal.energy<2500?'warning':'normal');
+      condition(a,'Water',animal.thirst/100,animal.thirst<2500?'warning':'normal');
       if (!targeted) a.append(
         text(
           'p',
