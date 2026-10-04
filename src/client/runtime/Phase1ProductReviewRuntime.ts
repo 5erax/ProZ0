@@ -2026,8 +2026,14 @@ export async function createPhase1ProductReviewRuntime(
         break;
       case 'Space':
         if(event.target instanceof Element && event.target.closest('button,summary,input,textarea,select,[contenteditable=true]')) return;
+        if(root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true')return;
         event.preventDefault();
-        if(!event.repeat)combatAssist.hold();
+        if(!event.repeat){
+          combatAssist.hold();
+          // A quick tap can be released before the next fixed step. Resolve the
+          // first eligible attack now, with the same range/cooldown/manual guards.
+          combatAssist.sample(phase1IsometricInput(input.sample()));
+        }
         break;
       case 'KeyC':
         event.preventDefault();

@@ -62,7 +62,7 @@ body { block-size:100dvh; }
 #proz0-phase1-ui .p1-item-inspection h3 { font-size:17px; }
 #proz0-phase1-ui .p1-item-state { font-size:11px; }
 #proz0-phase1-ui .p1-craft-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
-#proz0-phase1-ui .p1-craft-row { padding:12px; display:grid; gap:8px; }
+#proz0-phase1-ui .p1-craft-row { padding:8px; display:grid; gap:8px; }
 #proz0-phase1-ui .p1-craft-heading { min-height:32px; gap:8px; }
 #proz0-phase1-ui .p1-craft-ingredients { display:flex; flex-wrap:wrap; gap:8px; }
 #proz0-phase1-ui .p1-craft-footer { align-items:center; gap:8px; }
