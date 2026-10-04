@@ -8,6 +8,7 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
       const p = await page.locator('canvas').evaluate((e) => ({
         x: Number(e.getAttribute('data-player-x')),
         y: Number(e.getAttribute('data-player-y')),
+        tick: e.hasAttribute('data-authority-tick') ? Number(e.getAttribute('data-authority-tick')) : null,
       }));
       const current = p.x.toFixed(2) + ',' + p.y.toFixed(2);
       if(n>0&&n%300===0)console.info('Walking approach', {step:n,target:{x,y},position:p,tolerance});
@@ -38,6 +39,9 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
         held = keys;
       }
       await page.waitForTimeout(Math.hypot(dx, dy) < 2 ? 16 : 200);
+      // Async chunk preparation can outlast a short key pulse on a busy runner.
+      // Hold real keys until a subsequent authority step has sampled the intent.
+      if(p.tick!==null)await expect.poll(async()=>Number(await page.locator('canvas').getAttribute('data-authority-tick')),{intervals:[16,32,50],timeout:5000}).toBeGreaterThan(p.tick+1);
       // Do not keep moving while a slow locator round trip reads the pose.
       await Promise.all(held.map(k=>page.keyboard.up(k)));
       held = [];

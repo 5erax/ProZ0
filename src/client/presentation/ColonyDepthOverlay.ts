@@ -160,10 +160,12 @@ export function createColonyDepthOverlay(
     );
     const lab=bundle.colonyDepth.restoredSite('laboratory');
     const labNearby=!!lab && Math.hypot(position.x-lab.position.x,position.y-lab.position.y)<=7.5 || (bundle.expedition?.hasRemoteLab(playerId) ?? false);
+    const discovered=panel==='journal'?sites.filter(site=>{if(state.inspectedSites.includes(site.id))return true;const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));}):[];
     const current = JSON.stringify([locale(),
       panel,
       state.revision,
       inventory.revision,
+      discovered.map(site=>site.id),
       nearSite?.id,
       labNearby,
       sites.map(s=>Math.hypot(position.x-s.position.x,position.y-s.position.y)<=4),
@@ -265,7 +267,6 @@ export function createColonyDepthOverlay(
       const guidance=document.createElement('p');guidance.dataset.explorationGuidance='true';bindUiText(guidance,'textContent',gameUiText('traceHint'));content.append(guidance);
       if(observedSites.length>=2){const network=document.createElement('p');network.dataset.observedNetwork='true';bindUiText(network,'textContent',gameUiText('networkHint',{names:observedSites.map(site=>uiPhrase(site.name)).join(' · ')}));content.append(network);}
 
-      const discovered=sites.filter(site=>{const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));});
       for(const site of discovered){
         const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
         row.dataset.discoveredLandmark=site.id;row.append(uiPhrase(site.name)+' · '+distance+' m');

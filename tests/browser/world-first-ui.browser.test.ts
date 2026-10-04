@@ -4,6 +4,9 @@ import {page,userEvent} from 'vitest/browser';
 import {createPhase1ProductReviewRuntime} from '../../src/client/runtime/Phase1ProductReviewRuntime';
 import {createColonySettings} from '../../src/client/runtime/ColonySettings';
 import {setLocale} from '../../src/client/localization/Locale';
+import {vi} from 'vitest';
+import {Phase1AuthorityBundle} from '../../src/integration/Phase1AuthorityBundle';
+import {createColonyDepthOverlay} from '../../src/client/presentation/ColonyDepthOverlay';
 
 it('keeps the HUD corners clear, unifies the world cycle and exposes real mouse navigation in EN/VI',async()=>{
   const root=document.createElement('section');root.id='app';root.style.cssText='position:relative;width:100%;height:100%';document.body.append(root);
@@ -36,4 +39,21 @@ it('keeps the HUD corners clear, unifies the world cycle and exposes real mouse 
     compact.click();expect(root.dataset.hudDensity).toBe('expanded');expect(compact.getAttribute('aria-pressed')).toBe('false');
     compact.click();expect(root.dataset.hudDensity).toBe('compact');expect(compact.getAttribute('aria-pressed')).toBe('true');
   }finally{settings.destroy();runtime.destroy();root.remove();setLocale('en');}
+},30_000);
+
+it('retains inspected journal sites while chunks are unavailable and refreshes new known sites without changing authority state',async()=>{
+  const bundle=await Phase1AuthorityBundle.create({worldId:'world:journal-chunk-readiness',worldSeed:'p1-world-golden',playerIds:['solo'],singlePlayerExpeditionEnabled:true,colonyDepthEnabled:true,interactionRangeWorldUnits:4,spawnClearanceRadiusWorldUnits:0,requiredAccessRadiusWorldUnits:0});await bundle.stepSolo();
+  const sites=bundle.colonyDepth.sites(),observed=sites.find(site=>site.template==='laboratory')!,known=sites.find(site=>site.id!==observed.id)!;
+  await bundle.world.activatePosition(known.position);await bundle.worldStore.revealResolvedPlayerPosition(known.position);
+  const state=bundle.colonyDepth.read(),read=vi.spyOn(bundle.colonyDepth,'read').mockReturnValue({...state,inspectedSites:[observed.id]}),query=vi.spyOn(bundle.worldStore,'query').mockReturnValue(undefined);
+  const root=document.createElement('section');document.body.append(root);const overlay=createColonyDepthOverlay(root,bundle,'solo');
+  try {
+    root.querySelector<HTMLButtonElement>('[data-colony-panel=journal]')!.click();
+    expect(root.querySelector('[data-discovered-landmark="'+observed.id+'"]')?.textContent).toContain(observed.name);
+    expect(root.querySelector('[data-discovered-landmark="'+known.id+'"]')).toBeNull();
+    query.mockRestore();overlay.render();
+    expect(root.querySelector('[data-discovered-landmark="'+known.id+'"]')).not.toBeNull();
+    expect(root.querySelector('[data-discovered-landmark="'+observed.id+'"]')).not.toBeNull();
+    expect(bundle.colonyDepth.read().revision).toBe(state.revision);
+  }finally {overlay.destroy();root.remove();query.mockRestore();read.mockRestore();await bundle.destroy();}
 },30_000);
