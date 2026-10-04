@@ -1,46 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-async function walk(page: Page, x: number, y: number, tolerance = 0.5) {
-  let held: string[] = [];
-  let last = { x: NaN, y: NaN };
-  try {
-    for (let n = 0; n < 1500; n++) {
-      const p = await page.locator('canvas').evaluate((e) => ({
-        x: Number(e.getAttribute('data-player-x')),
-        y: Number(e.getAttribute('data-player-y')),
-      }));
-      const dx = x - p.x,
-        dy = y - p.y;
-      last = p;
-      const remaining = Math.hypot(dx, dy);
-      if (remaining < tolerance) return;
-      const keys =
-        Math.abs(dx) >= Math.abs(dy)
-          ? dx > 0
-            ? ['s', 'd']
-            : ['w', 'a']
-          : dy > 0
-            ? ['s', 'a']
-            : ['w', 'd'];
-      if (keys.join() !== held.join()) {
-        for (const k of held) await page.keyboard.up(k);
-        for (const k of keys) await page.keyboard.down(k);
-        held = keys;
-      }
-      // Shorten the final approach rather than oscillating past a close target
-      // on runners that process several authority ticks per browser command.
-      await page.waitForTimeout(remaining < 2 ? 16 : 80);
-      // Release before querying the rendered position: a slow runner must not
-      // continue walking throughout locator round trips and overshoot the goal.
-      for (const k of held.toReversed()) await page.keyboard.up(k);
-      held = [];
-    }
-    throw Error('Natural walk could not reach ' + String(x) + ',' + String(y) + '; last ' + last.x + ',' + last.y);
-  } finally {
-    for (const k of held) await page.keyboard.up(k);
-  }
-}
+import { walk as walkWithKeys } from './support/solo-actions';
+const walk=(page:Page,x:number,y:number,tolerance=.5)=>walkWithKeys(page,x,y,tolerance);
 async function clickGround(page: Page, x: number, y: number) {
   const point = await page.locator('canvas').evaluate(
     (e, target) => {
@@ -154,7 +116,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
       '[data-world-role="structure"][data-world-id*="expedition-build"]',
     ),
   ).toHaveCount(1);
-  await walk(page, -40, -12);
+  await walk(page, -40, -12, 0.15);
   await page.keyboard.press('i');
   await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
   const playerPane = page.locator('[data-inventory-pane="player"]');

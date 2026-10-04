@@ -19,8 +19,12 @@ export async function walk(page: Page, x: number, y: number, tolerance = 0.65) {
       const dx = x - p.x,
         dy = y - p.y;
       if (Math.hypot(dx, dy) < tolerance) return;
+      // Align the other axis when a footprint clips a nearby corner. A greedy
+      // walker must not repeatedly push into a real crate or cave wall.
+      const preferX = Math.abs(dx) >= Math.abs(dy);
+      const useX = stuck >= 2 && Math.min(Math.abs(dx),Math.abs(dy)) > .03 ? !preferX : preferX;
       const keys =
-        Math.abs(dx) >= Math.abs(dy)
+        useX
           ? dx > 0
             ? ['s', 'd']
             : ['w', 'a']
