@@ -685,7 +685,12 @@ function renderPanel(
     }
 
     case 'build': {
-      if(panel.expeditionEnabled)root.append(actionButton(document,'Expedition blueprints · materials later','open-expedition'));
+      if(panel.expeditionEnabled){
+        const blueprints=actionButton(document,'Blueprint','open-expedition');
+        bindUiText(blueprints,'aria-label','Expedition blueprints · materials later');
+        bindUiText(blueprints,'title','Expedition blueprints · materials later');
+        root.append(blueprints);
+      }
       const catalog = createElement(
         document,
         'div',
@@ -779,22 +784,28 @@ function renderPanel(
         'p1-build-preview-label',
         panel.placementState,
       ));
+      const kitLabel=createElement(document,'div','p1-build-kit',panel.sourceKitLabel.split(' · ')[0]);
+      bindUiText(kitLabel,'title',panel.sourceKitLabel);
       root.append(
         catalog,
         createElement(document, 'div', 'p1-build-name', panel.selectedStructure),
-        createElement(document, 'div', 'p1-build-kit', panel.sourceKitLabel),
+        kitLabel,
         preview,
       );
       if (panel.reason !== null) {
         root.append(createElement(document, 'div', 'p1-feedback', panel.reason));
       }
       const actions = createElement(document, 'div', 'p1-build-actions');
-      const place = actionButton(document, 'Place [Enter]', 'build-place');
+      const compactAction=(name:string,symbol:string,action:string)=>{
+        const button=actionButton(document,symbol,action);
+        bindUiText(button,'aria-label',name);bindUiText(button,'title',name);return button;
+      };
+      const place = compactAction('Place [Enter]', '✓', 'build-place');
       place.disabled = panel.placementState === 'INVALID';
-      actions.append(actionButton(document, 'Prepare kit', 'build-prepare'),
-        actionButton(document, 'Rotate [R]', 'build-rotate'),
-        actionButton(document, '← Connector', 'build-connector-previous'),
-        actionButton(document, 'Connector →', 'build-connector-next'), place);
+      actions.append(compactAction('Prepare kit','Kit','build-prepare'),
+        compactAction('Rotate [R]','↻','build-rotate'),
+        compactAction('← Connector','‹','build-connector-previous'),
+        compactAction('Connector →','›','build-connector-next'), place);
       root.append(actions);
       return root;
     }
