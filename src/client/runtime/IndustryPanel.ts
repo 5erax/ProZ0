@@ -613,7 +613,6 @@ export function createIndustryPanel(
       event.preventDefault(); event.stopImmediatePropagation(); open();
     }
   };
-  const onKeyUp = (event: KeyboardEvent) => { if (opened) event.stopImmediatePropagation(); };
   const onPointerDown = () => { pointerHeld = true; };
   const onPointerUp = () => { pointerHeld = false; };
   const stopPointer = (event: Event) => event.stopPropagation();
@@ -622,7 +621,6 @@ export function createIndustryPanel(
   document.addEventListener('pointerup', onPointerUp, true);
   document.addEventListener('pointercancel', onPointerUp, true);
   document.addEventListener('keydown', onKey, true);
-  document.addEventListener('keyup', onKeyUp, true);
   root.dataset.industryOpen = 'false';
   const unsubscribeLocale = onLocaleChange(() => {
     launcher.textContent = industryText('Industry · O');
@@ -639,7 +637,6 @@ export function createIndustryPanel(
       destroyed = true;
       root.dataset.industryOpen = 'false';
       document.removeEventListener('keydown', onKey, true);
-      document.removeEventListener('keyup', onKeyUp, true);
       document.removeEventListener('pointerup', onPointerUp, true);
       document.removeEventListener('pointercancel', onPointerUp, true);
       markers.remove();

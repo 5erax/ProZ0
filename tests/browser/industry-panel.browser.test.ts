@@ -6,6 +6,9 @@ import { industryMessages } from '../../src/client/localization/IndustryMessages
 
 it('industry changes locale without changing draft placement, focus, IDs or the existing Farm shortcut', () => {
   const root = document.createElement('div'); document.body.append(root);
+  let released = false;
+  const release = (event: KeyboardEvent) => { if (event.code === 'KeyW') released = true; };
+  document.addEventListener('keyup', release);
   const handle = createIndustryPanel(root, { read: () => emptyIndustryState(), inventory: () => [], position: () => ({ x: 0, y: 0 }), command: () => ({ status: 'rejected', reason: 'RESEARCH_REQUIRED' }) });
   try {
     assertDictionaryParity(industryMessages);
@@ -13,6 +16,9 @@ it('industry changes locale without changing draft placement, focus, IDs or the 
     expect(root.dataset.industryOpen).toBe('false');
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyO', bubbles: true }));
     expect(root.dataset.industryOpen).toBe('true');
+    // Opening a modal while walking must still deliver the physical key release.
+    document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+    expect(released).toBe(true);
     const x = root.querySelector<HTMLInputElement>('[data-industry-control="offset-x"]') ?? root.querySelector<HTMLInputElement>('input');
     expect(x).not.toBeNull(); x!.value = '-1.5'; x!.dispatchEvent(new Event('input')); x!.focus();
     setLocale('vi');
@@ -21,5 +27,5 @@ it('industry changes locale without changing draft placement, focus, IDs or the 
     expect(root.querySelector('[data-industry-control="build-solar-array"]')?.textContent).toBe('Xây Dàn pin mặt trời');
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true }));
     expect(root.dataset.industryOpen).toBe('false');
-  } finally { setLocale('en'); handle.destroy(); root.remove(); }
+  } finally { document.removeEventListener('keyup', release); setLocale('en'); handle.destroy(); root.remove(); }
 });
