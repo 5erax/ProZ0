@@ -15,6 +15,7 @@ import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import { LIVING_ROOT_ITEMS, CANONICAL_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
 import { validateIndustryState } from '../../simulation/industry/IndustryAuthority';
+import { industryStateHasDurableProgress } from '../../simulation/industry/IndustryState';
 import { INDUSTRY_RESEARCH } from '../../content/phase3/IndustryContent';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
@@ -220,8 +221,12 @@ export function validateWorldManifestV2(
   const record = input as unknown as WorldManifestV2;
   if(record.soloResourceMarkers!==undefined){try{validateSoloResourceMarkers(record.soloResourceMarkers);if(!record.singlePlayerExpedition)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid solo resource markers.');}}
   if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
+  let industryHasDurableProgress = false;
   if (record.industry !== undefined) {
-    try { validateIndustryState(record.industry); }
+    try {
+      const industry = validateIndustryState(record.industry);
+      industryHasDurableProgress = industryStateHasDurableProgress(industry);
+    }
     catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported industry state.'); }
     if (record.industry.lastTick !== record.authorityTick) return saveFailure('CORRUPT_RECORD', 'Industry clock does not match the saved authority time.');
   }
@@ -259,15 +264,14 @@ export function validateWorldManifestV2(
   if (!policy.seedDerivationVersions.includes(record.seedDerivationVersion)) {
     return saveFailure('UNSUPPORTED_SEED_DERIVATION_VERSION', `Seed derivation version ${record.seedDerivationVersion} is unsupported.`);
   }
-  const industrySave = record.industry !== undefined;
   const contentFailure = sameContentIdentity(
     record.contentCompatibility,
     policy,
-    industrySave,
+    industryHasDurableProgress,
   );
   if (contentFailure !== null) return contentFailure;
   if (
-    industrySave
+    industryHasDurableProgress
     && (
       record.contentCompatibility.packVersion
         !== INDUSTRY_SAVE_CONTENT_PACK_VERSION
