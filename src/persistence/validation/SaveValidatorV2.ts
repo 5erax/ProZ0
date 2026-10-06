@@ -52,7 +52,10 @@ import type { FootholdRecordV2 } from '../schema/v2/FootholdRecordV2';
 import type { PlayerRecordV2 } from '../schema/v2/PlayerRecordV2';
 import type { PortableSaveBundleV2 } from '../schema/v2/PortableSaveBundleV2';
 import type { StructureRecordV2 } from '../schema/v2/StructureRecordV2';
-import type { WorldManifestV2 } from '../schema/v2/WorldManifestV2';
+import {
+  INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+  type WorldManifestV2,
+} from '../schema/v2/WorldManifestV2';
 
 export interface SaveV2CompatibilityPolicy {
   readonly catalog: ContentCatalogV1;
@@ -161,6 +164,7 @@ function common(
 function sameContentIdentity(
   actual: unknown,
   policy: SaveV2CompatibilityPolicy,
+  allowIndustrySaveIdentity = false,
 ): SaveFailure | null {
   if (!isObject(actual)) {
     return saveFailure('CORRUPT_RECORD', 'contentCompatibility must be an object.');
@@ -169,7 +173,10 @@ function sameContentIdentity(
   if (actual.formatId !== expected.formatId || actual.schemaVersion !== expected.schemaVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_SCHEMA', 'Saved content schema identity is unsupported.');
   }
-  if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
+  const supportedPackVersion = actual.packVersion === expected.packVersion
+    || (allowIndustrySaveIdentity
+      && actual.packVersion === INDUSTRY_SAVE_CONTENT_PACK_VERSION);
+  if (actual.packId !== expected.packId || !supportedPackVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
   if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsEquipmentV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootsV2Catalog(policy.catalog, actual.canonicalFingerprint)) {
@@ -252,8 +259,27 @@ export function validateWorldManifestV2(
   if (!policy.seedDerivationVersions.includes(record.seedDerivationVersion)) {
     return saveFailure('UNSUPPORTED_SEED_DERIVATION_VERSION', `Seed derivation version ${record.seedDerivationVersion} is unsupported.`);
   }
-  const contentFailure = sameContentIdentity(record.contentCompatibility, policy);
+  const industrySave = record.industry !== undefined;
+  const contentFailure = sameContentIdentity(
+    record.contentCompatibility,
+    policy,
+    industrySave,
+  );
   if (contentFailure !== null) return contentFailure;
+  if (
+    industrySave
+    && (
+      record.contentCompatibility.packVersion
+        !== INDUSTRY_SAVE_CONTENT_PACK_VERSION
+      || record.contentCompatibility.canonicalFingerprint
+        !== policy.catalog.compatibility.canonicalFingerprint
+    )
+  ) {
+    return saveFailure(
+      'UNSUPPORTED_CONTENT_PACK',
+      'Industry state requires the Industry-aware save content identity.',
+    );
+  }
   try {
     const environment = validatePhase1EnvironmentState(record.environment, policy.catalog);
     if (environment.activeTick !== record.authorityTick) {
