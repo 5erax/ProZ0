@@ -160,7 +160,28 @@ export function createColonyDepthOverlay(
     );
     const lab=bundle.colonyDepth.restoredSite('laboratory');
     const labNearby=!!lab && Math.hypot(position.x-lab.position.x,position.y-lab.position.y)<=7.5 || (bundle.expedition?.hasRemoteLab(playerId) ?? false);
-    const discovered=panel==='journal'?sites.filter(site=>{if(state.inspectedSites.includes(site.id))return true;const coord=fromWorldPosition(site.position),view=bundle.worldStore.query(coord);if(!view)return false;const local=toChunkLocalPosition(site.position,coord);return isExplorationCellKnown(coord,view.delta.exploration,Math.floor(local.x/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS),Math.floor(local.y/PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS));}):[];
+    const isSiteDiscovered = (
+      site: (typeof sites)[number],
+    ): boolean => {
+      if (state.inspectedSites.includes(site.id)) return true;
+      const coord = fromWorldPosition(site.position);
+      const view = bundle.worldStore.query(coord);
+      if (!view) return false;
+      const local = toChunkLocalPosition(site.position, coord);
+      return isExplorationCellKnown(
+        coord,
+        view.delta.exploration,
+        Math.floor(
+          local.x / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,
+        ),
+        Math.floor(
+          local.y / PHASE1_EXPLORATION_CELL_SIZE_WORLD_UNITS,
+        ),
+      );
+    };
+    const discovered = panel === 'journal'
+      ? sites.filter(isSiteDiscovered)
+      : [];
     const current = JSON.stringify([locale(),
       panel,
       state.revision,
@@ -263,9 +284,56 @@ export function createColonyDepthOverlay(
         content.append(row);
       }
     if (panel === "journal") {
-      const observedSites=sites.filter(site=>site.template&&state.inspectedSites.includes(site.id));
-      const guidance=document.createElement('p');guidance.dataset.explorationGuidance='true';bindUiText(guidance,'textContent',gameUiText('traceHint'));content.append(guidance);
-      if(observedSites.length>=2){const network=document.createElement('p');network.dataset.observedNetwork='true';bindUiText(network,'textContent',gameUiText('networkHint',{names:observedSites.map(site=>uiPhrase(site.name)).join(' · ')}));content.append(network);}
+      const observedSites = sites.filter(
+        (site) =>
+          site.template
+          && state.inspectedSites.includes(site.id),
+      );
+      const guidance = document.createElement('p');
+      guidance.dataset.explorationGuidance = 'true';
+      bindUiText(
+        guidance,
+        'textContent',
+        gameUiText('traceHint'),
+      );
+      content.append(guidance);
+      if (observedSites.length >= 2) {
+        const repairableFacilities = observedSites.filter(
+          (site) =>
+            site.template === 'laboratory'
+            || site.template === 'mine'
+            || site.template === 'shelter',
+        );
+        const hasMatchingRepairEvidence =
+          repairableFacilities.length >= 2;
+        const comparedSites = hasMatchingRepairEvidence
+          ? repairableFacilities
+          : observedSites;
+        const comparison = document.createElement('p');
+        comparison.dataset.observedComparison =
+          hasMatchingRepairEvidence ? 'bounded' : 'neutral';
+        comparison.dataset.comparisonCertainty =
+          hasMatchingRepairEvidence ? 'hypothesis' : 'observed-only';
+        comparison.dataset.comparisonFeature =
+          hasMatchingRepairEvidence
+            ? 'repairable-facility'
+            : 'none';
+        bindUiText(
+          comparison,
+          'textContent',
+          gameUiText(
+            hasMatchingRepairEvidence
+              ? 'repairComparisonHint'
+              : 'comparisonFallback',
+            {
+              names: comparedSites
+                .map((site) => uiPhrase(site.name))
+                .join(' · '),
+            },
+          ),
+        );
+        content.append(comparison);
+      }
 
       for(const site of discovered){
         const row=document.createElement('article'),distance=Math.round(Math.hypot(position.x-site.position.x,position.y-site.position.y));
@@ -289,8 +357,41 @@ export function createColonyDepthOverlay(
               const rest=document.createElement('p');rest.dataset.poiRest='status';const remaining=bundle.expedition?.restStatus(playerId)?.remainingTicks;
               bindUiText(rest,"textContent",remaining!==undefined?uiText("ui.1c1724c4")+Math.ceil(remaining/60)+uiText("ui.3a49b846"):(bundle.expedition!.read().restCooldown[playerId]??0)>bundle.authorityTick?uiText("ui.6f9cb83"):uiText("ui.ded11927"));row.append(rest);
             }
-            if(site.template==='relay' && stage!=='unrestored'){
-              const target=sites.find(s=>s.template==='laboratory')!,dx=target.position.x-position.x,dy=target.position.y-position.y;const signal=document.createElement('p');signal.dataset.relaySignal=target.id;bindUiText(signal,"textContent",uiText("ui.c51c9aba")+uiPhrase(target.name)+' · '+Math.round(Math.hypot(dx,dy))+' m · '+(dy<0?'N':'S')+(dx<0?'W':'E')+' · '+target.position.x+', '+target.position.y);row.append(signal);
+            if (site.template === 'relay' && stage !== 'unrestored') {
+              const target = sites.find(
+                (candidate) => candidate.template === 'laboratory',
+              );
+              const signal = document.createElement('p');
+              signal.dataset.relaySignal =
+                target?.id ?? 'unknown-destination';
+              if (target !== undefined && isSiteDiscovered(target)) {
+                const dx = target.position.x - position.x;
+                const dy = target.position.y - position.y;
+                signal.dataset.relayDisclosure = 'observed';
+                bindUiText(
+                  signal,
+                  'textContent',
+                  uiText('ui.c51c9aba')
+                    + uiPhrase(target.name)
+                    + ' · '
+                    + Math.round(Math.hypot(dx, dy))
+                    + ' m · '
+                    + (dy < 0 ? 'N' : 'S')
+                    + (dx < 0 ? 'W' : 'E')
+                    + ' · '
+                    + target.position.x
+                    + ', '
+                    + target.position.y,
+                );
+              } else {
+                signal.dataset.relayDisclosure = 'withheld';
+                bindUiText(
+                  signal,
+                  'textContent',
+                  gameUiText('relaySignalWithheld'),
+                );
+              }
+              row.append(signal);
             }
           }
         }
