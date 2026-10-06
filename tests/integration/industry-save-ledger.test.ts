@@ -80,7 +80,7 @@ describe('industry ledger and Save V2 integration', () => {
       expect(reconstructPhase1ReopenState({ ...saved, world: { ...saved.world,
         industry: { ...saved.world.industry!, lastTick: 71 } } }, compatibility)).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
       expect(saved.world.contentCompatibility.packVersion).toBe(
-        INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+        original.catalog.compatibility.packVersion,
       );
       const legacy = {
         ...saved,
