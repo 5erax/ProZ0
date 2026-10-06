@@ -3,7 +3,14 @@ import { Phase1AuthorityBundle, composePhase1SaveV2 } from '../../src/integratio
 import { createPhase1ContentCatalog } from '../../src/content';
 import { COLONY_RESEARCH } from '../../src/content/phase2/ColonyDepthContent';
 import { INDUSTRY_FACILITIES, INDUSTRY_RESEARCH, type IndustryCost } from '../../src/content/phase3/IndustryContent';
-import { SAVE_FORMAT_ID, SAVE_SCHEMA_VERSION_V2, createPhase1SaveV2Compatibility, reconstructPhase1ReopenState } from '../../src/persistence';
+import {
+  INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+  SAVE_FORMAT_ID,
+  SAVE_SCHEMA_VERSION_V2,
+  createPhase1SaveV2Compatibility,
+  reconstructPhase1ReopenState,
+  validatePortableSaveBundleV2,
+} from '../../src/persistence';
 import { Phase1ItemAuthority } from '../../src/simulation';
 import { IndustryAuthority } from '../../src/simulation/industry/IndustryAuthority';
 import { COLONY_WORLD_GENERATION_VERSION } from '../../src/world/phase1/Phase1ChunkGenerator';
@@ -18,6 +25,25 @@ function portable(bundle: Phase1AuthorityBundle) {
   return { formatId: SAVE_FORMAT_ID, schemaVersion: SAVE_SCHEMA_VERSION_V2, recordKind: 'portable-bundle' as const,
     world: request.world, players: request.players, containers: request.containers,
     chunks: request.chunks, footholds: request.footholds, structures: request.structures };
+}
+
+/** Exact compatibility checks performed by the pre-Industry V2 reader at the PR base. */
+function preIndustryReaderCompatibility(
+  bundle: ReturnType<typeof portable>,
+  catalog = createPhase1ContentCatalog(),
+): 'ACCEPTED' | 'UNSUPPORTED_CONTENT_SCHEMA' | 'UNSUPPORTED_CONTENT_PACK' | 'CONTENT_FINGERPRINT_MISMATCH' {
+  const actual = bundle.world.contentCompatibility;
+  const expected = catalog.compatibility;
+  if (actual.formatId !== expected.formatId || actual.schemaVersion !== expected.schemaVersion) {
+    return 'UNSUPPORTED_CONTENT_SCHEMA';
+  }
+  if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
+    return 'UNSUPPORTED_CONTENT_PACK';
+  }
+  if (actual.canonicalFingerprint !== expected.canonicalFingerprint) {
+    return 'CONTENT_FINGERPRINT_MISMATCH';
+  }
+  return 'ACCEPTED';
 }
 describe('industry ledger and Save V2 integration', () => {
   it('rolls back a dismantle refund when a real ordinary inventory cannot carry it', () => {
@@ -53,7 +79,20 @@ describe('industry ledger and Save V2 integration', () => {
       expect(saved.world.industry?.lastTick).toBe(70);
       expect(reconstructPhase1ReopenState({ ...saved, world: { ...saved.world,
         industry: { ...saved.world.industry!, lastTick: 71 } } }, compatibility)).toMatchObject({ ok: false, code: 'CORRUPT_RECORD' });
-      const legacy = { ...saved, world: { ...saved.world } }; delete legacy.world.industry;
+      expect(saved.world.contentCompatibility.packVersion).toBe(
+        INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+      );
+      const legacy = {
+        ...saved,
+        world: {
+          ...saved.world,
+          contentCompatibility: original.catalog.compatibility,
+        },
+      };
+      delete legacy.world.industry;
+      expect(legacy.world.contentCompatibility.packVersion).toBe(
+        original.catalog.compatibility.packVersion,
+      );
       const decoded = reconstructPhase1ReopenState(legacy, compatibility);
       expect(decoded.ok).toBe(true); if (!decoded.ok) throw new Error(decoded.message);
       reopened = await Phase1AuthorityBundle.create({ ...config, reopen: decoded.value });
@@ -94,6 +133,25 @@ describe('industry ledger and Save V2 integration', () => {
         expectedRevision: original.industry!.read().revision, expectedInventoryRevision: original.items.getContainerView('inventory:p1').revision };
       const result = original.industry!.execute(command); expect(result.status).toBe('committed');
       const saved = portable(original), compatibility = createPhase1SaveV2Compatibility(original.catalog, [COLONY_WORLD_GENERATION_VERSION]);
+      expect(saved.world.industry?.researchIds).toContain('automation');
+      expect(saved.world.industry?.facilities.some(facility => facility.id === depot)).toBe(true);
+      expect(saved.world.industry?.facilities.find(facility => facility.id === depot)?.buffer)
+        .toContainEqual({ itemDefinitionId: 'item:stone', quantity: 3 });
+      expect(saved.world.contentCompatibility.packVersion).toBe(
+        INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+      );
+
+      const serializedBeforeOldReader = JSON.stringify(saved);
+      expect(preIndustryReaderCompatibility(saved, original.catalog))
+        .toBe('UNSUPPORTED_CONTENT_PACK');
+      expect(JSON.stringify(saved)).toBe(serializedBeforeOldReader);
+      expect(JSON.parse(serializedBeforeOldReader).world.industry)
+        .toEqual(saved.world.industry);
+
+      const currentReader = validatePortableSaveBundleV2(saved, compatibility);
+      expect(currentReader.ok).toBe(true);
+      if (!currentReader.ok) throw new Error(currentReader.message);
+
       const decoded = reconstructPhase1ReopenState(saved, compatibility); expect(decoded.ok).toBe(true); if (!decoded.ok) throw new Error(decoded.message);
       reopened = await Phase1AuthorityBundle.create({ ...config, worldId: 'industry-full-roundtrip', reopen: decoded.value });
       expect(reopened.industry?.read()).toEqual(original.industry?.read());
