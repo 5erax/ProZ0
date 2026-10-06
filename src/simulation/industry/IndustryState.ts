@@ -74,6 +74,21 @@ export function emptyIndustryState(lastTick = 0): IndustryState {
     researchIds: Object.freeze([]), facilities: Object.freeze([]), links: Object.freeze([]),
     powerNetworks: Object.freeze([]), receipts: Object.freeze([]), events: Object.freeze([]) });
 }
+
+/**
+ * Returns true only when dropping Industry state would lose canonical progress
+ * rather than a reconstructable empty authority clock.
+ */
+export function industryStateHasDurableProgress(state: IndustryState): boolean {
+  return state.revision !== 0
+    || state.nextFacilityOrdinal !== 1
+    || state.researchIds.length !== 0
+    || state.facilities.length !== 0
+    || state.links.length !== 0
+    || state.powerNetworks.length !== 0
+    || state.receipts.length !== 0
+    || state.events.length !== 0;
+}
 export function validIndustryPosition(value: unknown): value is WorldPosition {
   if (typeof value !== 'object' || value === null) return false;
   const p = value as WorldPosition;
