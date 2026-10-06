@@ -2,6 +2,7 @@ import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
 } from '../foundation';
+import { industryStateHasDurableProgress } from '../simulation/industry/IndustryState';
 import type { Phase1AuthorityBundle } from './Phase1AuthorityBundle';
 import {
   INDUSTRY_SAVE_CONTENT_PACK_VERSION,
@@ -329,12 +330,13 @@ function composePhase1SaveV2AtRevision(
   });
 
   const industryState = bundle.industry?.read();
-  const saveContentCompatibility = industryState === undefined
-    ? bundle.catalog.compatibility
-    : Object.freeze({
+  const saveContentCompatibility = industryState !== undefined
+    && industryStateHasDurableProgress(industryState)
+    ? Object.freeze({
         ...bundle.catalog.compatibility,
         packVersion: INDUSTRY_SAVE_CONTENT_PACK_VERSION,
-      });
+      })
+    : bundle.catalog.compatibility;
 
   const world: WorldManifestV2 = Object.freeze({
     formatId: SAVE_FORMAT_ID,
