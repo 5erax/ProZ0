@@ -1,3 +1,4 @@
+import { industryMessages } from './src/client/localization/IndustryMessages';
 import {gameUiMessages} from './src/client/localization/GameUiMessages';
 import { presentationMessages } from './src/client/localization/PresentationMessages';
 import { defineConfig } from 'vite';
@@ -7,7 +8,7 @@ import { coreMessages } from './src/client/localization/CoreMessages';
 import { lobbyMessages } from './src/client/localization/LobbyMessages';
 import { resourceMessages } from './src/client/localization/ResourceFacts';
 import { statusMessages } from './src/client/localization/StatusMessages';
-for (const dictionary of [uiMessages,coreMessages,lobbyMessages,resourceMessages,statusMessages,presentationMessages,gameUiMessages]) assertDictionaryParity(dictionary);
+for (const dictionary of [industryMessages,uiMessages,coreMessages,lobbyMessages,resourceMessages,statusMessages,presentationMessages,gameUiMessages]) assertDictionaryParity(dictionary);
 
 const proxy=process.env.PROZ0_LOCAL_PILOT?{'/api/pilot':{target:process.env.PROZ0_LOCAL_PILOT,ws:true}}:undefined;
 export default defineConfig({

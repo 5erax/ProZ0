@@ -55,6 +55,9 @@ function aggregateViews(
   bundle: Phase1AuthorityBundle,
 ): readonly RevisionedAggregateViewV1[] {
   const values: RevisionedAggregateViewV1[] = [];
+  if (bundle.industry) values.push(Object.freeze({ aggregateType: 'industry', aggregateId: 'colony',
+    revision: bundle.authorityTick + bundle.industry.read().revision, tombstone: false,
+    state: asJson({ ...bundle.industry.read(), receipts: [] }) }));
   if(bundle.config.colonyDepthEnabled===true){let known=equipmentRevisions.get(bundle);if(!known){known=new Map();equipmentRevisions.set(bundle,known);}for(const playerId of bundle.getActivePlayerIds()){const state=bundle.equipment.reconcile(playerId),signature=JSON.stringify(state),previous=known.get(playerId),revision=previous?previous.revision+(signature!==previous.signature?1:0):0;known.set(playerId,{signature,revision});values.push({aggregateType:'equipment',aggregateId:playerId,revision,tombstone:false,state:asJson(state)});}}
   if(bundle.config.colonyDepthEnabled===true)values.push(Object.freeze({aggregateType:'colony-depth',aggregateId:'colony',revision:bundle.colonyDepth.read().revision,tombstone:false,state:asJson(bundle.colonyDepth.read())}));
   const colony = bundle.sustenance.read();
@@ -389,6 +392,7 @@ export class Phase1HostedAuthorityComposition {
       equipment:{set(playerId,slot,stackId,inventoryRevision){if(bundle.items.getContainerView('inventory:'+playerId).revision!==inventoryRevision)return {status:'rejected',reason:'STALE_REVISION'};return slot==='weapon'?bundle.equipWeapon(playerId,stackId):bundle.equipThermalWrap(playerId,stackId);}},
       sustenance: bundle.sustenance,
       ...(config.colonyDepthEnabled===true?{colonyDepth:bundle.colonyDepth}:{}),
+      ...(bundle.industry ? { industry: bundle.industry } : {}),
       combat: bundle.combat,
       ruins: bundle,
       replication,

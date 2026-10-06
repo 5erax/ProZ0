@@ -294,8 +294,9 @@ describe("Colony-depth real authority transactions", () => {
       expect(validatePortableSaveBundleV2(save, policy)).toMatchObject({
         ok: true,
       });
-      const { colonyDepth, ...legacyWorld } = save.world;
+      const { colonyDepth, industry, ...legacyWorld } = save.world;
       expect(colonyDepth).toBeDefined();
+      expect(industry).toBeDefined();
       const legacy = { ...save, world: legacyWorld };
       expect(validatePortableSaveBundleV2(legacy, policy).ok).toBe(true);
       expect(() =>

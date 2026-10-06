@@ -1,4 +1,5 @@
 import type { PlayerId } from '../../foundation';
+import { INDUSTRY_ACTIONS, type IndustryAuthority, type IndustryCommand } from '../../simulation/industry/IndustryAuthority';
 import { COLONY_ACTIONS, type ColonySustenanceAuthority, type ColonySustenanceAction } from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type { ColonyDepthAuthority, ColonyDepthCommand } from '../../simulation/colony/ColonyDepthAuthority';
 import {
@@ -91,6 +92,7 @@ export interface Phase1HostedCommandDispatcherOptions {
   readonly combat?: Phase1CombatAuthority;
   readonly sustenance?: Pick<ColonySustenanceAuthority, 'execute'>;
   readonly colonyDepth?: Pick<ColonyDepthAuthority,'execute'>;
+  readonly industry?: Pick<IndustryAuthority, 'execute'>;
   readonly equipment?: {set(playerId:PlayerId,slot:'weapon'|'protection',stackId:string|null,inventoryRevision:number):{status:'committed'}|{status:'rejected';reason:string}};
   readonly ruins?: Phase1HostedRuinAuthority;
   readonly replication?: Phase1HostedReplicationAdapter;
@@ -241,6 +243,19 @@ implements HostedCommandDispatcher {
     const payload = payloadObject(command);
 
     switch (command.commandType) {
+      case 'industry.action': {
+        if (!this.options.industry || command.expectedRevisions.length !== 2 || !INDUSTRY_ACTIONS.includes(payload.action as IndustryCommand['action'])) {
+          return Object.freeze({ status: 'rejected', reason: 'INVALID_MESSAGE' });
+        }
+        const result = this.options.industry.execute({ ...payload,
+          operationId: command.operationId, playerId: context.playerId,
+          expectedRevision: expectedRevision(command, 'industry', 'colony'),
+          expectedInventoryRevision: expectedRevision(command, 'container', 'inventory:' + context.playerId),
+        } as unknown as IndustryCommand);
+        return withReplication(this.options, command.commandType, context.playerId,
+          result.status === 'committed' ? { status: 'committed', resultingRevisions: [] }
+            : { status: 'rejected', reason: result.reason });
+      }
       case 'equipment.set': {
         const slot=payload.slot,stackId=payload.stackId;
         if(!this.options.equipment||!['weapon','protection'].includes(String(slot))||(stackId!==null&&typeof stackId!=='string')||command.expectedRevisions.length!==1)return {status:'rejected',reason:'INVALID_MESSAGE'};

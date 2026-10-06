@@ -19,6 +19,7 @@ import {
   COLONY_SURVEY_SITE_IDS,
 } from "../../world/phase2/ColonyRegions";
 import type { Phase1ItemAuthority } from "../items";
+import { STORAGE_CRATE_MAX_VOLUME, STORAGE_CRATE_MAX_WEIGHT_KG } from "../items/ItemCapacity";
 
 export interface ColonyDepthState {
   readonly exploration?: ExplorationProgress;
@@ -385,10 +386,28 @@ export class ColonyDepthAuthority {
         return reject("RETURN_TO_BASE");
       if (next.professions[command.playerId] === id)
         return reject("ALREADY_SPECIALIZED");
-      next = {
+      const specialized = {
         ...next,
         professions: { ...next.professions, [command.playerId]: id },
       };
+      const currentCapacity = colonyStorageMultiplier(this.state);
+      const prospectiveCapacity = colonyStorageMultiplier(specialized);
+      if (prospectiveCapacity < currentCapacity) {
+        for (const container of this.items.exportLedgerSnapshot().containers) {
+          if (container.kind !== "storage-crate") continue;
+          const usage = this.items.getContainerView(container.containerId);
+          if (usage.totalWeightKg > STORAGE_CRATE_MAX_WEIGHT_KG * prospectiveCapacity
+            || usage.totalVolume > STORAGE_CRATE_MAX_VOLUME * prospectiveCapacity) return reject("REDUCE_STORAGE_BEFORE_SWITCH");
+        }
+      }
+      // Selecting another eligible profession replaces the active bonus and never awards XP or spends materials.
+      // The inventory revision still participates in authoritative admission and duplicate protection.
+      const inventory = this.items.commitColonyExchange({
+        operationId: command.operationId, playerId: command.playerId,
+        expectedInventoryRevision: command.expectedInventoryRevision, inputs: [], outputs: [],
+      });
+      if (inventory.status === "rejected") return reject(inventory.reason);
+      next = specialized;
     } else if (command.action === "inspect-site") {
       const site = this.sites().find(
         (s) => s.id === command.targetId,

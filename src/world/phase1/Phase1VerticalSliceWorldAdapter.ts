@@ -134,6 +134,9 @@ export interface Phase1VerticalSliceWorldAdapterOptions {
   readonly requiredAccessRadiusWorldUnits: number;
   readonly structures: () => readonly Readonly<StructureRuntimeState>[];
   readonly structureFootprint?: (structureId:string)=>StructurePlacementProfile['footprint']|null;
+  readonly additionalSolidFootprints?: () => readonly {
+    readonly position: WorldPosition; readonly width: number; readonly depth: number;
+  }[];
   readonly playerIds: () => readonly PlayerId[];
   readonly playerOnSurface?: (playerId:PlayerId)=>boolean;
   readonly playerInsideStructure?: (
@@ -826,6 +829,11 @@ export class Phase1VerticalSliceWorldAdapter
     return footprint ? {...base,footprint} : base;
   }
   private blocksExpeditionMotion(previous:WorldPosition,next:WorldPosition,footprint:AxisSweepRequest['footprint']):boolean{
+    if (this.options.additionalSolidFootprints?.().some(solid => {
+      const overlaps = (p: WorldPosition) => Math.abs(p.x - solid.position.x) < solid.width / 2 + footprint.halfWidth
+        && Math.abs(p.y - solid.position.y) < solid.depth / 2 + footprint.halfDepth;
+      return overlaps(next) && (!overlaps(previous) || distanceSquared(next, solid.position) <= distanceSquared(previous, solid.position));
+    })) return true;
     if(!this.options.expeditionCollisionEnabled)return false;
     return this.options.structures().some(structure=>{
       if(structure.definitionId==='structure:landing-module'||structure.definitionId==='structure:habitat-room')return false;
@@ -912,6 +920,10 @@ export class Phase1VerticalSliceWorldAdapter
     profile: StructurePlacementProfile,
     orientationQuarterTurns: QuarterTurn,
   ): boolean {
+    const width = orientationQuarterTurns % 2 === 0 ? profile.footprint.width : profile.footprint.depth;
+    const depth = orientationQuarterTurns % 2 === 0 ? profile.footprint.depth : profile.footprint.width;
+    if (this.options.additionalSolidFootprints?.().some(solid => Math.abs(position.x - solid.position.x) < (width + solid.width) / 2
+      && Math.abs(position.y - solid.position.y) < (depth + solid.depth) / 2)) return true;
     for (const view of this.activeChunks.values()) {
       for (const entity of view.base.entities) {
         if (

@@ -7,10 +7,10 @@ import { SoloWorldspaceWorldAdapter } from './worldspaces/SoloWorldspaceWorldAda
 import { soloCaveRegistry } from '../world/phase2/SoloCaveRegistry';
 import { mountainAt, mountainFoundation } from '../world/phase2/SoloMountain';
 import { wearableThermalTarget } from '../content/livingworld/WearableContent';
-import { PHASE1_STRUCTURE_PLACEMENT_PROFILES } from '../world/building/Phase1BuildingWorld';
 import {LivingWorldAuthority} from '../simulation/livingworld/LivingWorldAuthority';
 import {expeditionFacility} from '../content/singleplayer/ExpeditionContent';
 import {ExpeditionAuthority} from '../simulation/expedition/ExpeditionAuthority';
+import { IndustryAuthority, emptyIndustryState } from '../simulation/industry/IndustryAuthority';
 import { EXPEDITION_PLAYER_CARRY } from '../simulation/items/ItemCapacity';
 import {
   RNG_ALGORITHM_VERSION,
@@ -63,6 +63,7 @@ import {
   Phase1SessionWorldPersistence,
   Phase1VerticalSliceWorldAdapter,
   createChunkCoord,
+  PHASE1_STRUCTURE_PLACEMENT_PROFILES,
   fromWorldPosition,
   type BuildingWorldSnapshot,
   type Phase1VerticalSliceWorldSnapshot,
@@ -414,6 +415,7 @@ export class Phase1AuthorityBundle {
   public readonly machines: Phase1CondenserAuthority;
   public readonly sustenance: ColonySustenanceAuthority;
   public readonly colonyDepth: ColonyDepthAuthority;
+  public readonly industry: IndustryAuthority | null;
   public readonly expedition: ExpeditionAuthority|null;
   public readonly livingWorld: LivingWorldAuthority|null;
   public readonly caves: SoloCaveAuthority | null;
@@ -527,6 +529,42 @@ export class Phase1AuthorityBundle {
       },
       cancelRest:playerId=>this.expedition!.cancelRest(playerId),
     } : undefined);
+    this.industry = config.colonyDepthEnabled === true ? new IndustryAuthority(items,
+      playerId => ({ position: positions.get(playerId), spaceId: this.playerWorldspace(), alive: survival.getPlayerState(playerId).lifeState.type === 'alive' }),
+      {
+        hasResearch: id => this.colonyDepth.read().researchIds.some(researched => researched === id),
+        solarActive: () => worldStore.getEnvironmentView().dayPeriod === 'day',
+        canPlace: position => {
+          const profile = { structureDefinitionId: 'structure:storage-crate' as const,
+            footprint: { width: 1, depth: 1 }, doorClearanceDepth: 0, connectorOffsetWorldUnits: null };
+          const overlapsStructure = (center: WorldPosition, definitionId: keyof typeof PHASE1_STRUCTURE_PLACEMENT_PROFILES, orientation: number) => {
+            const footprint = PHASE1_STRUCTURE_PLACEMENT_PROFILES[definitionId].footprint;
+            const width = orientation % 2 === 0 ? footprint.width : footprint.depth;
+            const depth = orientation % 2 === 0 ? footprint.depth : footprint.width;
+            return Math.abs(center.x - position.x) < (width + 1) / 2 && Math.abs(center.y - position.y) < (depth + 1) / 2;
+          };
+          return world.isFootprintExplored(position, profile, 0)
+            && world.isBuildableGround(position, profile, 0)
+            && !world.hasBlockingWorldCollision(position, profile, 0)
+            && !world.overlapsProtectedRuin(position, profile, 0)
+            && !world.obstructsDeathCache(position, profile, 0)
+            && !world.blocksSpawnClearance(position, profile, 0)
+            && !world.blocksRequiredAccess(position, profile, 0)
+            && !buildings.exportSnapshot().foothold.structures.some(s => overlapsStructure(s.position, s.definitionId, s.orientationQuarterTurns))
+            && !(this.expedition?.read().facilities.some(f => overlapsStructure({ x: f.x, y: f.y }, expeditionFacility(f.definitionId)!.shape, f.orientation)) ?? false);
+        },
+        movePlayer: (playerId, target) => {
+          const current = positions.get(playerId);
+          const footprint = { halfWidth: 0.3, halfDepth: 0.3 };
+          const xSweep = world.sweepAabbAxis({ center: current, footprint, axis: 'x', desiredDelta: target.x - current.x });
+          if (xSweep.blocked) return false;
+          const intermediate = createWorldPosition(target.x, current.y);
+          const ySweep = world.sweepAabbAxis({ center: intermediate, footprint, axis: 'y', desiredDelta: target.y - current.y });
+          if (ySweep.blocked) return false;
+          positions.set(playerId, createWorldPosition(target.x, target.y));
+          return true;
+        },
+      }, config.reopen?.bundle.world.industry ?? { ...emptyIndustryState(), lastTick: authorityTickRef.value }) : null;
     if (config.colonyDepthEnabled === true) worldStore.setRenewalPolicy({
       multiplier: (position, definitionId) => this.colonyDepth.recoveryMultiplier(position, definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)*(this.livingWorld?.renewal(position,definitionId)??1),
       ...(this.livingWorld ? {growthMultiplier:(position:WorldPosition,definitionId:string)=>this.colonyDepth.recoveryMultiplier(position,definitionId)*(this.expedition?.recoveryMultiplier(position,definitionId)??1)} : {}),
@@ -578,6 +616,9 @@ export class Phase1AuthorityBundle {
     }
     if ((config.soloCavesEnabled && !config.singlePlayerExpeditionEnabled) || (config.reopen?.bundle.world.soloCaves && !config.soloCavesEnabled)) throw Error('Cave saves require an explicitly enabled single-player worldspace session.');
     const catalog = config.catalog ?? createPhase1ContentCatalog();
+    if (config.reopen?.bundle.world.industry && config.colonyDepthEnabled !== true) {
+      throw new Error('Industry saves require an explicitly enabled colony session.');
+    }
     const reopen = config.reopen;
     if (
       reopen !== undefined
@@ -628,6 +669,7 @@ export class Phase1AuthorityBundle {
     let caves: SoloCaveAuthority | null = null;
     let livingWorld: LivingWorldAuthority | null = null;
     let capacityAuthority:ColonyDepthAuthority|null=null;
+    let industry: IndustryAuthority | null = null;
     const reopenedWorld = initialWorldSnapshot(reopen);
     const mountains=config.soloCavesEnabled?soloCaveRegistry(config.worldSeed,reopen?.bundle.world.generationVersion??config.worldGenerationVersion??PHASE1_WORLD_GENERATION_VERSION):[];
     const world = new Phase1VerticalSliceWorldAdapter({
@@ -648,6 +690,7 @@ export class Phase1AuthorityBundle {
       structureFootprint: id=>expedition?.facilityFootprint(id) ?? null,
       playerIds: () => Object.freeze(playerIds.filter(() => !caves || caves.isSurface())),
       playerOnSurface: () => !caves || caves.isSurface(),
+      additionalSolidFootprints: () => industry?.read().facilities.filter(f => f.kind !== 'rover').map(f => ({ position: f.position, width: 1, depth: 1 })) ?? [],
       playerInsideStructure: (playerId, structureId) => {
         const structure = buildings?.getStructure(structureId) ?? null;
         return structure !== null
@@ -766,6 +809,7 @@ export class Phase1AuthorityBundle {
     capacityAuthority=bundle.colonyDepth;
     expedition=bundle.expedition;
     livingWorld=bundle.livingWorld;
+    industry=bundle.industry;
 
     if (config.activatePlayersOnCreate !== false) {
       for (const playerId of playerIds) {
@@ -1034,6 +1078,7 @@ export class Phase1AuthorityBundle {
       this.sustenance.tick({cropStep:pressure&&authorityTick%2===0?0:cultivated&&this.colonyDepth.hasResearch('cultivation')?2:this.colonyDepth.hasResearch('cultivation')&&authorityTick%4===0?2:wet&&this.colonyDepth.hasResearch('water-stewardship')&&authorityTick%4===0?2:1,careStep:this.colonyDepth.hasResearch('water-stewardship')&&authorityTick%4===0?2:1});
     }else this.sustenance.tick();
     if (this.config.colonyDepthEnabled === true) this.colonyDepth.recover(authorityTick);
+    this.industry?.tick(authorityTick);
 
     for (const structure of this.buildings.exportSnapshot().foothold.structures) {
       if (structure.definitionId === 'structure:atmospheric-water-condenser') {

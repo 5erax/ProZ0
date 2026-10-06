@@ -19,10 +19,11 @@ export type {
 export type { ChunkRecordV1 } from './schema/v1/ChunkRecordV1';
 export type { PortableSaveBundleV1 } from './schema/v1/PortableSaveBundleV1';
 
-export type {
-  SaveContentCompatibilityV2,
-  WeatherEventSaveV2,
-  WorldManifestV2,
+export {
+  INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+  type SaveContentCompatibilityV2,
+  type WeatherEventSaveV2,
+  type WorldManifestV2,
 } from './schema/v2/WorldManifestV2';
 export type {
   PlayerLifeStateSaveV2,

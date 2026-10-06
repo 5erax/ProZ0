@@ -12,9 +12,9 @@ import {
   type OperationStatusV1,
   type PlayerMotionViewV1,
   type RevisionedAggregateViewV1,
-  type ServerEnvelopeV1,
 } from '../../protocol';
 import { ClientReplicationStore } from './ClientReplicationStore';
+import { parseHostedServerEnvelope } from './HostedServerValidation';
 
 export interface HostedClientTransport {
   sendText(text: string): void;
@@ -38,34 +38,6 @@ function asJson(value: unknown): JsonValue {
   return value as JsonValue;
 }
 
-function parseServerEnvelope(text: string): ServerEnvelopeV1 | null {
-  let input: unknown;
-  try {
-    input = JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-  if (
-    typeof input !== 'object'
-    || input === null
-    || Array.isArray(input)
-  ) {
-    return null;
-  }
-  const value = input as Partial<ServerEnvelopeV1>;
-  if (
-    value.protocolVersion !== HOSTED_PROTOCOL_VERSION
-    || typeof value.messageType !== 'string'
-    || !Number.isSafeInteger(value.serverMessageSeq)
-    || typeof value.sessionId !== 'string'
-    || typeof value.sessionEpoch !== 'string'
-    || !Number.isSafeInteger(value.authorityTick)
-  ) {
-    return null;
-  }
-  return value as ServerEnvelopeV1;
-}
-
 export class HostedClientConnection {
   public readonly replication = new ClientReplicationStore();
 
@@ -77,6 +49,7 @@ export class HostedClientConnection {
   private sessionEpoch: string | null = null;
   private connectionId: string | null = null;
   private playerId: string | null = null;
+  private worldId: string | null = null;
   private resumeCredential: string | null;
   private pendingSnapshotId: string | null = null;
   private readonly commandResults = new Map<string, CommandResultV1>();
@@ -106,7 +79,8 @@ export class HostedClientConnection {
   }
 
   private applyServerText(text: string): void {
-    const envelope = parseServerEnvelope(text);
+    if (this.state === 'CLOSED' || this.state === 'RESYNC_REQUIRED') return;
+    const envelope = parseHostedServerEnvelope(text);
     if (envelope === null) {
       this.state = 'RESYNC_REQUIRED';
       return;
@@ -118,9 +92,6 @@ export class HostedClientConnection {
       this.state = 'RESYNC_REQUIRED';
       return;
     }
-    this.lastServerMessageSeq = envelope.serverMessageSeq;
-    this.replication.setAuthorityTick(envelope.authorityTick);
-
     if (
       this.sessionId !== null
       && (
@@ -132,10 +103,24 @@ export class HostedClientConnection {
       return;
     }
 
+    const terminalResponse = ['ERROR', 'SESSION_REJECTED', 'RESYNC_REQUIRED', 'SESSION_CLOSING'].includes(envelope.messageType);
+    if (
+      this.state === 'DISCONNECTED'
+      || (envelope.messageType === 'SESSION_ACCEPTED' && this.state !== 'HANDSHAKING')
+      || (envelope.messageType === 'BASELINE_SNAPSHOT' && this.state !== 'BASELINING')
+      || (!terminalResponse && !['SESSION_ACCEPTED', 'BASELINE_SNAPSHOT'].includes(envelope.messageType) && this.state !== 'READY')
+      || (envelope.messageType === 'SESSION_REJECTED' && this.state !== 'HANDSHAKING')
+    ) {
+      this.state = 'RESYNC_REQUIRED';
+      return;
+    }
+    this.lastServerMessageSeq = envelope.serverMessageSeq;
+
     switch (envelope.messageType) {
       case 'SESSION_ACCEPTED': {
         const payload = envelope.payload as unknown as {
           readonly playerId: string;
+          readonly worldId: string;
           readonly connectionId: string;
           readonly resumeCredential: string;
           readonly snapshotId: string;
@@ -143,6 +128,7 @@ export class HostedClientConnection {
         this.sessionId = envelope.sessionId;
         this.sessionEpoch = envelope.sessionEpoch;
         this.playerId = payload.playerId;
+        this.worldId = payload.worldId;
         this.connectionId = payload.connectionId;
         this.resumeCredential = payload.resumeCredential;
         this.pendingSnapshotId = payload.snapshotId;
@@ -173,11 +159,19 @@ export class HostedClientConnection {
           baseline.snapshotId !== this.pendingSnapshotId
           || baseline.sessionEpoch !== this.sessionEpoch
           || baseline.playerId !== this.playerId
+          || baseline.worldId !== this.worldId
+          || baseline.authorityTick !== envelope.authorityTick
+          || Object.entries(this.options.hello.contentCompatibility).some(
+            ([key, value]) => baseline.contentCompatibility[key as keyof typeof baseline.contentCompatibility] !== value,
+          )
+          || new Set(baseline.players.map(player => player.playerId)).size !== baseline.players.length
+          || new Set(baseline.aggregates.map(view => `${view.aggregateType}\u0000${view.aggregateId}`)).size !== baseline.aggregates.length
         ) {
           this.state = 'RESYNC_REQUIRED';
           break;
         }
         this.replication.applyBaseline(baseline);
+        this.durableSaveRevision = baseline.durableSaveRevision;
         this.playerMotions.clear();
         for (const motion of baseline.players) {
           this.playerMotions.set(
@@ -203,6 +197,9 @@ export class HostedClientConnection {
           validatePlayerMotionViewV1(envelope.payload);
         if (validatedMotion.ok) {
           const motion = validatedMotion.value;
+          if (motion.authorityTick > envelope.authorityTick) break;
+          const previous = this.playerMotions.get(motion.playerId);
+          if (previous !== undefined && motion.authorityTick < previous.authorityTick) break;
           this.playerMotions.set(
             motion.playerId,
             Object.freeze({
@@ -260,7 +257,7 @@ export class HostedClientConnection {
         const checkpoint = envelope.payload as unknown as {
           readonly durableSaveRevision: number;
         };
-        this.durableSaveRevision = checkpoint.durableSaveRevision;
+        this.durableSaveRevision = Math.max(this.durableSaveRevision ?? 0, checkpoint.durableSaveRevision);
         break;
       }
 
@@ -279,6 +276,9 @@ export class HostedClientConnection {
 
       case 'AUTHORITY_CHECKPOINT':
         break;
+    }
+    if (this.state !== 'RESYNC_REQUIRED') {
+      this.replication.setAuthorityTick(envelope.authorityTick);
     }
   }
 

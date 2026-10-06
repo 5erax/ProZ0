@@ -2,8 +2,10 @@ import {
   RNG_ALGORITHM_VERSION,
   SEED_DERIVATION_VERSION,
 } from '../foundation';
+import { industryStateHasDurableProgress } from '../simulation/industry/IndustryState';
 import type { Phase1AuthorityBundle } from './Phase1AuthorityBundle';
 import {
+  INDUSTRY_SAVE_CONTENT_PACK_VERSION,
   SAVE_FORMAT_ID,
   SAVE_SCHEMA_VERSION_V2,
   buildingSnapshotToRecordsV2,
@@ -327,6 +329,15 @@ function composePhase1SaveV2AtRevision(
     );
   });
 
+  const industryState = bundle.industry?.read();
+  const saveContentCompatibility = industryState !== undefined
+    && industryStateHasDurableProgress(industryState)
+    ? Object.freeze({
+        ...bundle.catalog.compatibility,
+        packVersion: INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+      })
+    : bundle.catalog.compatibility;
+
   const world: WorldManifestV2 = Object.freeze({
     formatId: SAVE_FORMAT_ID,
     schemaVersion: SAVE_SCHEMA_VERSION_V2,
@@ -339,13 +350,14 @@ function composePhase1SaveV2AtRevision(
     ...(bundle.caves?{soloCaves:bundle.caves.read()}:{}),
     ...(bundle.livingWorld?{livingWorld:bundle.livingWorld.read()}:{}),
     ...(bundle.expedition?{singlePlayerExpedition:bundle.expedition.read()}:{}),
+    ...(industryState !== undefined ? { industry: industryState } : {}),
     ...(bundle.config.colonyDepthEnabled === true || bundle.config.reopen?.bundle.world.colonyDepth !== undefined
       ? { colonyDepth: bundle.colonyDepth.read() } : {}),
     worldSeed: bundle.config.worldSeed,
     generationVersion: bundle.getWorldCompatibility().worldGenerationVersion,
     rngAlgorithmVersion: RNG_ALGORITHM_VERSION,
     seedDerivationVersion: SEED_DERIVATION_VERSION,
-    contentCompatibility: bundle.catalog.compatibility,
+    contentCompatibility: saveContentCompatibility,
     environment: environmentStateToManifestFieldsV2(environment),
     createdAtUtc: revisionState.createdAtUtc ?? options.nowUtc,
     lastActiveAtUtc: options.nowUtc,

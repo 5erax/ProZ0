@@ -100,7 +100,7 @@ export function createColonyDepthOverlay(
     feedback =
       result.status === "committed"
         ? "✓ " + (uiPhrase(bundle.colonyDepth.sites().find(s=>s.id===targetId)?.name) ?? targetId.replaceAll("-", " "))
-        : explain(result.reason);
+        : result.reason === "REDUCE_STORAGE_BEFORE_SWITCH" ? uiPhrase("Unload overloaded storage crates before leaving Engineer.") : explain(result.reason);
     signature = "";
     render();
   };

@@ -14,7 +14,7 @@ Research [U] spends the materials shown beside each icon. Return within the land
 | Engineer | Expanded Storage | Researched storage rises from 150 kg / 180 volume to 200 kg / 240 volume |
 | Cultivator | Cultivation | Planted crops advance twice per active simulation step |
 
-Expanded Storage alone raises crates from 100 kg / 120 volume to 150 kg / 180 volume. Move one and Move stack buttons use the same range, revision and capacity checks as keyboard transfers. Carry limits stay unchanged.
+Expanded Storage alone raises crates from 100 kg / 120 volume to 150 kg / 180 volume. Before the last Engineer switches to another profession, reduce every shared crate to this researched budget; a blocked switch preserves all items and the current profession. Another active Engineer preserves the higher capacity. Move one and Move stack buttons use the same range, revision and capacity checks as keyboard transfers. Carry limits stay unchanged.
 
 In Inventory choose **Build storage crate**, then Prepare kit. A crate costs **4 Timber + 2 Cordage**. Craft its kit, place the crate on valid nearby ground, then open Inventory beside it to transfer supplies. Nearby discovered trees, plants, rocks and water can also be clicked or focused and activated with Enter; E remains available. Range/tool/capacity checks still apply.
 

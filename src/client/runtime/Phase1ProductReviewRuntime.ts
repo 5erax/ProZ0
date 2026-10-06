@@ -13,9 +13,10 @@ import { installGameContextMenu } from '../input/GameContextMenu';
 import { createEntityInspection } from '../presentation/EntityInspection';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
+import { createIndustryPanel } from './IndustryPanel';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
-import { phase1IsometricInput, unprojectPhase1Isometric } from './Phase1IsometricProjection';
+import { phase1IsometricInput, projectPhase1Isometric, unprojectPhase1Isometric } from './Phase1IsometricProjection';
 import { CULTIVATION_POSITION, PEN_POSITION, GRAZER_CARE_TICKS, type ColonySustenanceAction }
   from '../../simulation/sustenance/ColonySustenanceAuthority';
 import type {
@@ -338,7 +339,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
   const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
-  const entityInspection = createEntityInspection(root, () => ['colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'), view=>{
+  const entityInspection = createEntityInspection(root, () => ['industryOpen','colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'), view=>{
     const authority=bundle.resourceMarkers;if(!authority)return [];
     const spaceId=bundle.caves?.activeLayout()?.spaceId??'surface';
     const marked=authority.read().markers.some(m=>m.resourceId===view.id&&m.spaceId===spaceId);
@@ -346,6 +347,24 @@ export async function createPhase1ProductReviewRuntime(
     if(!known&&!marked)return [];
     return [{label:uiPhrase(marked?'Remove resource marker':'Mark resource on map'),run:()=>{const result=authority.set(config.localPlayerId,authority.read().revision,view.id,spaceId,!marked);source.setLocalCommandFeedback({operationId:nextOperationId('resource-marker'),verb:'MARK',target:view.name,status:result==='COMPLETE'?'committed':'rejected',...(result==='COMPLETE'?{}:{reason:result})});}}];
   });
+  const industryPanel = bundle.industry ? createIndustryPanel(root, {
+    markerHost: root.querySelector<HTMLElement>('.p1-product-world-stage') ?? undefined,
+    read: () => bundle.industry!.read(),
+    inventory: () => bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks,
+    colonyResearchIds: () => bundle.colonyDepth.read().researchIds,
+    position: () => bundle.getPlayerPosition(config.localPlayerId),
+    command: intent => bundle.industry!.execute({ ...intent, operationId: 'industry:' + crypto.randomUUID(), playerId: config.localPlayerId,
+      expectedRevision: bundle.industry!.read().revision, expectedInventoryRevision: bundle.items.getContainerView('inventory:' + config.localPlayerId).revision }),
+    project: position => {
+      const stage = root.querySelector<HTMLElement>('.p1-product-world-stage');
+      if (!stage || bundle.playerWorldspace() !== 'surface' || !bundle.world.isExploredPosition(position)) return null;
+      const origin = { x: Number(stage.dataset.rasterOriginX), y: Number(stage.dataset.rasterOriginY) };
+      const point = projectPhase1Isometric(position, origin);
+      const visible = projectPhase1Isometric(position, bundle.getPlayerPosition(config.localPlayerId));
+      return { x: 320 + point.x, y: 180 + point.y, visible: Math.abs(visible.x) < 350 && Math.abs(visible.y) < 200 };
+    },
+    onOpen: () => { livingOverlay?.close(); entityInspection.close(); colonyDepthOverlay?.close(); expeditionOverlay?.close(); actionPanel = null; source.setPresentationPanel(null); source.setPanel(null); controls.close(); },
+  }) : null;
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
@@ -1944,7 +1963,7 @@ export async function createPhase1ProductReviewRuntime(
 
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) return;
-    if(root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true')return;
+    if(root.dataset.industryOpen==='true'||root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true')return;
     if((event.code==='Enter'||event.code==='Space') && event.target instanceof Element && actionPanel===null){const site=event.target.closest<HTMLElement>('[data-world-role="survey-site"][data-poi-template]');if(site?.dataset.poiTemplate){event.preventDefault();colonyDepthOverlay?.openSite(site.dataset.siteId!);return;}}
     if(event.code==='Enter' && event.target instanceof Element && actionPanel===null){const entity=event.target.closest<HTMLElement>('[data-world-role][data-world-id][data-entity-inspectable]');if(entity){event.preventDefault();interactWorldEntity(entity);return;}}
 
@@ -2234,8 +2253,8 @@ export async function createPhase1ProductReviewRuntime(
       stepQueue = stepQueue.then(async () => {
         if (destroyed) return;
         // Sample at execution, so queued steps cannot replay movement after release or a menu opens.
-        const sampled = (root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
-        const blocked=root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true';
+        const sampled = (root.dataset.industryOpen==='true'||root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true') ? {moveUp:false,moveDown:false,moveLeft:false,moveRight:false} : input.sample();
+        const blocked=root.dataset.industryOpen==='true'||root.dataset.colonySettingsOpen==='true'||root.dataset.expeditionPanelOpen==='true'||root.dataset.livingPanelOpen==='true'||root.dataset.colonyDepthPanelOpen==='true'||root.dataset.productReviewPanelOpen==='true'||root.dataset.productReviewHelpOpen==='true';
         if(blocked)combatAssist.release();
         bundle.submitInput(config.localPlayerId,combatAssist.sample(phase1IsometricInput(sampled)));
         root.dataset.autoCombatTarget=combatAssist.target()??'';
@@ -2267,7 +2286,7 @@ export async function createPhase1ProductReviewRuntime(
     },
     onRender: () => {
       // Present only the most recent completed authority state once per frame.
-      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();entityInspection.render();}
+      if (!destroyed) {worldRenderer.render();expeditionOverlay?.render();livingOverlay?.render();entityInspection.render();industryPanel?.update();}
     },
   });
 
@@ -2499,6 +2518,7 @@ export async function createPhase1ProductReviewRuntime(
       colonyDepthOverlay?.destroy();
       expeditionOverlay?.destroy();
       livingOverlay?.destroy();
+      industryPanel?.destroy();
       presentation.destroy();
       worldRenderer.destroy();
       void bundle.destroy();

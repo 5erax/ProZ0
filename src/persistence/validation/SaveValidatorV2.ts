@@ -14,6 +14,9 @@ import { GEAR_ITEMS } from '../../content/livingworld/EquipmentContent';
 import { FISHING_ITEMS } from '../../content/livingworld/FishingContent';
 import { LIVING_ROOT_ITEMS, CANONICAL_ROOT_ITEMS } from '../../content/livingworld/LivingRootContent';
 import {validateExpeditionState} from '../../simulation/expedition/ExpeditionState';
+import { validateIndustryState } from '../../simulation/industry/IndustryAuthority';
+import { industryStateHasDurableProgress } from '../../simulation/industry/IndustryState';
+import { INDUSTRY_RESEARCH } from '../../content/phase3/IndustryContent';
 import {expeditionFacility,expeditionStructureCap} from '../../content/singleplayer/ExpeditionContent';
 import type {Phase1StructureDefinitionId} from '../../world/building/BuildingTypes';
 import type { ContentCatalogV1, ContentKindV1 } from '../../content';
@@ -50,7 +53,10 @@ import type { FootholdRecordV2 } from '../schema/v2/FootholdRecordV2';
 import type { PlayerRecordV2 } from '../schema/v2/PlayerRecordV2';
 import type { PortableSaveBundleV2 } from '../schema/v2/PortableSaveBundleV2';
 import type { StructureRecordV2 } from '../schema/v2/StructureRecordV2';
-import type { WorldManifestV2 } from '../schema/v2/WorldManifestV2';
+import {
+  INDUSTRY_SAVE_CONTENT_PACK_VERSION,
+  type WorldManifestV2,
+} from '../schema/v2/WorldManifestV2';
 
 export interface SaveV2CompatibilityPolicy {
   readonly catalog: ContentCatalogV1;
@@ -159,6 +165,7 @@ function common(
 function sameContentIdentity(
   actual: unknown,
   policy: SaveV2CompatibilityPolicy,
+  allowIndustrySaveIdentity = false,
 ): SaveFailure | null {
   if (!isObject(actual)) {
     return saveFailure('CORRUPT_RECORD', 'contentCompatibility must be an object.');
@@ -167,7 +174,10 @@ function sameContentIdentity(
   if (actual.formatId !== expected.formatId || actual.schemaVersion !== expected.schemaVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_SCHEMA', 'Saved content schema identity is unsupported.');
   }
-  if (actual.packId !== expected.packId || actual.packVersion !== expected.packVersion) {
+  const supportedPackVersion = actual.packVersion === expected.packVersion
+    || (allowIndustrySaveIdentity
+      && actual.packVersion === INDUSTRY_SAVE_CONTENT_PACK_VERSION);
+  if (actual.packId !== expected.packId || !supportedPackVersion) {
     return saveFailure('UNSUPPORTED_CONTENT_PACK', 'Saved content pack identity is unsupported.');
   }
   if (actual.canonicalFingerprint !== expected.canonicalFingerprint && !acceptsLegacyCatalog(policy.catalog,actual.canonicalFingerprint) && !acceptsPreviousLivingCatalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsFishingV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsEquipmentV1Catalog(policy.catalog, actual.canonicalFingerprint) && !acceptsRootsV2Catalog(policy.catalog, actual.canonicalFingerprint)) {
@@ -211,6 +221,15 @@ export function validateWorldManifestV2(
   const record = input as unknown as WorldManifestV2;
   if(record.soloResourceMarkers!==undefined){try{validateSoloResourceMarkers(record.soloResourceMarkers);if(!record.singlePlayerExpedition)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid solo resource markers.');}}
   if(record.livingWorld!==undefined){try{const living=validateLivingWorld(record.livingWorld);if(!record.singlePlayerExpedition||living.lastTick>record.authorityTick)throw Error();}catch{return saveFailure('CORRUPT_RECORD','Invalid living-world state.');}}
+  let industryHasDurableProgress = false;
+  if (record.industry !== undefined) {
+    try {
+      const industry = validateIndustryState(record.industry);
+      industryHasDurableProgress = industryStateHasDurableProgress(industry);
+    }
+    catch { return saveFailure('CORRUPT_RECORD', 'Invalid or unsupported industry state.'); }
+    if (record.industry.lastTick !== record.authorityTick) return saveFailure('CORRUPT_RECORD', 'Industry clock does not match the saved authority time.');
+  }
   if(record.singlePlayerExpedition!==undefined){try{validateExpeditionState(record.singlePlayerExpedition);}catch{return saveFailure('CORRUPT_RECORD','Invalid single-player expedition state.');}}
   if (record.soloCaves !== undefined) {
     try {
@@ -245,8 +264,26 @@ export function validateWorldManifestV2(
   if (!policy.seedDerivationVersions.includes(record.seedDerivationVersion)) {
     return saveFailure('UNSUPPORTED_SEED_DERIVATION_VERSION', `Seed derivation version ${record.seedDerivationVersion} is unsupported.`);
   }
-  const contentFailure = sameContentIdentity(record.contentCompatibility, policy);
+  const contentFailure = sameContentIdentity(
+    record.contentCompatibility,
+    policy,
+    industryHasDurableProgress,
+  );
   if (contentFailure !== null) return contentFailure;
+  if (
+    industryHasDurableProgress
+    && (
+      record.contentCompatibility.packVersion
+        !== INDUSTRY_SAVE_CONTENT_PACK_VERSION
+      || record.contentCompatibility.canonicalFingerprint
+        !== policy.catalog.compatibility.canonicalFingerprint
+    )
+  ) {
+    return saveFailure(
+      'UNSUPPORTED_CONTENT_PACK',
+      'Industry state requires the Industry-aware save content identity.',
+    );
+  }
   try {
     const environment = validatePhase1EnvironmentState(record.environment, policy.catalog);
     if (environment.activeTick !== record.authorityTick) {
@@ -976,6 +1013,20 @@ function globalCrossReferences(
   policy: SaveV2CompatibilityPolicy,
 ): SaveFailure | null {
   const players = new Map(bundle.players.map((entry) => [entry.playerId, entry]));
+  const industry = bundle.world.industry;
+  if (industry) {
+    if (!bundle.world.colonyDepth || industry.facilities.some(f => !players.has(f.ownerPlayerId))
+      || industry.receipts.some(r => !players.has(r.playerId))) {
+      return saveFailure('CORRUPT_RECORD', 'Industry state references an absent colony or player.');
+    }
+    if (industry.researchIds.some(id => {
+      const prerequisite = INDUSTRY_RESEARCH.find(r => r.id === id)?.colonyPrerequisite;
+      return prerequisite != null && !bundle.world.colonyDepth!.researchIds.some(researched => researched === prerequisite);
+    })) return saveFailure('CORRUPT_RECORD', 'Industry research is missing its colony prerequisite.');
+    for (const facility of industry.facilities) {
+      if (facility.buffer.some(item => !policy.catalog.has(item.itemDefinitionId))) return saveFailure('CORRUPT_RECORD', 'Industry material is absent from the saved content catalog.');
+    }
+  }
   if (Object.keys(bundle.world.colonyDepth?.professions ?? {}).some(playerId => !players.has(playerId))) {
     return saveFailure('CORRUPT_RECORD', 'Colony profession references an absent player.');
   }
