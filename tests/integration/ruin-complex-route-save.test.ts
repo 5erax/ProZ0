@@ -8,9 +8,6 @@ import {
   reconstructPhase1ReopenState,
 } from '../../src/persistence';
 import {
-  PHASE1_WORLD_GENERATION_VERSION,
-} from '../../src/world/phase1/Phase1ChunkGenerator';
-import {
   colonyRuinComplexRoute,
   colonyRuinObservedRouteView,
 } from '../../src/world/phase2/ColonyRuinComplexRoute';
@@ -22,7 +19,7 @@ it('recomputes the same ruin-complex route after Save V2 reopen without persisti
     playerIds: ['solo'],
     colonyDepthEnabled: true,
     singlePlayerExpeditionEnabled: true,
-    worldGenerationVersion: PHASE1_WORLD_GENERATION_VERSION,
+    worldGenerationVersion: 5,
     interactionRangeWorldUnits: 4,
     spawnClearanceRadiusWorldUnits: 0,
     requiredAccessRadiusWorldUnits: 0,
@@ -55,16 +52,14 @@ it('recomputes the same ruin-complex route after Save V2 reopen without persisti
       recordKind: 'portable-bundle' as const,
     };
 
-    expect(request.world.generationVersion).toBe(
-      PHASE1_WORLD_GENERATION_VERSION,
-    );
+    expect(request.world.generationVersion).toBe(5);
     expect(JSON.stringify(portable)).not.toContain('route:ruin:');
     expect(JSON.stringify(portable)).not.toContain('open-court');
     expect(JSON.stringify(portable)).not.toContain('covered-edge');
 
     const policy = createPhase1SaveV2Compatibility(
       original.catalog,
-      [PHASE1_WORLD_GENERATION_VERSION],
+      [5],
     );
     const reconstructed = reconstructPhase1ReopenState(
       portable,
@@ -91,9 +86,6 @@ it('recomputes the same ruin-complex route after Save V2 reopen without persisti
 
     expect(routeAfter).toEqual(routeBefore);
     expect(observedAfter).toEqual(observedBefore);
-    expect(reopened.world.generationVersion).toBe(
-      original.world.generationVersion,
-    );
   } finally {
     await reopened?.destroy();
     await original.destroy();

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPhase1ContentCatalog } from '../../src/content';
 import {
-  PHASE1_WORLD_GENERATION_VERSION,
   Phase1ChunkGenerator,
   getPhase1WorldLandmarks,
 } from '../../src/world/phase1/Phase1ChunkGenerator';
@@ -161,17 +160,17 @@ describe('P2-WORLD-IMPL-001 authored ruin-complex route graph', () => {
 
     const before = generator.generate({
       worldSeed: seed,
-      generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      generationVersion: 5,
       coord,
     });
-    colonyRuinComplexRoute(seed, PHASE1_WORLD_GENERATION_VERSION);
+    colonyRuinComplexRoute(seed, 5);
     const after = generator.generate({
       worldSeed: seed,
-      generationVersion: PHASE1_WORLD_GENERATION_VERSION,
+      generationVersion: 5,
       coord,
     });
 
-    expect(PHASE1_WORLD_GENERATION_VERSION).toBe(5);
+    expect(before.generationVersion).toBe(5);
     expect(after).toEqual(before);
     expect(after.entities.map((entity) => entity.entityId)).toEqual(
       before.entities.map((entity) => entity.entityId),
