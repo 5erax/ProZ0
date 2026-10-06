@@ -37,7 +37,12 @@ for(const template of EXPLORATION_TEMPLATES)test('exploration UI: '+template.id+
   await expect(row.getByRole('button',{name:'Inspect',exact:true})).toBeFocused();
   await page.keyboard.press('Enter');await expect(row.locator('[data-colony-action="restore-site:'+template.siteId+'"]')).toBeVisible();
   await row.getByRole('button',{name:template.restoreLabel,exact:true}).click();await expect(sprite).toHaveAttribute('data-poi-stage','restored');
-  if(template.id==='relay')await expect(row.locator('[data-relay-signal]')).toContainText('Abandoned Field Laboratory');
+  if(template.id==='relay'){
+    const signal=row.locator('[data-relay-signal]');
+    await expect(signal).toHaveAttribute('data-relay-disclosure','withheld');
+    await expect(signal).not.toContainText('Abandoned Field Laboratory');
+    await expect(signal).toContainText('destination remains unconfirmed');
+  }
   await row.getByRole('button',{name:'Recover supplies',exact:true}).click();await expect(row).toHaveAttribute('data-poi-stage','recovered');await expect(sprite).toHaveAttribute('data-poi-stage','recovered');
   await expect(row).toContainText('does not refill');await expect(row.getByRole('button',{name:'Recover supplies',exact:true})).toHaveCount(0);
   if(template.id==='shelter'){
@@ -49,9 +54,87 @@ for(const template of EXPLORATION_TEMPLATES)test('exploration UI: '+template.id+
   await page.keyboard.press('Escape');await page.screenshot({path:'test-results/exploration-sites/'+template.id+'-world.png'});
   await page.keyboard.press('l');await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state','success');await page.reload();await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
   await expect(sprite).toHaveAttribute('data-poi-stage','recovered');await page.keyboard.press('j');await expect(row).toContainText('does not refill');
+  if(template.id==='relay'){
+    await expect(row.locator('[data-relay-signal]')).toHaveAttribute('data-relay-disclosure','withheld');
+  }
   if(template.id==='laboratory'){
     await page.keyboard.press('u');const research=panel.locator('[data-colony-action="research:field-survey"]');await expect(research).toBeEnabled();await research.click();await expect(research).toHaveText('✓ Completed');
   }
   await page.keyboard.press('Escape');await page.keyboard.press('m');await expect(page.locator('[data-panel-kind="map"]')).toBeVisible();await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
+});
+
+
+test('relay reveals laboratory details only when the laboratory was legitimately discovered first',async({page})=>{
+  const databaseName='exploration-relay-known-ui';
+  const worldId='world:exploration-relay-known-ui';
+  const b=await Phase1AuthorityBundle.create({
+    worldId,worldSeed:'p1-world-golden',playerIds:['solo'],
+    colonyDepthEnabled:true,singlePlayerExpeditionEnabled:true,
+    worldGenerationVersion:5,resourceProfileVersion:1,
+    interactionRangeWorldUnits:4,spawnClearanceRadiusWorldUnits:0,
+    requiredAccessRadiusWorldUnits:0,
+  });
+  let save:ReturnType<typeof composePhase1SaveV2>;
+  try{
+    const sites=b.colonyDepth.sites();
+    const lab=sites.find(site=>site.template==='laboratory')!;
+    const relay=sites.find(site=>site.template==='relay')!;
+    const relayTemplate=EXPLORATION_TEMPLATES.find(template=>template.id==='relay')!;
+    const inspect=(targetId:string)=>b.colonyDepth.execute({
+      operationId:'fixture:known-lab:'+targetId+':'+b.colonyDepth.read().revision,
+      playerId:'solo',expectedRevision:b.colonyDepth.read().revision,
+      expectedInventoryRevision:b.items.getContainerView('inventory:solo').revision,
+      action:'inspect-site',targetId,
+    });
+    b.getRuntime('solo').relocatePlayer(lab.position);await b.stepSolo();
+    expect(b.world.isExploredPosition(lab.position)).toBe(true);
+    expect(inspect(lab.id).status).toBe('committed');
+    b.getRuntime('solo').relocatePlayer(relay.position);await b.stepSolo();
+    expect(b.world.isExploredPosition(relay.position)).toBe(true);
+    expect(b.items.commitColonyExchange({
+      operationId:'fixture:known-lab:relay-materials',playerId:'solo',
+      expectedInventoryRevision:b.items.getContainerView('inventory:solo').revision,
+      inputs:[],outputs:relayTemplate.costs.map(([itemDefinitionId,quantity])=>({itemDefinitionId,quantity})),
+    }).status).toBe('committed');
+    save=composePhase1SaveV2(b,{nowUtc:'2026-10-07T00:00:00Z'});
+    expect(validatePortableSaveBundleV2({
+      ...save,formatId:save.world.formatId,schemaVersion:save.world.schemaVersion,recordKind:'portable-bundle',
+    },createPhase1SaveV2Compatibility(b.catalog,[3,4,5])).ok).toBe(true);
+  }finally{await b.destroy();}
+
+  await page.goto('/');
+  await page.evaluate(async ({request,databaseName})=>{
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{
+      const open=indexedDB.open(databaseName,2);
+      open.onupgradeneeded=()=>{
+        open.result.createObjectStore('worlds',{keyPath:'worldId'});
+        for(const [name,key] of [['players','playerId'],['containers','containerId'],['chunks','coord'],['footholds','footholdId'],['structures','structureId']])
+          open.result.createObjectStore(name!,{keyPath:key==='coord'?['worldId','coord.x','coord.y']:['worldId',key!]}).createIndex('worldId','worldId');
+      };
+      open.onsuccess=()=>resolve(open.result);open.onerror=()=>reject(open.error);
+    });
+    await new Promise<void>((resolve,reject)=>{
+      const tx=db.transaction(['worlds','players','containers','chunks','footholds','structures'],'readwrite');
+      tx.objectStore('worlds').put(request.world);
+      for(const key of ['players','containers','chunks','footholds','structures'] as const)
+        for(const record of request[key])tx.objectStore(key).put(record);
+      tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);
+    });db.close();
+  },{request:save,databaseName});
+
+  await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId='+encodeURIComponent(worldId)+'&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb='+encodeURIComponent(databaseName));
+  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status','ready');
+  const relayTemplate=EXPLORATION_TEMPLATES.find(template=>template.id==='relay')!;
+  const relaySprite=page.locator('[data-world-role="survey-site"][data-site-id="site:marsh-relay"]');
+  await expect(relaySprite).toHaveAttribute('data-poi-stage','unrestored');
+  await relaySprite.locator('[data-site-interaction]').click();
+  const row=page.locator('[data-discovered-landmark="site:marsh-relay"]');
+  await row.getByRole('button',{name:'Inspect',exact:true}).click();
+  await row.getByRole('button',{name:relayTemplate.restoreLabel,exact:true}).click();
+  const signal=row.locator('[data-relay-signal]');
+  await expect(signal).toHaveAttribute('data-relay-disclosure','observed');
+  await expect(signal).toContainText('Abandoned Field Laboratory');
+  await expect(signal).toContainText(/\d+ m/);
+  await expect(signal).toContainText(/-?\d+, -?\d+/);
 });
