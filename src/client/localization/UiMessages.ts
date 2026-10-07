@@ -2,7 +2,11 @@ import { bindLocalized, message, type MessageDictionary } from './Locale';
 import { statusText } from './StatusMessages';
 // Authored glossary. Lookup is exact and only called at source-owned UI boundaries.
 // Player/profile/chat strings never pass through this dictionary.
-const glossary = `INVALID|Vị trí chưa hợp lệ
+const glossary = `Crops and livestock|Cây trồng và vật nuôi
+Exploration guidance|Hướng dẫn khám phá
+Discovered locations|Địa điểm đã khám phá
+Observed facts|Thông tin đã quan sát
+INVALID|Vị trí chưa hợp lệ
 VALID|Vị trí hợp lệ
 Consume|Dùng
 Consume available food or water|Dùng thức ăn hoặc nước hiện có

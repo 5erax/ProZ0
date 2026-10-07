@@ -84,6 +84,7 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
     .getByRole('button', { name: 'Homestead farming and wildlife' })
     .click();
   const panel = page.locator('.lw-panel');
+  await panel.locator('[data-living-scope=recipes]').click();
   if (
     !(await panel
       .locator('[data-living-craft]')

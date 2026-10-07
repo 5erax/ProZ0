@@ -64,3 +64,12 @@ it('industry changes locale without changing draft placement, focus, IDs or the 
     expect(root.dataset.industryOpen).toBe('false');
   } finally { document.removeEventListener('keyup', release); setLocale('en'); handle.destroy(); root.remove(); }
 });
+
+it('routes empty facilities and power tabs to construction without issuing a gameplay command',()=>{
+ const root=document.createElement('div');document.body.append(root);
+ const handle=createIndustryPanel(root,{read:()=>emptyIndustryState(),inventory:()=>[],position:()=>({x:0,y:0}),command:()=>{throw Error('Navigation must not mutate authority');}});
+ try{handle.open();for(const [tab,action] of [['production','empty-build'],['networks','empty-power-build']]){
+  root.querySelector<HTMLButtonElement>('[data-industry-control=tab-'+tab+']')!.click();root.querySelector<HTMLButtonElement>('[data-industry-control='+action+']')!.click();
+  expect(root.querySelector('[data-industry-facility-kind=solar-array]')).not.toBeNull();
+ }}finally{handle.destroy();root.remove();}
+});

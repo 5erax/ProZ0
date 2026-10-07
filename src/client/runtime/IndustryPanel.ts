@@ -337,9 +337,11 @@ export function createIndustryPanel(
   };
 
   const facilityName = (facility: Facility) => INDUSTRY_FACILITIES[facility.kind].name + ' · ' + facility.id.slice(-6);
+  const showConstruction=()=>{tab='build';signature='';render(true);};
   const renderProduction = (content: HTMLElement, state: IndustryState) => {
     if (!state.facilities.length) {
       content.append(text('p', 'Build your first facility in Construction.'));
+      content.append(button('Open construction','empty-build',showConstruction));
       return;
     }
     if (!state.facilities.some((facility) => facility.id === selectedFacility)) selectedFacility = state.facilities[0]!.id;
@@ -444,7 +446,7 @@ export function createIndustryPanel(
     for (const network of state.powerNetworks) {
       power.append(text('p', network.id + ' · ' + String(network.usedCapacity) + '/' + String(network.capacity) + ' power · ' + String(network.consumerIds.length) + ' consumers · ' + String(network.relayIds.length) + ' relays'));
     }
-    if (!state.powerNetworks.length) power.append(text('p', 'No network yet. Build a solar array.'));
+    if (!state.powerNetworks.length) power.append(text('p', 'No network yet. Build a solar array.'),button('Open construction','empty-power-build',showConstruction));
     content.append(power);
     const logistics = card('Conveyor logistics');
     logistics.append(text('p', 'Links move actual buffer stock between facilities during active simulation. Endpoints must be within ' + String(INDUSTRY_CONVEYOR_RANGE) + ' units. Pause or repair damaged facilities to control the chain.', 'industry-small'));

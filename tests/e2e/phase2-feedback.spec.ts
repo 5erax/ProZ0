@@ -29,7 +29,7 @@ test('settings consolidate display, sound and real save; quiet HUD keeps context
  await page.keyboard.press('Escape');await expect(dialog).toBeHidden();await page.reload();
  await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-product-review-reopened','true');
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
- await page.locator('.p1-inventory-utilities > summary').click();
+ await expect(page.locator('.p1-inventory-utilities')).toBeVisible();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toBeVisible();
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-selected','true');
@@ -61,7 +61,7 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await expect(page.locator('.lw-object').first()).toHaveCSS('pointer-events','none');
  await page.keyboard.press('e');
  await expect(page.locator('.lw-panel')).toBeHidden();
- await page.locator('.p1-inventory-utilities > summary').click();
+ await expect(page.locator('.p1-inventory-utilities')).toBeVisible();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
  await page.getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
  await page.getByRole('button',{name:'Build base [B]',exact:true}).click();

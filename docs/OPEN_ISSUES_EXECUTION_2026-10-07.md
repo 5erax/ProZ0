@@ -110,3 +110,9 @@ Verification: 76 browser checks passed before the final map crop; focused map, f
 ## Main integration check timing repair
 
 Main CI 37582361348 and 37582859151 failed at the existing synchronous season-caption assertion immediately after locale change (opposite-language frames in each run). Locale-dependent world projection refreshes on the next game frame. The assertion now polls that actual caption and the seasonal counterpart while retaining the exact EN/VI requirement. No runtime translation, expected wording or CI quality threshold is bypassed.
+
+## #282 — first action-hierarchy slice (placement still outstanding)
+
+Inventory utilities are a visible action group rather than a closed help accordion; selected-item equip/drop/repair behavior and authority remain unchanged. Journal separates guidance, discovered locations and observed facts without expanding knowledge/certainty. Farm defaults to crops/livestock, with explicit nearby-resource/fishing and recipe tabs. Wild animals are classified as wildlife rather than livestock; direct selected-object interactions still use the compact targeted card. Tabs only change presentation and preserve selected scope across live rebuilds. Empty Industry facility/power views route to Construction without executing a command.
+
+Verification: typecheck/lint/build; 15 focused browser cases including read-only Farm navigation and localization; 11 production E2E for actual fishing/cooking/cancel/save, equipment crafting/rarity, storage and POI restoration/knowledge flows; four Industry browser cases including actionable empty-state navigation. Natural farming E2E now uses the explicit recipe/farming destinations and still needs its final run. No cost, ownership, save or world simulation change. Canonical placement across Industry, kit builds and expedition blueprints remains the outstanding #282 seam; do not close this issue from this slice.

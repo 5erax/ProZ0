@@ -332,7 +332,7 @@ function arrangeWardrobe(document: Document, root: HTMLElement): void {
   if(description)description.classList.add('p1-visually-hidden');
   const storageTip=bag.querySelector<HTMLElement>('.p1-storage-tip');
   if(storageTip){const more=createElement(document,'details','p1-storage-guide');more.dataset.inspectionKey='storage-guide';more.append(createElement(document,'summary','','Storage'));storageTip.replaceWith(more);more.append(storageTip);}
-  const utilities=createElement(document,'details','p1-inventory-utilities');utilities.dataset.inspectionKey='inventory-utilities';utilities.append(createElement(document,'summary','','Inventory actions'));
+  const utilities=createElement(document,'section','p1-inventory-utilities');utilities.setAttribute('role','group');bindUiText(utilities,'aria-label','Inventory actions');utilities.append(createElement(document,'h3','','Inventory actions'));
   for(const button of Array.from(bag.children).filter(e=>e instanceof HTMLButtonElement))utilities.append(button);
   bag.append(utilities);
   layout.append(character,bag);if(inspection)layout.append(inspection);root.append(layout);

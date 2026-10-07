@@ -57,3 +57,14 @@ it('uses one opaque fog mass without per-cell gradients or texture detail',()=>{
   expect(svg).not.toMatch(/terrain|biome|resource/);
  }
 });
+
+it('separates farming, nearby resource/fishing and recipe navigation without changing world state',async()=>{
+ const bundle=await Phase1AuthorityBundle.create({worldId:'world:living-navigation',worldSeed:'p1-world-golden',playerIds:['solo'],singlePlayerExpeditionEnabled:true,colonyDepthEnabled:true,interactionRangeWorldUnits:4,spawnClearanceRadiusWorldUnits:0,requiredAccessRadiusWorldUnits:0});await bundle.stepSolo();
+ const root=document.createElement('section'),canvas=document.createElement('canvas'),stage=document.createElement('div');stage.className='p1-product-world-stage';stage.dataset.rasterOriginX='0';stage.dataset.rasterOriginY='0';canvas.width=640;canvas.height=360;root.append(canvas,stage);document.body.append(root);
+ const overlay=createLivingWorldOverlay(root,canvas,bundle,'solo',()=>{}),before=JSON.stringify(bundle.livingWorld!.read());
+ try{overlay.open();const panel=root.querySelector<HTMLElement>('.lw-panel')!;expect(panel.dataset.livingScope).toBe('farm');expect(panel.querySelector<HTMLDetailsElement>('[data-living-craft]')!.hidden).toBe(true);
+ panel.querySelector<HTMLButtonElement>('[data-living-scope=nearby]')!.click();expect(panel.dataset.livingScope).toBe('nearby');expect([...panel.querySelectorAll('button')].some(button=>button.textContent==='Fish nearby water')).toBe(true);
+ panel.querySelector<HTMLButtonElement>('[data-living-scope=recipes]')!.click();expect(panel.querySelector<HTMLDetailsElement>('[data-living-craft]')!.hidden).toBe(false);expect(JSON.stringify(bundle.livingWorld!.read())).toBe(before);
+ setLocale('vi');overlay.render();expect(panel.querySelector('[data-living-scope=farm]')!.textContent).toBe('Cây trồng và vật nuôi');
+ }finally{overlay.destroy();root.remove();setLocale('en');await bundle.destroy();}
+});
