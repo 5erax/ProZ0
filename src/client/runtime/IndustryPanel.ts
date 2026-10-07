@@ -1,3 +1,5 @@
+import { panelShell } from '../presentation/PanelShell';
+import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
 import { costList } from '../presentation/CostList';
 import { costRequirements, missingCostText } from '../presentation/CostRequirements';
 import { industryText } from '../localization/IndustryMessages';
@@ -151,7 +153,7 @@ export function createIndustryPanel(
   const launcher = document.createElement('button');
   launcher.type = 'button';
   launcher.className = 'industry-launch';
-  launcher.textContent = industryText('Industry · O');
+  launcher.textContent = industryText(PANEL_SHORTCUTS.industry.label+' · '+PANEL_SHORTCUTS.industry.key);
   launcher.setAttribute('aria-controls', 'proz0-industry-dialog');
   launcher.setAttribute('aria-expanded', 'false');
   const dialog = document.createElement('section');
@@ -573,7 +575,7 @@ export function createIndustryPanel(
     if (!force && signature === next) return;
     signature = next;
     const focusedId = active instanceof HTMLElement && dialog.contains(active) ? active.dataset.industryControl : undefined;
-    const scroll = dialog.scrollTop;
+    const scroll = dialog.querySelector<HTMLElement>('.ui-panel-body')?.scrollTop ?? 0;
     dialog.replaceChildren();
     const header = document.createElement('header'); header.className = 'industry-header';
     const heading = text('h2', 'INDUSTRY'); heading.tabIndex = -1;
@@ -582,7 +584,7 @@ export function createIndustryPanel(
     header.querySelector('button')!.disabled = false;
     const tabs = document.createElement('nav'); tabs.className = 'industry-tabs'; tabs.setAttribute('aria-label', industryText('Industry sections'));
     for (const [value, label] of [['build', 'Construction'], ['production', 'Facilities'], ['networks', 'Power & logistics'], ['research', 'Research']] as const) {
-      const control = button(label, 'tab-' + value, () => { tab = value; signature = ''; render(true); });
+      const control = button(label, 'tab-' + value, () => { tab = value; signature = ''; render(true); dialog.querySelector<HTMLElement>('.ui-panel-body')!.scrollTop=0; });
       control.setAttribute('aria-selected', String(tab === value));
       control.disabled = false;
       tabs.append(control);
@@ -595,7 +597,8 @@ export function createIndustryPanel(
     else if (tab === 'production') renderProduction(content, state);
     else if (tab === 'networks') renderNetworks(content, state);
     else renderResearch(content, state);
-    dialog.scrollTop = scroll;
+    const body=panelShell(dialog,heading,header.querySelector<HTMLButtonElement>('button')!,tabs);
+    header.remove();body.scrollTop = scroll;
     if (focusedId) [...dialog.querySelectorAll<HTMLElement>('[data-industry-control]')].find((node) => node.dataset.industryControl === focusedId)?.focus({ preventScroll: true });
   }
 
@@ -615,7 +618,7 @@ export function createIndustryPanel(
     }
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))) return;
-    if (event.code === 'KeyO' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.code === PANEL_SHORTCUTS.industry.code && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault(); event.stopImmediatePropagation(); open();
     }
   };

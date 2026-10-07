@@ -1,3 +1,4 @@
+import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
 import { materialSource } from '../presentation/MaterialGuide';
 import { costRequirements, missingCostText } from '../presentation/CostRequirements';
 import { CombatAssist, type AssistTarget } from '../input/CombatAssist';
@@ -371,7 +372,7 @@ export async function createPhase1ProductReviewRuntime(
   const refreshColonyPanel = (): void => {
     if (actionPanel !== 'colony') return;
     const state = bundle.sustenance.read();
-    source.setPresentationPanel(Object.freeze({ kind: 'colony', title: uiText("ui.72df119f"),
+    source.setPresentationPanel(Object.freeze({ kind: 'colony', title: uiPhrase(PANEL_SHORTCUTS.colony.label),
       lines: Object.freeze([
         uiText("ui.d95c84cb") + (!state.bedBuilt ? uiText("ui.a4b08895") : state.cropProgressTicks === null ? uiText("ui.db3227fc")
           : state.cropProgressTicks >= state.cropCycleTicks ? uiText("ui.7216f2bc") : uiText("ui.ae8998d") + String(Math.ceil((state.cropCycleTicks - state.cropProgressTicks) / 60)) + 's'),
@@ -2012,12 +2013,12 @@ export async function createPhase1ProductReviewRuntime(
     }
 
     switch (event.code) {
-      case 'KeyN':
+      case PANEL_SHORTCUTS.colony.code:
         event.preventDefault();
         if (actionPanel === 'colony') { actionPanel = null; source.setPresentationPanel(null); }
         else { actionPanel = 'colony'; refreshColonyPanel(); }
         break;
-      case 'KeyH':
+      case PANEL_SHORTCUTS.help.code:
         event.preventDefault();
         controls.toggle();
         break;
@@ -2048,11 +2049,11 @@ export async function createPhase1ProductReviewRuntime(
           combatAssist.sample(phase1IsometricInput(input.sample()));
         }
         break;
-      case 'KeyC':
+      case PANEL_SHORTCUTS.craft.code:
         event.preventDefault();
         toggleCraftPanel();
         break;
-      case 'KeyB':
+      case PANEL_SHORTCUTS.build.code:
         event.preventDefault();
         toggleBuildPanel();
         break;
@@ -2113,17 +2114,17 @@ export async function createPhase1ProductReviewRuntime(
         source.setPresentationPanel(null);
         source.setPanel(null);
         break;
-      case 'KeyI':
+      case PANEL_SHORTCUTS.inventory.code:
         event.preventDefault();
         actionPanel = null;
         source.togglePanel('inventory');
         break;
-      case 'KeyM':
+      case PANEL_SHORTCUTS.map.code:
         event.preventDefault();
         actionPanel = null;
         source.togglePanel('map');
         break;
-      case 'KeyP':
+      case PANEL_SHORTCUTS.professions.code:
         event.preventDefault();
         actionPanel = null;
         source.togglePanel('progression');

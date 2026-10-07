@@ -28,7 +28,15 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
           expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(width!);
           expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(height!);
           expect(getComputedStyle(panel!).scrollbarWidth).toBe('none');
-          if(key==='p')expect(panel!.scrollHeight).toBeLessThanOrEqual(panel!.clientHeight);
+          if(key==='p'){
+            expect(root.dataset.colonyDepthPanel).toBe('professions');
+            const body=panel!.querySelector<HTMLElement>('.ui-panel-body')!;body.scrollTop=body.scrollHeight;
+            const lastCard=panel!.querySelector('article:last-child');
+            expect(lastCard).not.toBeNull();
+            const lastBounds=lastCard!.getBoundingClientRect();
+            expect(lastBounds.bottom).toBeLessThanOrEqual(bounds.bottom+1);
+            expect(lastBounds.top).toBeGreaterThanOrEqual(bounds.top);
+          }
           if(key==='b'){
             expect(panel!.querySelector<HTMLElement>('.p1-build-catalog')!.clientHeight).toBeGreaterThanOrEqual(32);
             for(const button of panel!.querySelectorAll<HTMLElement>('.p1-build-actions button')){

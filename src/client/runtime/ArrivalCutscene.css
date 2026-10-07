@@ -1,0 +1,28 @@
+.proz0-arrival {position:fixed;inset:0;z-index:2000000;background:#081520;color:#e9edde;display:grid;place-items:center;font:16px var(--ui-font,monospace);overflow:auto;}
+.arrival-frame {width:min(1080px,94vw);padding:16px;text-align:center;}
+.arrival-art {height:min(62vh,620px);position:relative;background:radial-gradient(ellipse at 50% 70%,#375c55 0,#17313b 45%,#081520 75%);}
+.arrival-art svg {height:100%;width:100%;image-rendering:pixelated;overflow:visible;animation:arrival-reveal .6s ease-out;}
+.arrival-frame h1 {font-size:clamp(22px,3vw,36px);margin:12px 0;}
+.arrival-frame p {font:16px/1.6 system-ui,sans-serif;max-width:54ch;min-height:3.2em;margin:12px auto 20px;color:#b8cbbf;}
+.arrival-progress {font-size:12px;letter-spacing:4px;color:#a8c6b4;margin-top:8px;}
+.arrival-actions {display:flex;justify-content:center;align-items:center;gap:24px;}
+.arrival-actions button {font:inherit;padding:12px 20px;cursor:pointer;border-radius:3px;}
+.arrival-next {background:#bdc5a0;border:1px solid #e5e7cb;color:#122a2d;font-weight:700;}
+.arrival-skip {background:transparent;border:0;color:#adc0af;}
+.arrival-actions button:focus-visible {outline:2px solid #edcd83;outline-offset:4px;}
+.arrival-actions button:disabled {cursor:default;}
+.arrival-star {animation:arrival-drift 12s linear infinite alternate;}
+.arrival-signal {animation:arrival-pulse 3s ease-in-out infinite;}
+.arrival-descending {animation:arrival-land .8s ease-out both;}
+.arrival-dust {animation:arrival-dust .8s ease-out both;}
+.arrival-player {position:absolute;left:56%;top:55%;animation:arrival-emerge .6s ease-out both;}
+.proz0-arrival[data-leaving=true] {animation:arrival-exit .45s ease-in forwards;pointer-events:none;}
+@keyframes arrival-land {from{transform:translateY(-90px);}to{transform:translateY(0);}}
+@keyframes arrival-drift {to{transform:translate(4px,8px);}}
+@keyframes arrival-pulse {50%{opacity:.35;}}
+@keyframes arrival-dust {from{opacity:0;transform:translateY(-6px);}50%{opacity:.8;}to{opacity:.2;}}
+@keyframes arrival-reveal {from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+@keyframes arrival-emerge {from{opacity:0;transform:translateX(-12px);}to{opacity:1;transform:translateX(0);}}
+@keyframes arrival-exit {to{opacity:0;}}
+@media(max-height:500px){.arrival-art {height:40vh;}.arrival-frame {padding:8px;}.arrival-frame h1 {margin:6px 0;}.arrival-frame p {font-size:13px;min-height:0;margin:6px auto 12px;}.arrival-actions button {padding:8px 14px;}.arrival-player {scale:.65;}}
+@media(prefers-reduced-motion:reduce){.proz0-arrival *, .proz0-arrival[data-leaving=true] {animation:none!important;transition:none!important;}}

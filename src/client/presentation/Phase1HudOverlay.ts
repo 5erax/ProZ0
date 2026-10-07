@@ -1,3 +1,5 @@
+import { panelShell } from './PanelShell';
+import { DOCK_SHORTCUTS, isPanelShortcutActive } from '../input/PanelShortcuts';
 import { actionGlyph } from './UiActionIcon';
 import './WorldFirstUi.css';
 import { materialHint } from './MaterialGuide';
@@ -1601,11 +1603,10 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
           '[' + inputLabel + ']',
         ));
         if (slot === null) {
-          bindUiText(row,"title",emptyLabel + uiText("ui.b60ccd0a"));
-          const emptyIcon = assetSprite(this.document, 'p1-asset-icon p1-equipment-icon',
-            itemIconSprite(key === 'weapon' ? uiText("ui.898df54c") : uiText("ui.cd44c054")));
-          if (emptyIcon !== null) { emptyIcon.style.opacity = '.35'; row.append(emptyIcon); }
-          row.append(createElement(this.document, 'span', 'p1-visually-hidden', emptyLabel), '—');
+          row.dataset.equipmentState = 'EMPTY';
+          const caption = emptyLabel + ' · ' + uiPhrase('not equipped');
+          bindUiText(row,"title",caption);row.setAttribute('aria-label',caption);
+          row.append(createElement(this.document, 'span', 'p1-visually-hidden', emptyLabel), uiPhrase('Empty'));
         } else {
           const icon = assetSprite(
             this.document,
@@ -1672,10 +1673,11 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
         'p1-quick-use',
       );
       quickUse.dataset.quickUseState = equipmentSlots.quickUse.state;
-      const quickLabel=uiText('ui.d9199510')+(equipmentSlots.quickUse.target??'—');
+      const quickLabel=uiPhrase('Consume available food or water')+' · '+(equipmentSlots.quickUse.target??uiPhrase('Empty'));
+      quickUse.dataset.action='consume';
       bindUiText(quickUse,'title',quickLabel);bindUiText(quickUse,'aria-label',quickLabel);
-      const quickIcon=assetSprite(this.document,'p1-asset-icon p1-equipment-icon',itemIconSprite(equipmentSlots.quickUse.target??'Clean Water'));
-      quickUse.append(createElement(this.document,'span','p1-equipment-slot-label','[V]'));
+      const quickIcon=equipmentSlots.quickUse.target===null?null:assetSprite(this.document,'p1-asset-icon p1-equipment-icon',itemIconSprite(equipmentSlots.quickUse.target));
+      quickUse.append(createElement(this.document,'span','p1-equipment-slot-label','[V] '+uiPhrase('Consume')));
       if(quickIcon)quickUse.append(quickIcon);
       quickUse.append(createElement(this.document,'span','p1-quick-use-label',equipmentSlots.quickUse.target??'—'));
       equipment.append(quickUse);
@@ -1749,22 +1751,18 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       const dock = createElement(this.document, 'nav', 'p1-action-dock');
       this.actionDock = dock;
       bindUiText(dock,"aria-label",uiText("ui.57bffba4"));
-      for (const [label, key, action] of [
-        [uiText("ui.c8d2dcdf"), 'I', 'open-inventory'],
-        [uiText("ui.c8f02361"), 'C', 'open-craft'],
-        [uiText("ui.8d432504"), 'B', 'open-build'],
-        [uiText("ui.44a7f051"), 'M', 'open-map'],
-        [uiText("ui.d74d21d2"), 'F', 'open-farm'],
-      ] as const) {
+      for (const shortcut of DOCK_SHORTCUTS) {
+        const {key,action}=shortcut;
         const button = actionButton(this.document, '', action);
-        bindUiText(button,"aria-label",label + ' [' + key + ']'); bindUiText(button,"title",label + ' [' + key + ']');
+        bindLocalized(button,"aria-label",()=>uiPhrase(shortcut.label) + ' [' + key + ']'); bindLocalized(button,"title",()=>uiPhrase(shortcut.label) + ' [' + key + ']');
         button.append(actionGlyph(this.document,action));
         button.append(createElement(this.document, 'span', '', key)); dock.append(button);
       }
       this.layer.append(dock);
     }
     for(const button of this.actionDock!.querySelectorAll<HTMLButtonElement>('button')){
-      const active=button.dataset.reviewAction==='open-'+state.panel?.kind;
+      const shortcut=DOCK_SHORTCUTS.find(shortcut=>shortcut.action===button.dataset.reviewAction);
+      const active=shortcut!==undefined&&isPanelShortcutActive(shortcut,state.panel?.kind,this.root.dataset);
       button.setAttribute('aria-pressed',String(active));
     }
 
@@ -1841,6 +1839,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       this.layer.append(panel);
       const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
       if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
+      panelShell(panel,panel.querySelector<HTMLElement>('.p1-panel-title')!,panel.querySelector<HTMLButtonElement>('.p1-panel-close')!);
       if (previousPanel?.dataset.panelKind === state.panel.kind) {
         panel.querySelectorAll<HTMLDetailsElement>('details[data-inspection-key]').forEach(e => { e.open = expanded.has(e.dataset.inspectionKey); });
         panel.scrollTop = previousScroll;

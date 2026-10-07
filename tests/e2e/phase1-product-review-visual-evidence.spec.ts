@@ -2930,7 +2930,7 @@ test('colony: builds a visible bed, plants, harvests once and reopens persistent
   await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'false');
   await page.keyboard.press('e');
   const panel = page.locator('[data-panel-kind="colony"]');
-  await expect(panel).toContainText('CULTIVATION / HUSBANDRY');
+  await expect(panel.locator('.p1-panel-title')).toHaveText('Colony');
   await page.locator('[data-review-action="colony:build-bed"]').click();
   await expect(panel).toContainText('BUILD-BED · DONE');
   await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'true');

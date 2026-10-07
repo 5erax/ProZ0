@@ -62,4 +62,39 @@ Final verification follow-up: CI exposed the old fixed-two-decimal item-fact ass
 
 At the precision follow-up: 570 domain tests passed, 3 existing skipped; 67 Chromium browser tests passed; typecheck/lint passed. All canonical item masses and volumes are compared numerically with the displayed facts. No expected value was rounded down to accommodate a failing test.
 
+## #279 — equipment truth and panel shortcut identity
+
+The HUD no longer renders fallback spear/wrap/water art in empty slots. Weapon and protection use canonical equipped projections; an empty slot explicitly says not equipped. V is labeled as the existing consume action, not an assignable equipment quickslot. No equipment ownership, authority, save or consumption selection changed.
+
+A shared shortcut table now supplies panel keys, dock labels and active-state identity. F represents Farm, N Colony, and P the same Professions panel opened by its navigation button (the legacy progression panel remains the fallback without Colony Depth). Research/Journal/Professions expose their actual panel identity and nav pressed state. Headings no longer contain a competing close instruction. Repeat/modifier events do not toggle Colony panels. Journal knowledge content is untouched.
+
+Verification: regressions first reproduced the empty spear icon and missing P panel identity. Domain 572 passed, 3 existing skipped; browser 69 passed. The small-viewport P check now verifies the actual Professions panel and that its last card is reachable by internal scrolling; viewport/outer-scroll guards remain. Production equipment ownership/drag/keyboard/save/reopen and EN/VI journeys: 3 passed. Typecheck, lint and build passed. Required CI, merge and deployment verification remain pending; no issue is closed by this document.
+
+## #280 — fixed headers, body scrolling and modal safe areas
+
+PanelShell reuses each panel's existing DOM and command handlers, with one fixed header/close pattern and a body-only scroll region. It is consumed by Inventory/Craft/Build/Map/Colony, Farm, Research/Journal/Professions, Expedition, Settings, Industry and Controls. Industry tabs are part of the fixed header; changing sections resets body scroll. Main modal anchors remain fixed when accordions expand. Scrollbars are visible on the content body, focus is explicit, and close stays available during pending Industry commands. Settings sound/fullscreen/save attach inside its body.
+
+The viewport controls no longer inherit world/canvas scale. HUD context and world action hints hide while a shell is open; panel-switch controls remain available in the reserved lower strip. Settings remains accessible in the reserved upper strip; Industry close is anchored below it so the controls do not intercept one another. World card minimum height and no-wrap weather prevent unstable phrase wrapping. Layers and safe inset are explicit CSS tokens. Gameplay authority, commands, inventories, saves and world simulation are untouched.
+
+Verification: the new browser check first failed before shell implementation. It covers EN/VI at 1366x768, 1920x1080, 2560x1080 and 640x360, all primary panels, expanded accordions, body scroll, close bounds, Industry tab stability and Settings language/audio/lower controls. Browser suite: 70 passed. Typecheck/lint/build passed. Initial focused production run: 15 passed, 5 regressions; fixes retain navigation switching, prevent Settings interception, separate help from survival HUD and update authored carry/Colony captions. All five failed journeys passed on the rebuilt source. Final exact-head CI/deployment and actual visual acceptance remain pending.
+
+## #269 — three distinct arrival scenes
+
+The intro now shows distant fragments and a survey signal, an animated descending landing module with thrust/dust, then a landed foothold with visible selected player, water/resource silhouettes and an outward frontier. The existing production landing-module and player art are reused. Each frame has different scene content rather than only a camera scale change. Progress is 01/03 through 03/03; Continue/Start is primary, Skip tertiary. Copy has a readable measure; focus uses the game palette. Motion uses CSS, with reduced-motion support. The final handoff fades for 450 ms (instant when reduced motion is requested).
+
+Seen-world/replay, world/room IDs, skin selection, saves, login and gameplay authority are unchanged. Keyboard repeat cannot skip scenes; focused buttons retain native keyboard activation, so Enter on Skip skips rather than advances. No external dependency or sound was added.
+
+Verification: a browser regression first reproduced missing distinct-scene identities; after the change it covers three unique scenes, progress, selected player, repeat handling, keyboard completion and no replay. Typecheck/lint/build passed. Eight production E2E journeys passed, including solo start/skip, saves/continue, selected skin, keyboard handoff, small/wide lobby and explicit review entrypoint. Scene evidence covers EN/VI at 1280x720, 1920x1080 and 640x360; descent transforms are measured before/after, and reduced-motion disables animation. This source has local screenshot/motion evidence; final exact-head CI and visual acceptance remain pending.
+
+## #268 — lobby action hierarchy and appearance preview
+
+The landing page now has one prominent journey action that opens/focuses the existing solo world choice without discarding drafted seeds or bypassing saves. Account, native EN/VI toggle buttons and Appearance are grouped in the header; Appearance is no longer a competing game mode. Headline measure, body typography, island size and selected appearance preview have been adjusted. The selected outfit has an explicit badge. Login, room flows, skin identifiers, save identity and world authority are unchanged.
+
+Verification: the browser regression checks grouping, draft preservation, language state and selected appearance. All 72 browser checks passed; typecheck/lint/build passed. Eleven production E2E journeys passed across lobby, localization, arrival and entrypoints, including EN/VI at 1920x1080, 1280x720 and 640x360, keyboard focus, outfit persistence and horizontal overflow. Screenshots are captured by the runnable lobby-hierarchy E2E. Actual user time-to-recognize the primary action and final visual approval remain human acceptance criteria, not assertions inferred from automation.
 Final CI follow-up: 80 E2E cases passed; one container carry-caption assertion still expected raw uppercase codes. Inventory also had a hashed-message lookup bypassing the shared status glossary. Inventory now uses the same authored status labels as carry/container; E2E checks the authored Normal/Heavy load/Overloaded labels while retaining exact capacity/authority checks. Isolated production P1-POLISH-007 passed with CI server reuse disabled. The full required CI is rerun on the repair commit.
+
+## Integrated production verification — #275 / #278 / #281
+
+PR #277 merged at bef382f and PR #284 at 180861683e7b7cdb2b257098b7e305cedc00fc7e. Required exact-head CI 37549204282 and 37581406349 passed respectively, including production E2E and frame pacing. Vercel deployment dpl_CA5DvdccZZL6Qr47LcuWtH6mjTdv is READY/production, and its gitSource and GitHub commit metadata match main 180861683e7b7cdb2b257098b7e305cedc00fc7e.
+
+Checks against https://proz0-colony.vercel.app/: game EN/VI selected item, save/reopen and narrow layout passed; relay withheld/known-first disclosure, laboratory restoration/research and finite reward/save flows passed (three exploration E2E). A production Craft check verified 14 material requirements: deficit=max(required-have,0), independent sufficient state and accessible quantities. These close the bounded technical reports #275/#278/#281; human visual, multiplayer latency and Phase 2 acceptance remain separate.

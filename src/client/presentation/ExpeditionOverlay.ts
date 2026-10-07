@@ -1,3 +1,4 @@
+import { panelShell } from './PanelShell';
 import { materialSource } from './MaterialGuide';
 import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
@@ -597,6 +598,7 @@ export function createExpeditionOverlay(
           panel.append(row);
         }
       }
+      if(opened){const header=panel.querySelector<HTMLElement>('.sp-expedition-header')!;panelShell(panel,header.querySelector<HTMLElement>('h2')!,header.querySelector<HTMLButtonElement>('button')!);header.remove();}
       restoreUi();
       markers.replaceChildren();
       delete markers.dataset.buildRevision;

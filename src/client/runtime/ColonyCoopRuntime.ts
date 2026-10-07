@@ -1,3 +1,4 @@
+import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
 import { gameUiText } from '../localization/GameUiMessages';
 import { contentDisplayName } from '../localization/ContentText';
 import { materialSource } from '../presentation/MaterialGuide';
@@ -155,7 +156,7 @@ export async function bootColonyCoop(
   context.setAttribute("role", "status");
   root.append(context);
   const settings = createColonySettings(root),
-    settingsPanel = root.querySelector<HTMLElement>("[data-colony-settings]")!;
+    settingsPanel = root.querySelector<HTMLElement>("[data-colony-settings] .ui-panel-body")!;
   const audio = createColonyAudio(settingsPanel);
   const nav = document.createElement("nav");
   nav.className = "coop-nav";
@@ -1419,14 +1420,14 @@ export async function bootColonyCoop(
         if(equipped||stack)command('equipment.set',{slot,stackId:equipped?null:stack!.stackId},[containerRef()]);
       }
       const kind: Record<string, string> = {
-        KeyI: "inventory",
-        KeyC: "craft",
-        KeyU: "research",
-        KeyJ: "journal",
-        KeyB: "build",
-        KeyH: "help",
-        KeyM: "map",
-        KeyP: "professions",
+        [PANEL_SHORTCUTS.inventory.code]: "inventory",
+        [PANEL_SHORTCUTS.craft.code]: "craft",
+        [PANEL_SHORTCUTS.research.code]: "research",
+        [PANEL_SHORTCUTS.journal.code]: "journal",
+        [PANEL_SHORTCUTS.build.code]: "build",
+        [PANEL_SHORTCUTS.help.code]: "help",
+        [PANEL_SHORTCUTS.map.code]: "map",
+        [PANEL_SHORTCUTS.professions.code]: "professions",
       };
       if (event.code === "KeyE") {
         event.preventDefault();

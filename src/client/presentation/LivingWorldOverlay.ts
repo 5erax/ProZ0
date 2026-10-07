@@ -1,3 +1,5 @@
+import { panelShell } from './PanelShell';
+import { PANEL_SHORTCUTS, panelShortcutForCode } from '../input/PanelShortcuts';
 import { costList } from './CostList';
 import { costRequirements, missingCostText, costLabel } from './CostRequirements';
 import { EXPEDITION_FACILITIES } from '../../content/singleplayer/ExpeditionContent';
@@ -732,6 +734,7 @@ export function createLivingWorldOverlay(
       if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-description',reason);if(stationBlocked)a.append(text('p',reason));}
       a.append(action);
     }
+    panelShell(panel,panel.querySelector<HTMLElement>('h2')!,panel.querySelector<HTMLButtonElement>('button')!);
     panel.scrollTop = scrollTop;restoreUi();
   };
   const pointer = (e: PointerEvent) => {
@@ -789,7 +792,7 @@ export function createLivingWorldOverlay(
       e.preventDefault(); e.stopImmediatePropagation(); fishingAction(e.code === 'Escape' ? 'cancel' : 'reel'); return;
     }
     if (
-      e.code === 'KeyF' &&
+      e.code === PANEL_SHORTCUTS.farm.code && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey &&
       !root.dataset.colonySettingsOpen?.includes('true')
     ) {
       e.preventDefault();
@@ -846,9 +849,7 @@ export function createLivingWorldOverlay(
       hint.hidden = true;
     } else if (opened) {
       if (
-        ['KeyI', 'KeyC', 'KeyB', 'KeyM', 'KeyN', 'KeyU', 'KeyJ'].includes(
-          e.code,
-        )
+        panelShortcutForCode(e.code)!==undefined
       ) {
         close();
         return;

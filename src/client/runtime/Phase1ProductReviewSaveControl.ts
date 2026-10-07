@@ -167,7 +167,7 @@ export function createPhase1ProductReviewSaveControl(
     void triggerSave();
   };
   document.addEventListener('keydown', onKeyDown);
-  const settingsPanel=root.querySelector('[data-colony-settings]');
+  const settingsPanel=root.querySelector('[data-colony-settings] .ui-panel-body');
   const saveButton=document.createElement('button');saveButton.type='button';bindUiText(saveButton,"textContent",uiText("ui.27817d2a"));
   if(settingsPanel!==null){settingsPanel.append(saveButton,box);saveButton.addEventListener('click',()=>{void triggerSave();});}
   const leaveButton = document.createElement('button');

@@ -1,0 +1,32 @@
+/* Panels use the root viewport; only their content scrolls. Build remains a side panel. */
+#app {--ui-safe-inset:16px;--ui-modal-layer:1000020;}
+#app [data-panel-shell] {display:flex;flex-direction:column;overflow:hidden!important;gap:8px;}
+#app [data-panel-shell][hidden] {display:none!important;}
+#app [data-panel-shell]>.ui-panel-header {flex:none;display:grid;grid-template-columns:minmax(0,1fr) 32px;gap:8px;align-items:center;background:var(--hud-surface,#102129);position:relative;z-index:1;}
+#app [data-panel-shell]>.ui-panel-header>:first-child {margin:0;padding:0;border:0;min-width:0;}
+#app [data-panel-shell] .ui-panel-header>[data-panel-close] {position:static!important;transform:none;width:32px;height:32px;min-height:32px;margin:0;padding:0;font-size:22px;line-height:1;border:1px solid var(--hud-edge,#59716f);}
+#app [data-panel-shell] .ui-panel-header>[data-panel-close]::before {content:none;}
+#app [data-panel-shell] .ui-panel-tabs {grid-column:1/-1;margin:0;}
+#app [data-panel-shell]>.ui-panel-body {flex:1;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--hud-edge,#59716f) transparent;scrollbar-gutter:stable;}
+#app [data-panel-shell]>.ui-panel-body::-webkit-scrollbar {display:block;width:8px;height:8px;}
+#app [data-panel-shell]>.ui-panel-body::-webkit-scrollbar-thumb {background:var(--hud-edge,#59716f);}
+#app [data-panel-shell] :focus-visible {outline:2px solid var(--hud-warning,#d5b077);outline-offset:2px;}
+#app #proz0-phase1-ui .p1-panel[data-panel-kind=build]>.ui-panel-body {display:flex;flex-direction:column;}
+#app #proz0-phase1-ui .p1-panel[data-panel-shell]:not([data-panel-kind=build]),#app .p2-colony-panel[data-panel-shell] {left:50%;top:72px;bottom:72px;transform:translateX(-50%);max-height:none;}
+#app .industry-dialog[data-panel-shell] {top:72px;bottom:72px;transform:translateX(-50%);max-height:none;z-index:var(--ui-modal-layer);}
+#app .p2-settings-panel[data-panel-shell] {max-height:calc(100dvh - 80px);width:min(320px,calc(100vw - 32px));}
+#app .p1-product-controls {inset:0;width:100%;height:100%;transform:none!important;font-size:12px;}
+#app .p1-product-controls-panel[data-panel-shell] {width:min(640px,calc(100% - 32px));max-height:calc(100% - 32px);z-index:var(--ui-modal-layer);}
+#app #proz0-phase1-ui .p1-world {min-height:108px;}
+#app #proz0-phase1-ui .p1-world-weather {white-space:nowrap;}
+#app:has([data-panel-shell]:not([hidden])) #proz0-phase1-ui .p1-context-hud,
+#app:has([data-panel-shell]:not([hidden])) :is(.sp-context-action,.lw-hint,.industry-launch) {visibility:hidden;pointer-events:none;}
+#app:has([data-panel-shell]:not([hidden])) :is(.p1-action-dock,.p2-colony-controls>nav) {opacity:.85;}
+#app .p1-product-controls-hint {top:180px;}
+#app :is(.industry-layer,.sp-expedition,.p2-colony-controls) {z-index:var(--ui-modal-layer);}
+#app .p2-settings {z-index:calc(var(--ui-modal-layer) + 1);}
+#app #proz0-phase1-ui :is(.p1-survival,.p1-equipment,.p1-carry) {left:var(--ui-safe-inset);}
+#app #proz0-phase1-ui .p1-world {right:calc(var(--ui-safe-inset) + 44px);}
+#app #proz0-phase1-ui .p1-action-dock {right:var(--ui-safe-inset);}
+#app .p2-colony-controls>nav {bottom:16px;right:270px;}
+@media(max-height:500px){#app #proz0-phase1-ui .p1-world {min-height:96px;}#app #proz0-phase1-ui .p1-panel[data-panel-shell]:not([data-panel-kind=build]),#app .p2-colony-panel[data-panel-shell] {top:42px;bottom:42px;}}

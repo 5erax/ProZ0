@@ -1,3 +1,4 @@
+import './GameLobby.css';
 import { lobbyText } from '../localization/LobbyMessages';
 import { bindLocalized, locale, onLocaleChange, setLocale } from '../localization/Locale';
 import { coreText } from '../localization/CoreMessages';
@@ -74,16 +75,16 @@ export function createGameLobby(root: HTMLElement) {
     }
     show(account ? "profile" : "login");
   });
-  header.append(brand, user);
-  const language = doc.createElement('select');
-  language.dataset.localeChoice = 'true';
-  bindLocalized(language, 'aria-label', () => coreText('language'));
-  for (const [value, label] of [['en', 'English'], ['vi', 'Tiếng Việt']]) {
-    const option = doc.createElement('option'); option.value = value!; option.textContent = label!; language.append(option);
+  const accountActions=doc.createElement('div');accountActions.className='lobby-account-actions';
+  header.append(brand,accountActions);accountActions.append(user);
+  const language=doc.createElement('div');language.dataset.localeChoice='true';language.className='lobby-language';language.setAttribute('role','group');
+  bindLocalized(language,'aria-label',()=>coreText('language'));
+  for(const [value,label] of [['en','EN'],['vi','VI']] as const){
+    const choice=doc.createElement('button');choice.type='button';choice.dataset.language=value;choice.textContent=label;
+    choice.setAttribute('aria-label',value==='en'?'English':'Tiếng Việt');choice.setAttribute('aria-pressed',String(locale()===value));
+    choice.addEventListener('click',()=>setLocale(value));language.append(choice);
   }
-  language.value = locale();
-  language.addEventListener('change', () => setLocale(language.value as 'en' | 'vi'));
-  header.append(language);
+  accountActions.append(language);
   const layout = doc.createElement("div");
   layout.className = "lobby-layout";
   const left = doc.createElement("section");
@@ -103,9 +104,12 @@ export function createGameLobby(root: HTMLElement) {
     '<svg viewBox="0 0 420 220" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges"><path d="M40 115 210 32 380 115 210 198Z" fill="#71896b"/><path d="M40 115v16l170 83v-16Z" fill="#355c50"/><path d="M210 198v16l170-83v-16Z" fill="#254954"/><path d="M82 94 210 156 338 94M124 73 252 135 294 115M82 136 252 53" fill="none" stroke="#617e64" stroke-width="2"/><path d="M112 128v-27m-12 11 12-11 12 11M310 124v-25m-14 10 14-10 14 10" fill="none" stroke="#afbd85" stroke-width="6"/><path d="M180 91 210 76 240 91 210 107Z" fill="#d2d5bd"/><path d="M180 91v36l30 15v-35Z" fill="#6f999a"/><path d="M210 107v35l30-15V91Z" fill="#477680"/><path d="M219 112v13l14-7v-13Z" fill="#90d1b7"/><path d="M97 160l20-10 17 10-17 10Z" fill="#b1b5a0"/><path d="M278 155l18-9 20 9-20 10Z" fill="#89b2ac"/></svg>';
   const avatar = doc.createElement("span");
   avatar.className = "lobby-avatar";
-  applyProductionSprite(avatar, playerActorSprite("S", "IDLE", 0).sprite, 3);
+  applyProductionSprite(avatar, playerActorSprite("S", "IDLE", 0).sprite, 5);
   diagram.append(avatar);
-  left.append(eyebrow, heading, pitch, diagram);
+  const journey=doc.createElement('button');journey.type='button';journey.dataset.primaryJourney='true';journey.className='lobby-journey';
+  bindLocalized(journey,'textContent',()=>lobbyText('journey')+' →');
+  journey.addEventListener('click',()=>{if(active!=='single')show('single');(view.querySelector<HTMLElement>('[data-continue-phase1-review]')??view.querySelector<HTMLElement>('[data-start-phase2-review]'))?.focus();});
+  left.append(eyebrow,heading,pitch,journey,diagram);
   const content = doc.createElement("section");
   content.className = "lobby-content";
   const tabs = doc.createElement("nav");
@@ -124,8 +128,8 @@ export function createGameLobby(root: HTMLElement) {
   ] as const) {
     const button = doc.createElement("button");
     button.type = "button";
-    button.textContent = label;
-    button.setAttribute("aria-selected", "false");
+    button.textContent = label;button.dataset.lobbyView=key;
+    button.setAttribute(key==="skins"?"aria-pressed":"aria-selected", "false");
     button.addEventListener("click", () => {
       if (key === "multi" && onPages) {
         target.location.assign(
@@ -135,7 +139,7 @@ export function createGameLobby(root: HTMLElement) {
       }
       show(key);
     });
-    tabs.append(button);
+    (key==="skins"?accountActions:tabs).append(button);
     tabButtons[key] = button;
   }
   content.append(tabs, view, status);
@@ -542,7 +546,7 @@ export function createGameLobby(root: HTMLElement) {
     view.replaceChildren();
     status.textContent = "";
     for (const [id, b] of Object.entries(tabButtons))
-      b.setAttribute("aria-selected", String(id === kind));
+      b.setAttribute(id==="skins"?"aria-pressed":"aria-selected", String(id === kind));
     if (["login", "register", "recover"].includes(kind)) auth(kind);
     else if (kind === "single") {
       title(
@@ -631,12 +635,13 @@ export function createGameLobby(root: HTMLElement) {
         applyProductionSprite(
           image,
           playerActorSprite("S", "IDLE", 0).sprite,
-          3,
+          selectedPlayerSkin()===skin.id ? 5 : 2,
         );
         image.style.filter = playerSkinFilter(skin.id);
         const label = doc.createElement("span");
         label.textContent = skin.name;
-        choice.append(image, label);
+        const selected=doc.createElement('small');selected.dataset.selectedAppearance='true';selected.textContent='✓ '+lobbyText('selected');selected.hidden=selectedPlayerSkin()!==skin.id;
+        choice.append(image,label,selected);
       }
       if (!account) {
         const p = doc.createElement("p");
@@ -683,6 +688,7 @@ export function createGameLobby(root: HTMLElement) {
     const inputs = Array.from(view.querySelectorAll('input')).map(input => ({ name: input.name, value: input.value, start: input.selectionStart, end: input.selectionEnd }));
     eyebrow.textContent = lobbyText('eyebrow'); heading.textContent = lobbyText('heading'); pitch.textContent = lobbyText('pitch'); note.textContent = lobbyText('note'); settings.textContent = lobbyText('fullscreen');
     tabs.setAttribute('aria-label', lobbyText('modes'));
+    for(const choice of language.querySelectorAll('button'))choice.setAttribute('aria-pressed',String(choice.dataset.language===locale()));
     for (const [id, button] of Object.entries(tabButtons)) button.textContent = lobbyText(id === 'skins' ? 'skin' : id);
     updateProfile(); show(active);
     for (const saved of inputs) {

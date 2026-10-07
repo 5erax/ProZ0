@@ -242,8 +242,8 @@ describe('Phase 0 browser runtime', () => {
     expect(controls?.textContent).toContain('WASD / ARROWS');
     expect(controls?.textContent).toContain('V · CONSUME');
     expect(controls?.textContent).toContain('SPACE · ATTACK');
-    expect(controls?.textContent).toContain('C · CRAFT');
-    expect(controls?.textContent).toContain('B · BUILD');
+    expect(controls?.textContent).toContain('C · Craft');
+    expect(controls?.textContent).toContain('B · Build');
   });
 
   it('resolves Product Review autoboot from declarative deployment config and uses persisted Save V2', async () => {
