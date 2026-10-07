@@ -21,7 +21,6 @@
 #app #proz0-phase1-ui .p1-world-weather {white-space:nowrap;}
 #app:has([data-panel-shell]:not([hidden])) #proz0-phase1-ui .p1-context-hud,
 #app:has([data-panel-shell]:not([hidden])) :is(.sp-context-action,.lw-hint,.industry-launch) {visibility:hidden;pointer-events:none;}
-#app:has([data-panel-shell]:not([hidden])) .p2-settings>button {visibility:hidden;pointer-events:none;}
 #app:has([data-panel-shell]:not([hidden])) :is(.p1-action-dock,.p2-colony-controls>nav) {opacity:.85;}
 #app .p1-product-controls-hint {top:180px;}
 #app :is(.industry-layer,.sp-expedition,.p2-colony-controls) {z-index:var(--ui-modal-layer);}
