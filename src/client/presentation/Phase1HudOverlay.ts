@@ -461,7 +461,7 @@ function renderPanel(
               document,
               'div',
               'p1-panel-capacity',
-              presentationText('carry', {weight:formatInventoryAmount(capacity.weightCurrent),maxWeight:formatInventoryAmount(capacity.weightMax),bulk:formatInventoryAmount(capacity.volumeCurrent),maxBulk:formatInventoryAmount(capacity.volumeMax),state:uiText(uiMessageKey(capacity.stateLabel)) || uiPhrase(capacity.stateLabel)}),
+              presentationText('carry', {weight:formatInventoryAmount(capacity.weightCurrent),maxWeight:formatInventoryAmount(capacity.weightMax),bulk:formatInventoryAmount(capacity.volumeCurrent),maxBulk:formatInventoryAmount(capacity.volumeMax),state:uiPhrase(capacity.stateLabel)}),
             )]),
         createElement(
           document,

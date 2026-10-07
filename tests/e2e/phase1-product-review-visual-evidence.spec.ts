@@ -1291,7 +1291,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
     await expect(inventoryCapacity).toContainText('/20.0 kg');
     await expect(inventoryCapacity).toContainText('/24.0 u');
     await expect(inventoryCapacity).toContainText(
-      /NORMAL|HEAVY|OVERLOADED/,
+      /Normal|Heavy load|Overloaded/,
     );
     const brokenSpear = inventoryPanel.locator(
       '.p1-item-row',
@@ -1466,7 +1466,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
     await expect(capacityRows.nth(0)).toContainText('/20.0 kg');
     await expect(capacityRows.nth(0)).toContainText('/24.0 u');
     await expect(capacityRows.nth(0)).toContainText(
-      /NORMAL|HEAVY|OVERLOADED/,
+      /Normal|Heavy load|Overloaded/,
     );
     await expect(capacityRows.nth(1)).toContainText('/100.0 kg');
     await expect(capacityRows.nth(1)).toContainText('/120.0 u');
