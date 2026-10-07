@@ -4,6 +4,10 @@ import { statusText } from './StatusMessages';
 // Player/profile/chat strings never pass through this dictionary.
 const glossary = `INVALID|Vị trí chưa hợp lệ
 VALID|Vị trí hợp lệ
+Consume|Dùng
+Consume available food or water|Dùng thức ăn hoặc nước hiện có
+not equipped|chưa trang bị
+Industry|Công nghiệp
 Kit|Bộ lắp
 MIST RAIN|Mưa sương
 DRY WIND|Gió khô

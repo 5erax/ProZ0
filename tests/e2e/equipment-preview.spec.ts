@@ -29,6 +29,9 @@ test('equipment UI: owned drag/drop and keyboard equip match avatar/world, conse
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:equipment-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=equipment-ui');
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
+  const hudWeapon=page.locator('[data-equipment-slot="weapon"]');
+  await expect(hudWeapon).toHaveAttribute('data-equipment-state','EMPTY');
+  await expect(hudWeapon.locator('.p1-equipment-icon')).toHaveCount(0);
   await page.keyboard.press('i');
   const inventory = page.locator('[data-panel-kind="inventory"]');
   const weapon = inventory.locator('[data-equipment-drop-slot="weapon"]'), protection = inventory.locator('[data-equipment-drop-slot="protection"]');
@@ -39,6 +42,8 @@ test('equipment UI: owned drag/drop and keyboard equip match avatar/world, conse
   await expect(weapon).not.toHaveAttribute('data-equipped-stack');
   await spear.dragTo(weapon);
   await expect(weapon).toHaveAttribute('data-equipped-stack', spearId);
+  await expect(hudWeapon.locator('.p1-equipment-icon')).toHaveCount(1);
+  await expect(hudWeapon).not.toHaveAttribute('data-equipment-state','EMPTY');
   await expect(inventory.locator('[data-avatar-equipment="weapon"]')).toHaveCount(1);
   // Repeated drop is idempotent, unlike the explicit X toggle.
   await spear.dragTo(weapon); await expect(weapon).toHaveAttribute('data-equipped-stack', spearId);
@@ -59,9 +64,12 @@ test('equipment UI: owned drag/drop and keyboard equip match avatar/world, conse
   await page.keyboard.press('l'); await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state', 'success');
   await page.reload(); await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready'); await page.keyboard.press('i');
   await expect(weapon).toHaveAttribute('data-equipped-stack', spearId); await expect(protection).toHaveAttribute('data-equipped-stack', wrapId);
+  await expect(hudWeapon.locator('.p1-equipment-icon')).toHaveCount(1);
   const unequip = weapon.getByRole('button', { name: 'Unequip weapon', exact: true });
   await unequip.focus(); await page.keyboard.press('Space');
   await expect(weapon).not.toHaveAttribute('data-equipped-stack');
+  await expect(hudWeapon).toHaveAttribute('data-equipment-state','EMPTY');
+  await expect(hudWeapon.locator('.p1-equipment-icon')).toHaveCount(0);
   await expect(inventory.locator('[data-avatar-equipment="weapon"]')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-world-role="held-weapon-overlay"][data-world-id="solo"]')).toHaveCount(0);

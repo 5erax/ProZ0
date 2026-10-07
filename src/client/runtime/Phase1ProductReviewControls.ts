@@ -1,5 +1,7 @@
-import { uiText } from '../localization/UiMessages';
-import { bindUiText } from '../localization/UiMessages';
+import { gameUiText } from '../localization/GameUiMessages';
+import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
+import { bindLocalized } from '../localization/Locale';
+import { uiPhrase, uiText, bindUiText } from '../localization/UiMessages';
 import { createColonySettings } from './ColonySettings';
 export interface Phase1ProductReviewControls {
   toggle(): void;
@@ -80,13 +82,9 @@ export function createPhase1ProductReviewControls(
     uiText("ui.3a381566"),
     uiText("ui.76860a07"),
     uiText("ui.efe9f674"),
-    uiText("ui.2099532b"),
     uiText("ui.ca74032a"),
-    uiText("ui.7b047d93"),
     uiText("ui.ba9ddea0"),
     uiText("ui.e4d901e2"),
-    uiText("ui.e97743bb"),
-    uiText("ui.cf6a2b04"),
     uiText("ui.3bcb9901"),
   ]);
   for (const text of rows) {
@@ -94,6 +92,13 @@ export function createPhase1ProductReviewControls(
     row.className = 'p1-product-controls-row';
     bindUiText(row,"textContent",text);
     panel.append(row);
+  }
+  const shortcuts=Object.values(PANEL_SHORTCUTS).filter(shortcut=>colonyDepth||!['F','N','U','J','O'].includes(shortcut.key));
+  const summary=document.createElement('div');summary.className='p1-product-controls-row';
+  bindLocalized(summary,'textContent',()=>shortcuts.map(shortcut=>shortcut.key+' · '+uiPhrase(shortcut.label)).join(' / '));panel.append(summary);
+  for(const [message,shortcut] of [['craftControls',PANEL_SHORTCUTS.craft],['buildControls',PANEL_SHORTCUTS.build]] as const){
+    const row=document.createElement('div');row.className='p1-product-controls-row';
+    bindLocalized(row,'textContent',()=>gameUiText(message,{key:shortcut.key}));panel.append(row);
   }
   layer.append(panel);
   root.append(layer);

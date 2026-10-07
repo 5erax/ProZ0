@@ -1,3 +1,5 @@
+import { PANEL_SHORTCUTS, panelShortcutForCode } from '../input/PanelShortcuts';
+import { bindLocalized } from '../localization/Locale';
 import { costList } from './CostList';
 import { costRequirements, missingCostText } from './CostRequirements';
 import { gameUiText } from '../localization/GameUiMessages';
@@ -51,20 +53,18 @@ export function createColonyDepthOverlay(
   style.textContent =
     ".p2-colony-controls{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:1000000;font:12px monospace;color:#eef4e6;pointer-events:auto;max-width:60vw}.p2-colony-controls button{font:inherit;color:inherit;background:#152733;border:1px solid #809799;padding:8px;cursor:pointer}.p2-colony-controls button:disabled{opacity:.45;cursor:default}.p2-colony-controls nav{display:flex;gap:4px;justify-content:center}.p2-colony-panel{margin-top:8px;background:#0b1721f5;border:2px solid #809799;padding:12px;width:min(620px,80vw);max-height:60vh;overflow:auto;box-sizing:border-box}.p2-colony-panel article{border-bottom:1px solid #405655;padding:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.p2-colony-panel p{margin:4px 0;line-height:1.4}.p2-cost{display:inline-flex;align-items:center;gap:4px}.p2-region{padding:4px;text-align:center;background:#0b1721e6}.p2-colony-panel h2{font-size:16px;margin:0 0 8px}.p2-colony-panel [role=status]{color:#dfc38d}";
   const nav = document.createElement("nav");
-  style.textContent += '@media(max-width:850px){.p2-colony-controls{top:108px;max-width:85vw;font-size:10px}.p2-region{font-size:9px;padding:2px}.p2-colony-controls nav button{font-size:0;padding:4px 8px}.p2-colony-controls nav button::before{font-size:10px}.p2-colony-controls [data-colony-panel="research"]::before{content:"⚗ U"}.p2-colony-controls [data-colony-panel="journal"]::before{content:"◇ J"}.p2-colony-controls [data-colony-panel="professions"]::before{content:"⌁"}.p2-colony-panel{max-height:44vh}.p2-audio-controls{text-align:center}.p2-audio-controls button{padding:4px}}';
+  style.textContent += '@media(max-width:850px){.p2-colony-controls{top:108px;max-width:85vw;font-size:10px}.p2-region{font-size:9px;padding:2px}.p2-colony-controls nav button{font-size:0;padding:4px 8px}.p2-colony-controls nav button::before{font-size:10px}.p2-colony-controls [data-colony-panel="research"]::before{content:"⚗ " attr(data-panel-key)}.p2-colony-controls [data-colony-panel="journal"]::before{content:"◇ " attr(data-panel-key)}.p2-colony-controls [data-colony-panel="professions"]::before{content:"⌁ " attr(data-panel-key)}.p2-colony-panel{max-height:44vh}.p2-audio-controls{text-align:center}.p2-audio-controls button{padding:4px}}';
   let panel: "research" | "journal" | "professions" | null = null;
   let feedback = "";
   let ordinal = 0;
   let signature = "";
-  for (const [kind, label] of [
-    ["research", uiText("ui.14e87838")],
-    ["journal", uiText("ui.c33f9ed")],
-    ["professions", uiText("ui.4383fda7")],
-  ] as const) {
+  for (const kind of ['research', 'journal', 'professions'] as const) {
+    const shortcut=PANEL_SHORTCUTS[kind];
     const button = document.createElement("button");
-    bindUiText(button,"textContent",label);
-    bindUiText(button,"aria-label",label);bindUiText(button,"title",label);
-    button.dataset.colonyPanel = kind;
+    const caption=()=>uiPhrase(shortcut.label)+' ['+shortcut.key+']';
+    bindLocalized(button,"textContent",caption);
+    bindLocalized(button,"aria-label",caption);bindLocalized(button,"title",caption);
+    button.dataset.colonyPanel = kind;button.dataset.panelKey=shortcut.key;
     button.addEventListener("click", () => {
       panel = panel === kind ? null : kind;
       if (panel !== null) onOpen();
@@ -126,6 +126,8 @@ export function createColonyDepthOverlay(
   function render(): void {
     if(root.dataset.colonySettingsOpen === 'true') panel=null;
     root.dataset.colonyDepthPanelOpen=String(panel!==null);
+    root.dataset.colonyDepthPanel=panel??'';
+    for(const button of nav.querySelectorAll<HTMLButtonElement>('button'))button.setAttribute('aria-pressed',String(button.dataset.colonyPanel===panel));
     const state = bundle.colonyDepth.read();
     const position = bundle.getPlayerPosition(playerId);
     const weather = colonyWeatherAt(
@@ -320,30 +322,20 @@ export function createColonyDepthOverlay(
     restoreUi();
   }
   const onKey = (event: KeyboardEvent): void => {
+    if(event.repeat||event.ctrlKey||event.metaKey||event.altKey)return;
     if (
       event.target instanceof HTMLElement &&
       ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)
     )
       return;
-    if (
-      event.code === "Escape" ||
-      ["KeyI", "KeyC", "KeyB", "KeyM", "KeyN", "KeyH", "KeyP"].includes(event.code)
-    ) {
-      panel = null;
-      signature = "";
-      render();
-    }
-    if (event.code === "KeyU" || event.code === "KeyJ") {
-      panel =
-        panel === (event.code === "KeyU" ? "research" : "journal")
-          ? null
-          : event.code === "KeyU"
-            ? "research"
-          : "journal";
-      if (panel !== null) onOpen();
-      signature = "";
-      render();
-    }
+    const shortcut=panelShortcutForCode(event.code);
+    const requested=(['research','journal','professions'] as const).find(kind=>shortcut===PANEL_SHORTCUTS[kind]);
+    if(requested){
+      event.preventDefault();
+      panel=panel===requested?null:requested;
+      if(panel!==null)onOpen();
+      signature='';render();
+    }else if(event.code==='Escape'||shortcut!==undefined){panel=null;signature='';render();}
   };
   document.addEventListener("keydown", onKey);
   render();
@@ -359,7 +351,7 @@ export function createColonyDepthOverlay(
     destroy() {
       document.removeEventListener("keydown", onKey);
       audio.destroy();
-      delete root.dataset.colonyDepthPanelOpen;
+      delete root.dataset.colonyDepthPanelOpen;delete root.dataset.colonyDepthPanel;
       container.remove();
     },
   };

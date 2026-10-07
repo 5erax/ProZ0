@@ -1,3 +1,4 @@
+import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
 import { costList } from '../presentation/CostList';
 import { costRequirements, missingCostText } from '../presentation/CostRequirements';
 import { industryText } from '../localization/IndustryMessages';
@@ -151,7 +152,7 @@ export function createIndustryPanel(
   const launcher = document.createElement('button');
   launcher.type = 'button';
   launcher.className = 'industry-launch';
-  launcher.textContent = industryText('Industry · O');
+  launcher.textContent = industryText(PANEL_SHORTCUTS.industry.label+' · '+PANEL_SHORTCUTS.industry.key);
   launcher.setAttribute('aria-controls', 'proz0-industry-dialog');
   launcher.setAttribute('aria-expanded', 'false');
   const dialog = document.createElement('section');
@@ -615,7 +616,7 @@ export function createIndustryPanel(
     }
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))) return;
-    if (event.code === 'KeyO' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.code === PANEL_SHORTCUTS.industry.code && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault(); event.stopImmediatePropagation(); open();
     }
   };

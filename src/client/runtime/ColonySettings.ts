@@ -24,7 +24,7 @@ export function createColonySettings(root: HTMLElement): {destroy(): void} {
     '[data-colony-ui="true"] .p2-colony-controls{top:auto;bottom:12px;max-width:52vw}[data-colony-ui="true"] .p2-region{display:none}',
     '[data-colony-ui="true"] .p2-colony-panel{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);max-height:65vh;max-width:85vw}',
     '[data-colony-ui="true"] .p2-colony-controls nav button{font-size:0;padding:7px 12px}[data-colony-ui="true"] .p2-colony-controls nav button::before{font-size:13px}',
-    '[data-colony-ui="true"] [data-colony-panel="research"]::before{content:"⚗"}[data-colony-ui="true"] [data-colony-panel="journal"]::before{content:"◇"}[data-colony-ui="true"] [data-colony-panel="professions"]::before{content:"⌁"}',
+    '[data-colony-ui="true"] [data-colony-panel="research"]::before{content:"⚗ " attr(data-panel-key)}[data-colony-ui="true"] [data-colony-panel="journal"]::before{content:"◇ " attr(data-panel-key)}[data-colony-ui="true"] [data-colony-panel="professions"]::before{content:"⌁ " attr(data-panel-key)}',
   ].join('');
   const gear=document.createElement('button');bindUiText(gear,"textContent",'⚙');bindLocalized(gear,'aria-label',()=>coreText('settings'));gear.setAttribute('aria-expanded','false');
   const panel=document.createElement('div');panel.className='p2-settings-panel';panel.dataset.colonySettings='true';panel.hidden=true;bindUiText(panel,"aria-label",uiText("ui.4b058728"));panel.setAttribute('role','dialog');
