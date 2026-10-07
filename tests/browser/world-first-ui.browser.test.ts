@@ -23,8 +23,8 @@ it('keeps the HUD corners clear, unifies the world cycle and exposes real mouse 
           const rect=a.getBoundingClientRect();expect(rect.left).toBeGreaterThanOrEqual(0);expect(rect.right).toBeLessThanOrEqual(width!);expect(rect.bottom).toBeLessThanOrEqual(height!);
           for(const b of hud.slice(i+1)){const other=b.getBoundingClientRect();expect(rect.right<=other.left||rect.left>=other.right||rect.bottom<=other.top||rect.top>=other.bottom).toBe(true);}
         }
-        expect(root.querySelector('.p1-world .p1-world-cycle')!.textContent).toContain(language==='vi'?'Năm':'Year');
-        expect(root.querySelector('.lw-season')!.textContent).toContain(language==='vi'?'Năm':'Year');
+        await expect.poll(()=>root.querySelector('.p1-world .p1-world-cycle')!.textContent).toContain(language==='vi'?'Năm':'Year');
+        await expect.poll(()=>root.querySelector('.lw-season')!.textContent).toContain(language==='vi'?'Năm':'Year');
         const build=root.querySelector<HTMLButtonElement>('[data-review-action=open-build]')!;
         build.click();expect(build.getAttribute('aria-pressed')).toBe('true');
         root.querySelector<HTMLButtonElement>('.p1-panel-close')!.click();expect(root.querySelector('.p1-panel')).toBeNull();

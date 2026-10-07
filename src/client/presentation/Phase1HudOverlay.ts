@@ -151,6 +151,7 @@ function meter(
   row.setAttribute('aria-valuemin','0'); row.setAttribute('aria-valuemax',String(presentation.max)); row.setAttribute('aria-valuenow',String(presentation.value));
   const caption=()=>uiText(uiMessageKey(presentation.stateLabel))||uiPhrase(presentation.stateLabel);
   bindLocalized(row,'title',()=>uiPhrase(presentation.label)+' · '+caption());
+  if(identity==='temperature')bindLocalized(row,'title',()=>uiPhrase('Body temperature index')+' · '+formatNumber(presentation.value,{maximumFractionDigits:0})+'/'+formatNumber(presentation.max)+' · '+caption());
   bindLocalized(row,'aria-label',()=>uiPhrase(presentation.label)+' · '+formatNumber(presentation.value,{maximumFractionDigits:0})+'/'+formatNumber(presentation.max)+' · '+caption());
 
   const label = createElement(document, 'div', 'p1-meter-label');
@@ -943,7 +944,17 @@ function renderPanel(
 
     case 'map': {
       if (panel.spatial !== undefined) {
-        const spatial = panel.spatial;
+        const projected = panel.spatial;
+        // Fit observed local ground, not the empty fixed window. Remote known
+        // markers still clamp to the edge; no hidden terrain is requested.
+        const cells=[...projected.exploredCells,...projected.unknownBoundaryCells].filter(cell=>
+          cell.cellX>=projected.minCellX&&cell.cellX<=projected.maxCellX&&cell.cellY>=projected.minCellY&&cell.cellY<=projected.maxCellY);
+        const spatial=cells.length?{...projected,
+          minCellX:Math.max(projected.minCellX,Math.min(...cells.map(cell=>cell.cellX))-1),
+          maxCellX:Math.min(projected.maxCellX,Math.max(...cells.map(cell=>cell.cellX))+1),
+          minCellY:Math.max(projected.minCellY,Math.min(...cells.map(cell=>cell.cellY))-1),
+          maxCellY:Math.min(projected.maxCellY,Math.max(...cells.map(cell=>cell.cellY))+1),
+        }:projected;
         const widthCells =
           spatial.maxCellX - spatial.minCellX + 1;
         const heightCells =
@@ -967,6 +978,7 @@ function renderPanel(
         field.dataset.mapKnowledge =
           spatial.knowledgePolicy.toLowerCase().replace('_', '-');
         field.dataset.mapCellScale = String(cellScale);
+        field.dataset.mapWorldUnitsPerCell = String(spatial.cellSizeWorldUnits);
         field.dataset.exploredCellCount =
           String(spatial.exploredCells.length);
         field.dataset.unknownBoundaryCount =
