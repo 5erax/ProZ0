@@ -163,3 +163,8 @@
 #app #proz0-phase1-ui .p1-map-marker {width:16px!important;height:16px!important;}
 #app #proz0-phase1-ui .p1-map-selection-label {transform-origin:0 0;transform:scale(var(--map-inverse-scale,1)) translate(12px,-18px);font-size:13px;}
 #app #proz0-phase1-ui .p1-panel {background:#102129;}
+#app .p2-journal-section {border-top:1px solid var(--hud-edge);padding-top:10px;margin-top:12px;}
+#app .p2-journal-section>h3 {font-size:14px;color:var(--hud-active);margin:0 0 8px;}
+#app #proz0-phase1-ui .p1-inventory-utilities>h3 {font-size:12px;margin:6px 0;}
+#app #proz0-phase1-ui :is(.p1-wardrobe-help,.p1-storage-guide) {max-height:140px;overflow:auto;}
+#app .lw-management-group[hidden],#app [data-living-craft][hidden] {display:none;}

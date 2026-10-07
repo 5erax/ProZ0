@@ -26,8 +26,8 @@ it('keeps the HUD corners clear, unifies the world cycle and exposes real mouse 
         await expect.poll(()=>root.querySelector('.p1-world .p1-world-cycle')!.textContent).toContain(language==='vi'?'Năm':'Year');
         await expect.poll(()=>root.querySelector('.lw-season')!.textContent).toContain(language==='vi'?'Năm':'Year');
         const build=root.querySelector<HTMLButtonElement>('[data-review-action=open-build]')!;
-        build.click();expect(build.getAttribute('aria-pressed')).toBe('true');
-        root.querySelector<HTMLButtonElement>('.p1-panel-close')!.click();expect(root.querySelector('.p1-panel')).toBeNull();
+        build.click();await expect.poll(()=>build.getAttribute('aria-pressed')).toBe('true');
+        root.querySelector<HTMLButtonElement>('.sp-expedition-panel [data-panel-close]')!.click();expect(root.querySelector<HTMLElement>('.sp-expedition-panel')!.hidden).toBe(true);
         root.querySelector<HTMLButtonElement>('[data-review-action=open-map]')!.click();
         const marker=root.querySelector<HTMLButtonElement>('[data-review-action=map-select-marker]')!;expect(marker).not.toBeNull();marker.click();
         expect(root.querySelector('.p1-map-detail')!.textContent).toContain(language==='vi'?'Căn cứ':'BASE');

@@ -5,7 +5,7 @@ const shortcut = (label: string, key: string, panel: string, kind: string | null
 export const PANEL_SHORTCUTS = Object.freeze({
   inventory: shortcut('Inventory', 'I', 'inventory'),
   craft: shortcut('Craft', 'C', 'craft'),
-  build: shortcut('Build base', 'B', 'build'),
+  build: shortcut('Build base', 'B', 'build', 'build', 'expeditionPanelOpen'),
   map: shortcut('Map', 'M', 'map'),
   farm: shortcut('Homestead farming and wildlife', 'F', 'farm', null, 'livingPanelOpen'),
   colony: shortcut('Colony', 'N', 'colony'),

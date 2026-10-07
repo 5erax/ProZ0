@@ -36,6 +36,7 @@ test('root UI fixture: mature harvest, uproot, ground preview, transplant and sa
   await expect(page.locator('.lw-panel')).toBeHidden();
   await page.keyboard.press('f');
   const panel = page.locator('.lw-panel'), row = panel.locator('[data-living-row="fixture:berry"]');
+  await panel.locator('[data-living-scope=nearby]').click();
   await expect(row).toContainText('Early growth');
   await row.getByRole('button', { name: 'Uproot · Field Hoe', exact: true }).click();
   await expect(row).toHaveCount(0);

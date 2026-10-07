@@ -164,19 +164,25 @@ test('industry UI pays for a powered processing chain, conserves logistics stock
   for (const [index, kind] of kinds.entries()) {
     await panel.getByRole('button', { name: 'Construction', exact: true }).click();
     const position = seeded.positions[index]!;
-    const x = panel.getByLabel('Offset X', { exact: true });
-    await x.fill(String(position.x + 4));
-    await panel.getByLabel('Offset Y', { exact: true }).fill(String(position.y));
-    if (index === 0) {
-      await x.focus();
-      await page.waitForTimeout(700);
-      await expect(x).toBeFocused();
-      await expect(x).toHaveValue(String(position.x + 4));
-      const before = await page.locator('canvas').getAttribute('data-player-x');
-      await page.keyboard.down('w'); await page.waitForTimeout(250); await page.keyboard.up('w');
-      await expect(page.locator('canvas')).toHaveAttribute('data-player-x', before!);
-    }
+    await expect(panel.getByLabel('Offset X', { exact: true })).toHaveCount(0);
     await panel.getByRole('button', { name: 'Build ' + INDUSTRY_FACILITIES[kind].name, exact: true }).click();
+    const pointer = await page.locator('canvas').evaluate((canvas, point) => {
+      const rect = canvas.getBoundingClientRect(), x = Number(canvas.getAttribute('data-player-x')), y = Number(canvas.getAttribute('data-player-y'));
+      return { x: rect.left + (320+(point.x-x-point.y+y)*16)*rect.width/640, y: rect.top+(180+(point.x-x+point.y-y)*8)*rect.height/360 };
+    }, position);
+    await page.mouse.move(pointer.x, pointer.y);
+    await expect(page.locator('.sp-ghost')).toHaveAttribute('data-valid', 'true');
+    if (index === 0) {
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.sp-ghost')).toBeHidden();
+      await expect(page.locator('[data-industry-facility]')).toHaveCount(0);
+      await page.keyboard.press('o');
+      await panel.getByRole('button', { name: 'Build ' + INDUSTRY_FACILITIES[kind].name, exact: true }).click();
+      await page.mouse.move(pointer.x, pointer.y);
+      await page.keyboard.press('r');
+      await expect(page.locator('.sp-ghost')).toHaveAttribute('data-orientation', '0');
+    }
+    await page.keyboard.press('Enter');
     await expect(panel.getByRole('status')).toContainText(INDUSTRY_FACILITIES[kind].name + ' built');
     await expect(page.locator('[data-industry-facility]')).toHaveCount(index + 1);
   }

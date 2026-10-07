@@ -20,7 +20,7 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
         expect(stamina!.getAttribute('aria-label')).toContain(language==='vi'?'Thể lực':'Stamina');
         for(const key of ['i','c','b','m','u','j','p','h']){
           await userEvent.keyboard('{Escape}');await userEvent.keyboard(key);
-          const panel=Array.from(root.querySelectorAll<HTMLElement>('.p1-panel,.p2-colony-panel,.p1-product-controls-panel')).find(e=>!e.hidden&&e.getBoundingClientRect().height>0);
+          const panel=Array.from(root.querySelectorAll<HTMLElement>('.p1-panel,.p2-colony-panel,.p1-product-controls-panel,.sp-expedition-panel')).find(e=>!e.hidden&&e.getBoundingClientRect().height>0);
           expect(panel,'panel '+key).toBeDefined();
           const bounds=panel!.getBoundingClientRect();
           expect(bounds.left,key+' left').toBeGreaterThanOrEqual(-1);expect(bounds.right,key+' right').toBeLessThanOrEqual(width!+1);
@@ -38,13 +38,15 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
             expect(lastBounds.top).toBeGreaterThanOrEqual(bounds.top);
           }
           if(key==='b'){
-            expect(panel!.querySelector<HTMLElement>('.p1-build-catalog')!.clientHeight).toBeGreaterThanOrEqual(32);
-            for(const button of panel!.querySelectorAll<HTMLElement>('.p1-build-actions button')){
-              const actionBounds=button.getBoundingClientRect();
-              expect(actionBounds.top).toBeGreaterThanOrEqual(bounds.top);
-              expect(actionBounds.bottom).toBeLessThanOrEqual(bounds.bottom+1);
-              expect(button.getAttribute('aria-label')).toBeTruthy();
-            }
+            const body=panel!.querySelector<HTMLElement>('.ui-panel-body')!;
+            expect(body.clientHeight).toBeGreaterThanOrEqual(32);
+            const choices=panel!.querySelectorAll<HTMLButtonElement>('[data-construction-definition] button');
+            expect(choices.length).toBeGreaterThan(0);
+            for(const button of choices) expect(button.getAttribute('aria-label')).toBeTruthy();
+            body.scrollTop=body.scrollHeight;
+            const last=body.lastElementChild!.getBoundingClientRect();
+            expect(last.bottom).toBeLessThanOrEqual(bounds.bottom+1);
+            expect(panel!.querySelector('[data-panel-close]')!.getBoundingClientRect().top).toBeGreaterThanOrEqual(bounds.top);
           }
           if(key==='i')await page.getByTestId('layout-root').screenshot({path:`../../.vitest/attachments/ui-inventory-${width}-${language}.png`});
         }

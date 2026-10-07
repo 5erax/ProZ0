@@ -38,6 +38,7 @@ export interface IndustryPanelAdapter {
   itemDisplayName?(id: string): string;
   position(): { readonly x: number; readonly y: number } | null;
   command(intent: IndustryIntent): IndustryPanelResult | Promise<IndustryPanelResult>;
+  beginPlacement?(kind: IndustryFacilityKind, artwork: HTMLElement, onResult: (result: IndustryPanelResult) => void): void;
   ready?(): boolean;
   /** Canonical raster stage for world markers; management UI stays in physical pixels. */
   markerHost?: HTMLElement | undefined;
@@ -53,6 +54,7 @@ export interface IndustryPanelAdapter {
 
 export interface IndustryPanelHandle {
   open(facilityId?: string): void;
+  openConstruction(): void;
   close(): void;
   update(): void;
   destroy(): void;
@@ -313,7 +315,7 @@ export function createIndustryPanel(
     );
     placement.append(coordinates, text('p', 'Offsets are world units from your current position. Build within ' + String(INDUSTRY_BUILD_RANGE) + ' units, on explored dry ground clear of obstacles.', 'industry-small'));
     if (player) placement.append(text('p', 'Your position: ' + player.x.toFixed(1) + ', ' + player.y.toFixed(1), 'industry-small'));
-    content.append(placement);
+    if (!adapter.beginPlacement) content.append(placement);
     const grid = document.createElement('div');
     grid.className = 'industry-grid';
     for (const definition of Object.values(INDUSTRY_FACILITIES)) {
@@ -324,6 +326,16 @@ export function createIndustryPanel(
       const researched = !definition.requiredResearch || state.researchIds.includes(definition.requiredResearch);
       if (!researched) node.append(text('p', 'Requires: ' + (INDUSTRY_RESEARCH.find((r) => r.id === definition.requiredResearch)?.name ?? definition.requiredResearch), 'industry-small'));
       node.append(button('Build ' + definition.name, 'build-' + definition.id, () => {
+        if (adapter.beginPlacement) {
+          const artwork = document.createElement('span');
+          artwork.innerHTML = silhouette(definition.id);
+          close();
+          adapter.beginPlacement(definition.id, artwork, result => {
+            feedback = result.status === 'committed' ? definition.name + ' built.' : readableReason(result.reason);
+            if (result.status === 'committed') open(result.entityId);
+          });
+          return;
+        }
         const current = adapter.position();
         const x = Number(draft.x), y = Number(draft.y);
         if (!current || !draft.x.trim() || !draft.y.trim() || !Number.isFinite(x) || !Number.isFinite(y) || Math.hypot(x, y) > INDUSTRY_BUILD_RANGE) {
@@ -337,9 +349,11 @@ export function createIndustryPanel(
   };
 
   const facilityName = (facility: Facility) => INDUSTRY_FACILITIES[facility.kind].name + ' · ' + facility.id.slice(-6);
+  const showConstruction=()=>{tab='build';signature='';render(true);};
   const renderProduction = (content: HTMLElement, state: IndustryState) => {
     if (!state.facilities.length) {
       content.append(text('p', 'Build your first facility in Construction.'));
+      content.append(button('Open construction','empty-build',showConstruction));
       return;
     }
     if (!state.facilities.some((facility) => facility.id === selectedFacility)) selectedFacility = state.facilities[0]!.id;
@@ -444,7 +458,7 @@ export function createIndustryPanel(
     for (const network of state.powerNetworks) {
       power.append(text('p', network.id + ' · ' + String(network.usedCapacity) + '/' + String(network.capacity) + ' power · ' + String(network.consumerIds.length) + ' consumers · ' + String(network.relayIds.length) + ' relays'));
     }
-    if (!state.powerNetworks.length) power.append(text('p', 'No network yet. Build a solar array.'));
+    if (!state.powerNetworks.length) power.append(text('p', 'No network yet. Build a solar array.'),button('Open construction','empty-power-build',showConstruction));
     content.append(power);
     const logistics = card('Conveyor logistics');
     logistics.append(text('p', 'Links move actual buffer stock between facilities during active simulation. Endpoints must be within ' + String(INDUSTRY_CONVEYOR_RANGE) + ' units. Pause or repair damaged facilities to control the chain.', 'industry-small'));
@@ -638,6 +652,7 @@ export function createIndustryPanel(
   });
   render();
   return {
+    openConstruction: () => { tab = 'build'; open(); },
     open,
     close,
     update: () => render(),

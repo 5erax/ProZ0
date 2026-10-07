@@ -15,7 +15,8 @@ import { installGameContextMenu } from '../input/GameContextMenu';
 import { createEntityInspection } from '../presentation/EntityInspection';
 import { ColonyAutosaveCrossings, COLONY_AUTOSAVE_EVENT } from './ColonyAutosave';
 import {createExpeditionOverlay} from '../presentation/ExpeditionOverlay';
-import { createIndustryPanel } from './IndustryPanel';
+import { createIndustryPanel, type IndustryPanelResult } from './IndustryPanel';
+import type { IndustryFacilityKind } from '../../content/phase3/IndustryContent';
 import {createColonyPlaytestTools} from './ColonyPlaytestTools';
 import type { PlayerId, WorldPosition } from '../../foundation';
 import { phase1IsometricInput, projectPhase1Isometric, unprojectPhase1Isometric } from './Phase1IsometricProjection';
@@ -337,11 +338,16 @@ export async function createPhase1ProductReviewRuntime(
   const nextOperationId = (kind: string): string =>
     'product-review:' + operationSession + ':' + kind + ':' + String(++operationOrdinal);
   const colonyDepthOverlay=config.colonyDepthEnabled===true?createColonyDepthOverlay(root,bundle,config.localPlayerId,()=>{
-    livingOverlay?.close();expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
+    industryPanel?.close();livingOverlay?.close();expeditionOverlay?.close();actionPanel=null;machineStructureId=null;controls.close();source.setPresentationPanel(null);source.setPanel(null);
   }):null;
 
-  const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
-  const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const livingOverlay=bundle.livingWorld?createLivingWorldOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{industryPanel?.close();expeditionOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();}):null;
+  const expeditionOverlay=bundle.expedition?createExpeditionOverlay(root,worldRenderer.canvas,bundle,config.localPlayerId,()=>{industryPanel?.close();livingOverlay?.close();colonyDepthOverlay?.close();actionPanel=null;source.setPresentationPanel(null);source.setPanel(null);controls.close();},(definitionId,action)=>{
+    const index=buildDefinitions().findIndex(definition=>definition.id===definitionId);
+    if(index<0)return;
+    buildIndex=index;
+    if(action==='prepare') prepareSelectedBuildKit(); else beginKitPlacement();
+  },()=>industryPanel?.openConstruction()):null;
   const entityInspection = createEntityInspection(root, () => ['industryOpen','colonySettingsOpen','livingPanelOpen','expeditionPanelOpen','colonyDepthPanelOpen','productReviewPanelOpen','productReviewHelpOpen'].some(key => root.dataset[key] === 'true'), view=>{
     const authority=bundle.resourceMarkers;if(!authority)return [];
     const spaceId=bundle.caves?.activeLayout()?.spaceId??'surface';
@@ -359,6 +365,19 @@ export async function createPhase1ProductReviewRuntime(
     position: () => bundle.getPlayerPosition(config.localPlayerId),
     command: intent => bundle.industry!.execute({ ...intent, operationId: 'industry:' + crypto.randomUUID(), playerId: config.localPlayerId,
       expectedRevision: bundle.industry!.read().revision, expectedInventoryRevision: bundle.items.getContainerView('inventory:' + config.localPlayerId).revision }),
+    ...(expeditionOverlay ? { beginPlacement: (kind: IndustryFacilityKind, artwork: HTMLElement, onResult: (result: IndustryPanelResult) => void) => {
+      expeditionOverlay.beginPlacement({ definition: 'industry:' + kind, artwork, canRotate: false,
+        preview: point => ({ position: point, footprint: { width: 1.5, depth: 1.5 }, reason: bundle.industry!.assessBuild(config.localPlayerId, kind, point) }),
+        confirm: point => {
+          const result = bundle.industry!.execute({ action: 'build', facilityKind: kind, position: point,
+            operationId: nextOperationId('industry-build'), playerId: config.localPlayerId,
+            expectedRevision: bundle.industry!.read().revision,
+            expectedInventoryRevision: bundle.items.getContainerView('inventory:' + config.localPlayerId).revision });
+          onResult(result);
+          return result.status === 'committed' ? null : result.reason;
+        },
+      });
+    } } : {}),
     project: position => {
       const stage = root.querySelector<HTMLElement>('.p1-product-world-stage');
       if (!stage || bundle.playerWorldspace() !== 'surface' || !bundle.world.isExploredPosition(position)) return null;
@@ -894,6 +913,11 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const toggleBuildPanel = (): void => {
+    if (expeditionOverlay) {
+      if(root.dataset.expeditionPanelOpen==='true') expeditionOverlay.close();
+      else expeditionOverlay.openConstruction();
+      return;
+    }
     if (actionPanel === 'build') {
       actionPanel = null;
       source.setPresentationPanel(null);
@@ -937,14 +961,14 @@ export async function createPhase1ProductReviewRuntime(
     source.setPresentationPanel(buildPanel());
   };
 
-  const placeSelectedStructure = (): void => {
-    if (actionPanel !== 'build') return;
+  const placeSelectedStructure = (fromGhost = false): string | null => {
+    if (!fromGhost && actionPanel !== 'build') return 'INVALID_PLACEMENT';
     const definition = selectedBuildDefinition();
     const inventory = bundle.items.getContainerView(
       'inventory:' + config.localPlayerId,
     );
     const kitId = definition.sourceKitItemId;
-    if (kitId === null) return;
+    if (kitId === null) return 'KIT_REQUIRED';
     const kit = inventory.stacks.find(
       (stack) => stack.itemDefinitionId === kitId,
     );
@@ -962,7 +986,7 @@ export async function createPhase1ProductReviewRuntime(
       placement: placementIntent(),
     });
 
-    source.setPresentationPanel(buildPanel());
+    if (!fromGhost) source.setPresentationPanel(buildPanel());
     source.setLocalCommandFeedback({
       inputLabel: uiText("ui.b57994ad"),
       operationId: result.operationId,
@@ -972,6 +996,50 @@ export async function createPhase1ProductReviewRuntime(
         : {}),
       verb: 'BUILD',
       target: contentDisplayName(definition),
+    });
+    return result.status === 'committed' ? null : result.reason;
+  };
+
+  const prepareSelectedBuildKit = () => {
+    const kitId = selectedBuildDefinition().sourceKitItemId;
+    const index = craftRecipes().findIndex(recipe => recipe.outputs.some(output => output.itemId === kitId));
+    if (index >= 0) { actionPanel = 'craft'; craftPage = Math.floor(index / CRAFT_PAGE_SIZE); source.clearCommandFeedback(); refreshCraftPanel(); }
+  };
+
+  const beginKitPlacement = (): void => {
+    if (!expeditionOverlay) { placeSelectedStructure(); return; }
+    const definition = selectedBuildDefinition();
+    const evaluate = (point: WorldPosition, orientation: 0 | 1 | 2 | 3) => {
+      buildAnchor = point;
+      buildOrientation = orientation;
+      if (definition.id === 'structure:habitat-room') {
+        const landing = bundle.buildings.getStructure('structure-instance:landing-module');
+        const connectors = landingConnectors();
+        if (landing && connectors.length) {
+          buildConnectorIndex = connectors.reduce((best, connector, index) => {
+            const vector = connectorVector(connector.localConnectorKey);
+            const previous = connectorVector(connectors[best]!.localConnectorKey);
+            const offset = (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:landing-module'].connectorOffsetWorldUnits ?? 0)
+              + (PHASE1_STRUCTURE_PLACEMENT_PROFILES['structure:habitat-room'].connectorOffsetWorldUnits ?? 0);
+            return Math.hypot(point.x-landing.position.x-vector.x*offset,point.y-landing.position.y-vector.y*offset)
+              < Math.hypot(point.x-landing.position.x-previous.x*offset,point.y-landing.position.y-previous.y*offset) ? index : best;
+          }, 0);
+        }
+      }
+      return bundle.buildings.assessPlacement(placeableStructureDefinitionId(definition.id), placementIntent());
+    };
+    expeditionOverlay.beginPlacement({ definition: definition.id, canRotate: definition.id !== 'structure:habitat-room',
+      preview: (point, orientation) => {
+        const assessment = evaluate(point, orientation);
+        const footprint = PHASE1_STRUCTURE_PLACEMENT_PROFILES[placeableStructureDefinitionId(definition.id)].footprint;
+        const turn = typeof assessment === 'string' ? orientation : assessment.orientationQuarterTurns;
+        const inventory = bundle.items.getContainerView('inventory:' + config.localPlayerId);
+        const hasKit = inventory.stacks.some(stack => stack.itemDefinitionId === definition.sourceKitItemId);
+        return { position: typeof assessment === 'string' ? point : assessment.finalPosition,
+          footprint: turn % 2 === 0 ? footprint : { width: footprint.depth, depth: footprint.width },
+          reason: !hasKit ? 'KIT_REQUIRED' : typeof assessment === 'string' ? assessment : null };
+      },
+      confirm: (point, orientation) => { evaluate(point, orientation); return placeSelectedStructure(true); },
     });
   };
 
@@ -2074,7 +2142,7 @@ export async function createPhase1ProductReviewRuntime(
       case 'Enter':
         if (actionPanel === 'build') {
           event.preventDefault();
-          placeSelectedStructure();
+          beginKitPlacement();
         }
         break;
       case 'PageUp':
@@ -2133,7 +2201,7 @@ export async function createPhase1ProductReviewRuntime(
   };
 
   const buildPreview = (): Phase1ProductReviewBuildPreview | null => {
-    if (actionPanel !== 'build') return null;
+    if (actionPanel !== 'build' || expeditionOverlay) return null;
     const definition = selectedBuildDefinition();
     const panel = buildPanel();
     const connectorRequired =
@@ -2326,7 +2394,7 @@ export async function createPhase1ProductReviewRuntime(
       if(actionPanel)refreshColonyPanel();else source.setPresentationPanel(null);return;
     }
     if(action==='open-expedition'){expeditionOverlay?.open();return;}
-    if(action?.startsWith('open-')){livingOverlay?.close();colonyDepthOverlay?.close();expeditionOverlay?.close();}
+    if(action?.startsWith('open-')){industryPanel?.close();livingOverlay?.close();colonyDepthOverlay?.close();if(action!=='open-build')expeditionOverlay?.close();}
     if(action==='inventory-repair'){repairSelectedItem();return;}
     if(action==='inventory-split'&&source.isInventoryOpen()){
       const selection=selectedInventoryAction('SPLIT','SPLIT');if(!selection||!selection.stack)return;
@@ -2357,6 +2425,7 @@ export async function createPhase1ProductReviewRuntime(
     }
     if (action === 'open-craft') { source.setPanel(null); toggleCraftPanel(); return; }
     if (action === 'build-storage') {
+      if (expeditionOverlay) { expeditionOverlay.openConstruction('structure:storage-crate'); return; }
       colonyDepthOverlay?.close();source.setPanel(null);actionPanel=null;toggleBuildPanel();
       buildIndex=Math.max(0,buildDefinitions().findIndex(definition=>definition.id==='structure:storage-crate'));
       source.setPresentationPanel(buildPanel());return;
@@ -2377,15 +2446,11 @@ export async function createPhase1ProductReviewRuntime(
       if (action.startsWith('build-select:')) {
         const index = buildDefinitions().findIndex(definition => definition.id === action.slice(13));
         if (index >= 0) { buildIndex = index; buildAnchor = null; source.clearCommandFeedback(); refreshBuildPanel(); }
-      } else if (action === 'build-place') placeSelectedStructure();
+      } else if (action === 'build-place') beginKitPlacement();
       else if (action === 'build-rotate') rotateBuild();
       else if (action === 'build-connector-previous') cycleBuildConnector(-1);
       else if (action === 'build-connector-next') cycleBuildConnector(1);
-      else if (action === 'build-prepare') {
-        const kitId = selectedBuildDefinition().sourceKitItemId;
-        const index = craftRecipes().findIndex(recipe => recipe.outputs.some(output => output.itemId === kitId));
-        if (index >= 0) { actionPanel = 'craft'; craftPage = Math.floor(index / CRAFT_PAGE_SIZE); source.clearCommandFeedback(); refreshCraftPanel(); }
-      }
+      else if (action === 'build-prepare') prepareSelectedBuildKit();
       return;
     }
     if (action === 'craft-page') { const page=Number(event.target.closest<HTMLElement>('[data-page]')?.dataset.page);if(Number.isInteger(page)&&page>=0&&page<Math.ceil(craftRecipes().length/CRAFT_PAGE_SIZE)){craftPage=page;refreshCraftPanel();}return; }
@@ -2404,7 +2469,7 @@ export async function createPhase1ProductReviewRuntime(
       colonyCommand(action.slice(7) as ColonySustenanceAction);
       return;
     }
-    if (updateBuildPointer(event)) placeSelectedStructure();
+    if (!expeditionOverlay && updateBuildPointer(event)) placeSelectedStructure();
   };
 
   input.start();

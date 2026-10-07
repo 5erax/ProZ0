@@ -105,6 +105,7 @@ export function createLivingWorldOverlay(
     fishingError = '',
     interactionFlashUntil = 0,
     cursor: { x: number; y: number } | null = null;
+  let managementScope:'farm'|'nearby'|'recipes'='farm';
   const particles = Array.from({ length: 10 }, () => {
     const e = document.createElement('span');
     e.style.cssText =
@@ -215,6 +216,7 @@ export function createLivingWorldOverlay(
     opened = true;
     layer.style.zIndex = '1000020';
     focus = id;
+    managementScope=id==='craft'?'recipes':'farm';
     panel.hidden = false;
     root.dataset.livingPanelOpen = 'true';
     signature = '';
@@ -478,7 +480,7 @@ export function createLivingWorldOverlay(
     panel.replaceChildren(
       text('h2', targeted ? uiText("ui.1e2eb9ef") : uiText("ui.d9324124") + uiPhrase(s.name)),
       button(uiText("ui.cd86acc3"), close),
-      ...(!targeted ? [button(uiText("ui.e048e22e"), startPlot)] : []),
+      ...(!targeted && managementScope==='farm' ? [button(uiText("ui.e048e22e"), startPlot)] : []),
     );
     const status = text('p', feedback);
     status.setAttribute('role', 'status');
@@ -490,7 +492,7 @@ export function createLivingWorldOverlay(
       ),
     );
     const roots = LIVING_ROOT_ITEMS.filter(i => inventory.stacks.some(s => s.itemDefinitionId === i.id));
-    if (!targeted) panel.append(button(uiText("ui.5f9c6795"), startFishing));
+    if (!targeted && managementScope==='nearby') panel.append(button(uiText("ui.5f9c6795"), startFishing));
     const fishFeedback = authority.fishing.message(player);
     if (fishFeedback && !fish) panel.append(text('p', fishFeedback.startsWith('FISHING_CAUGHT:') ? uiText("ui.f8dbcaff") + contentDisplayName(bundle.catalog.get(fishFeedback.slice('FISHING_CAUGHT:'.length))) : statusText(fishFeedback)));
     for (const rootItem of targeted ? [] : roots) panel.append(button(uiText("ui.73de41ef") + contentDisplayName(rootItem), () => {
@@ -519,6 +521,7 @@ export function createLivingWorldOverlay(
       else {
         let group=groups.get(kind);
         if(!group){group=document.createElement('section');group.className='lw-management-group';group.dataset.livingGroup=kind;group.append(text('h3',kind));groups.set(kind,group);panel.append(group);}
+        group.hidden=managementScope==='recipes'||(managementScope==='farm'?!['Plots','Livestock'].includes(kind):['Plots','Livestock'].includes(kind));
         group.append(a);
       }
       return a;
@@ -587,7 +590,7 @@ export function createLivingWorldOverlay(
               ? uiText("ui.715a6a83")
               : animal.age >= d.matureSeconds * 60
                 ? uiText("ui.5c0e81af")
-                : uiText("ui.2a407de3")),'Livestock',
+                : uiText("ui.2a407de3")),animal.pen?'Livestock':'Wildlife',
         );
       a.dataset.careState=animal.health===0?'dead':animal.energy<2500||animal.thirst<2500?'needs-care':'normal';
       const animalIcon=document.createElement('span');animalIcon.className='lw-card-icon';animalIcon.innerHTML=livingArt('animal',animal.species,1,animal.age<d.matureSeconds*60,animal.health===0).markup;a.prepend(animalIcon);
@@ -705,6 +708,7 @@ export function createLivingWorldOverlay(
     }
     const craft = document.createElement('details');
     craft.dataset.livingCraft='true';
+    craft.hidden=managementScope!=='recipes';
     craft.open = craftOpen;
     craft.append(
       text(
@@ -734,7 +738,13 @@ export function createLivingWorldOverlay(
       if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-description',reason);if(stationBlocked)a.append(text('p',reason));}
       a.append(action);
     }
-    panelShell(panel,panel.querySelector<HTMLElement>('h2')!,panel.querySelector<HTMLButtonElement>('button')!);
+    const navigation=document.createElement('nav');navigation.dataset.livingNavigation='true';
+    if(!targeted)for(const [scope,label] of [['farm','Crops and livestock'],['nearby','Nearby resources'],['recipes','Crafting']] as const){
+      const choice=button(uiPhrase(label),()=>{managementScope=scope;signature='';render();});
+      choice.dataset.livingScope=scope;choice.setAttribute('aria-pressed',String(scope===managementScope));navigation.append(choice);
+    }
+    panel.dataset.livingScope=targeted?'target':managementScope;
+    panelShell(panel,panel.querySelector<HTMLElement>('h2')!,panel.querySelector<HTMLButtonElement>('button')!,targeted?undefined:navigation);
     panel.scrollTop = scrollTop;restoreUi();
   };
   const pointer = (e: PointerEvent) => {

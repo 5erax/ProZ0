@@ -27,6 +27,20 @@ import { expeditionSprite } from './ExpeditionAssets';
 import { createCanvasBounds } from './CanvasBounds';
 import { bindEntityInspection } from './EntityInspection';
 
+/** Another authority can reuse this ghost without sharing its transaction rules. */
+export interface ExpeditionPlacement {
+  readonly definition: string;
+  readonly artwork?: HTMLElement;
+  readonly canRotate: boolean;
+  preview(point: { x: number; y: number }, orientation: 0 | 1 | 2 | 3): {
+    readonly position: { x: number; y: number };
+    readonly footprint: { width: number; depth: number };
+    readonly reason: string | null;
+  };
+  /** Revalidate at confirmation; a rejection keeps the ghost active. */
+  confirm(point: { x: number; y: number }, orientation: 0 | 1 | 2 | 3): string | null;
+}
+
 /** Presentation only: every material change runs through the solo authority. */
 export function createExpeditionOverlay(
   root: HTMLElement,
@@ -34,6 +48,8 @@ export function createExpeditionOverlay(
   bundle: Phase1AuthorityBundle,
   playerId: string,
   onOpen: () => void,
+  placeOwnedKit?: (definitionId: string, action: 'place' | 'prepare') => void,
+  openIndustry?: () => void,
 ) {
   const document = root.ownerDocument,
     authority = bundle.expedition!;
@@ -82,6 +98,7 @@ export function createExpeditionOverlay(
       relocationId?: string;
       orientation: 0 | 1 | 2 | 3;
     } | null = null;
+  let externalPlacement: ExpeditionPlacement | null = null;
   let cursor: { x: number; y: number } | null = null,
     previewSignature = '';
   const art = (id: string) => {
@@ -104,6 +121,7 @@ export function createExpeditionOverlay(
   const close = () => {
     authority.cancelRest(playerId);
     placement = null;
+    externalPlacement = null;
     hint.hidden = true;
     opened = false;
     focusedEntity = null;
@@ -283,6 +301,7 @@ export function createExpeditionOverlay(
     if (focus && focus !== focusedEntity) feedback = '';
     focusedEntity = focus ?? null;
     placement = null;
+    externalPlacement = null;
     hint.hidden = true;
     root.dataset.expeditionPanelOpen = 'true';
     signature = '';
@@ -332,7 +351,7 @@ export function createExpeditionOverlay(
         const header = document.createElement('header');
         header.className = 'sp-expedition-header';
         header.append(
-          text('h2', focusedEntity ? uiText("ui.9256cb9e") : uiText("ui.cc393a1d")),
+          text('h2', focusedEntity ? uiText("ui.9256cb9e") : placeOwnedKit ? uiPhrase('Build and outposts') : uiText("ui.cc393a1d")),
           button(uiText("ui.cd86acc3"), close),
         );
         panel.append(header);
@@ -364,6 +383,7 @@ export function createExpeditionOverlay(
               uiPhrase('Place a blueprint first. Bring supplies later, contribute what you carry, then complete it. Moving keeps contributed materials; cancel refunds them when your bag has room.'),
             ),
           );
+          if (openIndustry) panel.append(button(uiPhrase('Industrial construction'), () => { close(); openIndustry(); }));
           const event = authority.currentEvent(
             bundle.getPlayerPosition(playerId),
           );
@@ -397,12 +417,19 @@ export function createExpeditionOverlay(
         panel.append(status);
         for (const def of focusedEntity ? [] : EXPEDITION_FACILITIES) {
           const row = document.createElement('article');
+          row.dataset.constructionDefinition = def.canonical ?? def.id;
           row.append(art(def.id), text('p', uiPhrase(def.name)));
           costs(row, def.costs);
           row.append(
             button(uiText("ui.1eab5e32"), () => selectPlacement(def.id)),
             text('small', uiPhrase(def.purpose)),
           );
+          if (placeOwnedKit && def.canonical) {
+            const canonical = bundle.catalog.getAs(def.canonical, 'structure');
+            row.append(button(uiPhrase('Prepare kit'), () => { close(); placeOwnedKit(def.canonical!, 'prepare'); }));
+            if (canonical.sourceKitItemId && inventory.stacks.some(stack => stack.itemDefinitionId === canonical.sourceKitItemId))
+              row.append(button(uiPhrase('Place owned kit'), () => { close(); placeOwnedKit(def.canonical!, 'place'); }));
+          }
           panel.append(row);
         }
         for (const plan of state.plans.filter(plan => !focusedEntity || plan.id === focusedEntity)) {
@@ -678,14 +705,16 @@ export function createExpeditionOverlay(
     }
     const camera = bundle.getPlayerPosition(playerId),
       point = unprojectPhase1Isometric({ x: sx - 320, y: sy - 180 }, camera),
-      position = placement.relocationId
+      snapped = { x: Math.round(point.x * 4) / 4, y: Math.round(point.y * 4) / 4 },
+      external = externalPlacement?.preview(snapped, placement.orientation),
+      position = external?.position ?? (placement.relocationId
         ? authority.relocationPosition(
             placement.relocationId,
             Math.round(point.x * 4) / 4,
             Math.round(point.y * 4) / 4,
             placement.orientation,
           )
-        : authority.planPosition(placement.definition, Math.round(point.x * 4) / 4, Math.round(point.y * 4) / 4, placement.orientation),
+        : authority.planPosition(placement.definition, Math.round(point.x * 4) / 4, Math.round(point.y * 4) / 4, placement.orientation)),
       x = position.x,
       y = position.y;
     const key = JSON.stringify([
@@ -702,7 +731,7 @@ export function createExpeditionOverlay(
       return;
     }
     previewSignature = key;
-    const reason = placement.relocationId
+    const reason = external ? external.reason : placement.relocationId
         ? authority.assessRelocationPreview(
             playerId,
             placement.relocationId,
@@ -718,7 +747,7 @@ export function createExpeditionOverlay(
             placement.orientation,
             placement.planId,
           ),
-      size = authority.previewFootprint(
+      size = external?.footprint ?? authority.previewFootprint(
         placement.definition,
         placement.orientation,
         placement.relocationId ?? placement.planId,
@@ -754,7 +783,7 @@ export function createExpeditionOverlay(
     outline.setAttribute('stroke', reason ? '#eb9277' : '#ace5ce');
     outline.setAttribute('fill', reason ? '#eb927744' : '#ace5ce44');
     bindUiText(hint,"textContent",(reason ? describeFeedback(reason) : uiText("ui.dfacc6ec")) +
-      (placement.definition === 'attached-habitat' ? uiText("ui.1971545d") : uiText("ui.c6669b3")));
+      (externalPlacement && !externalPlacement.canRotate ? uiPhrase(' · Click or Enter to confirm · Esc to cancel · Fixed orientation') : placement.definition === 'attached-habitat' ? uiText("ui.1971545d") : uiPhrase(' · Click or Enter to confirm · R rotate · Esc to cancel')));
   };
   const pointer = (event: PointerEvent) => {
     cursor = { x: event.clientX, y: event.clientY };
@@ -779,6 +808,21 @@ export function createExpeditionOverlay(
       { x: x - 320, y: y - 180 },
       bundle.getPlayerPosition(playerId),
     );
+    confirmPlacement(position);
+  };
+  const confirmPlacement = (position: { x: number; y: number }) => {
+    if (!placement) return;
+    const point = { x: Math.round(position.x * 4) / 4, y: Math.round(position.y * 4) / 4 };
+    if (externalPlacement) {
+      const reason = externalPlacement.confirm(point, placement.orientation);
+      if (reason === null) close();
+      else {
+        previewSignature = '';
+        renderPreview();
+        bindUiText(hint, 'textContent', describeFeedback(reason) + uiText("ui.847bf822"));
+      }
+      return;
+    }
     if (
       run(
         placement.relocationId
@@ -816,7 +860,11 @@ export function createExpeditionOverlay(
       placement = null;
       hint.hidden = true;
       ghost.hidden = true;
-    } else if (event.code === 'KeyR' && placement) {
+    } else if (event.code === 'Enter' && placement && cursor && !event.repeat) {
+      const rect = bounds.read().canvas;
+      const x = ((cursor.x - rect.left) * 640) / rect.width, y = ((cursor.y - rect.top) * 360) / rect.height;
+      if (x >= 0 && x <= 640 && y >= 0 && y <= 360) confirmPlacement(unprojectPhase1Isometric({x:x-320,y:y-180},bundle.getPlayerPosition(playerId)));
+    } else if (event.code === 'KeyR' && placement && !event.repeat && (!externalPlacement || externalPlacement.canRotate)) {
       placement.orientation = ((placement.orientation + 1) % 4) as
         0 | 1 | 2 | 3;
       bindUiText(hint,"textContent",uiText("ui.80d9fd33") +
@@ -830,7 +878,27 @@ export function createExpeditionOverlay(
   document.addEventListener('keydown', key, true);
   return {
     open,
+    openConstruction(definitionId?: string) {
+      open();
+      const row = Array.from(panel.querySelectorAll<HTMLElement>('[data-construction-definition]')).find(node => node.dataset.constructionDefinition === definitionId);
+      row?.scrollIntoView({ block: 'center' });
+      row?.querySelector<HTMLButtonElement>('button')?.focus();
+    },
     close,
+    beginPlacement(request: ExpeditionPlacement) {
+      close();
+      onOpen();
+      externalPlacement = request;
+      placement = { definition: request.definition, orientation: 0 };
+      ghost.querySelector('.sp-facility-art')?.remove();
+      const artwork = request.artwork ?? art(request.definition);
+      artwork.classList.add('sp-facility-art');
+      ghost.append(artwork);
+      previewSignature = '';
+      hint.hidden = false;
+      bindUiText(hint, 'textContent', uiText("ui.27694c56"));
+      renderPreview();
+    },
     cancelPlacement: () => { const active = placement !== null; if (placement) close(); return active; },
     render,
     destroy() {

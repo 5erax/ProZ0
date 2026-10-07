@@ -64,3 +64,24 @@ it('industry changes locale without changing draft placement, focus, IDs or the 
     expect(root.dataset.industryOpen).toBe('false');
   } finally { document.removeEventListener('keyup', release); setLocale('en'); handle.destroy(); root.remove(); }
 });
+
+it('routes empty facilities and power tabs to construction without issuing a gameplay command',()=>{
+ const root=document.createElement('div');document.body.append(root);
+ const handle=createIndustryPanel(root,{read:()=>emptyIndustryState(),inventory:()=>[],position:()=>({x:0,y:0}),command:()=>{throw Error('Navigation must not mutate authority');}});
+ try{handle.open();for(const [tab,action] of [['production','empty-build'],['networks','empty-power-build']]){
+  root.querySelector<HTMLButtonElement>('[data-industry-control=tab-'+tab+']')!.click();root.querySelector<HTMLButtonElement>('[data-industry-control='+action+']')!.click();
+  expect(root.querySelector('[data-industry-facility-kind=solar-array]')).not.toBeNull();
+ }}finally{handle.destroy();root.remove();}
+});
+
+it('routes a funded build into the shared ghost without numeric placement or premature material mutation',()=>{
+ const root=document.createElement('div');document.body.append(root);let selected='';
+ const handle=createIndustryPanel(root,{read:()=>({...emptyIndustryState(),researchIds:['automation']}),
+  inventory:()=>[{itemDefinitionId:'item:metal-ore',quantity:100},{itemDefinitionId:'item:timber',quantity:100},{itemDefinitionId:'item:cordage',quantity:100}],
+  position:()=>({x:0,y:0}),command:()=>{throw Error('Selecting a ghost must not spend supplies');},
+  beginPlacement:(kind,artwork)=>{selected=kind;expect(artwork.querySelector('svg')).not.toBeNull();},
+ });
+ try{handle.open();expect(root.querySelector('[data-industry-control=build-x]')).toBeNull();
+  root.querySelector<HTMLButtonElement>('[data-industry-control=build-solar-array]')!.click();expect(selected).toBe('solar-array');expect(root.dataset.industryOpen).toBe('false');
+ }finally{handle.destroy();root.remove();}
+});

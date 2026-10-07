@@ -15,7 +15,7 @@ test('item inspection: actual emergency water use updates stack and character wi
   await expect(card.getByRole('button', { name: 'Equip selected item [X]', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
-  await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+
   const expedition = page.locator('.sp-expedition-panel');
   await expedition.getByRole('button', { name: 'Emergency supplies · once', exact: true }).click();
   await expedition.getByRole('button', { name: 'Close', exact: true }).click();

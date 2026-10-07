@@ -2,6 +2,7 @@ import { locale, type MessageDictionary } from './Locale';
 import { uiPhrase } from './UiMessages';
 
 const rows = [
+  ['Open construction','Mở mục xây dựng'],
   ['Industry · O', 'Công nghiệp · O'], ['INDUSTRY', 'CÔNG NGHIỆP'],
   ['Industry management', 'Quản lý công nghiệp'], ['Industry sections', 'Mục công nghiệp'],
   ['Construction', 'Xây dựng'], ['Facilities', 'Công trình'], ['Power & logistics', 'Điện & vận chuyển'],

@@ -287,6 +287,8 @@ export function createColonyDepthOverlay(
         content.append(row);
       }
     if (panel === "journal") {
+      const section=(label:string)=>{const node=document.createElement('section');node.className='p2-journal-section';node.dataset.journalSection=label;const title=document.createElement('h3');bindUiText(title,'textContent',label);node.append(title);content.append(node);return node;};
+      const guidanceSection=section('Exploration guidance'),locationsSection=section('Discovered locations'),factsSection=section('Observed facts');
       const observedSites = sites.filter(
         (site) =>
           site.template
@@ -299,7 +301,7 @@ export function createColonyDepthOverlay(
         'textContent',
         gameUiText('traceHint'),
       );
-      content.append(guidance);
+      guidanceSection.append(guidance);
       if (observedSites.length >= 2) {
         const repairableFacilities = observedSites.filter(
           (site) =>
@@ -335,7 +337,7 @@ export function createColonyDepthOverlay(
             },
           ),
         );
-        content.append(comparison);
+        factsSection.append(comparison);
       }
 
       for(const site of discovered){
@@ -398,12 +400,12 @@ export function createColonyDepthOverlay(
             }
           }
         }
-        content.append(row);
+        locationsSection.append(row);
       }
       const regions = document.createElement("p");
       bindUiText(regions,"textContent",uiText("ui.dc34e2cf") +
         state.discoveredBiomes.map((id) => uiPhrase(COLONY_BIOMES[id].name)).join(" · "));
-      content.append(regions);
+      factsSection.append(regions);
       for (const site of sites.filter((s) =>
         state.inspectedSites.includes(s.id),
       )) {
@@ -413,12 +415,12 @@ export function createColonyDepthOverlay(
         const unresolved = document.createElement("p");
         bindUiText(unresolved,"textContent",uiText("ui.662d2bd0") + site.unresolved);
         row.append(observed, unresolved);
-        content.append(row);
+        factsSection.append(row);
       }
       if (state.inspectedSites.length === 0) {
         const empty = document.createElement("p");
         bindUiText(empty,"textContent","No inspected sites yet. Explore outward; inspect visible landmarks nearby.");
-        content.append(empty);
+        factsSection.append(empty);
       }
     }
     panelShell(content,heading,close);
