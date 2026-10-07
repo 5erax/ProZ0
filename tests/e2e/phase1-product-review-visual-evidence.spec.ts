@@ -1291,7 +1291,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
     await expect(inventoryCapacity).toContainText('/20.0 kg');
     await expect(inventoryCapacity).toContainText('/24.0 u');
     await expect(inventoryCapacity).toContainText(
-      /NORMAL|HEAVY|OVERLOADED/,
+      /Normal|Heavy load|Overloaded/,
     );
     const brokenSpear = inventoryPanel.locator(
       '.p1-item-row',
@@ -1466,7 +1466,7 @@ test('P1-POLISH-007 closes Final QA presentation conformance gaps', async ({ pag
     await expect(capacityRows.nth(0)).toContainText('/20.0 kg');
     await expect(capacityRows.nth(0)).toContainText('/24.0 u');
     await expect(capacityRows.nth(0)).toContainText(
-      /NORMAL|HEAVY|OVERLOADED/,
+      /Normal|Heavy load|Overloaded/,
     );
     await expect(capacityRows.nth(1)).toContainText('/100.0 kg');
     await expect(capacityRows.nth(1)).toContainText('/120.0 u');
@@ -2930,7 +2930,7 @@ test('colony: builds a visible bed, plants, harvests once and reopens persistent
   await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'false');
   await page.keyboard.press('e');
   const panel = page.locator('[data-panel-kind="colony"]');
-  await expect(panel).toContainText('CULTIVATION / HUSBANDRY');
+  await expect(panel.locator('.p1-panel-title')).toHaveText('Colony');
   await page.locator('[data-review-action="colony:build-bed"]').click();
   await expect(panel).toContainText('BUILD-BED · DONE');
   await expect(page.locator('[data-world-role="cultivation-bed"]')).toHaveAttribute('data-built', 'true');

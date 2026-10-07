@@ -1,3 +1,4 @@
+import { panelShell } from '../presentation/PanelShell';
 import { gameUiText } from '../localization/GameUiMessages';
 import { PANEL_SHORTCUTS } from '../input/PanelShortcuts';
 import { bindLocalized } from '../localization/Locale';
@@ -62,7 +63,7 @@ export function createPhase1ProductReviewControls(
   };
   fullscreen.addEventListener('click', () => { void toggleFullscreen(); });
   document.addEventListener('fullscreenchange', updateFullscreen);
-  (root.querySelector('[data-colony-settings]') ?? layer).append(fullscreen);
+  (root.querySelector('[data-colony-settings] .ui-panel-body') ?? layer).append(fullscreen);
 
   const panel = document.createElement('section');
   panel.className = 'p1-product-controls-panel';
@@ -120,6 +121,8 @@ export function createPhase1ProductReviewControls(
     root.dataset.productReviewHelpOpen = String(open);
   };
 
+  const close=document.createElement('button');close.addEventListener('click',()=>setOpen(false));
+  panelShell(panel,title,close);
   return Object.freeze({
     toggle(): void {
       setOpen(layer.dataset.productReviewControls !== 'open');

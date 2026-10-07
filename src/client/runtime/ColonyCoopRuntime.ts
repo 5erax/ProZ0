@@ -156,7 +156,7 @@ export async function bootColonyCoop(
   context.setAttribute("role", "status");
   root.append(context);
   const settings = createColonySettings(root),
-    settingsPanel = root.querySelector<HTMLElement>("[data-colony-settings]")!;
+    settingsPanel = root.querySelector<HTMLElement>("[data-colony-settings] .ui-panel-body")!;
   const audio = createColonyAudio(settingsPanel);
   const nav = document.createElement("nav");
   nav.className = "coop-nav";

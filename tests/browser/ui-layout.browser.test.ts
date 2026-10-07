@@ -30,7 +30,7 @@ it('keeps primary panels and the document within three viewports in EN/VI, with 
           expect(getComputedStyle(panel!).scrollbarWidth).toBe('none');
           if(key==='p'){
             expect(root.dataset.colonyDepthPanel).toBe('professions');
-            panel!.scrollTop=panel!.scrollHeight;
+            const body=panel!.querySelector<HTMLElement>('.ui-panel-body')!;body.scrollTop=body.scrollHeight;
             const lastCard=panel!.querySelector('article:last-child');
             expect(lastCard).not.toBeNull();
             const lastBounds=lastCard!.getBoundingClientRect();

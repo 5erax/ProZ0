@@ -1,3 +1,4 @@
+import { panelShell } from './PanelShell';
 import { DOCK_SHORTCUTS, isPanelShortcutActive } from '../input/PanelShortcuts';
 import { actionGlyph } from './UiActionIcon';
 import './WorldFirstUi.css';
@@ -462,7 +463,7 @@ function renderPanel(
               document,
               'div',
               'p1-panel-capacity',
-              presentationText('carry', {weight:formatInventoryAmount(capacity.weightCurrent),maxWeight:formatInventoryAmount(capacity.weightMax),bulk:formatInventoryAmount(capacity.volumeCurrent),maxBulk:formatInventoryAmount(capacity.volumeMax),state:uiText(uiMessageKey(capacity.stateLabel)) || uiPhrase(capacity.stateLabel)}),
+              presentationText('carry', {weight:formatInventoryAmount(capacity.weightCurrent),maxWeight:formatInventoryAmount(capacity.weightMax),bulk:formatInventoryAmount(capacity.volumeCurrent),maxBulk:formatInventoryAmount(capacity.volumeMax),state:uiPhrase(capacity.stateLabel)}),
             )]),
         createElement(
           document,
@@ -1838,6 +1839,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       this.layer.append(panel);
       const field=panel.querySelector<HTMLElement>('[data-map-spatial]');
       if(field){const next=field.nextSibling;const view=mountMapViewport(field,this.mapViewport);panel.insertBefore(view,next);}
+      panelShell(panel,panel.querySelector<HTMLElement>('.p1-panel-title')!,panel.querySelector<HTMLButtonElement>('.p1-panel-close')!);
       if (previousPanel?.dataset.panelKind === state.panel.kind) {
         panel.querySelectorAll<HTMLDetailsElement>('details[data-inspection-key]').forEach(e => { e.open = expanded.has(e.dataset.inspectionKey); });
         panel.scrollTop = previousScroll;

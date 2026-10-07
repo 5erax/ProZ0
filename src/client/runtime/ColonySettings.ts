@@ -1,3 +1,4 @@
+import { panelShell } from '../presentation/PanelShell';
 import { bindUiText } from '../localization/UiMessages';
 import { uiText } from '../localization/UiMessages';
 import { bindLocalized, locale, setLocale } from '../localization/Locale';
@@ -49,6 +50,7 @@ export function createColonySettings(root: HTMLElement): {destroy(): void} {
   density.addEventListener('click',()=>{const compact=root.dataset.hudDensity!=='compact';root.dataset.hudDensity=compact?'compact':'expanded';density.setAttribute('aria-pressed',String(compact));});panel.append(density);
   const close=document.createElement('button');bindLocalized(close,'textContent',()=>coreText('close'));close.addEventListener('click',()=>setOpen(false));panel.append(close);
   const key=(event:KeyboardEvent):void=>{if(event.code==='Escape')setOpen(false);};document.addEventListener('keydown',key);
+  panelShell(panel,title,close);
   host.append(style,gear,panel);root.append(host);
   return {destroy(){document.removeEventListener('keydown',key);host.remove();delete root.dataset.colonyUi;delete root.dataset.hudDensity;delete root.dataset.worldCycleLabel;delete root.dataset.displayLimit;delete root.dataset.colonySettingsOpen;}};
 }

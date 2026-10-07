@@ -1,3 +1,4 @@
+import { panelShell } from './PanelShell';
 import { PANEL_SHORTCUTS, panelShortcutForCode } from '../input/PanelShortcuts';
 import { costList } from './CostList';
 import { costRequirements, missingCostText, costLabel } from './CostRequirements';
@@ -733,6 +734,7 @@ export function createLivingWorldOverlay(
       if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-description',reason);if(stationBlocked)a.append(text('p',reason));}
       a.append(action);
     }
+    panelShell(panel,panel.querySelector<HTMLElement>('h2')!,panel.querySelector<HTMLButtonElement>('button')!);
     panel.scrollTop = scrollTop;restoreUi();
   };
   const pointer = (e: PointerEvent) => {

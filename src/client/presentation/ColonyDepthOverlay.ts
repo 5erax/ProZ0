@@ -1,3 +1,4 @@
+import { panelShell } from './PanelShell';
 import { PANEL_SHORTCUTS, panelShortcutForCode } from '../input/PanelShortcuts';
 import { bindLocalized } from '../localization/Locale';
 import { costList } from './CostList';
@@ -80,7 +81,7 @@ export function createColonyDepthOverlay(
   content.hidden = true;
   container.append(style, region, nav, content);
   root.append(container);
-  const audio = createColonyAudio(root.querySelector<HTMLElement>('[data-colony-settings]') ?? container);
+  const audio = createColonyAudio(root.querySelector<HTMLElement>('[data-colony-settings] .ui-panel-body') ?? container);
   const run = (
     action: ColonyDepthCommand["action"],
     targetId: string,
@@ -319,6 +320,7 @@ export function createColonyDepthOverlay(
         content.append(empty);
       }
     }
+    panelShell(content,heading,close);
     restoreUi();
   }
   const onKey = (event: KeyboardEvent): void => {
