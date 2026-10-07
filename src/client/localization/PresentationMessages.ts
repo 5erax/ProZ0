@@ -1,6 +1,7 @@
 import { message, type MessageDictionary } from './Locale';
 export const presentationMessages:MessageDictionary = {
   en: {
+    mapOrientation:'N ↑ · {meters} m / cell',
     carry:'CARRY · {weight}/{maxWeight} kg · {bulk}/{maxBulk} u · {state}',
     capacity:'Weight {weight} / {maxWeight} kg · Volume {bulk} / {maxBulk}',
     item:'{name} · qty {qty}', condition:' · condition {value}/{max}',
@@ -16,6 +17,7 @@ export const presentationMessages:MessageDictionary = {
     mapHelp:'Scroll to zoom · +/− zoom · arrows pan · Home reset',zoomIn:'Zoom in',zoomOut:'Zoom out',resetMap:'Reset map',
   },
   vi: {
+    mapOrientation:'Bắc ↑ · {meters} m / ô',
     carry:'MANG THEO · {weight}/{maxWeight} kg · {bulk}/{maxBulk} đơn vị · {state}',
     capacity:'Khối lượng {weight} / {maxWeight} kg · Thể tích {bulk} / {maxBulk}',
     item:'{name} · số lượng {qty}',condition:' · độ bền {value}/{max}',

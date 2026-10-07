@@ -151,3 +151,15 @@
   #app #proz0-phase1-ui .p1-map-viewport {height:160px!important;}
   #app .lw-panel:not([data-targeted=true]) {inset:42px 16px;}
 }
+
+/* Readability: opaque modal content, restrained ground detail, fitted known-state map. */
+#app :is(.p1-panel,.lw-panel,.p2-colony-panel,.p2-settings-panel,.sp-expedition-panel) {background:#102129;}
+#app #proz0-phase1-ui .p1-meter {font-size:12px;}
+#app #proz0-phase1-ui .p1-meter-label-copy {font-size:11px;}
+#app #proz0-phase1-ui .p1-map-legend {font-size:13px;line-height:1.5;}
+#app #proz0-phase1-ui .p1-map-legend-marker {width:16px!important;height:16px!important;}
+#app #proz0-phase1-ui .p1-map-orientation {font-size:12px;color:var(--ui-text);margin-left:auto;}
+#app #proz0-phase1-ui .p1-map-marker-position {transform-origin:0 0;transform:scale(var(--map-inverse-scale,1)) translate(-8px,-8px);width:16px;height:16px;}
+#app #proz0-phase1-ui .p1-map-marker {width:16px!important;height:16px!important;}
+#app #proz0-phase1-ui .p1-map-selection-label {transform-origin:0 0;transform:scale(var(--map-inverse-scale,1)) translate(12px,-18px);font-size:13px;}
+#app #proz0-phase1-ui .p1-panel {background:#102129;}

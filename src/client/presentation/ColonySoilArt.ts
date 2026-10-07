@@ -13,7 +13,7 @@ export function colonyGroundSprite(biome: ColonyBiomeId, soil: string, variant: 
   const v = ((variant % 8) + 8) % 8, key = [biome, soil, v, moisture, shore].join(':');
   const found = cache.get(key); if (found) return found;
   const p = COLONY_BIOMES[biome], tint = tints[soil] ?? tints.loam!;
-  const base = color(p.ground, tint, v % 3 - 1, moisture), light = color(p.ground, tint, 9, moisture), dark = color(p.ground, tint, -12, moisture);
+  const base = color(p.ground, tint, (v % 3 - 1)*.5, moisture), light = color(p.ground, tint, 5, moisture), dark = color(p.ground, tint, -7, moisture);
   const details = Array.from({ length: 8 }, (_, i) => {
     const x = 10 + (i * 13 + v * 7) % 43, y = 9 + (i * 5 + v * 3) % 15;
     return '<path d="M' + x + ' ' + y + 'h' + (2 + i % 3) + 'v1h-' + (2 + i % 3) + 'z" fill="' + (i % 3 ? light : dark) + '" opacity=".55"/>';

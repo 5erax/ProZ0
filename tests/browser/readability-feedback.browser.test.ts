@@ -49,3 +49,11 @@ it('preserves the weather icon while its separate caption changes language',()=>
  const overlay=createPhase1HudOverlay(root,canvas,{...fixture.state,world:{...fixture.state.world,weatherLabel:'CLEAR'}});
  try{const weather=root.querySelector('.p1-world-weather')!;expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();setLocale('vi');expect(weather.querySelector('.p1-weather-label')!.textContent).toBe('Trời quang');expect(weather.querySelector('[data-asset-path="assets/phase1/ui/icons/hud_status_icons.png"]')).not.toBeNull();}finally{overlay.destroy();root.remove();setLocale('en');}
 });
+
+it('uses one opaque fog mass without per-cell gradients or texture detail',()=>{
+ for(let mask=0;mask<16;mask++){
+  const svg=decodeURIComponent(fogFrontierSprite(mask).url);
+  expect(svg).not.toContain('Gradient');expect(svg).toContain('fill="#14252e"');
+  expect(svg).not.toMatch(/terrain|biome|resource/);
+ }
+});

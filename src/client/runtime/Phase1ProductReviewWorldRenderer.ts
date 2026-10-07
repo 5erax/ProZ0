@@ -73,7 +73,6 @@ import {
 } from '../presentation/Phase1ProductionAssets';
 
 const INTERNAL_WIDTH = 640;
-const FOG_CLOUDS_URL = new URL('../../../assets/phase1/world/effects/fog_clouds_v1.svg', import.meta.url).href;
 const INTERNAL_HEIGHT = 360;
 const HALF_WIDTH = INTERNAL_WIDTH / 2;
 const HALF_HEIGHT = INTERNAL_HEIGHT / 2;
@@ -578,8 +577,7 @@ export function createPhase1ProductReviewWorldRenderer(
   layer.dataset.productionAssetFoundation = 'p1-75-78';
   // UNKNOWN content is never rendered. A single cloud backdrop fills the
   // unrevealed area; only reveal-boundary cells need individual occluding masks.
-  layer.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
-  layer.style.backgroundSize = '128px 128px';
+  layer.style.backgroundColor = '#14252e';
   layer.append(styleElement(document));
   const worldStage = document.createElement('div');
   worldStage.className = 'p1-product-world-stage';
@@ -1265,8 +1263,8 @@ export function createPhase1ProductReviewWorldRenderer(
       return;
     }
     canvas.dataset.worldspace = 'surface';
-    layer.style.backgroundImage = 'url("' + FOG_CLOUDS_URL + '")';
-    layer.style.backgroundColor = '';
+    layer.style.backgroundImage = 'none';
+    layer.style.backgroundColor = '#14252e';
     particleHost.hidden = false;
     for(const f of bundle.expedition?.read().facilities??[]){
       if(f.canonicalStructureId!==null||!worldPositionKnown(bundle,{x:f.x,y:f.y}))continue;
@@ -1274,9 +1272,6 @@ export function createPhase1ProductReviewWorldRenderer(
       const rendered=renderSprite(fieldFacilitySprite(f.definitionId,footprint.width,footprint.depth,f.orientation),{x:f.x,y:f.y},camera,'facility',f.id);
       if(rendered){rendered.dataset.facilityDefinition=f.definitionId;rendered.dataset.facilityOrientation=String(f.orientation);bindUiText(rendered,"aria-label",uiPhrase(expeditionFacility(f.definitionId)!.name));}
     }
-    // Atmospheric cloud drift is screen-space; camera motion must not repaint
-    // the full viewport backdrop on each simulation tick.
-    layer.style.backgroundPosition = String(Math.floor(bundle.authorityTick / 120)) + 'px 0px';
     const environment = bundle.worldStore.getEnvironmentView();
     if (environment.brightness !== undefined) {
       const brightness = Math.round(environment.brightness * 200) / 200;

@@ -9,7 +9,7 @@ export function atmosphericParticleAt(kind: AtmosphericKind, index: number, seco
   // Integrating the common sinusoid keeps horizontal motion continuous between gusts.
   const windTravel = visual.direction * (t * speed - Math.cos(t * .8) * speed * .35 / .8);
   const gust = kind === 'dry-wind' ? Math.sin(t * .8 + index * .3) * 3 : 0;
-  return { x: Math.floor(wrap(hash % 680 + (kind === 'rain' ? t * 19 : windTravel) - camera.x * depth, 680) - 20), y: Math.floor(wrap((hash >>> 9) % 400 + (kind === 'rain' ? t * speed : gust) - camera.y * depth, 400) - 20), length: kind === 'rain' ? (near ? 9 : 5) : (near ? 3 : 1), alpha: (kind === 'rain' ? near ? .38 : .19 : near ? .3 : .12) * visual.intensity, near };
+  return { x: Math.floor(wrap(hash % 680 + (kind === 'rain' ? t * speed * .22 : windTravel) - camera.x * depth, 680) - 20), y: Math.floor(wrap((hash >>> 9) % 400 + (kind === 'rain' ? t * speed : gust) - camera.y * depth, 400) - 20), length: kind === 'rain' ? (near ? 12 : 7) : (near ? 3 : 1), alpha: (kind === 'rain' ? near ? .3 : .14 : near ? .3 : .12) * visual.intensity, near };
 }
 export interface GroundDustAnchor { readonly x:number;readonly y:number;readonly salt:number; }
 export function createAtmosphericParticles(document: Document) {
@@ -26,7 +26,7 @@ export function createAtmosphericParticles(document: Document) {
       const p=atmosphericParticleAt(kind,i,seconds,camera,reduced,visual);
       context.globalAlpha=reduced?p.alpha*.45:p.alpha;
       context.fillStyle=kind==='rain'?p.near?'#a9d3d5':'#6f9ca6':p.near?'#c6b18b':'#9e9876';
-      if(kind==='rain'){context.fillRect(p.x,p.y,1,p.length);context.fillRect(p.x-1,p.y-2,1,3);}
+      if(kind==='rain')for(let y=0;y<p.length;y++)context.fillRect(p.x+Math.round(y*.22),p.y+y,p.near?2:1,1);
       else{context.fillRect(p.x,p.y,p.length,1);if(p.near)context.fillRect(p.x-2,p.y+2,1,1);}
     }
     if(ground && kind==='dry-wind') {
