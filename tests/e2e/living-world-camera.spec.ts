@@ -65,7 +65,7 @@ test('living plants share the terrain raster anchor through continuous camera mo
 test('secondary click cancels a solo blueprint placement without placing or consuming materials', async ({ page }) => {
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:secondary-click&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=secondary-click');
   await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
-  await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+
   const panel = page.locator('.sp-expedition-panel');
   await panel.locator('article').filter({ has: page.getByText('Campfire', { exact: true }) }).getByRole('button', { name: 'Plan', exact: true }).click();
   await expect(page.locator('.sp-placement-hint')).toBeVisible();

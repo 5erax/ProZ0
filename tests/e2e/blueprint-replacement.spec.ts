@@ -31,7 +31,7 @@ test('blueprint UI fixture changes a funded plan and persists shared escrow and 
   await page.goto('/?proz0Mode=phase2-colony-review&proz0WorldId=world:blueprint-ui&proz0WorldSeed=p1-world-golden&proz0Players=solo&proz0Player=solo&proz0SaveDb=blueprint-ui');
   const open = async () => {
     await page.getByRole('button', { name: 'Build base [B]', exact: true }).click();
-    await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+
   };
   await open();
   const panel = page.locator('.sp-expedition-panel'), plan = panel.locator('[data-expedition-plan="plan:fixture:cache"]');

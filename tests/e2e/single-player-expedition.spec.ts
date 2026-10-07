@@ -79,12 +79,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
     .click();
-  await page
-    .getByRole('button', {
-      name: 'Expedition blueprints · materials later',
-      exact: true,
-    })
-    .click();
+
   const panel = page.locator('.sp-expedition-panel');
   await expect(panel.locator('.sp-facility-art')).toHaveCount(20);
   await expect(
@@ -131,12 +126,7 @@ test('solo expedition: real gathering builds remote storage and reload preserves
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
     .click();
-  await page
-    .getByRole('button', {
-      name: 'Expedition blueprints · materials later',
-      exact: true,
-    })
-    .click();
+
   const cache = panel
     .locator('[data-expedition-facility]')
     .filter({ has: page.getByText('Supply Cache', { exact: true }) });

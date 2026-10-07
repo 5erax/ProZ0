@@ -52,7 +52,7 @@ test('river UI fixture: reject water blueprints, place an empty-bank plan and re
   await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready');
   const river = page.locator('[data-world-role="terrain"][data-water-kind="river"]'); await expect(river.first()).toBeVisible();
   const count = await river.count();
-  await page.keyboard.press('b'); await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+  await page.keyboard.press('b');
   const panel = page.locator('.sp-expedition-panel');
   await panel.locator('article').filter({ has: page.getByText('Campfire', { exact: true }) }).getByRole('button', { name: 'Plan', exact: true }).click();
   const wet = await groundPoint(page, water); await page.mouse.move(wet.x, wet.y);
@@ -66,7 +66,7 @@ test('river UI fixture: reject water blueprints, place an empty-bank plan and re
   await page.keyboard.press('m'); await expect(page.locator('[data-map-spatial="true"]')).toBeVisible(); await page.keyboard.press('Escape');
   await page.keyboard.press('l'); await expect(page.locator('[data-product-review-save]')).toHaveAttribute('data-save-state', 'success');
   await page.reload(); await expect(page.locator('[data-proz0-autoboot]')).toHaveAttribute('data-runtime-status', 'ready'); await expect(river).toHaveCount(count);
-  await page.keyboard.press('b'); await page.getByRole('button', { name: 'Expedition blueprints · materials later', exact: true }).click();
+  await page.keyboard.press('b');
   await expect(plan).toHaveCount(1); await expect(plan).toContainText('Timber 0/');
   expect(errors).toEqual([]);
 });

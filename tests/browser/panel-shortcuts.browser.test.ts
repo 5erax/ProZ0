@@ -38,3 +38,16 @@ it('keeps only the real Farm panel active through HUD ticks and maps P to the sa
     }
   } finally {destroy();}
 });
+
+it('mouse Build shortcuts share the construction destination and close Industry before opening it', async () => {
+ const {root,destroy}=await fixture('construction');
+ try {
+  await userEvent.keyboard('o');expect(root.dataset.industryOpen).toBe('true');
+  root.querySelector<HTMLButtonElement>('[data-review-action=open-build]')!.click();
+  expect(root.dataset.industryOpen).toBe('false');expect(root.dataset.expeditionPanelOpen).toBe('true');
+  expect(root.querySelector('.sp-expedition-panel [data-construction-definition="structure:storage-crate"]')).not.toBeNull();
+  expect(root.querySelector('[data-panel-kind=build]')).toBeNull();
+  await expect.poll(()=>root.querySelector('[data-review-action=open-build]')!.getAttribute('aria-pressed')).toBe('true');
+  root.querySelector<HTMLButtonElement>('[data-review-action=open-build]')!.click();expect(root.dataset.expeditionPanelOpen).toBe('false');
+ } finally {destroy();}
+});

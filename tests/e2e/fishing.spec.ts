@@ -40,7 +40,7 @@ test('fishing material fixture: craft rod/bait, build a bank campfire, cast/reop
   await page.keyboard.press('f'); const farm = page.locator('.lw-panel'); await farm.locator('[data-living-scope=recipes]').click(); await farm.locator('[data-living-craft] > summary').click();
   await farm.getByRole('button',{name:'Craft Field Fishing Rod',exact:true}).click(); await expect(farm.getByRole('status')).toContainText('crafted');
   await farm.getByRole('button',{name:'Craft Plant Fishing Bait',exact:true}).click(); await page.keyboard.press('Escape');
-  await page.keyboard.press('b'); await page.getByRole('button',{name:'Expedition blueprints · materials later',exact:true}).click();
+  await page.keyboard.press('b');
   const expedition = page.locator('.sp-expedition-panel'); await expedition.locator('article').filter({has:page.getByText('Campfire',{exact:true})}).getByRole('button',{name:'Plan',exact:true}).click();
   const bank = await screen(ground); await page.mouse.move(bank.x,bank.y); await expect(page.locator('.sp-ghost')).toHaveAttribute('data-valid','true'); await page.mouse.click(bank.x,bank.y);
   const plan = expedition.locator('[data-expedition-plan]'); await plan.getByRole('button',{name:'Contribute',exact:true}).click(); await plan.getByRole('button',{name:'Complete',exact:true}).click(); await expect(plan).toHaveCount(0); await expedition.getByRole('button',{name:'Close',exact:true}).click();

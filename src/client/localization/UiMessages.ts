@@ -2,7 +2,12 @@ import { bindLocalized, message, type MessageDictionary } from './Locale';
 import { statusText } from './StatusMessages';
 // Authored glossary. Lookup is exact and only called at source-owned UI boundaries.
 // Player/profile/chat strings never pass through this dictionary.
-const glossary = `Crops and livestock|Cây trồng và vật nuôi
+const glossary = ` · Click or Enter to confirm · R rotate · Esc to cancel| · Nhấp hoặc Enter để xác nhận · R để xoay · Esc để hủy
+Build and outposts|Xây dựng và tiền đồn
+Industrial construction|Xây dựng công nghiệp
+Place owned kit|Đặt bộ lắp có sẵn
+ · Click or Enter to confirm · Esc to cancel · Fixed orientation| · Nhấp hoặc Enter để xác nhận · Esc để hủy · Hướng cố định
+Crops and livestock|Cây trồng và vật nuôi
 Exploration guidance|Hướng dẫn khám phá
 Discovered locations|Địa điểm đã khám phá
 Observed facts|Thông tin đã quan sát

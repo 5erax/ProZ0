@@ -1495,6 +1495,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const roundedMeter = (value: Phase1MeterPresentation) => ({ ...value, value: Math.round(value.value) });
     const displaySignature = JSON.stringify({
       ...state,
+      activePanels: DOCK_SHORTCUTS.map(shortcut=>isPanelShortcutActive(shortcut,state.panel?.kind,this.root.dataset)),
       health: roundedMeter(state.health), water: roundedMeter(state.water),
       food: roundedMeter(state.food), stamina: roundedMeter(state.stamina),
       temperature: roundedMeter(state.temperature),

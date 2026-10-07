@@ -21,12 +21,7 @@ test("large field blueprint preview rotates its real dimensions without clipping
   await page
     .getByRole("button", { name: "Build base [B]", exact: true })
     .click();
-  await page
-    .getByRole("button", {
-      name: "Expedition blueprints · materials later",
-      exact: true,
-    })
-    .click();
+
   const panel = page.locator(".sp-expedition-panel");
   await panel
     .locator("article")
@@ -184,12 +179,7 @@ test("full bag cancellation tells the player materials reached a real crate and 
   await page
     .getByRole("button", { name: "Build base [B]", exact: true })
     .click();
-  await page
-    .getByRole("button", {
-      name: "Expedition blueprints · materials later",
-      exact: true,
-    })
-    .click();
+
   const panel = page.locator(".sp-expedition-panel");
   await panel
     .locator('[data-expedition-plan="plan:bed"]')

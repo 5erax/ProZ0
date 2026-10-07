@@ -93,6 +93,23 @@ export class IndustryAuthority {
   }
   public read(): IndustryState { return this.state; }
 
+  /** Read-only spatial rules shared by the ghost and the build transaction. */
+  public assessBuild(playerId: PlayerId, kind: IndustryFacilityKind, position: WorldPosition): string | null {
+    if (!Object.hasOwn(INDUSTRY_FACILITIES, kind)) return 'UNKNOWN_FACILITY';
+    if (!validIndustryPosition(position)) return 'INVALID_POSITION';
+    let actor: ReturnType<IndustryAuthority['actor']>;
+    try { actor = this.actor(playerId); } catch { return 'UNKNOWN_PLAYER'; }
+    if (!actor.alive) return 'PLAYER_DEAD';
+    if (actor.spaceId && actor.spaceId !== 'surface') return 'WRONG_WORLDSPACE';
+    const def = INDUSTRY_FACILITIES[kind];
+    if (def.requiredResearch !== null && !this.state.researchIds.includes(def.requiredResearch)) return 'RESEARCH_PREREQUISITE';
+    if (this.state.facilities.length >= INDUSTRY_MAX_FACILITIES) return 'FACILITY_LIMIT';
+    if (distance(actor.position, position) > INDUSTRY_BUILD_RANGE) return 'OUT_OF_RANGE';
+    if (!this.world.canPlace(position) || this.state.facilities.some(f => distance(f.position, position) < 1.5)) return 'PLACEMENT_BLOCKED';
+    if (this.state.nextFacilityOrdinal >= Number.MAX_SAFE_INTEGER) return 'FACILITY_LIMIT';
+    return null;
+  }
+
   public execute(command: IndustryCommand): IndustryResult {
     const reject = (reason: string): IndustryResult => Object.freeze({ status: 'rejected', operationId: command.operationId, reason });
     if (typeof command.operationId !== 'string' || !command.operationId || command.operationId.length > 256
@@ -145,11 +162,8 @@ export class IndustryAuthority {
       if (!command.facilityKind || !Object.hasOwn(INDUSTRY_FACILITIES, command.facilityKind)) return reject('UNKNOWN_FACILITY');
       const def = INDUSTRY_FACILITIES[command.facilityKind], position = command.position;
       if (!position) return reject('INVALID_POSITION');
-      if (def.requiredResearch !== null && !researchIds.includes(def.requiredResearch)) return reject('RESEARCH_PREREQUISITE');
-      if (facilities.length >= INDUSTRY_MAX_FACILITIES) return reject('FACILITY_LIMIT');
-      if (distance(actor.position, position) > INDUSTRY_BUILD_RANGE) return reject('OUT_OF_RANGE');
-      if (!this.world.canPlace(position) || facilities.some(f => distance(f.position, position) < 1.5)) return reject('PLACEMENT_BLOCKED');
-      if (nextFacilityOrdinal >= Number.MAX_SAFE_INTEGER) return reject('FACILITY_LIMIT');
+      const placementReason = this.assessBuild(command.playerId, command.facilityKind, position);
+      if (placementReason) return reject(placementReason);
       inputs.push(...def.costs); entityId = 'industry:' + command.facilityKind + ':' + String(nextFacilityOrdinal++);
       const recipe = INDUSTRY_RECIPES.find(r => r.facilityKind === command.facilityKind
         && (r.requiredResearch === null || researchIds.includes(r.requiredResearch)));

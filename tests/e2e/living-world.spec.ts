@@ -63,12 +63,7 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
   await page
     .getByRole('button', { name: 'Build base [B]', exact: true })
     .click();
-  await page
-    .getByRole('button', {
-      name: 'Expedition blueprints · materials later',
-      exact: true,
-    })
-    .click();
+
   const expedition = page.locator('.sp-expedition-panel');
   await expedition
     .locator('article')
@@ -106,6 +101,7 @@ test('living world: natural materials craft a hoe, plant remote soil, observe gr
     .getByRole('button', { name: 'Craft Prepare Root Seeds', exact: true })
     .click();
   await expect(panel.getByRole('status')).toContainText('crafted');
+  await panel.locator('[data-living-scope=farm]').click();
   await panel
     .getByRole('button', { name: 'Till a new plot', exact: true })
     .click();

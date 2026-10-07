@@ -41,6 +41,24 @@ describe('Phase 3 industry authority', () => {
     const total = f.items.getContainerView('inventory:p1').stacks.filter(s => s.itemDefinitionId === 'item:metal-ore').reduce((sum, s) => sum + s.quantity, 0);
     expect(total).toBe(96);
   });
+  it('previews spatial guards without stock or receipt mutation and revalidates changed ground', () => {
+    const f = industryTestFixture();
+    const before = f.industry.read(), stock = f.items.exportLedgerSnapshot();
+    expect(f.industry.assessBuild('p1', 'depot', { x: 2, y: 0 })).toBeNull();
+    expect(f.industry.assessBuild('missing', 'depot', { x: 2, y: 0 })).toBe('UNKNOWN_PLAYER');
+    expect(f.industry.assessBuild('p1', 'depot', { x: 9, y: 0 })).toBe('OUT_OF_RANGE');
+    expect(f.industry.assessBuild('p1', 'depot', { x: NaN, y: 0 })).toBe('INVALID_POSITION');
+    f.setWorldspace('cave:test');
+    expect(f.industry.assessBuild('p1', 'depot', { x: 2, y: 0 })).toBe('WRONG_WORLDSPACE');
+    f.setWorldspace('surface');
+    expect(f.industry.read()).toEqual(before);
+    expect(f.items.exportLedgerSnapshot()).toEqual(stock);
+    f.setPlace(() => false);
+    expect(f.industry.assessBuild('p1', 'depot', { x: 2, y: 0 })).toBe('PLACEMENT_BLOCKED');
+    expect(f.perform({ action: 'build', facilityKind: 'depot', position: { x: 2, y: 0 } })).toMatchObject({ reason: 'PLACEMENT_BLOCKED' });
+    expect(f.industry.read()).toEqual(before);
+    expect(f.items.exportLedgerSnapshot()).toEqual(stock);
+  });
   it('rejects blocked, distant, overlapping and dead construction without spending supplies', () => {
     const f = industryTestFixture();
     const before = f.items.exportLedgerSnapshot();

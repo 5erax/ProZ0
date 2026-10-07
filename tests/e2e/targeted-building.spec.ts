@@ -19,7 +19,7 @@ test('solo building interaction: mouse and E open the lab only, right click stay
   await page.setViewportSize({width:640,height:360});const b=await panel.boundingBox();expect(b!.x+b!.width).toBeLessThanOrEqual(640);expect(b!.width).toBeLessThanOrEqual(320);
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Build base [B]',exact:true}).click();
-  await page.getByRole('button',{name:'Expedition blueprints · materials later',exact:true}).click();
+
   await expect(panel.getByRole('button',{name:'Plan',exact:true})).toHaveCount(20);
 });
 

@@ -31,8 +31,8 @@ test('settings consolidate display, sound and real save; quiet HUD keeps context
  await page.getByRole('button',{name:'Inventory [I]',exact:true}).click();
  await expect(page.locator('.p1-inventory-utilities')).toBeVisible();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
- await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toBeVisible();
- await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-selected','true');
+ await expect(page.locator('[data-construction-definition="structure:storage-crate"]')).toBeVisible();
+ await expect(page.locator('[data-construction-definition="structure:storage-crate"] button').first()).toBeFocused();
 });
 
 test('fresh ecosystem: natural gathering builds accessible storage and a real stack transfers into it',async({page})=>{
@@ -63,13 +63,14 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await expect(page.locator('.lw-panel')).toBeHidden();
  await expect(page.locator('.p1-inventory-utilities')).toBeVisible();
  await page.getByRole('button',{name:'Build storage crate',exact:true}).click();
- await page.getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
+ await page.locator('[data-construction-definition="structure:storage-crate"]').getByRole('button',{name:'Prepare kit',exact:true}).click();await page.locator('[data-review-action="craft-recipe:recipe:storage-crate-kit"]').click();
  await page.getByRole('button',{name:'Build base [B]',exact:true}).click();
  // Place at a known reachable distance from the actual standing position.
  // This exercises free placement, instead of asking an axis-only walker to enter/go around a new obstacle.
  const point=await page.locator('canvas').evaluate(element=>{const r=element.getBoundingClientRect();return{x:r.left+(320+1.1*16)*r.width/640,y:r.top+(180+1.1*8)*r.height/360};});
+ await page.locator('[data-construction-definition="structure:storage-crate"]').getByRole('button',{name:'Place owned kit',exact:true}).click();
  await page.mouse.move(point.x,point.y);
- await expect(page.locator('.p1-build-preview')).toHaveAttribute('data-placement-state','VALID');await page.getByRole('button',{name:'Place [Enter]',exact:true}).click();
+ await expect(page.locator('.sp-ghost')).toHaveAttribute('data-valid','true');await page.keyboard.press('Enter');
  await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-built-count','1');await page.keyboard.press('Escape');
  await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
  await page.locator('[data-inventory-pane="player"]').getByRole('button',{name:'Stone Field Tool',exact:true}).click();
