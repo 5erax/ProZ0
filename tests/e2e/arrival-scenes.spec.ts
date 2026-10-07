@@ -11,7 +11,7 @@ test('arrival scenes: EN/VI composition, descent motion, selected player, keyboa
       await page.setViewportSize({width:width!,height:height!});
       await page.goto('/');
       await page.evaluate(()=>localStorage.setItem('proz0:skin','azure'));
-      await page.locator('[data-locale-choice]').selectOption(language!);
+      await page.locator('[data-locale-choice] [data-language='+language+']').click();
       await page.locator('[data-start-phase2-review]').click();
       const art=page.locator('.arrival-art'),next=page.locator('.arrival-next');
       for(let shot=0;shot<3;shot++){

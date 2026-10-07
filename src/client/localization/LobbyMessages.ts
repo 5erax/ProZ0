@@ -1,6 +1,7 @@
 import { message, type MessageDictionary } from './Locale';
 // Stable keys belong to UI content, independently of username, room name or save identity.
 const rows = [
+ ['journey','Begin your journey','Bắt đầu hành trình'],['selected','Selected','Đã chọn'],
  ['login','Sign in','Đăng nhập'],['eyebrow','EXPLORE · BUILD · BELONG','KHÁM PHÁ · XÂY DỰNG · GẮN BÓ'],
  ['heading','One world. Your footprints.','Một thế giới. Dấu chân của bạn.'],
  ['pitch','Land among floating islands. Build your first base and discover what waits beyond the fog.','Hạ cánh giữa những mảnh đất lơ lửng. Dựng căn cứ đầu tiên và tìm điều gì đang chờ phía sau màn sương.'],

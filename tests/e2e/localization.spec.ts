@@ -3,11 +3,11 @@ test('EN/VI preference changes labels immediately, preserves unsubmitted seed, a
   await page.route('**/api/pilot/auth/me',r=>r.fulfill({json:{account:null}}));
   await page.goto('/');await expect(page.locator('[data-start-phase2-review]')).toHaveText('Start a new world');
   await page.locator('[data-single-player-seed]').fill('locale-expedition');
-  await page.locator('[data-locale-choice]').selectOption('vi');
+  await page.locator('[data-locale-choice] [data-language=vi]').click();
   await expect(page.locator('[data-start-phase2-review]')).toHaveText('Bắt đầu thế giới mới');
   await expect(page.locator('[data-single-player-seed]')).toHaveValue('locale-expedition');
-  await page.reload();await expect(page.locator('[data-locale-choice]')).toHaveValue('vi');
-  await page.locator('[data-locale-choice]').selectOption('en');await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible();
+  await page.reload();await expect(page.locator('[data-language=vi]')).toHaveAttribute('aria-pressed','true');
+  await page.locator('[data-locale-choice] [data-language=en]').click();await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible();
 });
 test('game language preserves selected canonical item and save/reopen while translating inventory, craft and ARIA at narrow width',async({page})=>{
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
