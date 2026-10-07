@@ -2,7 +2,19 @@ import { bindLocalized, message, type MessageDictionary } from './Locale';
 import { statusText } from './StatusMessages';
 // Authored glossary. Lookup is exact and only called at source-owned UI boundaries.
 // Player/profile/chat strings never pass through this dictionary.
-const glossary = `CLEAR|Trời quang
+const glossary = `INVALID|Vị trí chưa hợp lệ
+VALID|Vị trí hợp lệ
+Kit|Bộ lắp
+MIST RAIN|Mưa sương
+DRY WIND|Gió khô
+BASE|Căn cứ
+DETAIL|Chi tiết
+NEAR|Gần
+MID|Khoảng cách vừa
+FAR|Xa
+Skin|Trang phục
+Base guide|Hướng dẫn căn cứ
+CLEAR|Trời quang
 COLD RAIN|Mưa lạnh
 COLD RAIN · FORECAST|Dự báo mưa lạnh
 Low|Thấp
@@ -643,7 +655,7 @@ Craft station recipes away from the landing site.|Chế tạo công thức của
 Critical dehydration|Thiếu nước nghiêm trọng
 Critical starvation|Đói nghiêm trọng
 Crops mature faster under active care.|Cây trưởng thành nhanh hơn khi được chăm sóc.
-Cultivation|Trồng trọt
+Cultivation|Canh tác
 Cultivation bed|Luống trồng
 Cultivator|Người trồng trọt
 Current character appearance|Ngoại hình nhân vật hiện tại
@@ -663,7 +675,7 @@ Engineer|Kỹ sư
 Engineer — Prototype|Kỹ sư — Nguyên mẫu
 Equip selected |Trang bị vật phẩm đã chọn\u0020
 Equip this weapon to attack using its defined range and stamina cost.|Trang bị vũ khí để tấn công theo phạm vi và chi phí thể lực đã quy định.
-Expanded Storage|Mở rộng lưu trữ
+Expanded Storage|Kho mở rộng
 Expedition blueprints · materials later|Bản dựng thám hiểm · góp vật liệu sau
 Expedition construction|Xây dựng thám hiểm
 Explore |Khám phá\u0020
@@ -715,7 +727,7 @@ KIT UNAVAILABLE|CHƯA CÓ BỘ LẮP RÁP
 Keep this rod and plant bait in your bag. Homestead → Fish nearby water, then click explored water within 4 m. Wait for the bite and reel with Space. Moving or taking damage interrupts fishing.|Giữ cần và mồi thực vật trong túi. Nông trại → Câu ở vùng nước gần đây, rồi nhấp nước đã khám phá trong phạm vi 4 m. Chờ cá cắn và kéo bằng Space. Di chuyển hoặc bị thương sẽ ngắt câu.
 Keeps shared materials. Returns surplus to your bag or an accessible nearby crate. If neither has enough room, the original blueprint stays intact. Missing materials can be added later.|Giữ vật liệu chung. Trả phần dư vào túi hoặc thùng gần đó có thể tiếp cận. Nếu không đủ chỗ, bản dựng cũ được giữ nguyên. Có thể góp phần thiếu sau.
 L · SAVE WORLD|L · LƯU THẾ GIỚI
-LANDING MODULE · BASE|MÔ-ĐUN HẠ CÁNH · CĂN CỨ
+LANDING MODULE · BASE|Mô-đun hạ cánh · Căn cứ
 MOVE TO SET FACING|DI CHUYỂN ĐỂ ĐỔI HƯỚNG
 MOVE · WASD / ARROWS|DI CHUYỂN · WASD / PHÍM MŨI TÊN
 Maintenance Basics|Bảo trì cơ bản
@@ -975,7 +987,7 @@ const authored = glossary.split('\n').map(row => {
   return pair as [string, string];
 });
 const rowMap = new Map(authored.map(([en,vi])=>[en,vi]));
-for (const [en,vi] of authored) if (!rowMap.has(en.toUpperCase())) rowMap.set(en.toUpperCase(),vi.toUpperCase());
+for (const [en,vi] of authored) if (!rowMap.has(en.toUpperCase())) rowMap.set(en.toUpperCase(),vi);
 const rows = [...rowMap];
 if (rows.some(row=>row.length!==2) || new Set(rows.map(([source])=>uiMessageKey(source))).size!==rows.length) throw Error('Invalid UI glossary');
 export const uiMessages: MessageDictionary = {en:Object.fromEntries(rows.map(([en])=>[uiMessageKey(en),en])),vi:Object.fromEntries(rows.map(([en,vi])=>[uiMessageKey(en),vi]))};

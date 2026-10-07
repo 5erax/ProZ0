@@ -8,8 +8,10 @@ it('item inspection uses actual consumable/weapon profiles, distinguishes tool a
   for (const item of catalog.list('item')) {
     const details = inspectItem(catalog, item.id);
     expect(details.purpose.length).toBeGreaterThan(10);
-    expect(details.facts[0]).toContain(item.unitWeightKg.toFixed(2) + ' kg');
-    expect(details.facts[0]).toContain(item.unitVolume.toFixed(2) + ' bulk units');
+    const amounts = /^Per item: ([\d.]+) kg · ([\d.]+) bulk units$/.exec(details.facts[0]!);
+    expect(amounts).not.toBeNull();
+    expect(Number(amounts![1])).toBe(item.unitWeightKg);
+    expect(Number(amounts![2])).toBe(item.unitVolume);
     expect(inspectItem(catalog, item.id)).toBe(details);
     if (item.useProfile?.type === 'restore-stat') expect(details.facts).toContain('Restores ' + item.useProfile.amount + ' ' + item.useProfile.stat + ' · use takes ' + item.useProfile.channelSeconds + ' s');
   }

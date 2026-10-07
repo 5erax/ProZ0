@@ -10,6 +10,7 @@ const rows = [
   ['From', 'Từ'], ['To', 'Đến'], ['Item filter', 'Lọc vật phẩm'], ['All items', 'Mọi vật phẩm'], ['all items', 'mọi vật phẩm'],
   ['Solar array', 'Dàn pin mặt trời'], ['Power relay', 'Trạm tiếp điện'], ['Logistics depot', 'Kho vận'],
   ['Fiber processor', 'Máy xử lý sợi'], ['Fabricator', 'Máy chế tạo'], ['Greenhouse', 'Nhà kính'], ['Cargo rover', 'Xe chở hàng'],
+  ['expanded storage', 'Kho mở rộng'], ['cultivation', 'Canh tác'],
   ['Industrial automation', 'Tự động hóa công nghiệp'], ['Conveyor logistics', 'Vận chuyển băng chuyền'],
   ['Protected cultivation', 'Canh tác bảo vệ'], ['Cargo mobility', 'Vận tải cơ giới'], ['Intensive cultivation', 'Canh tác thâm canh'],
   ['Cordage', 'Dây thừng'], ['Repair patch', 'Miếng sửa chữa'], ['Machine kit', 'Bộ máy'], ['Power unit kit', 'Bộ nguồn điện'],

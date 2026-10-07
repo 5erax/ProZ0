@@ -1,5 +1,8 @@
+import { costList } from './CostList';
+import { costRequirements, missingCostText, costLabel } from './CostRequirements';
+import { EXPEDITION_FACILITIES } from '../../content/singleplayer/ExpeditionContent';
 import { gameUiText } from '../localization/GameUiMessages';
-import { materialHint,materialSource } from './MaterialGuide';
+import { materialSource } from './MaterialGuide';
 import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
 import { locale } from '../localization/Locale';
@@ -719,8 +722,15 @@ export function createLivingWorldOverlay(
         applyProductionSprite(icon, sprite, 1.2);
         a.prepend(icon);
       }
-      for(const [id,q] of r.costs)a.append(materialHint(document,contentDisplayName(bundle.catalog.get(id)),materialSource(bundle.catalog,id),inventory.stacks.filter(stack=>stack.itemDefinitionId===id).reduce((n,stack)=>n+stack.quantity,0),q,id));
-      a.append(button(uiText("ui.93077f53")+uiPhrase(r.name),()=>execute('craft',r.id)));
+      const requirements=costRequirements(r.costs.map(([itemId,quantity])=>({itemId,quantity})),
+        id=>inventory.stacks.filter(stack=>stack.itemDefinitionId===id).reduce((n,stack)=>n+stack.quantity,0),id=>contentDisplayName(bundle.catalog.get(id)));
+      a.append(costList(document,requirements,id=>materialSource(bundle.catalog,id)));
+      a.append(text('p',costLabel('outputs')+' '+r.quantity+' × '+contentDisplayName(definition)));
+      const stationBlocked=r.station&&!bundle.expedition!.read().facilities.some(f=>f.definitionId===r.station&&Math.hypot(f.x-p.x,f.y-p.y)<=4);
+      const reason=[missingCostText(requirements),stationBlocked?gameUiText('prerequisite',{name:uiPhrase(EXPEDITION_FACILITIES.find(f=>f.id===r.station)?.name??r.station!)}):''].filter(Boolean).join(' · ');
+      const action=button(uiText("ui.93077f53")+uiPhrase(r.name),()=>execute('craft',r.id));
+      if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-description',reason);if(stationBlocked)a.append(text('p',reason));}
+      a.append(action);
     }
     panel.scrollTop = scrollTop;restoreUi();
   };

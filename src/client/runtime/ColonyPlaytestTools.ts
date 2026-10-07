@@ -16,7 +16,9 @@ export interface ColonyPlaytestSample {
 export function createColonyPlaytestTools(
   root: HTMLElement,
   sample: () => ColonyPlaytestSample,
+  enabled = false,
 ) {
+  if (!enabled) return { destroy() {} };
   const document = root.ownerDocument,
     panel = root.querySelector<HTMLElement>("[data-colony-settings]");
   if (!panel) return { destroy() {} };

@@ -30,7 +30,7 @@ it('keeps the HUD corners clear, unifies the world cycle and exposes real mouse 
         root.querySelector<HTMLButtonElement>('.p1-panel-close')!.click();expect(root.querySelector('.p1-panel')).toBeNull();
         root.querySelector<HTMLButtonElement>('[data-review-action=open-map]')!.click();
         const marker=root.querySelector<HTMLButtonElement>('[data-review-action=map-select-marker]')!;expect(marker).not.toBeNull();marker.click();
-        expect(root.querySelector('.p1-map-detail')!.textContent).toContain(language==='vi'?'CĂN CỨ':'BASE');
+        expect(root.querySelector('.p1-map-detail')!.textContent).toContain(language==='vi'?'Căn cứ':'BASE');
         await userEvent.keyboard('{Escape}');
         root.querySelector<HTMLButtonElement>('[data-review-action=open-farm]')!.click();expect(root.dataset.livingPanelOpen).toBe('true');
         await userEvent.keyboard('{Escape}');

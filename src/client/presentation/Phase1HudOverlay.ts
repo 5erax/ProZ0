@@ -1,12 +1,13 @@
 import { actionGlyph } from './UiActionIcon';
 import './WorldFirstUi.css';
 import { materialHint } from './MaterialGuide';
+import { costLabel } from './CostRequirements';
 import { gameUiText } from '../localization/GameUiMessages';
 import { capturePanelUi } from './PanelUiState';
 import { presentationText } from '../localization/PresentationMessages';
 import { mountMapViewport, type MapViewportState } from './MapViewport';
 import { uiText, uiMessageKey } from '../localization/UiMessages';
-import { onLocaleChange, bindLocalized, formatNumber } from '../localization/Locale';
+import { onLocaleChange, bindLocalized, formatNumber, formatInventoryAmount } from '../localization/Locale';
 import { bindUiText } from '../localization/UiMessages';
 import { uiPhrase } from '../localization/UiMessages';
 import { WEARABLE_SLOTS, type WearableSlot } from '../../content/livingworld/WearableContent';
@@ -340,7 +341,7 @@ function itemInspectionCard(document: Document, item: Phase1InventoryItemPresent
   bindUiText(card,"aria-label",uiText("ui.9538e211"));
   card.dataset.inspectedStack = item.id;
   if (item.inspection.canEquip) { card.dataset.rarity = item.rarity ?? 'common'; card.style.borderColor = RARITY_STYLE[item.rarity ?? 'common'].colour; card.style.setProperty('--rarity-colour', RARITY_STYLE[item.rarity ?? 'common'].colour); }
-  card.append(createElement(document, 'h3', '', uiPhrase(item.name)), createElement(document, 'p', '', uiPhrase(item.inspection.purpose)), createElement(document, 'p', '', uiText("ui.345f446e") + item.quantity + uiText("ui.5dbd0754") + (item.stackWeightKg ?? 0).toFixed(2) + ' kg · ' + (item.stackBulk ?? 0).toFixed(2) + uiText("ui.c273f254")));
+  card.append(createElement(document, 'h3', '', uiPhrase(item.name)), createElement(document, 'p', '', uiPhrase(item.inspection.purpose)), createElement(document, 'p', '', uiText("ui.345f446e") + item.quantity + uiText("ui.5dbd0754") + formatInventoryAmount(item.stackWeightKg ?? 0) + ' kg · ' + formatInventoryAmount(item.stackBulk ?? 0) + uiText("ui.c273f254")));
   const details = createElement(document, 'details', 'p1-inspection-more');
   details.dataset.inspectionKey = 'item:' + item.id;
   details.append(createElement(document, 'summary', '', uiText("ui.aebde165")));
@@ -460,7 +461,7 @@ function renderPanel(
               document,
               'div',
               'p1-panel-capacity',
-              presentationText('carry', {weight:formatNumber(capacity.weightCurrent,{minimumFractionDigits:1,maximumFractionDigits:1}),maxWeight:formatNumber(capacity.weightMax,{minimumFractionDigits:1,maximumFractionDigits:1}),bulk:formatNumber(capacity.volumeCurrent,{minimumFractionDigits:1,maximumFractionDigits:1}),maxBulk:formatNumber(capacity.volumeMax,{minimumFractionDigits:1,maximumFractionDigits:1}),state:uiText(uiMessageKey(capacity.stateLabel)) || uiPhrase(capacity.stateLabel)}),
+              presentationText('carry', {weight:formatInventoryAmount(capacity.weightCurrent),maxWeight:formatInventoryAmount(capacity.weightMax),bulk:formatInventoryAmount(capacity.volumeCurrent),maxBulk:formatInventoryAmount(capacity.volumeMax),state:uiPhrase(capacity.stateLabel)}),
             )]),
         createElement(
           document,
@@ -531,16 +532,16 @@ function renderPanel(
           document,
           'div',
           'p1-panel-capacity',
-          'PLAYER · '
-            + panel.playerCapacity.weightCurrent.toFixed(1)
+          uiPhrase('Player') + ' · '
+            + formatInventoryAmount(panel.playerCapacity.weightCurrent)
             + '/'
-            + panel.playerCapacity.weightMax.toFixed(1)
+            + formatInventoryAmount(panel.playerCapacity.weightMax)
             + ' kg · '
-            + panel.playerCapacity.volumeCurrent.toFixed(1)
+            + formatInventoryAmount(panel.playerCapacity.volumeCurrent)
             + '/'
-            + panel.playerCapacity.volumeMax.toFixed(1)
+            + formatInventoryAmount(panel.playerCapacity.volumeMax)
             + ' u · '
-            + panel.playerCapacity.stateLabel,
+            + uiPhrase(panel.playerCapacity.stateLabel),
         ));
       }
       if (panel.containerCapacity !== undefined
@@ -549,14 +550,14 @@ function renderPanel(
           document,
           'div',
           'p1-panel-capacity',
-          'STORAGE · '
-            + panel.containerCapacity.weightCurrent.toFixed(1)
+          uiPhrase('Storage') + ' · '
+            + formatInventoryAmount(panel.containerCapacity.weightCurrent)
             + '/'
-            + panel.containerCapacity.weightMax.toFixed(1)
+            + formatInventoryAmount(panel.containerCapacity.weightMax)
             + ' kg · '
-            + panel.containerCapacity.volumeCurrent.toFixed(1)
+            + formatInventoryAmount(panel.containerCapacity.volumeCurrent)
             + '/'
-            + panel.containerCapacity.volumeMax.toFixed(1)
+            + formatInventoryAmount(panel.containerCapacity.volumeMax)
             + ' u',
         ));
       }
@@ -627,6 +628,7 @@ function renderPanel(
         if ((rowState.outputs?.length ?? 0) === 0) {
           output.append('→ ' + rowState.outputLabel);
         }
+        output.prepend(costLabel('outputs') + ' ');
         heading.append(
           createElement(document, 'span', 'p1-craft-name', uiPhrase(rowState.name)),
           output,
@@ -638,9 +640,10 @@ function renderPanel(
           'div',
           'p1-craft-ingredients',
         );
+        ingredients.append(costLabel('costs') + ' ');
         if ((rowState.ingredients?.length ?? 0) > 0) {
           for (const ingredient of rowState.ingredients ?? []) {
-            if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');hint.querySelector('summary > span')?.classList.add('p1-asset-icon','p1-craft-ingredient-icon');ingredients.append(hint);continue;}
+            if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');hint.querySelector('.p2-material-name')?.classList.add('p1-visually-hidden');hint.querySelector('summary > span')?.classList.add('p1-asset-icon','p1-craft-ingredient-icon');ingredients.append(hint);continue;}
             const token = createElement(
               document,
               'span',
@@ -696,6 +699,11 @@ function renderPanel(
         const craft = actionButton(document, 'Craft', 'craft-recipe:' + rowState.id);
         bindUiText(craft,"aria-label",'Craft ' + rowState.outputLabel);
         craft.disabled = rowState.state !== 'AVAILABLE';
+        if (rowState.reason) {
+          availability.id = 'craft-reason-' + rowState.id.replaceAll(':', '-');
+          craft.setAttribute('aria-describedby', availability.id);
+          craft.title = rowState.reason;
+        }
         footer.append(craft);
         row.append(footer);
         list.append(row);
@@ -805,7 +813,7 @@ function renderPanel(
         document,
         'span',
         'p1-build-preview-label',
-        panel.placementState,
+        uiPhrase(panel.placementState),
       ));
       const kitLabel=createElement(document,'div','p1-build-kit',panel.sourceKitLabel.split(' · ')[0]);
       bindUiText(kitLabel,'title',panel.sourceKitLabel);
@@ -1101,7 +1109,7 @@ function renderPanel(
               document,
               'span',
               'p1-map-selection-label',
-              markerState.label,
+              uiPhrase(markerState.label),
             );
             selectionLabel.dataset.mapSelectionLabel =
               markerState.label;
@@ -1145,7 +1153,7 @@ function renderPanel(
               document,
               'span',
               'p1-map-legend-label',
-              markerState.label,
+              uiPhrase(markerState.label),
             ),
           );
           if(markerState.kind==='resource'){
@@ -1172,10 +1180,10 @@ function renderPanel(
             document,
             'div',
             'p1-map-detail',
-            'DETAIL · '
-              + spatial.selectedDetailLabel
+            uiPhrase('DETAIL') + ' · '
+              + uiPhrase(spatial.selectedDetailLabel)
               + ' · '
-              + spatial.selectedDistanceBand,
+              + uiPhrase(spatial.selectedDistanceBand),
           );
           detail.dataset.distanceBand =
             spatial.selectedDistanceBand;
@@ -1539,7 +1547,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     if (weatherIcon !== null) {
       weatherIdentity.append(weatherIcon);
     }
-    const weatherLabel=createElement(this.document,'span','p1-weather-label',state.world.weatherLabel);weatherIdentity.append(weatherLabel);
+    const weatherLabel=createElement(this.document,'span','p1-weather-label',uiPhrase(state.world.weatherLabel));weatherIdentity.append(weatherLabel);
     weatherLine.append(
       weatherIdentity,
       createElement(this.document, 'span', '', String(state.world.teammateCount)+' '+uiPhrase('players')),
@@ -1676,7 +1684,7 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
     const carry = createElement(this.document, 'section', 'p1-carry p1-box p1-context-hud');
     carry.dataset.region = 'carry';
     carry.dataset.carryState = state.carry.stateLabel;
-    bindUiText(carry,"title",uiText("ui.ba72f17b")+state.carry.weightCurrent.toFixed(1)+'/'+state.carry.weightMax+uiText("ui.c164b263")+state.carry.volumeCurrent.toFixed(1)+'/'+state.carry.volumeMax+uiText("ui.15a006f6"));
+    bindUiText(carry,"title",uiText("ui.ba72f17b")+formatInventoryAmount(state.carry.weightCurrent)+'/'+formatInventoryAmount(state.carry.weightMax)+uiText("ui.c164b263")+formatInventoryAmount(state.carry.volumeCurrent)+'/'+formatInventoryAmount(state.carry.volumeMax)+uiText("ui.15a006f6"));
     bindUiText(carry,"aria-label",carry.title);
     const weightIcon = assetSprite(
       this.document,
@@ -1692,14 +1700,14 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
       carry.append(weightIcon);
     }
     carry.append(
-      ' ' + state.carry.weightCurrent.toFixed(1) + '/' + String(state.carry.weightMax) + ' kg ',
+      ' ' + formatInventoryAmount(state.carry.weightCurrent) + '/' + formatInventoryAmount(state.carry.weightMax) + ' kg ',
     );
     if (volumeIcon !== null) {
       carry.append(volumeIcon);
     }
     carry.append(
-      ' ' + state.carry.volumeCurrent.toFixed(1) + '/' + String(state.carry.volumeMax)
-      + ' · ' + state.carry.stateLabel,
+      ' ' + formatInventoryAmount(state.carry.volumeCurrent) + '/' + formatInventoryAmount(state.carry.volumeMax)
+      + ' · ' + uiPhrase(state.carry.stateLabel),
     );
 
     const toasts = createElement(this.document, 'section', 'p1-toasts p1-context-hud');

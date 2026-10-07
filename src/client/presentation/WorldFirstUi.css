@@ -69,11 +69,12 @@
 #app #proz0-phase1-ui .p1-item-inspection {margin:0;display:flex;flex-direction:column;gap:8px;background:#11232ba8;border:1px solid var(--hud-edge);}
 #app #proz0-phase1-ui .p1-item-inspection p {margin:0;font-size:12px;}
 #app #proz0-phase1-ui .p1-panel-capacity {font-size:11px;border:0;padding:6px;background:#152c32;}
-#app #proz0-phase1-ui .p1-craft-row {border:1px solid var(--hud-edge);background:#152a31;padding:8px;gap:8px;}
+#app #proz0-phase1-ui .p1-craft-row {border:1px solid var(--hud-edge);background:#152a31;padding:8px;gap:4px;}
 #app #proz0-phase1-ui .p1-craft-row[data-state=AVAILABLE] {border-left:3px solid var(--hud-active);}
 #app #proz0-phase1-ui .p1-craft-row:not([data-state=AVAILABLE]) {border-left:3px solid var(--hud-warning);}
 #app #proz0-phase1-ui .p1-craft-name {font-size:14px;font-weight:700;}
 #app #proz0-phase1-ui .p1-craft-state {font-size:11px;display:flex;align-items:center;gap:5px;}
+#app #proz0-phase1-ui .p1-craft-footer .p1-action {flex-shrink:0;white-space:nowrap;}
 #app #proz0-phase1-ui .p1-craft-state-icon {color:var(--hud-warning);font-size:14px;}
 #app #proz0-phase1-ui [data-state=AVAILABLE] .p1-craft-state-icon {color:var(--hud-active);}
 #app #proz0-phase1-ui .p1-craft-station {font-size:11px;color:var(--ui-muted);}
