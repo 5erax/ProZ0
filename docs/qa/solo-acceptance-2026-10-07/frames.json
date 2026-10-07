@@ -1,0 +1,342 @@
+{
+  "sourceHeadSha": "f94f28deea1f440f5d079efc8bc2ec37364562d2",
+  "fixture": "canonical Save V2 scene setup; generation 5 plus legacy v4; resource profiles v1; expedition/living enabled",
+  "generationVersion": 4,
+  "resourceProfileVersion": 1,
+  "threshold": {
+    "fpsMinimum": 50,
+    "p95MaximumMs": 34
+  },
+  "samples": [
+    {
+      "scene": "landing-clear",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.33682535472749,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 182,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "landing-clear",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 56.56861440170372,
+      "p95Ms": 33.30000000000018,
+      "authorityTicks": 181,
+      "distance": 1.9898425388268808,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "marsh-rain",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.295146408233144,
+      "p95Ms": 16.700000000000728,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "marsh-rain",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 56.874875274621836,
+      "p95Ms": 33.30000000000018,
+      "authorityTicks": 182,
+      "distance": 1.988737999999998,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "badlands-wind",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.34682847574523,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 182,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "badlands-wind",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 50.17444758285367,
+      "p95Ms": 33.399999999999636,
+      "authorityTicks": 182,
+      "distance": 2.0243266985983293,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "marsh-night-rain",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 59.42895086391945,
+      "p95Ms": 16.800000000000182,
+      "authorityTicks": 182,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "marsh-night-rain",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 52.7065999274892,
+      "p95Ms": 33.399999999999636,
+      "authorityTicks": 182,
+      "distance": 1.988737999999998,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "river-crossing",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.36484245439469,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 182,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "river-crossing",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 59.998000066187636,
+      "p95Ms": 16.799999999999272,
+      "authorityTicks": 181,
+      "distance": 1.3921160000000015,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "river-fishing",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 59.002916998376875,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 182,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "river-fishing",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 53.790218149856784,
+      "p95Ms": 33.30000000000018,
+      "authorityTicks": 182,
+      "distance": 1.988737999999998,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "equipped-mythic",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 59.992001067001176,
+      "p95Ms": 16.799999999999727,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "equipped-mythic",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 55.65182617946434,
+      "p95Ms": 33.30000000000018,
+      "authorityTicks": 181,
+      "distance": 1.9887380000000014,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-laboratory",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.30117270836811,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-laboratory",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.22092094780341,
+      "p95Ms": 16.700000000000728,
+      "authorityTicks": 181,
+      "distance": 1.988738000000012,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-garden",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.230940734563255,
+      "p95Ms": 16.799999999999727,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-garden",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.16487169211725,
+      "p95Ms": 16.799999999999272,
+      "authorityTicks": 181,
+      "distance": 1.988737999999998,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-array",
+      "moving": false,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.28912131055979,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "restored-array",
+      "moving": true,
+      "generationVersion": 5,
+      "resourceProfileVersion": 1,
+      "fps": 60.17487283391424,
+      "p95Ms": 16.700000000000728,
+      "authorityTicks": 181,
+      "distance": 1.988737999999998,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "legacy-v4-sized",
+      "moving": false,
+      "generationVersion": 4,
+      "resourceProfileVersion": 1,
+      "fps": 60.34082620492032,
+      "p95Ms": 16.700000000000273,
+      "authorityTicks": 181,
+      "distance": 0,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    },
+    {
+      "scene": "legacy-v4-sized",
+      "moving": true,
+      "generationVersion": 4,
+      "resourceProfileVersion": 1,
+      "fps": 60.15087567735106,
+      "p95Ms": 16.700000000000728,
+      "authorityTicks": 181,
+      "distance": 1.9887380000000014,
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+      "viewport": [
+        1280,
+        720
+      ]
+    }
+  ]
+}
