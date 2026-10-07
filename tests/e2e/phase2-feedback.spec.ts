@@ -71,7 +71,8 @@ test('fresh ecosystem: natural gathering builds accessible storage and a real st
  await page.locator('[data-construction-definition="structure:storage-crate"]').getByRole('button',{name:'Place owned kit',exact:true}).click();
  await page.mouse.move(point.x,point.y);
  await expect(page.locator('.sp-ghost')).toHaveAttribute('data-valid','true');await page.keyboard.press('Enter');
- await expect(page.locator('[data-structure-id="structure:storage-crate"]')).toHaveAttribute('data-built-count','1');await page.keyboard.press('Escape');
+ await expect(page.locator('.sp-ghost')).toBeHidden();
+ await expect(page.locator('[data-world-role="structure"] [data-storage-fill]')).toHaveCount(1);await page.keyboard.press('Escape');
  await page.keyboard.press('i');await expect(page.locator('[data-panel-kind="container"]')).toBeVisible();
  await page.locator('[data-inventory-pane="player"]').getByRole('button',{name:'Stone Field Tool',exact:true}).click();
  await page.getByRole('button',{name:'Move one',exact:true}).click();
