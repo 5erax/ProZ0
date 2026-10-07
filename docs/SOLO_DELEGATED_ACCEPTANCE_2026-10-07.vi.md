@@ -21,7 +21,7 @@ Bao phủ EN/VI ở 640×360, 1280×720, 1920×1080; selected skin; keyboard/red
 
 Ba hành trình khám phá tạo ba world ID riêng với seed golden để so sánh route lab/mine/shelter; đi từ landing và không grant/relocate. Hành trình trồng và căn cứ tạm lấy vật liệu tự nhiên. Wardrobe, săn bắt, root, câu cá và frame pacing dùng Save V2 fixture có chủ đích; fixture không được gọi là tiến trình người mới. Lobby layout test chỉ stub account lookup để ổn định trạng thái guest; đây không phải nghiệm thu đăng nhập production.
 
-**Frame pacing PASS**: spec `phase2-frame-pacing` chạy riêng một worker trên production, Windows x64 (UA Windows NT 10.0) / headless Chromium 153, viewport đo 1280×720; ảnh đối chiếu 640×360 và 1920×1080. 22 mẫu/11 cảnh, idle và moving, có clear/rain/wind/night/river/fishing/gear/restored sites/legacy generation. FPS 50,17–60,36; P95 lớn nhất 33,4 ms. Ngưỡng vẫn ≥50 FPS và ≤34 ms, với authority ticks và khoảng cách chuyển động được kiểm tra. Raw evidence: [frames.json](solo-acceptance-2026-10-07/frames.json). Không suy ra hiệu năng mọi GPU hoặc độ trễ Internet.
+**Frame pacing PASS**: spec `phase2-frame-pacing` chạy riêng một worker trên production, Windows x64 (UA Windows NT 10.0) / headless Chromium 153, viewport đo 1280×720; ảnh đối chiếu 640×360 và 1920×1080. 22 mẫu/11 cảnh, idle và moving, có clear/rain/wind/night/river/fishing/gear/restored sites/legacy generation. FPS 50,17–60,36; P95 lớn nhất 33,4 ms. Ngưỡng vẫn ≥50 FPS và ≤34 ms, với authority ticks và khoảng cách chuyển động được kiểm tra. Raw evidence: [frames.json](qa/solo-acceptance-2026-10-07/frames.json). Không suy ra hiệu năng mọi GPU hoặc độ trễ Internet.
 
 ## Đánh giá trực tiếp hình ảnh và quy tắc raster
 
@@ -33,7 +33,7 @@ Quy tắc dùng chung: world/effect raster tham chiếu 640×360, display scale 
 
 Giới hạn đã chấp nhận: sprite vẫn là pixel art cách điệu, các sprout đầu dùng hình chung và xác dùng biến dạng silhouette hiện có; không phải bộ animation riêng cho mỗi loài hay đồ họa ảnh thực. Kiểm tra agent không đo việc một người mới nhận ra CTA trong hai giây. Tối ưu GPU yếu hơn và subjective novice balance có thể nghiên cứu tiếp, không được giả là đã có số liệu người chơi.
 
-Ảnh lưu cùng biên bản: [loài/cây](solo-acceptance-2026-10-07/species-review.png), [lobby](solo-acceptance-2026-10-07/lobby.png), [arrival](solo-acceptance-2026-10-07/arrival.png), [gameplay/inspect](solo-acceptance-2026-10-07/world-inspection.png), [map VI](solo-acceptance-2026-10-07/map-vi.png).
+Ảnh lưu cùng biên bản: [loài/cây](qa/solo-acceptance-2026-10-07/species-review.png), [lobby](qa/solo-acceptance-2026-10-07/lobby.png), [arrival](qa/solo-acceptance-2026-10-07/arrival.png), [gameplay/inspect](qa/solo-acceptance-2026-10-07/world-inspection.png), [map VI](qa/solo-acceptance-2026-10-07/map-vi.png).
 
 ## Quyết định issue và bàn giao
 
