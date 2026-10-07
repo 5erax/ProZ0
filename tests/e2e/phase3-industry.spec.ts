@@ -190,7 +190,7 @@ test('industry UI pays for a powered processing chain, conserves logistics stock
   await expect(panel.getByRole('status')).toContainText('Recipe selected');
   await panel.getByLabel('Recipe', { exact: true }).selectOption('reinforced-patch');
   await expect(panel.getByRole('status')).toContainText('Recipe selected');
-  await panel.locator('.industry-row').filter({ hasText: 'metal ore · buffer' }).getByRole('button', { name: 'Load 1', exact: true }).click();
+  await panel.locator('.industry-row').filter({ hasText: 'Metal Ore · buffer' }).getByRole('button', { name: 'Load 1', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Input loaded');
   await selectFacility('fiber-processor');
   await panel.getByRole('button', { name: 'Load 3', exact: true }).click();
@@ -207,10 +207,10 @@ test('industry UI pays for a powered processing chain, conserves logistics stock
   await connect('industry:fiber-processor:2', 'industry:fabricator:3', 'item:cordage');
   await connect('industry:fabricator:3', 'industry:depot:4', 'item:repair-patch');
   await selectFacility('depot');
-  const patchRow = panel.getByRole('table', { name: 'Facility buffer' }).getByRole('row').filter({ hasText: 'repair patch' });
+  const patchRow = panel.getByRole('table', { name: 'Facility buffer' }).getByRole('row').filter({ hasText: 'Repair Patch' });
   await expect(patchRow).toContainText('1', { timeout: 25000 });
   await selectFacility('solar-array');
-  await panel.getByRole('button', { name: 'Repair · 1 repair patch', exact: true }).click();
+  await panel.getByRole('button', { name: 'Repair · 1 Repair Patch', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Facility repaired');
   await panel.getByRole('button', { name: 'Power & logistics', exact: true }).click();
   await expect(panel).toContainText('repaired');
@@ -276,7 +276,7 @@ test('greenhouse and rover UI grows upgraded crops and carries conserved cargo t
   await expect(panel.getByRole('progressbar', { name: 'Production cycle progress' })).not.toHaveAttribute('value', '0');
   const plant = panel.getByRole('table', { name: 'Facility buffer' }).getByRole('row').filter({ hasText: 'edible plant' });
   await expect(plant.getByRole('cell').nth(1)).toHaveText('6', { timeout: 50000 });
-  await panel.getByRole('button', { name: 'Repair · 1 repair patch', exact: true }).click();
+  await panel.getByRole('button', { name: 'Repair · 1 Repair Patch', exact: true }).click();
   await expect(panel.getByRole('status')).toContainText('Facility repaired');
   await page.screenshot({ path: resolve(evidence, 'greenhouse-harvest-1280.png') });
   await panel.getByLabel('Facility', { exact: true }).selectOption(seeded.rover.id);

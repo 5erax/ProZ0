@@ -80,6 +80,7 @@ import { createColonyDepthOverlay } from '../presentation/ColonyDepthOverlay';
 export interface Phase1ProductReviewRuntimeConfig
   extends Phase1AuthorityBundleConfig {
   readonly localPlayerId: PlayerId;
+  readonly supportToolsEnabled?: boolean;
 }
 
 export interface Phase1ProductReviewRuntime {
@@ -328,7 +329,7 @@ export async function createPhase1ProductReviewRuntime(
   );
 
   let gatheredActions=0;
-  const playtestTools=config.colonyDepthEnabled===true?createColonyPlaytestTools(root,()=>{const p=bundle.getPlayerPosition(config.localPlayerId),c=bundle.items.getContainerView('inventory:'+config.localPlayerId),d=bundle.colonyDepth.read();return {tick:bundle.authorityTick,x:p.x,y:p.y,carrying:c.playerWeightState??'NORMAL',stacks:c.stacks.length,sites:d.inspectedSites.length,biomes:d.discoveredBiomes.length,facilities:bundle.buildings.exportSnapshot().foothold.structures.length,gatherActions:gatheredActions,toolCondition:c.stacks.find(stack=>stack.itemDefinitionId==='item:stone-field-tool')?.condition??null};}):null;
+  const playtestTools=config.colonyDepthEnabled===true?createColonyPlaytestTools(root,()=>{const p=bundle.getPlayerPosition(config.localPlayerId),c=bundle.items.getContainerView('inventory:'+config.localPlayerId),d=bundle.colonyDepth.read();return {tick:bundle.authorityTick,x:p.x,y:p.y,carrying:c.playerWeightState??'NORMAL',stacks:c.stacks.length,sites:d.inspectedSites.length,biomes:d.discoveredBiomes.length,facilities:bundle.buildings.exportSnapshot().foothold.structures.length,gatherActions:gatheredActions,toolCondition:c.stacks.find(stack=>stack.itemDefinitionId==='item:stone-field-tool')?.condition??null};},config.supportToolsEnabled===true):null;
 
   // Intent identity belongs to the client session; it is not world RNG.
   const operationSession = crypto.randomUUID();
@@ -349,6 +350,7 @@ export async function createPhase1ProductReviewRuntime(
     return [{label:uiPhrase(marked?'Remove resource marker':'Mark resource on map'),run:()=>{const result=authority.set(config.localPlayerId,authority.read().revision,view.id,spaceId,!marked);source.setLocalCommandFeedback({operationId:nextOperationId('resource-marker'),verb:'MARK',target:view.name,status:result==='COMPLETE'?'committed':'rejected',...(result==='COMPLETE'?{}:{reason:result})});}}];
   });
   const industryPanel = bundle.industry ? createIndustryPanel(root, {
+    itemDisplayName: id => contentDisplayName(bundle.catalog.get(id)),
     markerHost: root.querySelector<HTMLElement>('.p1-product-world-stage') ?? undefined,
     read: () => bundle.industry!.read(),
     inventory: () => bundle.items.getContainerView('inventory:' + config.localPlayerId).stacks,

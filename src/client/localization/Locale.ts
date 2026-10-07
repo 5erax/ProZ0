@@ -24,6 +24,8 @@ export function message(dictionary: MessageDictionary, key: string, params: Mess
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(current === 'vi' ? 'vi-VN' : 'en-US', options).format(value);
 }
+/** Shared inventory precision: retain small item masses, avoid floating-point noise. */
+export const formatInventoryAmount = (value: number) => formatNumber(value, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 export const formatSeconds = (value: number) => formatNumber(value, { style: 'unit', unit: 'second', unitDisplay: 'short', maximumFractionDigits: 1 });
 export const formatMetres = (value: number) => formatNumber(value, { style: 'unit', unit: 'meter', unitDisplay: 'short', maximumFractionDigits: 1 });
 export function assertDictionaryParity(dictionary: MessageDictionary): void {

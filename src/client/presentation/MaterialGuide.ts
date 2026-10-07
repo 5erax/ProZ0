@@ -24,6 +24,6 @@ export function materialHint(document:Document,name:string,help:string,have:numb
  node.className='p2-material';node.dataset.material=id;node.dataset.sufficient=String(requirement.status==='sufficient');node.dataset.deficit=String(requirement.deficit);
  summary.setAttribute('aria-label',name+' '+formatNumber(have)+'/'+formatNumber(need)+' · '+status);summary.title=summary.getAttribute('aria-label')!;
  const sprite=itemIconSprite(id||name);if(sprite)applyProductionSprite(icon,sprite,1);icon.setAttribute('aria-hidden','true');text.textContent=formatNumber(have)+'/'+formatNumber(need);summary.append(icon,text);
- const label=document.createElement('span');label.className='p2-material-name';label.textContent=name+' · '+(requirement.status==='missing'?status:'✓');summary.append(label);
+ const label=document.createElement('span');label.className='p2-material-name';label.textContent=name+' · '+(requirement.status==='missing'?'!':'✓');summary.append(label);
  source.textContent=help;node.append(summary,source);return node;
 }

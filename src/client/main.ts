@@ -247,6 +247,7 @@ export function resolveProductReviewAutoBootConfig(
     ),
     playerIds: Object.freeze(playerIds),
     colonyDepthEnabled: (root.dataset.proz0Mode?.trim() || query.get('proz0Mode')) === 'phase2-colony-review',
+    supportToolsEnabled: root.dataset.proz0Support === 'true' || query.get('proz0Support') === 'true',
     localPlayerId: requiredAutoBootText(
       root,
       'proz0LocalPlayerId',

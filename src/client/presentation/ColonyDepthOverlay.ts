@@ -117,7 +117,7 @@ export function createColonyDepthOverlay(
     const button = document.createElement("button");
     bindUiText(button,"textContent",label);
     button.disabled = disabled;
-    if(disabled){button.title=blockedReason||uiText("ui.174bf540");button.setAttribute("aria-label",label+" · "+button.title);}
+    if(disabled){button.title=blockedReason||uiText("ui.174bf540");button.setAttribute("aria-description",button.title);}
     button.dataset.colonyAction = action + ":" + targetId;
     button.addEventListener("click", () => run(action, targetId));
     parent.append(button);

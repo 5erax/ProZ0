@@ -43,3 +43,17 @@ No recipe cost, item catalog, authority exchange, inventory mutation, network me
 - Domain suite: 568 passed, 3 pre-existing skipped. Browser suite: 64 passed. Typecheck and lint passed.
 - Client/server production build passed. Existing Vite native-config and large-chunk warnings remain; this slice does not claim a warning-free baseline.
 - Final E2E/CI/integration/deployment evidence will be appended before closure. Human visual and multiplayer acceptance are not implied by automated checks.
+
+### E2E review corrections
+
+The first production E2E run exposed two presentation regressions: complete deficits made six craft cards exceed the panel, and appending the blocked reason to an Industry button's accessible name broke its stable action identity. Material names remain in source disclosures/accessibility and the full deficit footer; compact craft chips avoid duplicate names. Card spacing is reduced without reducing type size, and action labels cannot shrink into split words. Block reasons are exposed as descriptions/title while action names stay stable. Production Industry paid-build/logistics/repair/reopen and greenhouse/rover journeys passed after correction. The six-card direct Product Review visual journey also passed; final head CI still required.
+
+## #281 — authored localization and inventory number formatting
+
+Reported placement/kit/weather/map labels now have explicit glossary entries. Industry material labels resolve through the same canonical catalog as Inventory and Craft; its colony prerequisites are authored translations. HUD carry states and weather, placement status and map detail labels are localized at their source-owned boundaries. Inventory totals, carry/tooltips, storage and item detail share `formatInventoryAmount`: one decimal minimum, two maximum, using `formatNumber` and the selected locale. This preserves small masses while avoiding floating-point noise.
+
+Vietnamese captions retain authored casing; uppercase source aliases no longer automatically uppercase translated prose. The map landing caption uses sentence case. Appearance UI says `Trang phục` consistently. Canonical item IDs, commands, player text and saves are unaffected.
+
+Local playtest recording/export and its Base guide are absent by default. Explicit support boot uses `proz0Support=true` (or `data-proz0-support="true"`) in the review entrypoint, mapped to `supportToolsEnabled`. Normal lobby/world play does not opt in. The supporting UI does not sample or mount controls when disabled.
+
+Verification: new glossary regression failed on `INVALID` before the fix; two browser regressions reproduced raw `NORMAL`/English decimals and non-opt-in support controls. Those pass after correction. A representative VI scan covers Inventory, Craft, Build, Map, Farm, Journal, Research, Colony, Industry and Settings for the reported leaks. Browser suite is now 67 passed. Typecheck/lint and focused unit tests pass. Industry E2E expectations now use canonical catalog display names; transactions, quantities and save assertions remain unchanged. Final head CI and deployment are pending; this is not a claim that every historical untranslated string has been audited.

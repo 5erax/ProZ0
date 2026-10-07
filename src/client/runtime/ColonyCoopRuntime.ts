@@ -272,6 +272,7 @@ export async function bootColonyCoop(
   };
   let industryPending: { id: string; resolve: (result: IndustryPanelResult) => void } | null = null;
   const industryPanel = createIndustryPanel(root, {
+    itemDisplayName: id => contentDisplayName(catalog.get(id)),
     read: () => aggregate('industry', 'colony')?.state as unknown as IndustryState ?? null,
     inventory: () => inventory().stacks,
     colonyResearchIds: () => (aggregate('colony-depth', 'colony')?.state as { researchIds?: string[] } | undefined)?.researchIds ?? [],

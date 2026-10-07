@@ -729,7 +729,7 @@ export function createLivingWorldOverlay(
       const stationBlocked=r.station&&!bundle.expedition!.read().facilities.some(f=>f.definitionId===r.station&&Math.hypot(f.x-p.x,f.y-p.y)<=4);
       const reason=[missingCostText(requirements),stationBlocked?gameUiText('prerequisite',{name:uiPhrase(EXPEDITION_FACILITIES.find(f=>f.id===r.station)?.name??r.station!)}):''].filter(Boolean).join(' · ');
       const action=button(uiText("ui.93077f53")+uiPhrase(r.name),()=>execute('craft',r.id));
-      if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-label',action.textContent+' · '+reason);if(stationBlocked)a.append(text('p',reason));}
+      if(reason){action.disabled=true;action.title=reason;action.setAttribute('aria-description',reason);if(stationBlocked)a.append(text('p',reason));}
       a.append(action);
     }
     panel.scrollTop = scrollTop;restoreUi();

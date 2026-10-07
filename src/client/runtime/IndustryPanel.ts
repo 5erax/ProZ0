@@ -33,6 +33,7 @@ export type IndustryPanelResult =
 export interface IndustryPanelAdapter {
   read(): IndustryState | null;
   inventory(): readonly IndustryCost[];
+  itemDisplayName?(id: string): string;
   position(): { readonly x: number; readonly y: number } | null;
   command(intent: IndustryIntent): IndustryPanelResult | Promise<IndustryPanelResult>;
   ready?(): boolean;
@@ -90,7 +91,7 @@ const REASONS: Readonly<Record<string, string>> = {
   TARGET_CAPACITY_VOLUME: 'Your bag is full. Store some supplies first.',
 };
 
-function itemName(id: string): string {
+function itemFallbackName(id: string): string {
   return id.replace(/^item:/, '').replaceAll('-', ' ');
 }
 
@@ -187,6 +188,7 @@ export function createIndustryPanel(
     const player = adapter.position();
     return player ? Math.hypot(player.x - facility.position.x, player.y - facility.position.y) : Infinity;
   };
+  const itemName = (id: string) => adapter.itemDisplayName?.(id) ?? industryText(itemFallbackName(id));
   const available = (id: string) => adapter.inventory().filter((i) => i.itemDefinitionId === id).reduce((total, i) => total + i.quantity, 0);
   const afford = (costs: readonly IndustryCost[]) => costs.every((cost) => available(cost.itemDefinitionId) >= cost.quantity);
   const requirements = (values: readonly IndustryCost[]) => costRequirements(values.map(cost => ({ itemId: cost.itemDefinitionId, quantity: cost.quantity })), available, id => industryText(itemName(id)));
@@ -197,7 +199,7 @@ export function createIndustryPanel(
     node.textContent = industryText(label);
     node.dataset.industryControl = id;
     node.disabled = !enabled || !ready();
-    if (node.disabled && reason) { node.title = reason; node.setAttribute('aria-label', industryText(label) + ' · ' + reason); }
+    if (node.disabled && reason) { node.title = reason; node.setAttribute('aria-description', reason); }
     node.addEventListener('click', run);
     return node;
   };

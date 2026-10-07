@@ -9,6 +9,8 @@ import {contentText} from '../../src/client/localization/ContentText';
 import {statusMessages} from '../../src/client/localization/StatusMessages';
 import {resourceMessages} from '../../src/client/localization/ResourceFacts';
 import {inspectItem} from '../../src/client/presentation/ItemInspection';
+import { industryText } from '../../src/client/localization/IndustryMessages';
+import { lobbyText } from '../../src/client/localization/LobbyMessages';
 import {createPhase1ContentCatalog} from '../../src/content';
 afterEach(()=>setLocale('en'));
 it('both dictionaries retain identical keys and parameters and fail safely to English',()=>{
@@ -27,3 +29,16 @@ it('locale presentation retains canonical identities/fingerprint and formats num
 });
 
 it('translates clear and cold-rain weather labels at authored UI boundaries',()=>{setLocale('vi');expect(uiPhrase('CLEAR')).toBe('Trời quang');expect(uiPhrase('COLD RAIN')).toBe('Mưa lạnh');expect(uiPhrase('COLD RAIN · FORECAST')).toBe('Dự báo mưa lạnh');});
+
+it('translates tester-reported labels without exposing internal state codes or borrowed skin labels', () => {
+  setLocale('vi');
+  expect(uiPhrase('INVALID')).toBe('Vị trí chưa hợp lệ');
+  expect(uiPhrase('Kit')).toBe('Bộ lắp');
+  expect(uiPhrase('MIST RAIN')).toBe('Mưa sương');
+  expect(uiPhrase('BASE')).toBe('Căn cứ');
+  expect(uiPhrase('DETAIL')).toBe('Chi tiết');
+  expect(uiPhrase('FAR')).toBe('Xa');
+  expect(industryText('expanded storage')).toBe('Kho mở rộng');
+  expect(industryText('cultivation')).toBe('Canh tác');
+  expect(lobbyText('chooseSkin')).toBe('Chọn trang phục');
+});

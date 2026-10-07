@@ -1,7 +1,7 @@
 import { contentDisplayName } from '../localization/ContentText';
 import { uiText } from '../localization/UiMessages';
 import { uiPhrase } from '../localization/UiMessages';
-import { locale, formatNumber } from '../localization/Locale';
+import { locale, formatNumber, formatInventoryAmount } from '../localization/Locale';
 import { WEARABLE_RECIPES, WEARABLE_PROFILES } from '../../content/livingworld/WearableContent';
 import type { ContentCatalogV1, ItemDefinitionV1 } from '../../content';
 import { CROPS, FORAGE, LIVING_RECIPES } from '../../content/livingworld/LivingWorldContent';
@@ -49,7 +49,7 @@ export function inspectItem(catalog: ContentCatalogV1, id: string): ItemInspecti
   const existing = definitions.get(cacheKey); if (existing) return existing;
   const item = catalog.getAs(id, 'item'), profile = item.useProfile;
   const facts = [
-    uiText("ui.ec492781") + formatNumber(item.unitWeightKg,{minimumFractionDigits:2,maximumFractionDigits:2}) + ' kg · ' + formatNumber(item.unitVolume,{minimumFractionDigits:2,maximumFractionDigits:2}) + uiText("ui.c273f254"),
+    uiText("ui.ec492781") + formatInventoryAmount(item.unitWeightKg) + ' kg · ' + formatInventoryAmount(item.unitVolume) + uiText("ui.c273f254"),
     uiText("ui.ccb153a6") + item.maxStack + (item.conditionMax === null ? '' : uiText("ui.15171153") + item.conditionMax),
   ];
   if (item.category === 'weapon' || item.category === 'equipment') facts.push(uiText("ui.d7f31bb0") + RARITY_STYLE[item.rarity ?? 'common'].label);
