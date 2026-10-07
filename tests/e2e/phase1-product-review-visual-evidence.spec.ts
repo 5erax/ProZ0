@@ -2568,10 +2568,10 @@ test('P1-INT-001 captures direct Product Review visual correction evidence', asy
   ).toContainText('Thermal Wrap');
   await expect(
     page.locator('[data-equipment-slot="weapon"]'),
-  ).toContainText('C100');
+  ).toContainText('100%');
   await expect(
     page.locator('[data-equipment-slot="protection"]'),
-  ).toContainText('C100');
+  ).toContainText('100%');
   const equipmentOverflow = await page.locator(
     '[data-region="equipment"]',
   ).evaluate((panel) =>

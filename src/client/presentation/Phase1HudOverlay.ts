@@ -1632,14 +1632,16 @@ class Phase1HudOverlayImpl implements Phase1HudOverlay {
             || slot.conditionMax === null
             || slot.conditionMax <= 0
               ? ''
-              : ' C' + String(slot.condition);
-          bindUiText(row,"title",uiPhrase(slot.name)
+              : ' ' + String(percent(slot.condition, slot.conditionMax)) + '%';
+          const equipmentCaption = uiPhrase(slot.name)
             + (slot.condition === null || slot.conditionMax === null
               ? ''
               : uiText("ui.903fa637")
                 + String(slot.condition)
                 + '/'
-                + String(slot.conditionMax)));
+                + String(slot.conditionMax));
+          bindUiText(row, 'title', equipmentCaption);
+          bindUiText(row, 'aria-label', equipmentCaption);
           row.dataset.equipmentState = slot.stateLabel;
           row.append(createElement(this.document, 'span', 'p1-visually-hidden', uiPhrase(slot.name)), conditionLabel);
           if (

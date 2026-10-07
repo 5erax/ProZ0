@@ -44,6 +44,9 @@ test('equipment UI: owned drag/drop and keyboard equip match avatar/world, conse
   await expect(weapon).toHaveAttribute('data-equipped-stack', spearId);
   await expect(hudWeapon.locator('.p1-equipment-icon')).toHaveCount(1);
   await expect(hudWeapon).not.toHaveAttribute('data-equipment-state','EMPTY');
+  await expect(hudWeapon).toContainText('100%');
+  await expect(hudWeapon).toHaveAttribute('title', /condition.*\d+\/\d+/);
+  await expect(hudWeapon).toHaveAttribute('aria-label', await hudWeapon.getAttribute('title') ?? '');
   await expect(inventory.locator('[data-avatar-equipment="weapon"]')).toHaveCount(1);
   // Repeated drop is idempotent, unlike the explicit X toggle.
   await spear.dragTo(weapon); await expect(weapon).toHaveAttribute('data-equipped-stack', spearId);
