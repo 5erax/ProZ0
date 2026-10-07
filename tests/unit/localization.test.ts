@@ -1,7 +1,7 @@
 import {gameUiMessages} from '../../src/client/localization/GameUiMessages';
 import {presentationMessages} from '../../src/client/localization/PresentationMessages';
 import {afterEach,expect,it} from 'vitest';
-import {assertDictionaryParity,formatNumber,message,setLocale} from '../../src/client/localization/Locale';
+import {assertDictionaryParity,formatNumber,formatInventoryAmount,message,setLocale} from '../../src/client/localization/Locale';
 import {coreMessages} from '../../src/client/localization/CoreMessages';
 import {lobbyMessages} from '../../src/client/localization/LobbyMessages';
 import {uiMessages,uiPhrase} from '../../src/client/localization/UiMessages';
@@ -41,4 +41,18 @@ it('translates tester-reported labels without exposing internal state codes or b
   expect(industryText('expanded storage')).toBe('Kho mở rộng');
   expect(industryText('cultivation')).toBe('Canh tác');
   expect(lobbyText('chooseSkin')).toBe('Chọn trang phục');
+});
+
+it('retains small item masses and removes floating point noise with the same EN/VI precision', () => {
+  expect(formatInventoryAmount(0.05)).toBe('0.05');
+  expect(formatInventoryAmount(0.025)).toBe('0.025');
+  expect(formatInventoryAmount(1.8)).toBe('1.8');
+  expect(formatInventoryAmount(0.1 + 0.2)).toBe('0.3');
+  expect(formatInventoryAmount(32)).toBe('32.0');
+  setLocale('vi');
+  expect(formatInventoryAmount(0.05)).toBe('0,05');
+  expect(formatInventoryAmount(0.025)).toBe('0,025');
+  expect(formatInventoryAmount(1.8)).toBe('1,8');
+  expect(formatInventoryAmount(0.1 + 0.2)).toBe('0,3');
+  expect(formatInventoryAmount(32)).toBe('32,0');
 });
