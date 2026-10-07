@@ -1,6 +1,7 @@
 import { actionGlyph } from './UiActionIcon';
 import './WorldFirstUi.css';
 import { materialHint } from './MaterialGuide';
+import { costLabel } from './CostRequirements';
 import { gameUiText } from '../localization/GameUiMessages';
 import { capturePanelUi } from './PanelUiState';
 import { presentationText } from '../localization/PresentationMessages';
@@ -627,6 +628,7 @@ function renderPanel(
         if ((rowState.outputs?.length ?? 0) === 0) {
           output.append('→ ' + rowState.outputLabel);
         }
+        output.prepend(costLabel('outputs') + ' ');
         heading.append(
           createElement(document, 'span', 'p1-craft-name', uiPhrase(rowState.name)),
           output,
@@ -638,6 +640,7 @@ function renderPanel(
           'div',
           'p1-craft-ingredients',
         );
+        ingredients.append(costLabel('costs') + ' ');
         if ((rowState.ingredients?.length ?? 0) > 0) {
           for (const ingredient of rowState.ingredients ?? []) {
             if(ingredient.source){const hint=materialHint(document,ingredient.name,ingredient.source,ingredient.have,ingredient.need,ingredient.itemId);hint.classList.add('p1-craft-ingredient');hint.querySelector('summary > span')?.classList.add('p1-asset-icon','p1-craft-ingredient-icon');ingredients.append(hint);continue;}
@@ -696,6 +699,11 @@ function renderPanel(
         const craft = actionButton(document, 'Craft', 'craft-recipe:' + rowState.id);
         bindUiText(craft,"aria-label",'Craft ' + rowState.outputLabel);
         craft.disabled = rowState.state !== 'AVAILABLE';
+        if (rowState.reason) {
+          availability.id = 'craft-reason-' + rowState.id.replaceAll(':', '-');
+          craft.setAttribute('aria-describedby', availability.id);
+          craft.title = rowState.reason;
+        }
         footer.append(craft);
         row.append(footer);
         list.append(row);

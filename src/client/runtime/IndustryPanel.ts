@@ -1,3 +1,5 @@
+import { costList } from '../presentation/CostList';
+import { costRequirements, missingCostText } from '../presentation/CostRequirements';
 import { industryText } from '../localization/IndustryMessages';
 import { locale, onLocaleChange } from '../localization/Locale';
 import { worldDepthOrder } from '../presentation/WorldDepth';
@@ -128,7 +130,7 @@ export function createIndustryPanel(
     .industry-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0}.industry-tabs [aria-selected=true]{background:#435f59;border-color:#d1ddba}
     .industry-summary{color:#bbcfbf;line-height:1.5;margin:8px 0}.industry-content{display:grid;gap:10px}.industry-card{border:1px solid #486459;padding:12px;min-width:0}.industry-card h3{font-size:14px;margin:0 0 8px}.industry-card p{line-height:1.5;margin:6px 0}
     .industry-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr));gap:10px}.industry-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}.industry-row label{display:flex;align-items:center;gap:6px}.industry-row input[type=number]{width:84px}.industry-row select{max-width:100%}
-    .industry-cost{display:block;font-size:11px;color:#c5d4c3}.industry-cost[data-affordable=false]{color:#e5b785}.industry-status{padding:9px;border-left:3px solid #d9bd79;color:#efd8aa;line-height:1.5;min-height:18px}.industry-status:empty{padding:0;min-height:0;border:0}
+    .industry-cost{display:block;font-size:11px;color:#c5d4c3}.industry-cost [data-sufficient=false],.industry-cost .p2-cost-deficit{color:#e5b785}.industry-cost [data-sufficient=true]{color:#c5d4c3}.industry-cost summary{display:flex;align-items:center;gap:4px;cursor:pointer}.industry-cost summary>span:first-child{flex-shrink:0}.industry-status{padding:9px;border-left:3px solid #d9bd79;color:#efd8aa;line-height:1.5;min-height:18px}.industry-status:empty{padding:0;min-height:0;border:0}
     .industry-buffer{width:100%;border-collapse:collapse}.industry-buffer th,.industry-buffer td{text-align:left;padding:6px;border-bottom:1px solid #38574f}.industry-buffer button{padding:5px;min-height:30px}.industry-progress{width:100%;accent-color:#afc789}.industry-small{font-size:11px;color:#b6cbbb}
     .industry-marker{font:10px monospace;color:#edf3de;position:absolute;transform:translate(-50%,-100%);pointer-events:auto;padding:0!important;border:0!important;min-height:0!important;background:transparent!important;filter:drop-shadow(0 3px 0 #101b27a0);z-index:2}.industry-marker svg{display:block;width:44px;height:44px;shape-rendering:crispEdges;image-rendering:pixelated}.industry-marker[data-powered=true] svg{filter:drop-shadow(0 0 2px #9bcbaf)}.industry-marker[data-worn=true]::after{content:'!';position:absolute;right:0;top:0;background:#a25e40;color:#fff;padding:1px 4px}.industry-marker[data-selected=true]{outline:1px dashed #e5d09a}
     .industry-marker-state{display:none;background:#10242ade;border:1px solid #637e70;white-space:nowrap;padding:2px 4px;font-size:9px}.industry-marker:focus-visible .industry-marker-state{display:block}.industry-marker[data-kind=rover] svg{width:40px;height:40px}
@@ -187,13 +189,15 @@ export function createIndustryPanel(
   };
   const available = (id: string) => adapter.inventory().filter((i) => i.itemDefinitionId === id).reduce((total, i) => total + i.quantity, 0);
   const afford = (costs: readonly IndustryCost[]) => costs.every((cost) => available(cost.itemDefinitionId) >= cost.quantity);
-  const costLabel = (costs: readonly IndustryCost[]) => costs.map((cost) => itemName(cost.itemDefinitionId) + ' ' + String(available(cost.itemDefinitionId)) + '/' + String(cost.quantity)).join(' · ');
-  const button = (label: string, id: string, run: () => void, enabled = true) => {
+  const requirements = (values: readonly IndustryCost[]) => costRequirements(values.map(cost => ({ itemId: cost.itemDefinitionId, quantity: cost.quantity })), available, id => industryText(itemName(id)));
+  const deficit = (values: readonly IndustryCost[]) => missingCostText(requirements(values));
+  const button = (label: string, id: string, run: () => void, enabled = true, reason = '') => {
     const node = document.createElement('button');
     node.type = 'button';
     node.textContent = industryText(label);
     node.dataset.industryControl = id;
     node.disabled = !enabled || !ready();
+    if (node.disabled && reason) { node.title = reason; node.setAttribute('aria-label', industryText(label) + ' · ' + reason); }
     node.addEventListener('click', run);
     return node;
   };
@@ -204,8 +208,8 @@ export function createIndustryPanel(
     return node;
   };
   const costs = (parent: HTMLElement, values: readonly IndustryCost[]) => {
-    const node = text('p', costLabel(values), 'industry-cost');
-    node.dataset.affordable = String(afford(values));
+    const node = costList(document, requirements(values));
+    node.classList.add('industry-cost');
     parent.append(node);
   };
   const row = () => {
@@ -322,7 +326,7 @@ export function createIndustryPanel(
           feedback = 'Enter valid offsets within ' + String(INDUSTRY_BUILD_RANGE) + ' world units.'; signature = ''; render(true); return;
         }
         void run({ action: 'build', facilityKind: definition.id, position: { x: current.x + x, y: current.y + y } }, definition.name + ' built.');
-      }, researched && afford(definition.costs) && player !== null));
+      }, researched && afford(definition.costs) && player !== null, [deficit(definition.costs), !researched ? industryText('Complete the required research first.') : '', player === null ? industryText('Waiting for the colony state…') : ''].filter(Boolean).join(' · ')));
       grid.append(node);
     }
     content.append(grid);
@@ -347,7 +351,7 @@ export function createIndustryPanel(
     if (!nearby) machine.append(text('p', 'Move within ' + String(INDUSTRY_INTERACTION_RANGE) + ' world units to manage this facility. You are ' + (Number.isFinite(playerDistance(facility)) ? playerDistance(facility).toFixed(1) : '—') + ' units away.', 'industry-small'));
     const controls = row();
     controls.append(button(facility.enabled ? 'Pause' : 'Resume', 'enabled', () => { void run({ action: 'set-enabled', targetId: facility.id, enabled: !facility.enabled }, facility.enabled ? 'Facility paused.' : 'Facility enabled.'); }, nearby));
-    controls.append(button('Repair · ' + INDUSTRY_REPAIR_COSTS.map(cost => String(cost.quantity) + ' ' + itemName(cost.itemDefinitionId)).join(' + '), 'repair', () => { void run({ action: 'repair', targetId: facility.id }, 'Facility repaired.'); }, nearby && facility.condition < 1000 && afford(INDUSTRY_REPAIR_COSTS)));
+    controls.append(button('Repair · ' + INDUSTRY_REPAIR_COSTS.map(cost => String(cost.quantity) + ' ' + itemName(cost.itemDefinitionId)).join(' + '), 'repair', () => { void run({ action: 'repair', targetId: facility.id }, 'Facility repaired.'); }, nearby && facility.condition < 1000 && afford(INDUSTRY_REPAIR_COSTS), [deficit(INDUSTRY_REPAIR_COSTS), !nearby ? industryText(REASONS.OUT_OF_RANGE!) : ''].filter(Boolean).join(' · ')));
     const linked = state.links.some(link => link.sourceId === facility.id || link.destinationId === facility.id);
     const dismantle = button('Dismantle · refund materials', 'dismantle', () => { void run({ action: 'dismantle', targetId: facility.id }, 'Facility dismantled. Build materials returned to your bag.'); }, nearby && facility.buffer.length === 0 && !linked);
     dismantle.title = 'Unload the buffer and disconnect conveyors first. Build materials return only if your bag can hold the refund.';
@@ -451,7 +455,7 @@ export function createIndustryPanel(
       const items = [...new Set(INDUSTRY_RECIPES.flatMap((recipe) => [...recipe.inputs, ...recipe.outputs]).map((entry) => entry.itemDefinitionId))];
       selectors.append(select('Item filter', 'link-filter', [{ value: '', name: 'All items' }, ...items.map((id) => ({ value: id, name: itemName(id) }))], draft.filter, (value) => { draft.filter = value; }));
       const source = state.facilities.find((facility) => facility.id === draft.source)!;
-      selectors.append(button('Connect conveyor', 'connect', () => { void run({ action: 'connect', targetId: draft.source, destinationId: draft.destination, ...(draft.filter ? { itemDefinitionId: draft.filter } : {}) }, 'Conveyor connected.'); }, state.researchIds.includes('logistics') && draft.source !== draft.destination && playerDistance(source) <= INDUSTRY_INTERACTION_RANGE && afford(INDUSTRY_CONVEYOR_COSTS)));
+      selectors.append(button('Connect conveyor', 'connect', () => { void run({ action: 'connect', targetId: draft.source, destinationId: draft.destination, ...(draft.filter ? { itemDefinitionId: draft.filter } : {}) }, 'Conveyor connected.'); }, state.researchIds.includes('logistics') && draft.source !== draft.destination && playerDistance(source) <= INDUSTRY_INTERACTION_RANGE && afford(INDUSTRY_CONVEYOR_COSTS), [deficit(INDUSTRY_CONVEYOR_COSTS), !state.researchIds.includes('logistics') ? industryText('Requires Logistics research.') : '', playerDistance(source) > INDUSTRY_INTERACTION_RANGE ? industryText(REASONS.OUT_OF_RANGE!) : ''].filter(Boolean).join(' · ')));
       logistics.append(selectors);
     } else logistics.append(text('p', 'Build at least two facilities with material buffers to connect a conveyor.'));
     if (!state.researchIds.includes('logistics')) logistics.append(text('p', 'Requires Logistics research.', 'industry-small'));
@@ -492,7 +496,7 @@ export function createIndustryPanel(
         costs(node, research.costs);
         if (missing.length) node.append(text('p', 'Requires: ' + missing.map((id) => INDUSTRY_RESEARCH.find((r) => r.id === id)?.name ?? id).join(', '), 'industry-small'));
         if (research.colonyPrerequisite) node.append(text('p', 'Colony prerequisite: ' + research.colonyPrerequisite.replaceAll('-', ' '), 'industry-small'));
-        node.append(button('Research ' + research.name, 'research-' + research.id, () => { void run({ action: 'research', targetId: research.id }, research.name + ' researched.'); }, nearBase && missing.length === 0 && !colonyMissing && afford(research.costs)));
+        node.append(button('Research ' + research.name, 'research-' + research.id, () => { void run({ action: 'research', targetId: research.id }, research.name + ' researched.'); }, nearBase && missing.length === 0 && !colonyMissing && afford(research.costs), [deficit(research.costs), !nearBase ? industryText('Return near the Landing Lab to research industry.') : '', missing.length ? industryText('Complete the prerequisite research first.') : '', colonyMissing ? industryText('Complete the required colony research first.') : ''].filter(Boolean).join(' · ')));
       }
       grid.append(node);
     }

@@ -1,4 +1,5 @@
 import { materialSource } from '../presentation/MaterialGuide';
+import { costRequirements, missingCostText } from '../presentation/CostRequirements';
 import { CombatAssist, type AssistTarget } from '../input/CombatAssist';
 import { traversableSegment } from '../../world/collision/TraversableSegment';
 import { PLAYER_COLLISION_FOOTPRINT } from '../../simulation/player/PlayerCollisionFootprint';
@@ -625,20 +626,11 @@ export async function createPhase1ProductReviewRuntime(
         + String(pageCount)
         + uiText("ui.48cc7bed"),
       rows: Object.freeze(page.map((recipe, index) => {
-        const missing = recipe.inputs.find(
-          (input) => itemQuantity(input.itemId) < input.quantity,
-        );
+        const requirements = costRequirements(recipe.inputs, itemQuantity, id => contentDisplayName(bundle.catalog.get(id)));
         const stationBlocked =
           recipe.requiredStationStructureId !== null
           && workbench === null;
-        const reason = missing !== undefined
-          ? uiText("ui.77e6ebb7")
-            + String(missing.quantity)
-            + ' '
-            + contentDisplayName(bundle.catalog.get(missing.itemId))
-          : stationBlocked
-            ? uiText("ui.225d6b63")
-            : null;
+        const reason = [missingCostText(requirements), stationBlocked ? uiText("ui.225d6b63") : ''].filter(Boolean).join(' · ') || null;
 
         return Object.freeze({
           id: recipe.id,

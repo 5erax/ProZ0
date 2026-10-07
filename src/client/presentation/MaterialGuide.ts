@@ -5,6 +5,8 @@ import { contentDisplayName } from '../localization/ContentText';
 import { uiPhrase } from '../localization/UiMessages';
 import { gameUiText } from '../localization/GameUiMessages';
 import { applyProductionSprite,itemIconSprite } from './Phase1ProductionAssets';
+import { costRequirements, missingCostText, costLabel } from './CostRequirements';
+import { formatNumber } from '../localization/Locale';
 /** Source hints come from shipped recipes/resource definitions, not invented grant paths. */
 export function materialSource(catalog:ContentCatalogV1,id:string):string {
   const name=(id:string)=>contentDisplayName(catalog.get(id));
@@ -17,5 +19,11 @@ export function materialSource(catalog:ContentCatalogV1,id:string):string {
 }
 export function materialHint(document:Document,name:string,help:string,have:number,need:number,id=''):HTMLDetailsElement {
  const node=document.createElement('details'),summary=document.createElement('summary'),icon=document.createElement('span'),text=document.createElement('span'),source=document.createElement('p');
- node.className='p2-material';node.dataset.material=id;node.dataset.sufficient=String(have>=need);summary.setAttribute('aria-label',name+' '+have+'/'+need);summary.title=name;const sprite=itemIconSprite(id||name);if(sprite)applyProductionSprite(icon,sprite,1);icon.setAttribute('aria-hidden','true');text.textContent=have+'/'+need;summary.append(icon,text);source.textContent=name+' · '+help;node.append(summary,source);return node;
+ const requirement=costRequirements([{itemId:id,quantity:need}],()=>have,()=>name)[0]!;
+ const status=missingCostText([requirement])||costLabel('sufficient');
+ node.className='p2-material';node.dataset.material=id;node.dataset.sufficient=String(requirement.status==='sufficient');node.dataset.deficit=String(requirement.deficit);
+ summary.setAttribute('aria-label',name+' '+formatNumber(have)+'/'+formatNumber(need)+' · '+status);summary.title=summary.getAttribute('aria-label')!;
+ const sprite=itemIconSprite(id||name);if(sprite)applyProductionSprite(icon,sprite,1);icon.setAttribute('aria-hidden','true');text.textContent=formatNumber(have)+'/'+formatNumber(need);summary.append(icon,text);
+ const label=document.createElement('span');label.className='p2-material-name';label.textContent=name+' · '+(requirement.status==='missing'?status:'✓');summary.append(label);
+ source.textContent=help;node.append(summary,source);return node;
 }

@@ -1,5 +1,7 @@
+import { costList } from './CostList';
+import { costRequirements, missingCostText } from './CostRequirements';
 import { gameUiText } from '../localization/GameUiMessages';
-import { materialHint,materialSource } from './MaterialGuide';
+import { materialSource } from './MaterialGuide';
 import { capturePanelUi } from './PanelUiState';
 import { contentDisplayName } from '../localization/ContentText';
 import { locale } from '../localization/Locale';
@@ -110,11 +112,12 @@ export function createColonyDepthOverlay(
     action: ColonyDepthCommand["action"],
     targetId: string,
     disabled = false,
+    blockedReason = '',
   ): void => {
     const button = document.createElement("button");
     bindUiText(button,"textContent",label);
     button.disabled = disabled;
-    if(disabled)bindUiText(button,"title",uiText("ui.174bf540"));
+    if(disabled){button.title=blockedReason||uiText("ui.174bf540");button.setAttribute("aria-label",label+" · "+button.title);}
     button.dataset.colonyAction = action + ":" + targetId;
     button.addEventListener("click", () => run(action, targetId));
     parent.append(button);
@@ -201,15 +204,11 @@ export function createColonyDepthOverlay(
         const name = document.createElement("strong");
         bindUiText(name,"textContent",uiPhrase(def.name));
         row.append(name);
-        let affordable = true;
-        for (const cost of def.costs) {
-          const have = inventory.stacks
-            .filter((s) => s.itemDefinitionId === cost.itemDefinitionId)
-            .reduce((sum, s) => sum + s.quantity, 0);
-          if (have < cost.quantity) affordable = false;
-          const costNode=materialHint(document,contentDisplayName(bundle.catalog.get(cost.itemDefinitionId)),materialSource(bundle.catalog,cost.itemDefinitionId),have,cost.quantity,cost.itemDefinitionId);
-          row.append(costNode);
-        }
+        const requirements = costRequirements(def.costs.map(cost => ({itemId:cost.itemDefinitionId,quantity:cost.quantity})),
+          id => inventory.stacks.filter(stack=>stack.itemDefinitionId===id).reduce((sum,stack)=>sum+stack.quantity,0),
+          id => contentDisplayName(bundle.catalog.get(id)));
+        const affordable = requirements.every(cost=>cost.status==='sufficient');
+        row.append(costList(document,requirements,id=>materialSource(bundle.catalog,id)));
         const complete = state.researchIds.includes(def.id);
         const eligible = def.prerequisites.every((id) =>
           state.researchIds.includes(id),
@@ -230,6 +229,7 @@ export function createColonyDepthOverlay(
             !eligible ||
             !affordable ||
             Math.hypot(position.x, position.y) > 7.5 && !labNearby,
+          [missingCostText(requirements), !eligible ? gameUiText('prerequisite',{name:def.prerequisites.map(id=>uiPhrase(COLONY_RESEARCH.find(r=>r.id===id)?.name??id)).join(', ')}) : '', Math.hypot(position.x, position.y) > 7.5 && !labNearby ? uiText("ui.5dfab66") : ''].filter(Boolean).join(' · '),
         );
         content.append(row);
       }
